@@ -118,9 +118,12 @@ class _ProfileOnboardingScreenState
   final _loginPinCtrl = TextEditingController();
   String _acceptanceStatus = '';
 
+  // Certifications
+  List<CertificationDetail> _certifications = [];
+
   bool _saving = false;
 
-  final _formKeys = List.generate(6, (_) => GlobalKey<FormState>());
+  final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
   static const _greetingText = "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
   static const _countryList = [
@@ -2081,7 +2084,7 @@ class _ProfileOnboardingScreenState
 
   Future<void> _saveAndContinue() async {
     if (!_validateCurrentPage()) return;
-    if (_currentPage < 5) {
+    if (_currentPage < 6) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -2187,6 +2190,7 @@ class _ProfileOnboardingScreenState
           loginPin: _loginPinCtrl.text.trim(),
           acceptanceStatus: _acceptanceStatus,
         ),
+        certifications: _certifications,
         grade12Subjects: _subjects,
         careerInterests: _careerInterests,
         onboardingComplete: true,
@@ -2210,7 +2214,7 @@ class _ProfileOnboardingScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
-        children: List.generate(6, (i) {
+        children: List.generate(7, (i) {
           return Expanded(
             child: Container(
               height: 4,
@@ -2308,7 +2312,7 @@ class _ProfileOnboardingScreenState
               children: [
                 _buildProgressBar(),
                 Text(
-                  'Step ${_currentPage + 1} of 6',
+                  'Step ${_currentPage + 1} of 7',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -2327,6 +2331,7 @@ class _ProfileOnboardingScreenState
                       _buildPreferencesPage(),
                       _buildQualificationPage(),
                       _buildAgreementPage(),
+                      _buildCertificationPage(),
                     ],
                   ),
                 ),
@@ -3883,6 +3888,7 @@ class _ProfileOnboardingScreenState
           loginPin: _loginPinCtrl.text.trim(),
           acceptanceStatus: _acceptanceStatus,
         ),
+        certifications: _certifications,
         grade12Subjects: _subjects,
         careerInterests: _careerInterests,
         onboardingComplete: existingProfile?.onboardingComplete ?? false,
@@ -3901,6 +3907,173 @@ class _ProfileOnboardingScreenState
       }
     } catch (_) {}
     setState(() => _saving = false);
+  }
+
+  Widget _buildCertificationPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Form(
+        key: _formKeys[6],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Certification Details'),
+            const SizedBox(height: 16),
+            const Text(
+              'Manage your document uploads and certification status.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            ..._certifications.asMap().entries.map((entry) {
+              final i = entry.key;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Document ${i + 1}',
+                            style: const TextStyle(
+                                color: AppColors.primaryLight,
+                                fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline,
+                              color: AppColors.error, size: 20),
+                          onPressed: () => setState(
+                              () => _certifications.removeAt(i)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: _certifications[i].certificateType,
+                      decoration: const InputDecoration(
+                        labelText: 'Certificate Type *',
+                        hintText: 'e.g. Matric Certificate, Identity Document',
+                        prefixIcon: Icon(Icons.description_outlined, size: 20),
+                      ),
+                      onChanged: (v) => setState(() => _certifications[i] =
+                          _certifications[i].copyWith(certificateType: v)),
+                      validator: (v) =>
+                          v?.trim().isEmpty == true ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _certifications[i].processedStatus.isEmpty
+                          ? null
+                          : _certifications[i].processedStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Processed Status *',
+                        prefixIcon: Icon(Icons.verified_outlined, size: 20),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                        DropdownMenuItem(value: 'No', child: Text('No')),
+                      ],
+                      onChanged: (v) => setState(() => _certifications[i] =
+                          _certifications[i].copyWith(processedStatus: v ?? '')),
+                      validator: (v) => v == null ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _certifications[i].expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2050),
+                          builder: (ctx, child) => Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.dark(
+                                primary: AppColors.primary,
+                                surface: AppColors.surface,
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() => _certifications[i] =
+                              _certifications[i].copyWith(expiryDate: picked));
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Expiry Date (if applicable)',
+                          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                          suffixIcon: _certifications[i].expiryDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () => setState(() =>
+                                      _certifications[i] = _certifications[i]
+                                          .copyWith(expiryDate: null)),
+                                )
+                              : null,
+                        ),
+                        child: Text(
+                          _certifications[i].expiryDate != null
+                              ? '${_certifications[i].expiryDate!.day}/${_certifications[i].expiryDate!.month}/${_certifications[i].expiryDate!.year}'
+                              : '',
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: _certifications[i].remarks,
+                      decoration: const InputDecoration(
+                        labelText: 'Remarks',
+                        prefixIcon: Icon(Icons.notes_outlined, size: 20),
+                      ),
+                      onChanged: (v) => setState(() => _certifications[i] =
+                          _certifications[i].copyWith(remarks: v)),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _certifications[i].uploadStatus.isEmpty
+                          ? null
+                          : _certifications[i].uploadStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Upload Status *',
+                        prefixIcon: Icon(Icons.cloud_upload_outlined, size: 20),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Yes', child: Text('Yes - Uploaded')),
+                        DropdownMenuItem(value: 'No', child: Text('No - Not Uploaded')),
+                      ],
+                      onChanged: (v) => setState(() => _certifications[i] =
+                          _certifications[i].copyWith(uploadStatus: v ?? '')),
+                      validator: (v) => v == null ? 'Required' : null,
+                    ),
+                  ],
+                ),
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _certifications
+                    .add(const CertificationDetail()));
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Document'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryLight,
+                side: const BorderSide(color: AppColors.border),
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBottomButtons() {
@@ -3946,7 +4119,7 @@ class _ProfileOnboardingScreenState
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : Text(_currentPage < 5 ? 'Next' : 'Finish'),
+                  : Text(_currentPage < 6 ? 'Next' : 'Finish'),
             ),
           ),
         ],
