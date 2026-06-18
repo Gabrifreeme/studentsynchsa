@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/presentation/screens/auth/login_screen.dart';
+import 'package:studentsynchsa/core/theme/app_theme.dart';
+import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
 import 'package:studentsynchsa/presentation/screens/auth/signup_screen.dart';
 import 'package:studentsynchsa/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:studentsynchsa/presentation/screens/profile/profile_onboarding_screen.dart';
@@ -14,18 +17,40 @@ import 'package:studentsynchsa/presentation/screens/ai_recommendations/ai_recomm
 import 'package:studentsynchsa/presentation/screens/notifications/notifications_screen.dart';
 import 'package:studentsynchsa/presentation/screens/chat/chat_screen.dart';
 import 'package:studentsynchsa/presentation/screens/settings/settings_screen.dart';
+import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
 
 final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
 
+final _authRefresh = ValueNotifier<int>(0);
+
+void triggerAuthRedirect() {
+  _authRefresh.value++;
+}
+
 final appRouter = GoRouter(
   navigatorKey: _rootNavigator,
-  initialLocation: '/login',
+  initialLocation: '/dashboard',
+  refreshListenable: _authRefresh,
+  redirect: (context, state) {
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final auth = container.read(authProvider);
+      final authState = auth.valueOrNull;
+      final loc = state.matchedLocation;
+
+      if (authState == null || !authState.authenticated) {
+        // Should never happen now — autoLogin creates anonymous profile
+        return '/dashboard';
+      }
+
+      // Always go to dashboard, no login/signup gate
+      if (loc == '/signup') {
+        return '/dashboard';
+      }
+    } catch (_) {}
+    return null;
+  },
   routes: [
-    GoRoute(
-      path: '/login',
-      name: 'login',
-      builder: (context, state) => const LoginScreen(),
-    ),
     GoRoute(
       path: '/signup',
       name: 'signup',
@@ -125,21 +150,83 @@ final appRouter = GoRouter(
   ],
 );
 
-class DashboardShell extends StatelessWidget {
+class DashboardShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const DashboardShell({super.key, required this.navigationShell});
 
   @override
+  State<DashboardShell> createState() => _DashboardShellState();
+}
+
+class _DashboardShellState extends State<DashboardShell>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _floatCtrl;
+  late Animation<double> _floatAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _floatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _floatAnim = Tween<double>(begin: -6, end: 6).animate(
+      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _floatCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentIndex = navigationShell.currentIndex;
+    final currentIndex = widget.navigationShell.currentIndex;
     return Scaffold(
-      body: navigationShell,
+      body: Stack(
+        children: [
+          widget.navigationShell,
+          if (currentIndex != 0)
+            Positioned(
+            right: 16,
+            bottom: 80,
+            child: GestureDetector(
+              onTap: () => context.push('/ai-recommendations'),
+              child: AnimatedBuilder(
+                animation: _floatAnim,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(0, _floatAnim.value),
+                    child: child,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.starGold.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: const StarAvatar(size: 40, pulse: true),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {
-          navigationShell.goBranch(
+          widget.navigationShell.goBranch(
             index,
-            initialLocation: index == navigationShell.currentIndex,
+            initialLocation: index == widget.navigationShell.currentIndex,
           );
         },
         destinations: const [

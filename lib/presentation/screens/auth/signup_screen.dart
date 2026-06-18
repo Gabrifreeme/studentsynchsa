@@ -31,17 +31,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    final error = await ref.read(authProvider.notifier).signUpWithEmail(
-          _emailCtrl.text.trim(),
-          _passwordCtrl.text,
+    try {
+      final error = await ref.read(authProvider.notifier).signUpWithEmail(
+            _emailCtrl.text.trim(),
+            _passwordCtrl.text,
+          );
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
-    setState(() => _loading = false);
-    if (error != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.error),
-      );
-    } else if (mounted) {
-      context.go('/onboarding');
+      } else if (mounted) {
+        context.go('/onboarding');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -49,6 +58,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final cardWidth = size.width > 400 ? 380.0 : size.width * 0.92;
+    final isShort = size.height < 700;
 
     return GradientBackground(
       child: Scaffold(
@@ -56,14 +66,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 24),
               child: SizedBox(
                 width: cardWidth,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    SizedBox(height: isShort ? 8 : 24),
                     const StarAvatar(size: 56),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isShort ? 8 : 16),
                     const Text(
                       'Join StudentSynchSA',
                       style: TextStyle(
@@ -72,9 +82,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isShort ? 16 : 24),
                     AppCard(
-                      padding: const EdgeInsets.all(24),
+                      padding: EdgeInsets.all(isShort ? 16 : 24),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -96,7 +106,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 fontSize: 14,
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isShort ? 12 : 20),
                             TextFormField(
                               controller: _emailCtrl,
                               keyboardType: TextInputType.emailAddress,
@@ -110,7 +120,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isShort ? 8 : 14),
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscurePassword,
@@ -133,7 +143,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isShort ? 8 : 14),
                             TextFormField(
                               controller: _confirmCtrl,
                               obscureText: true,
@@ -148,23 +158,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: _loading ? null : _signUp,
-                              child: _loading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Create Account'),
+                            SizedBox(height: isShort ? 12 : 20),
+                            SizedBox(
+                              height: 44,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _signUp,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: Colors.white),
+                                      )
+                                    : const Text('Create Account'),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -184,6 +197,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         ),
                       ],
                     ),
+                    SizedBox(height: isShort ? 8 : 16),
                   ],
                 ),
               ),

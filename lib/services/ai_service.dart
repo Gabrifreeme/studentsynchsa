@@ -1,31 +1,102 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:html' as html;
 
 class AiService {
-  static const _ollamaUrl = 'http://192.168.1.153:11434/api/generate';
+  static const _ollamaUrl = 'http://127.0.0.1:11434/api/generate';
 
-  /// Ask Star for university recommendations based on profile data.
+  /// Pre-warm the model so first user request is faster.
+  static Future<void> warmUp() async {
+    try {
+      final body = jsonEncode({
+        'model': 'qwen3:0.6b',
+        'prompt': 'Hello',
+        'stream': false,
+      });
+      final request = html.HttpRequest();
+      request.open('POST', _ollamaUrl, async: true);
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.send(body);
+      await request.onLoad.first.timeout(const Duration(seconds: 30));
+    } catch (_) {}
+  }
+
+  /// Ask Star and stream the response token by token via [onToken].
+  static Future<void> askStream({
+    required String prompt,
+    required void Function(String token) onToken,
+  }) async {
+    try {
+      final body = jsonEncode({
+        'model': 'qwen3:0.6b',
+        'prompt': prompt,
+        'stream': true,
+      });
+      final request = html.HttpRequest();
+      request.open('POST', _ollamaUrl, async: true);
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.responseType = 'text';
+
+      var lastLength = 0;
+      request.onProgress.listen((_) {
+        final text = request.responseText ?? '';
+        if (text.length > lastLength) {
+          final chunk = text.substring(lastLength);
+          lastLength = text.length;
+          for (final line in chunk.split('\n')) {
+            if (line.trim().isEmpty) continue;
+            try {
+              final data = jsonDecode(line);
+              final token = data['response'] as String?;
+              if (token != null && token.isNotEmpty) {
+                onToken(token);
+              }
+            } catch (_) {}
+          }
+        }
+      });
+
+      request.send(body);
+      await request.onLoad.first.timeout(const Duration(seconds: 90));
+      final text = request.responseText ?? '';
+      if (text.length > lastLength) {
+        final chunk = text.substring(lastLength);
+        for (final line in chunk.split('\n')) {
+          if (line.trim().isEmpty) continue;
+          try {
+            final data = jsonDecode(line);
+            final token = data['response'] as String?;
+            if (token != null && token.isNotEmpty) {
+              onToken(token);
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      onToken('Star is offline — run "ollama serve" to wake me up! Error: $e');
+    }
+  }
+
+  /// Non-streaming ask (kept for the initial recommendation button).
   static Future<String> ask(String prompt) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(_ollamaUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'model': 'qwen',
-              'prompt': prompt,
-              'stream': false,
-            }),
-          )
-          .timeout(const Duration(seconds: 45));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      final body = jsonEncode({
+        'model': 'qwen3:0.6b',
+        'prompt': prompt,
+        'stream': false,
+      });
+      final request = html.HttpRequest();
+      request.open('POST', _ollamaUrl, async: true);
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.send(body);
+      await request.onLoad.first.timeout(const Duration(seconds: 90));
+      if (request.status == 200) {
+        final data = jsonDecode(request.responseText!);
         final text = data['response']?.toString().trim();
         if (text != null && text.isNotEmpty) return text;
         return 'Star has no recommendations right now.';
       } else {
-        return 'Star encountered an error: ${response.statusCode}';
+        return 'Star encountered an error: ${request.status}';
       }
     } catch (e) {
       return 'Star is offline — run "ollama serve" to wake me up! Error: $e';

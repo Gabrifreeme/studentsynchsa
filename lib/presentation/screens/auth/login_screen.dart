@@ -29,42 +29,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    final error = await ref.read(authProvider.notifier).signInWithEmail(
-          _emailCtrl.text.trim(),
-          _passwordCtrl.text,
-        );
-    setState(() => _loading = false);
-    if (error != null) {
-      if (mounted) {
+    try {
+      final error = await ref.read(authProvider.notifier).signInWithEmail(
+            _emailCtrl.text.trim(),
+            _passwordCtrl.text,
+          );
+      if (error != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
+      } else if (mounted) {
+        final authState = ref.read(authProvider).valueOrNull;
+        if (authState?.profile?.onboardingComplete == true) {
+          context.go('/dashboard');
+        } else {
+          context.go('/onboarding');
+        }
       }
-    } else if (mounted) {
-      _navigateAfterAuth();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _loginWithGoogle() async {
     setState(() => _loading = true);
-    final error = await ref.read(authProvider.notifier).signInWithGoogle();
-    setState(() => _loading = false);
-    if (error != null && error != 'cancelled' && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.error),
-      );
-    } else if (mounted) {
-      _navigateAfterAuth();
-    }
-  }
-
-  void _navigateAfterAuth() {
-    final state = ref.read(authProvider);
-    final profile = state.value?.profile;
-    if (profile?.onboardingComplete == true) {
-      context.go('/dashboard');
-    } else {
-      context.go('/onboarding');
+    try {
+      final error = await ref.read(authProvider.notifier).signInWithGoogle();
+      if (error != null && error != 'cancelled' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        );
+      } else if (mounted) {
+        final authState = ref.read(authProvider).valueOrNull;
+        if (authState?.profile?.onboardingComplete == true) {
+          context.go('/dashboard');
+        } else {
+          context.go('/onboarding');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -72,6 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final cardWidth = size.width > 400 ? 380.0 : size.width * 0.92;
+    final isShort = size.height < 700;
 
     return GradientBackground(
       child: Scaffold(
@@ -79,20 +96,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 24),
               child: SizedBox(
                 width: cardWidth,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    SizedBox(height: isShort ? 8 : 24),
                     // Star + Branding
-                    StarAvatar(size: 64, pulse: true),
-                    const SizedBox(height: 16),
-                    const Text(
+                    StarAvatar(size: isShort ? 48 : 64, pulse: true),
+                    SizedBox(height: isShort ? 8 : 16),
+                    Text(
                       'StudentSynchSA',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 26,
+                        fontSize: isShort ? 22 : 26,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -105,21 +122,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isShort ? 16 : 24),
 
                     // Login Card
                     AppCard(
-                      padding: const EdgeInsets.all(24),
+                      padding: EdgeInsets.all(isShort ? 16 : 24),
                       child: Form(
                         key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
+                            Text(
                               'Welcome Back',
                               style: TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 20,
+                                fontSize: isShort ? 18 : 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -131,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 fontSize: 14,
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isShort ? 12 : 20),
                             TextFormField(
                               controller: _emailCtrl,
                               keyboardType: TextInputType.emailAddress,
@@ -142,7 +159,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               validator: (v) =>
                                   v?.isEmpty == true ? 'Enter your email' : null,
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isShort ? 8 : 14),
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscurePassword,
@@ -170,21 +187,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 child: const Text('Forgot password?'),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loading ? null : _login,
-                              child: _loading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Login'),
+                            SizedBox(height: isShort ? 8 : 14),
+                            SizedBox(
+                              height: 44,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _login,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Login'),
+                              ),
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isShort ? 8 : 14),
                             Row(
                               children: [
                                 const Expanded(child: Divider()),
@@ -202,44 +222,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 const Expanded(child: Divider()),
                               ],
                             ),
-                            const SizedBox(height: 16),
-                            OutlinedButton.icon(
-                              onPressed: _loading ? null : _loginWithGoogle,
-                              icon: const Icon(Icons.g_mobiledata_rounded,
-                                  size: 24),
-                              label: const Text('Sign in with Google'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.textPrimary,
-                                side: const BorderSide(color: AppColors.border),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                            SizedBox(height: isShort ? 8 : 14),
+                            SizedBox(
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                onPressed: _loading ? null : _loginWithGoogle,
+                                icon: const Icon(Icons.g_mobiledata_rounded,
+                                    size: 24),
+                                label: const Text('Sign in with Google'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.textPrimary,
+                                  side: const BorderSide(color: AppColors.border),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Apple login requires Apple Developer Program — coming soon',
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Apple login requires Apple Developer Program — coming soon',
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.apple_rounded, size: 24),
-                              label: const Text('Sign in with Apple'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.textMuted,
-                                side: const BorderSide(color: AppColors.border),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                  );
+                                },
+                                icon: const Icon(Icons.apple_rounded, size: 24),
+                                label: const Text('Sign in with Apple'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.textMuted,
+                                  side: const BorderSide(color: AppColors.border),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -259,6 +281,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
+                    SizedBox(height: isShort ? 8 : 16),
                   ],
                 ),
               ),

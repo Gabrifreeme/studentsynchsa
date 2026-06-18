@@ -5,6 +5,7 @@ class MockBursaryData {
     Bursary(
       id: 'nsfas', name: 'NSFAS Bursary',
       provider: 'National Student Financial Aid Scheme',
+      type: 'Nsfas',
       description: 'Government-funded bursary for South African students from low-income households. Covers tuition, accommodation, transport, and living expenses.',
       eligibility: 'South African citizen, combined household income below R350,000 per year, accepted at a public university or TVET college',
       website: 'https://www.nsfas.org.za', applicationUrl: 'https://my.nsfas.org.za',
@@ -16,6 +17,7 @@ class MockBursaryData {
     Bursary(
       id: 'sasol', name: 'Sasol Bursary Programme',
       provider: 'Sasol',
+      type: 'Bursary',
       description: 'Comprehensive bursary for students pursuing degrees in science, engineering, and technology fields.',
       eligibility: 'South African citizen, Grade 12 with Mathematics and Physical Science (60%+), studying towards a STEM degree',
       website: 'https://www.sasol.com', applicationUrl: 'https://www.sasolbursaries.com',
@@ -27,6 +29,7 @@ class MockBursaryData {
     Bursary(
       id: 'fnb', name: 'FNB Bursary Programme',
       provider: 'First National Bank',
+      type: 'Bursary',
       description: 'Bursary for students studying finance, commerce, and IT-related degrees.',
       eligibility: 'South African citizen, Grade 12 with Mathematics (60%+), studying towards a degree in commerce or IT',
       website: 'https://www.fnb.co.za', applicationUrl: 'https://www.fnb.co.za/careers',
@@ -38,6 +41,7 @@ class MockBursaryData {
     Bursary(
       id: 'anglo', name: 'Anglo American Bursary',
       provider: 'Anglo American',
+      type: 'Scholarship',
       description: 'Bursary for students interested in mining and engineering careers.',
       eligibility: 'South African citizen, Grade 12 with Mathematics and Science, studying engineering or geology',
       website: 'https://www.angloamerican.com', applicationUrl: 'https://www.angloamerican.com/careers',
@@ -49,6 +53,7 @@ class MockBursaryData {
     Bursary(
       id: 'funza', name: 'Funza Lushaka Bursary',
       provider: 'Department of Basic Education',
+      type: 'Grant',
       description: 'Government bursary for students who want to become teachers in priority subject areas.',
       eligibility: 'South African citizen, studying towards a teaching degree, committed to teaching at a South African school after graduation',
       website: 'https://www.funzalushaka.doe.gov.za', applicationUrl: 'https://www.funzalushaka.doe.gov.za',

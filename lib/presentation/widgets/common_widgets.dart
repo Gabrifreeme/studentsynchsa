@@ -32,29 +32,64 @@ class StarAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [AppColors.starGold, Color(0xFFFF6B00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.starGold.withValues(alpha: 0.4),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
-        ],
+    Widget image = ClipOval(
+      child: Image.asset(
+        'assets/images/star_avatar.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
       ),
-      child: Icon(
-        Icons.auto_awesome_rounded,
-        color: Colors.white,
-        size: size * 0.55,
-      ),
+    );
+    if (pulse) {
+      image = _PulseWrapper(child: image);
+    }
+    return image;
+  }
+}
+
+class _PulseWrapper extends StatefulWidget {
+  final Widget child;
+  const _PulseWrapper({required this.child});
+
+  @override
+  State<_PulseWrapper> createState() => _PulseWrapperState();
+}
+
+class _PulseWrapperState extends State<_PulseWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _anim.value,
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:studentsynchsa/core/router/app_router.dart';
 import 'package:studentsynchsa/core/theme/app_theme.dart';
 import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
+import 'package:studentsynchsa/services/ai_service.dart';
 import 'package:studentsynchsa/services/notification_service.dart';
 import 'package:studentsynchsa/services/sync_service.dart';
 
@@ -23,6 +24,7 @@ void main() async {
   await HiveDatabase.init();
   await NotificationService.init();
   SyncService.init();
+  AiService.warmUp();
 
   runApp(
     const ProviderScope(
@@ -40,6 +42,7 @@ class StudentSynchSAApp extends ConsumerWidget {
       title: 'StudentSynchSA',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
+      scrollBehavior: const NoScrollbarBehavior(),
       routerConfig: appRouter,
     );
   }

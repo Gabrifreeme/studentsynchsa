@@ -17,8 +17,8 @@ class DashboardScreen extends ConsumerWidget {
     final authAsync = ref.watch(authProvider);
     final profileAsync = ref.watch(profileProvider);
     final profile = profileAsync.valueOrNull ?? authAsync.valueOrNull?.profile;
-    final firstName = profile?.firstName.isNotEmpty == true
-        ? profile!.firstName
+    final firstName = profile?.personal.firstName.isNotEmpty == true
+        ? profile!.personal.firstName
         : 'Student';
 
     return GradientBackground(
@@ -78,7 +78,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            profile?.email ?? '',
+                            profile?.contact.email ?? '',
                             style: const TextStyle(
                                 fontSize: 12, color: AppColors.textSecondary),
                           ),
@@ -90,17 +90,17 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Quick Actions Grid
-              const SectionHeader(title: 'QUICK ACTIONS'),
-              const SizedBox(height: 12),
-              _buildQuickActions(context, ref),
+              // Star — center stage
+              _buildStarCta(context),
               const SizedBox(height: 24),
 
-              // Star Recommendation Prompt
-              _buildStarPrompt(context, firstName, profile?.apsScore),
-              const SizedBox(height: 20),
+              // Quick Links
+              const SectionHeader(title: 'QUICK LINKS'),
+              const SizedBox(height: 12),
+              _buildQuickLinks(context),
+              const SizedBox(height: 24),
 
               // Recent / Status
               const SectionHeader(title: 'YOUR PROGRESS'),
@@ -138,83 +138,58 @@ class DashboardScreen extends ConsumerWidget {
         );
   }
 
-  Widget _buildQuickActions(BuildContext context, WidgetRef ref) {
-    final actions = [
-      _ActionItem(
-        icon: Icons.calculate_rounded,
-        label: 'APS Calculator',
-        color: const Color(0xFF7C3AED),
-        onTap: () => context.push('/aps-calculator'),
-      ),
-      _ActionItem(
-        icon: Icons.auto_awesome_rounded,
-        label: 'Star AI',
-        color: AppColors.starGold,
-        onTap: () => context.push('/ai-recommendations'),
-      ),
-      _ActionItem(
-        icon: Icons.person_rounded,
-        label: 'My Profile',
-        color: const Color(0xFF3B82F6),
-        onTap: () => context.push('/onboarding'),
-      ),
-      _ActionItem(
-        icon: Icons.chat_rounded,
-        label: 'Community',
-        color: const Color(0xFF22C55E),
-        onTap: () => context.push('/chat'),
-      ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: actions.length,
-      itemBuilder: (_, i) => _ActionCard(action: actions[i]),
+  Widget _buildQuickLinks(BuildContext context) {
+    return Column(
+      children: [
+        _ProgressTile(
+          icon: Icons.person_rounded,
+          label: 'My Profile',
+          value: 'View and edit your profile',
+          onTap: () => context.push('/onboarding'),
+        ),
+        const SizedBox(height: 8),
+        _ProgressTile(
+          icon: Icons.chat_rounded,
+          label: 'Community',
+          value: 'Chat with other students',
+          onTap: () => context.push('/chat'),
+        ),
+      ],
     );
   }
 
-  Widget _buildStarPrompt(BuildContext context, String name, int? aps) {
-    return AppCard(
-      child: Row(
-        children: [
-          const StarAvatar(size: 48),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ask Star',
-                  style: TextStyle(
-                    color: AppColors.starGold,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+  Widget _buildStarCta(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/ai-recommendations'),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.starGold.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    spreadRadius: 3,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  aps != null
-                      ? 'Your APS is $aps. Want university recommendations?'
-                      : 'Complete your profile and Star will guide you!',
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
+                ],
+              ),
+              child: const StarAvatar(size: 80, pulse: true),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_rounded,
-                color: AppColors.starGold),
-            onPressed: () => context.push('/ai-recommendations'),
-          ),
-        ],
+            const SizedBox(height: 12),
+            const Text(
+              'Click me!',
+              style: TextStyle(
+                color: AppColors.starGold,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -243,60 +218,6 @@ class DashboardScreen extends ConsumerWidget {
           onTap: () => context.push('/funding'),
         ),
       ],
-    );
-  }
-}
-
-class _ActionItem {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-}
-
-class _ActionCard extends StatelessWidget {
-  final _ActionItem action;
-  const _ActionCard({required this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: action.onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              action.color.withValues(alpha: 0.2),
-              action.color.withValues(alpha: 0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: action.color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(action.icon, color: action.color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              action.label,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -11,12 +11,14 @@ class Bursary {
   final List<String> fieldsOfStudy;
   final bool requiresUniversityAdmission;
   final double? amount;
+  final String type;
   final String coverage;
 
   const Bursary({
     required this.id,
     required this.name,
     required this.provider,
+    this.type = 'Bursary',
     this.description = '',
     this.eligibility = '',
     this.website = '',
@@ -33,6 +35,7 @@ class Bursary {
     'id': id,
     'name': name,
     'provider': provider,
+    'type': type,
     'description': description,
     'eligibility': eligibility,
     'website': website,
@@ -49,6 +52,7 @@ class Bursary {
     id: json['id'] ?? '',
     name: json['name'] ?? '',
     provider: json['provider'] ?? '',
+    type: json['type'] ?? 'Bursary',
     description: json['description'] ?? '',
     eligibility: json['eligibility'] ?? '',
     website: json['website'] ?? '',

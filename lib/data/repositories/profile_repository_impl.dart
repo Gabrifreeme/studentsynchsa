@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:studentsynchsa/core/constants/app_constants.dart';
 import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
 import 'package:studentsynchsa/domain/models/student_profile.dart';
 import 'package:studentsynchsa/domain/repositories/profile_repository.dart';

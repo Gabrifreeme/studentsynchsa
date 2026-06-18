@@ -15,11 +15,75 @@ class AiRecommendationsScreen extends ConsumerStatefulWidget {
 
 class _AiRecommendationsScreenState
     extends ConsumerState<AiRecommendationsScreen> {
-  String? _response;
+  List<_ChatMessage> _messages = [
+    _ChatMessage(
+      text: "Hi there! I'm Star ⭐\n\n"
+          "First things first — complete your profile so I can give you the best recommendations for your needs!",
+      isUser: false,
+    ),
+  ];
+  final _ctrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
   bool _loading = false;
-  bool _hasAsked = false;
+  bool _initialAsked = false;
 
-  Future<void> _askStar() async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final profile = ref.read(profileProvider).valueOrNull;
+      final name = profile?.personal.firstName.isNotEmpty == true ? profile!.personal.firstName : 'there';
+      final isProfileComplete = profile != null && profile.personal.firstName.isNotEmpty &&
+          profile.grade12Subjects.isNotEmpty;
+      final greeting = isProfileComplete
+          ? "Hi there $name! I'm Star ⭐\n\n"
+              "I can help you find the right university/bursary that fits your needs and style. "
+              "I can do more than that — wherever you see me, just tap/click on me and ask away."
+          : "Hi there $name! I'm Star ⭐\n\n"
+              "First things first — complete your profile so I can give you the best recommendations for your needs!";
+      if (_messages.isNotEmpty && !_messages.first.text.contains(name)) {
+        setState(() {
+          _messages[0] = _ChatMessage(text: greeting, isUser: false);
+        });
+      }
+    });
+  }
+
+  Future<void> _sendMessage(String text) async {
+    final profile = ref.read(profileProvider).valueOrNull;
+    final userMsg = _ChatMessage(text: text, isUser: true);
+    final starMsg = _ChatMessage(text: '', isUser: false);
+    setState(() {
+      _messages.add(userMsg);
+      _messages.add(starMsg);
+      _loading = true;
+    });
+    _scrollDown();
+
+    final contextInfo = profile != null
+        ? 'The student is ${profile.personal.firstName}, studying ${profile.grade12Subjects.map((s) => s.subject).join(", ")}, APS: ${profile.apsScore}, interested in ${profile.careerInterests.join(", ")}.'
+        : '';
+
+    await AiService.askStream(
+      prompt: 'You are Star, a friendly South African university advisor. '
+          'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
+          '$contextInfo\nStudent asks: $text',
+      onToken: (token) {
+        setState(() {
+          _messages.last = _ChatMessage(
+            text: _messages.last.text + token,
+            isUser: false,
+          );
+        });
+        _scrollDown();
+      },
+    );
+
+    setState(() => _loading = false);
+  }
+
+  Future<void> _askInitial() async {
     final profile = ref.read(profileProvider).valueOrNull;
     if (profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -31,29 +95,58 @@ class _AiRecommendationsScreenState
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _response = null;
-    });
-
     final subjects = profile.grade12Subjects.isNotEmpty
         ? profile.grade12Subjects.map((s) => '${s.subject} (${s.mark}%)').toList()
         : profile.grade11Subjects.map((s) => '${s.subject} (${s.mark}%)').toList();
 
     final prompt = AiService.buildPrompt(
-      firstName: profile.firstName,
+      firstName: profile.personal.firstName,
       apsScore: profile.apsScore,
       subjects: subjects,
       careerInterests: profile.careerInterests,
-      province: profile.province,
+      province: profile.address.province,
     );
 
-    final result = await AiService.ask(prompt);
+    final starMsg = _ChatMessage(text: '', isUser: false);
     setState(() {
-      _response = result;
-      _loading = false;
-      _hasAsked = true;
+      _messages.add(starMsg);
+      _initialAsked = true;
+      _loading = true;
     });
+
+    await AiService.askStream(
+      prompt: prompt,
+      onToken: (token) {
+        setState(() {
+          _messages.last = _ChatMessage(
+            text: _messages.last.text + token,
+            isUser: false,
+          );
+        });
+        _scrollDown();
+      },
+    );
+
+    setState(() => _loading = false);
+  }
+
+  void _scrollDown() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -67,128 +160,131 @@ class _AiRecommendationsScreenState
             children: [
               StarAvatar(size: 28),
               SizedBox(width: 8),
-              Text('Star Recommendations'),
+              Text('Star'),
             ],
           ),
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              // Star Welcome
-              AppCard(
-                child: Column(
-                  children: [
-                    const StarAvatar(size: 72, pulse: true),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Hi! I'm Star ⭐",
-                      style: TextStyle(
-                        color: AppColors.starGold,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, i) {
+                        final msg = _messages[i];
+                        return _ChatBubble(message: msg);
+                      },
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Your smart university guide. I can help you find the perfect universities based on your profile, marks, and interests.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 14),
-                    ),
-                  ],
-                ),
+            ),
+            Container(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                    top: BorderSide(color: AppColors.surfaceLight, width: 1)),
               ),
-              const SizedBox(height: 20),
-
-              // Ask Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _loading ? null : _askStar,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.auto_awesome_rounded),
-                  label: Text(_loading
-                      ? 'Star is thinking...'
-                      : _hasAsked
-                          ? 'Ask Star Again'
-                          : 'Ask Star for Recommendations'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.starGold,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 12,
+                top: 8,
+                bottom: MediaQuery.of(context).padding.bottom + 8,
               ),
-              const SizedBox(height: 20),
-
-              // Response
-              if (_response != null)
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          StarAvatar(size: 24),
-                          SizedBox(width: 8),
-                          Text('Star says:',
-                              style: TextStyle(
-                                  color: AppColors.starGold,
-                                  fontWeight: FontWeight.bold)),
-                        ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: _loading
+                          ? null
+                          : (v) {
+                              if (v.trim().isNotEmpty) {
+                                _sendMessage(v.trim());
+                                _ctrl.clear();
+                              }
+                            },
+                      decoration: const InputDecoration(
+                        hintText: 'Ask Star anything...',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _response!,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              if (_response != null &&
-                  (_response!.contains('offline') ||
-                      _response!.contains('error')))
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColors.warning.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline,
-                            color: AppColors.warning, size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Run "ollama serve" in a terminal to wake Star up!',
-                            style: TextStyle(
-                                color: AppColors.warning, fontSize: 12),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                ),
-            ],
-          ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            if (_ctrl.text.trim().isNotEmpty) {
+                              _sendMessage(_ctrl.text.trim());
+                              _ctrl.clear();
+                            }
+                          },
+                    icon: const Icon(Icons.send_rounded,
+                        color: AppColors.starGold),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _ChatMessage {
+  final String text;
+  final bool isUser;
+  const _ChatMessage({required this.text, required this.isUser});
+}
+
+class _ChatBubble extends StatelessWidget {
+  final _ChatMessage message;
+  const _ChatBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment:
+            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!message.isUser) ...[
+            const StarAvatar(size: 28),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: message.isUser
+                    ? AppColors.primary.withValues(alpha: 0.2)
+                    : AppColors.card,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(
+                      message.isUser ? 16 : 4),
+                  bottomRight: Radius.circular(
+                      message.isUser ? 4 : 16),
+                ),
+              ),
+              child: Text(
+                message.text,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+          if (message.isUser) const SizedBox(width: 8),
+        ],
       ),
     );
   }

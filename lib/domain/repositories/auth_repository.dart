@@ -8,6 +8,7 @@ abstract class AuthRepository {
   Future<void> signOut();
   Future<bool> isSignedIn();
   Future<String?> getCurrentUserId();
+  Future<AuthResult> autoLogin();
 }
 
 class AuthResult {

@@ -21,8 +21,13 @@ class ProfileNotifier extends StateNotifier<AsyncValue<StudentProfile?>> {
   }
 
   Future<void> saveProfile(StudentProfile profile) async {
-    await _repo.saveProfile(profile);
-    state = AsyncData(profile);
+    try {
+      await _repo.saveProfile(profile);
+      state = AsyncData(profile);
+    } catch (e) {
+      state = AsyncError(e, StackTrace.current);
+      rethrow;
+    }
   }
 
   Future<void> updateProfile(StudentProfile profile) async {
