@@ -1,0 +1,61 @@
+import 'package:studentsynchsa/domain/models/bursary.dart';
+
+class MockBursaryData {
+  static List<Bursary> get all => [
+    Bursary(
+      id: 'nsfas', name: 'NSFAS Bursary',
+      provider: 'National Student Financial Aid Scheme',
+      description: 'Government-funded bursary for South African students from low-income households. Covers tuition, accommodation, transport, and living expenses.',
+      eligibility: 'South African citizen, combined household income below R350,000 per year, accepted at a public university or TVET college',
+      website: 'https://www.nsfas.org.za', applicationUrl: 'https://my.nsfas.org.za',
+      deadline: DateTime(2025, 11, 30),
+      fieldsOfStudy: ['All fields'],
+      requiresUniversityAdmission: true,
+      coverage: 'Full tuition, accommodation, transport, living allowance',
+    ),
+    Bursary(
+      id: 'sasol', name: 'Sasol Bursary Programme',
+      provider: 'Sasol',
+      description: 'Comprehensive bursary for students pursuing degrees in science, engineering, and technology fields.',
+      eligibility: 'South African citizen, Grade 12 with Mathematics and Physical Science (60%+), studying towards a STEM degree',
+      website: 'https://www.sasol.com', applicationUrl: 'https://www.sasolbursaries.com',
+      deadline: DateTime(2025, 4, 30),
+      fieldsOfStudy: ['Chemical Engineering', 'Mechanical Engineering', 'Electrical Engineering', 'Civil Engineering', 'Data Science', 'Analytical Chemistry'],
+      requiresUniversityAdmission: true,
+      coverage: 'Full tuition, accommodation, meals, book allowance, monthly stipend',
+    ),
+    Bursary(
+      id: 'fnb', name: 'FNB Bursary Programme',
+      provider: 'First National Bank',
+      description: 'Bursary for students studying finance, commerce, and IT-related degrees.',
+      eligibility: 'South African citizen, Grade 12 with Mathematics (60%+), studying towards a degree in commerce or IT',
+      website: 'https://www.fnb.co.za', applicationUrl: 'https://www.fnb.co.za/careers',
+      deadline: DateTime(2025, 7, 31),
+      fieldsOfStudy: ['Accounting', 'Finance', 'Information Technology', 'Actuarial Science', 'Business Science'],
+      requiresUniversityAdmission: true,
+      coverage: 'Full tuition, accommodation, book allowance',
+    ),
+    Bursary(
+      id: 'anglo', name: 'Anglo American Bursary',
+      provider: 'Anglo American',
+      description: 'Bursary for students interested in mining and engineering careers.',
+      eligibility: 'South African citizen, Grade 12 with Mathematics and Science, studying engineering or geology',
+      website: 'https://www.angloamerican.com', applicationUrl: 'https://www.angloamerican.com/careers',
+      deadline: DateTime(2025, 5, 31),
+      fieldsOfStudy: ['Mining Engineering', 'Metallurgical Engineering', 'Electrical Engineering', 'Mechanical Engineering', 'Geology'],
+      requiresUniversityAdmission: true,
+      coverage: 'Full tuition, accommodation, transport, monthly stipend',
+    ),
+    Bursary(
+      id: 'funza', name: 'Funza Lushaka Bursary',
+      provider: 'Department of Basic Education',
+      description: 'Government bursary for students who want to become teachers in priority subject areas.',
+      eligibility: 'South African citizen, studying towards a teaching degree, committed to teaching at a South African school after graduation',
+      website: 'https://www.funzalushaka.doe.gov.za', applicationUrl: 'https://www.funzalushaka.doe.gov.za',
+      deadline: DateTime(2025, 1, 31),
+      fieldsOfStudy: ['Education', 'Teaching'],
+      requiresUniversityAdmission: true,
+      coverage: 'Full tuition, accommodation, transport, book allowance, living allowance',
+    ),
+  ];
+}
