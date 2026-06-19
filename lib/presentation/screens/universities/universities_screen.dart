@@ -321,14 +321,7 @@ class _UniversityCard extends StatelessWidget {
   }
 
   void _handleBrowseOffline(BuildContext context, University uni) {
-    // TODO: Implement offline browsing (download prospectus, etc.)
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Downloading ${uni.shortName} prospectus...'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    context.push('/universities/${uni.id}?tab=offline');
   }
 
   void _handleApplyOnline(BuildContext context, University uni) {

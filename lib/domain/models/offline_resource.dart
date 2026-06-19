@@ -29,18 +29,3 @@ class OfflineResource {
     universityId: json['universityId'] ?? '',
   );
 }
-
-IconData _iconForType(String type) {
-  switch (type) {
-    case 'pdf':
-      return Icons.picture_as_pdf;
-    case 'image':
-      return Icons.image;
-    case 'map':
-      return Icons.map;
-    case 'doc':
-      return Icons.description;
-    default:
-      return Icons.file_present;
-  }
-}

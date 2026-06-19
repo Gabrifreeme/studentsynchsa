@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsynchsa/core/theme/app_theme.dart';
 import 'package:studentsynchsa/presentation/providers/university_provider.dart';
+import 'package:studentsynchsa/presentation/screens/universities/offline_tab.dart';
 import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
 
 class UniversityDetailScreen extends ConsumerWidget {
   final String universityId;
-  const UniversityDetailScreen({super.key, required this.universityId});
+  final String initialTab;
+  const UniversityDetailScreen({super.key, required this.universityId, this.initialTab = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,86 +65,159 @@ class UniversityDetailScreen extends ConsumerWidget {
               const SizedBox(height: 16),
 
               // Requirements Card
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Requirements',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary)),
-                    const SizedBox(height: 12),
-                    _ReqRow(Icons.check_circle_outline,
-                        'Minimum APS: ${uni.minimumAps ?? "Not specified"}',
-                        uni.minimumAps != null),
-                    _ReqRow(Icons.monetization_on_outlined,
-                        'Application Fee: ${uni.hasApplicationFee ? "R${uni.applicationFee?.toStringAsFixed(0) ?? ""}" : "No fee"}',
-                        true),
-                    _ReqRow(Icons.assignment_outlined,
-                        'NBT Required: ${uni.requiresNbt ? "Yes" : "No"}',
-                        true),
-                    ...uni.requirements.map((r) => _ReqRow(
-                        Icons.info_outline, r, true)),
-                  ],
+              if (initialTab != 'offline') ...[
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Requirements',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary)),
+                      const SizedBox(height: 12),
+                      _ReqRow(Icons.check_circle_outline,
+                          'Minimum APS: ${uni.minimumAps ?? "Not specified"}',
+                          uni.minimumAps != null),
+                      _ReqRow(Icons.monetization_on_outlined,
+                          'Application Fee: ${uni.hasApplicationFee ? "R${uni.applicationFee?.toStringAsFixed(0) ?? ""}" : "No fee"}',
+                          true),
+                      _ReqRow(Icons.assignment_outlined,
+                          'NBT Required: ${uni.requiresNbt ? "Yes" : "No"}',
+                          true),
+                      ...uni.requirements.map((r) => _ReqRow(
+                          Icons.info_outline, r, true)),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Faculties
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Faculties',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary)),
-                    const SizedBox(height: 12),
-                    ...uni.faculties.map((f) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.folder_outlined,
-                                  size: 16, color: AppColors.primaryLight),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(f,
-                                    style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 13)),
-                              ),
-                            ],
-                          ),
-                        )),
-                  ],
+                // Faculties
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Faculties',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary)),
+                      const SizedBox(height: 12),
+                      ...uni.faculties.map((f) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.folder_outlined,
+                                    size: 16, color: AppColors.primaryLight),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(f,
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Action Buttons
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(uni.applicationUrl),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Apply Now'),
-                ),
-              ),
-              if (uni.website.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                // Action Buttons
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _launchUrl(uni.website),
-                    icon: const Icon(Icons.language),
-                    label: const Text('Visit Website'),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _launchUrl(uni.applicationUrl),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Apply Now'),
+                  ),
+                ),
+                if (uni.website.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _launchUrl(uni.website),
+                      icon: const Icon(Icons.language),
+                      label: const Text('Visit Website'),
+                    ),
+                  ),
+                ],
+              ],
+
+              // Offline Resources section
+              if (initialTab == 'offline') ...[
+                const SizedBox(height: 8),
+                AppCard(
+                  child: OfflineTab(
+                    universityId: uni.id,
+                    resources: uni.offlineResources,
                   ),
                 ),
               ],
+
+              // Tab switcher at bottom
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTab(
+                      label: 'Details',
+                      icon: Icons.info_outline,
+                      selected: initialTab != 'offline',
+                      onTap: () => context.pushReplacement('/universities/${uni.id}'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildTab(
+                      label: 'Offline Resources',
+                      icon: Icons.download_rounded,
+                      selected: initialTab == 'offline',
+                      onTap: () => context.pushReplacement('/universities/${uni.id}?tab=offline'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTab({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final color = selected ? AppColors.primary : AppColors.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

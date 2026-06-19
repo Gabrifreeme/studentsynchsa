@@ -87,6 +87,7 @@ final appRouter = GoRouter(
                   name: 'university-detail',
                   builder: (context, state) => UniversityDetailScreen(
                     universityId: state.pathParameters['id']!,
+                    initialTab: state.uri.queryParameters['tab'] ?? '',
                   ),
                 ),
               ],
