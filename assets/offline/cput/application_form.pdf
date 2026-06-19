@@ -9,13 +9,18 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 44 >>
+<< /Length 169 >>
 stream
-BT /F1 24 Tf 100 700 Td (Placeholder) Tj ET
+BT
+/F1 20 Tf 50 720 Td (Cape Peninsula University of Technology) Tj
+/F1 14 Tf 50 680 Td (Application Form) Tj
+/F1 10 Tf 50 640 Td (Downloaded from StudentSynchSA) Tj
+/F1 10 Tf 50 620 Td (Offline resource - saved 2026-06-19) Tj
+ET
 endstream
 endobj
 5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
 endobj
 xref
 0 6
@@ -24,9 +29,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000266 00000 n 
-0000000360 00000 n 
+0000000487 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-434
+559
 %%EOF
