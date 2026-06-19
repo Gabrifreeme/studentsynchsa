@@ -16,7 +16,6 @@ class UniversitiesScreen extends ConsumerStatefulWidget {
 class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   final _searchCtrl = TextEditingController();
   String _selectedProvince = 'All';
-  final Set<String> _bookmarked = {};
 
   static const _provinces = [
     'All', 'Eastern Cape', 'Free State', 'Gauteng',
@@ -141,18 +140,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                               return _UniversityCard(
                                 university: filtered[i],
                                 logoColor: _logoColors[i % _logoColors.length],
-                                isBookmarked: _bookmarked.contains(filtered[i].id),
                                 onTap: () => context.push('/universities/${filtered[i].id}'),
-                                onBookmark: () {
-                                  setState(() {
-                                    if (_bookmarked.contains(filtered[i].id)) {
-                                      _bookmarked.remove(filtered[i].id);
-                                    } else {
-                                      _bookmarked.add(filtered[i].id);
-                                    }
-                                  });
-                                },
-                                onOpenLink: () {},
                               );
                             },
                           ),
@@ -176,24 +164,17 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
 class _UniversityCard extends StatelessWidget {
   final University university;
   final Color logoColor;
-  final bool isBookmarked;
   final VoidCallback onTap;
-  final VoidCallback onBookmark;
-  final VoidCallback onOpenLink;
 
   const _UniversityCard({
     required this.university,
     required this.logoColor,
-    required this.isBookmarked,
     required this.onTap,
-    required this.onBookmark,
-    required this.onOpenLink,
   });
 
   @override
   Widget build(BuildContext context) {
     final uni = university;
-    final statusTag = _buildStatusTag(uni);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -212,14 +193,23 @@ class _UniversityCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // University logo/image
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        color: logoColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
+                        color: logoColor.withValues(alpha: 0.1),
+                        image: uni.logoUrl.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(uni.logoUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
-                      child: Icon(Icons.account_balance_outlined, color: logoColor, size: 24),
+                      child: uni.logoUrl.isEmpty
+                          ? Icon(Icons.account_balance_outlined, color: logoColor, size: 28)
+                          : null,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -230,7 +220,7 @@ class _UniversityCard extends StatelessWidget {
                             uni.name,
                             style: const TextStyle(
                               color: AppColors.textPrimary,
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                             maxLines: 2,
@@ -248,25 +238,6 @@ class _UniversityCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.textMuted),
-                      onPressed: onOpenLink,
-                      splashRadius: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      icon: Icon(
-                        isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                        size: 20,
-                        color: isBookmarked ? AppColors.primaryLight : AppColors.textMuted,
-                      ),
-                      onPressed: onBookmark,
-                      splashRadius: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -283,8 +254,29 @@ class _UniversityCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                statusTag,
+                const SizedBox(height: 16),
+                // Two tabs: Browse Offline | Apply Online
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTab(
+                        label: 'Browse Offline',
+                        icon: Icons.download_rounded,
+                        color: AppColors.primary,
+                        onTap: () => _handleBrowseOffline(context, uni),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildTab(
+                        label: 'Apply Online',
+                        icon: Icons.open_in_new_rounded,
+                        color: AppColors.success,
+                        onTap: () => _handleApplyOnline(context, uni),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -293,31 +285,64 @@ class _UniversityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusTag(University uni) {
-    if (uni.hasApplicationFee && uni.applicationFee != null && uni.applicationFee! > 0) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.attach_money_rounded, size: 14, color: AppColors.primaryLight),
-          const SizedBox(width: 3),
-          Text(
-            'Fee: R${uni.applicationFee!.toInt()}',
-            style: const TextStyle(
-              color: AppColors.primaryLight,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+  Widget _buildTab({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
-      );
-    }
-    return const Text(
-      'No NBT or fee',
-      style: TextStyle(
-        color: AppColors.success,
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
+          ],
+        ),
       ),
     );
+  }
+
+  void _handleBrowseOffline(BuildContext context, University uni) {
+    // TODO: Implement offline browsing (download prospectus, etc.)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Downloading ${uni.shortName} prospectus...'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _handleApplyOnline(BuildContext context, University uni) {
+    if (uni.applicationUrl.isNotEmpty) {
+      // Navigate to application URL
+      context.push('/universities/${uni.id}/apply');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No application URL for ${uni.shortName}'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

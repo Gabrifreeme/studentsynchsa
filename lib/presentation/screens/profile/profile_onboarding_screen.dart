@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:studentsynchsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
@@ -118,8 +119,8 @@ class _ProfileOnboardingScreenState
   final _loginPinCtrl = TextEditingController();
   String _acceptanceStatus = '';
 
-  // Certifications
-  List<CertificationDetail> _certifications = [];
+  // Upload Documents
+  final List<String> _uploadedFiles = ['', '', ''];
 
   bool _saving = false;
 
@@ -2180,8 +2181,12 @@ class _ProfileOnboardingScreenState
         ),
         qualification: QualificationInfo(
           academicYear: _academicYear,
-          facultySchool: _facultyCtrl.text.trim(),
-          programme: _programmeCtrl.text.trim(),
+          choices: [
+            QualificationChoice(
+              faculty: _facultyCtrl.text.trim(),
+              programme: _programmeCtrl.text.trim(),
+            ),
+          ],
           applicationPeriod: _applicationPeriod,
           studyMode: _studyMode,
           studyTiming: _studyTiming,
@@ -2190,14 +2195,13 @@ class _ProfileOnboardingScreenState
           loginPin: _loginPinCtrl.text.trim(),
           acceptanceStatus: _acceptanceStatus,
         ),
-        certifications: _certifications,
+        uploadedDocuments: _uploadedFiles,
         grade12Subjects: _subjects,
         careerInterests: _careerInterests,
         onboardingComplete: true,
       );
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
-      ref.read(authProvider.notifier).completeOnboarding(profile);
       setState(() => _saving = false);
       if (mounted) context.go('/dashboard');
     } catch (e) {
@@ -2331,7 +2335,7 @@ class _ProfileOnboardingScreenState
                       _buildPreferencesPage(),
                       _buildQualificationPage(),
                       _buildAgreementPage(),
-                      _buildCertificationPage(),
+                      _buildUploadDocumentsPage(),
                     ],
                   ),
                 ),
@@ -3878,8 +3882,12 @@ class _ProfileOnboardingScreenState
         ),
         qualification: QualificationInfo(
           academicYear: _academicYear,
-          facultySchool: _facultyCtrl.text.trim(),
-          programme: _programmeCtrl.text.trim(),
+          choices: [
+            QualificationChoice(
+              faculty: _facultyCtrl.text.trim(),
+              programme: _programmeCtrl.text.trim(),
+            ),
+          ],
           applicationPeriod: _applicationPeriod,
           studyMode: _studyMode,
           studyTiming: _studyTiming,
@@ -3888,14 +3896,13 @@ class _ProfileOnboardingScreenState
           loginPin: _loginPinCtrl.text.trim(),
           acceptanceStatus: _acceptanceStatus,
         ),
-        certifications: _certifications,
+        uploadedDocuments: _uploadedFiles,
         grade12Subjects: _subjects,
         careerInterests: _careerInterests,
         onboardingComplete: existingProfile?.onboardingComplete ?? false,
       );
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
-      ref.read(authProvider.notifier).completeOnboarding(profile);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -3905,11 +3912,22 @@ class _ProfileOnboardingScreenState
           ),
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
     setState(() => _saving = false);
   }
 
-  Widget _buildCertificationPage() {
+  Widget _buildUploadDocumentsPage() {
+    const labels = [
+      'Final Grade 11 Report',
+      'Term 1 Grade 12 Report',
+      'Mid Year Grade 12 Report',
+    ];
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
@@ -3917,15 +3935,14 @@ class _ProfileOnboardingScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Certification Details'),
+            const _SectionHeader(title: 'Upload Documents'),
             const SizedBox(height: 16),
             const Text(
-              'Manage your document uploads and certification status.',
+              'Please upload the following supporting documents.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 20),
-            ..._certifications.asMap().entries.map((entry) {
-              final i = entry.key;
+            ...List.generate(3, (i) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(12),
@@ -3937,143 +3954,58 @@ class _ProfileOnboardingScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text('Document ${i + 1}',
-                            style: const TextStyle(
-                                color: AppColors.primaryLight,
-                                fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: AppColors.error, size: 20),
-                          onPressed: () => setState(
-                              () => _certifications.removeAt(i)),
+                    Text(labels[i],
+                        style: const TextStyle(
+                            color: AppColors.primaryLight,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickFile(i),
+                        icon: Icon(
+                          _uploadedFiles[i].isEmpty
+                              ? Icons.cloud_upload_outlined
+                              : Icons.check_circle_outline,
+                          size: 18,
+                          color: _uploadedFiles[i].isEmpty
+                              ? AppColors.primaryLight
+                              : AppColors.success,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      initialValue: _certifications[i].certificateType,
-                      decoration: const InputDecoration(
-                        labelText: 'Certificate Type *',
-                        hintText: 'e.g. Matric Certificate, Identity Document',
-                        prefixIcon: Icon(Icons.description_outlined, size: 20),
-                      ),
-                      onChanged: (v) => setState(() => _certifications[i] =
-                          _certifications[i].copyWith(certificateType: v)),
-                      validator: (v) =>
-                          v?.trim().isEmpty == true ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _certifications[i].processedStatus.isEmpty
-                          ? null
-                          : _certifications[i].processedStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Processed Status *',
-                        prefixIcon: Icon(Icons.verified_outlined, size: 20),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                        DropdownMenuItem(value: 'No', child: Text('No')),
-                      ],
-                      onChanged: (v) => setState(() => _certifications[i] =
-                          _certifications[i].copyWith(processedStatus: v ?? '')),
-                      validator: (v) => v == null ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _certifications[i].expiryDate ?? DateTime.now().add(const Duration(days: 365)),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2050),
-                          builder: (ctx, child) => Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.dark(
-                                primary: AppColors.primary,
-                                surface: AppColors.surface,
-                              ),
-                            ),
-                            child: child!,
+                        label: Text(
+                          _uploadedFiles[i].isEmpty
+                              ? 'Tap to upload'
+                              : _uploadedFiles[i],
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _uploadedFiles[i].isEmpty
+                              ? AppColors.primaryLight
+                              : AppColors.success,
+                          side: BorderSide(
+                            color: _uploadedFiles[i].isEmpty
+                                ? AppColors.border
+                                : AppColors.success,
                           ),
-                        );
-                        if (picked != null) {
-                          setState(() => _certifications[i] =
-                              _certifications[i].copyWith(expiryDate: picked));
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Expiry Date (if applicable)',
-                          prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
-                          suffixIcon: _certifications[i].expiryDate != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () => setState(() =>
-                                      _certifications[i] = _certifications[i]
-                                          .copyWith(expiryDate: null)),
-                                )
-                              : null,
-                        ),
-                        child: Text(
-                          _certifications[i].expiryDate != null
-                              ? '${_certifications[i].expiryDate!.day}/${_certifications[i].expiryDate!.month}/${_certifications[i].expiryDate!.year}'
-                              : '',
-                          style: const TextStyle(color: AppColors.textPrimary),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      initialValue: _certifications[i].remarks,
-                      decoration: const InputDecoration(
-                        labelText: 'Remarks',
-                        prefixIcon: Icon(Icons.notes_outlined, size: 20),
-                      ),
-                      onChanged: (v) => setState(() => _certifications[i] =
-                          _certifications[i].copyWith(remarks: v)),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _certifications[i].uploadStatus.isEmpty
-                          ? null
-                          : _certifications[i].uploadStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Upload Status *',
-                        prefixIcon: Icon(Icons.cloud_upload_outlined, size: 20),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Yes', child: Text('Yes - Uploaded')),
-                        DropdownMenuItem(value: 'No', child: Text('No - Not Uploaded')),
-                      ],
-                      onChanged: (v) => setState(() => _certifications[i] =
-                          _certifications[i].copyWith(uploadStatus: v ?? '')),
-                      validator: (v) => v == null ? 'Required' : null,
                     ),
                   ],
                 ),
               );
             }),
-            OutlinedButton.icon(
-              onPressed: () {
-                setState(() => _certifications
-                    .add(const CertificationDetail()));
-              },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Document'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryLight,
-                side: const BorderSide(color: AppColors.border),
-              ),
-            ),
             const SizedBox(height: 32),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _pickFile(int index) async {
+    final name = await pickFile('.pdf,.doc,.docx,.jpg,.jpeg,.png');
+    if (name != null && mounted) {
+      setState(() => _uploadedFiles[index] = name);
+    }
   }
 
   Widget _buildBottomButtons() {

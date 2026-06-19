@@ -1,3 +1,5 @@
+import 'package:studentsynchsa/domain/models/offline_resource.dart';
+
 class University {
   final String id;
   final String name;
@@ -17,6 +19,7 @@ class University {
   final List<String> faculties;
   final List<String> courses;
   final bool isPublic;
+  final List<OfflineResource> offlineResources;
 
   const University({
     required this.id,
@@ -37,6 +40,7 @@ class University {
     this.faculties = const [],
     this.courses = const [],
     this.isPublic = true,
+    this.offlineResources = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +62,7 @@ class University {
     'faculties': faculties,
     'courses': courses,
     'isPublic': isPublic,
+    'offlineResources': offlineResources.map((r) => r.toJson()).toList(),
   };
 
   factory University.fromJson(Map<String, dynamic> json) => University(
@@ -79,5 +84,8 @@ class University {
     faculties: List<String>.from(json['faculties'] ?? []),
     courses: List<String>.from(json['courses'] ?? []),
     isPublic: json['isPublic'] ?? true,
+    offlineResources: (json['offlineResources'] as List?)
+        ?.map((r) => OfflineResource.fromJson(r))
+        .toList() ?? [],
   );
 }

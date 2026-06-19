@@ -471,18 +471,33 @@ class ResultsInfo {
   );
 }
 
+class QualificationChoice {
+  final String faculty;
+  final String programme;
+
+  const QualificationChoice({this.faculty = '', this.programme = ''});
+
+  QualificationChoice copyWith({String? faculty, String? programme}) =>
+      QualificationChoice(faculty: faculty ?? this.faculty, programme: programme ?? this.programme);
+
+  Map<String, dynamic> toJson() => {'faculty': faculty, 'programme': programme};
+
+  factory QualificationChoice.fromJson(Map<String, dynamic> json) => QualificationChoice(
+    faculty: json['faculty'] ?? '',
+    programme: json['programme'] ?? '',
+  );
+}
+
 class QualificationInfo {
   final int academicYear;
-  final String facultySchool;
-  final String programme;
+  final List<QualificationChoice> choices;
   final String applicationPeriod;
   final String studyMode;
   final String studyTiming;
 
   const QualificationInfo({
     this.academicYear = 0,
-    this.facultySchool = '',
-    this.programme = '',
+    this.choices = const [],
     this.applicationPeriod = '',
     this.studyMode = '',
     this.studyTiming = '',
@@ -490,16 +505,14 @@ class QualificationInfo {
 
   QualificationInfo copyWith({
     int? academicYear,
-    String? facultySchool,
-    String? programme,
+    List<QualificationChoice>? choices,
     String? applicationPeriod,
     String? studyMode,
     String? studyTiming,
   }) =>
       QualificationInfo(
         academicYear: academicYear ?? this.academicYear,
-        facultySchool: facultySchool ?? this.facultySchool,
-        programme: programme ?? this.programme,
+        choices: choices ?? this.choices,
         applicationPeriod: applicationPeriod ?? this.applicationPeriod,
         studyMode: studyMode ?? this.studyMode,
         studyTiming: studyTiming ?? this.studyTiming,
@@ -507,8 +520,7 @@ class QualificationInfo {
 
   Map<String, dynamic> toJson() => {
     'academicYear': academicYear,
-    'facultySchool': facultySchool,
-    'programme': programme,
+    'choices': choices.map((c) => c.toJson()).toList(),
     'applicationPeriod': applicationPeriod,
     'studyMode': studyMode,
     'studyTiming': studyTiming,
@@ -516,58 +528,10 @@ class QualificationInfo {
 
   factory QualificationInfo.fromJson(Map<String, dynamic> json) => QualificationInfo(
     academicYear: json['academicYear'] ?? 0,
-    facultySchool: json['facultySchool'] ?? '',
-    programme: json['programme'] ?? '',
+    choices: (json['choices'] as List?)?.map((c) => QualificationChoice.fromJson(c)).toList() ?? [],
     applicationPeriod: json['applicationPeriod'] ?? '',
     studyMode: json['studyMode'] ?? '',
     studyTiming: json['studyTiming'] ?? '',
-  );
-}
-
-class CertificationDetail {
-  final String certificateType;
-  final String processedStatus;
-  final DateTime? expiryDate;
-  final String remarks;
-  final String uploadStatus;
-
-  const CertificationDetail({
-    this.certificateType = '',
-    this.processedStatus = '',
-    this.expiryDate,
-    this.remarks = '',
-    this.uploadStatus = '',
-  });
-
-  CertificationDetail copyWith({
-    String? certificateType,
-    String? processedStatus,
-    DateTime? expiryDate,
-    String? remarks,
-    String? uploadStatus,
-  }) =>
-      CertificationDetail(
-        certificateType: certificateType ?? this.certificateType,
-        processedStatus: processedStatus ?? this.processedStatus,
-        expiryDate: expiryDate ?? this.expiryDate,
-        remarks: remarks ?? this.remarks,
-        uploadStatus: uploadStatus ?? this.uploadStatus,
-      );
-
-  Map<String, dynamic> toJson() => {
-    'certificateType': certificateType,
-    'processedStatus': processedStatus,
-    'expiryDate': expiryDate?.toIso8601String(),
-    'remarks': remarks,
-    'uploadStatus': uploadStatus,
-  };
-
-  factory CertificationDetail.fromJson(Map<String, dynamic> json) => CertificationDetail(
-    certificateType: json['certificateType'] ?? '',
-    processedStatus: json['processedStatus'] ?? '',
-    expiryDate: json['expiryDate'] != null ? DateTime.tryParse(json['expiryDate']) : null,
-    remarks: json['remarks'] ?? '',
-    uploadStatus: json['uploadStatus'] ?? '',
   );
 }
 
@@ -604,7 +568,7 @@ class StudentProfile {
   final ResultsInfo results;
   final QualificationInfo qualification;
   final AgreementInfo agreement;
-  final List<CertificationDetail> certifications;
+  final List<String> uploadedDocuments;
   final List<SubjectMark> grade11Subjects;
   final List<SubjectMark> grade12Subjects;
   final List<String> preferredUniversities;
@@ -627,7 +591,7 @@ class StudentProfile {
     ResultsInfo? results,
     QualificationInfo? qualification,
     AgreementInfo? agreement,
-    this.certifications = const [],
+    this.uploadedDocuments = const [],
     this.grade11Subjects = const [],
     this.grade12Subjects = const [],
     this.preferredUniversities = const [],
@@ -683,7 +647,7 @@ class StudentProfile {
     ResultsInfo? results,
     QualificationInfo? qualification,
     AgreementInfo? agreement,
-    List<CertificationDetail>? certifications,
+    List<String>? uploadedDocuments,
     List<SubjectMark>? grade11Subjects,
     List<SubjectMark>? grade12Subjects,
     List<String>? preferredUniversities,
@@ -745,7 +709,7 @@ class StudentProfile {
         results: results ?? this.results,
         qualification: qualification ?? this.qualification,
         agreement: agreement ?? this.agreement,
-        certifications: certifications ?? this.certifications,
+        uploadedDocuments: uploadedDocuments ?? this.uploadedDocuments,
         onboardingComplete: onboardingComplete ?? this.onboardingComplete,
         createdAt: createdAt,
         updatedAt: DateTime.now(),
@@ -764,7 +728,7 @@ class StudentProfile {
     'results': results.toJson(),
     'qualification': qualification.toJson(),
     'agreement': agreement.toJson(),
-    'certifications': certifications.map((c) => c.toJson()).toList(),
+    'uploadedDocuments': uploadedDocuments,
     'grade11Subjects': grade11Subjects.map((s) => s.toJson()).toList(),
     'grade12Subjects': grade12Subjects.map((s) => s.toJson()).toList(),
     'preferredUniversities': preferredUniversities,
@@ -788,7 +752,7 @@ class StudentProfile {
     results: ResultsInfo.fromJson(json['results'] ?? {}),
     qualification: QualificationInfo.fromJson(json['qualification'] ?? {}),
     agreement: AgreementInfo.fromJson(json['agreement'] ?? {}),
-    certifications: (json['certifications'] as List?)?.map((c) => CertificationDetail.fromJson(c)).toList() ?? [],
+    uploadedDocuments: (json['uploadedDocuments'] as List?)?.cast<String>() ?? [],
     grade11Subjects: (json['grade11Subjects'] as List?)?.map((s) => SubjectMark.fromJson(s)).toList() ?? [],
     grade12Subjects: (json['grade12Subjects'] as List?)?.map((s) => SubjectMark.fromJson(s)).toList() ?? [],
     preferredUniversities: List<String>.from(json['preferredUniversities'] ?? []),
