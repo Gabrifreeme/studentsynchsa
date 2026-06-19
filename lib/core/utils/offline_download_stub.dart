@@ -1,3 +1,3 @@
-void downloadAsset(String assetPath) {
+Future<void> downloadAsset(String assetPath) async {
   // No-op for non-web platforms
 }

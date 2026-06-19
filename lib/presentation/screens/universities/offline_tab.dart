@@ -107,16 +107,18 @@ class OfflineTab extends StatelessWidget {
     );
   }
 
-  void _openResource(BuildContext context, OfflineResource resource) {
-    downloadAsset(resource.assetPath);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Downloading ${resource.title}...'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  Future<void> _openResource(BuildContext context, OfflineResource resource) async {
+    await downloadAsset(resource.assetPath);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${resource.title} saved to device'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
 

@@ -35,4 +35,23 @@ flutter:
     - assets/logos/
     - assets/icons/
     - assets/images/
-    - assets/offline/
+    - assets/offline/cput/
+    - assets/offline/cut/
+    - assets/offline/dut/
+    - assets/offline/mandela/
+    - assets/offline/mut/
+    - assets/offline/nwu/
+    - assets/offline/su/
+    - assets/offline/tut/
+    - assets/offline/uchenn/
+    - assets/offline/ufh/
+    - assets/offline/ufs/
+    - assets/offline/uj/
+    - assets/offline/ukzn/
+    - assets/offline/ul/
+    - assets/offline/unisa/
+    - assets/offline/univen/
+    - assets/offline/vut/
+    - assets/offline/wits/
+    - assets/offline/wsu/
+    - assets/offline/zululand/
