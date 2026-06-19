@@ -1,4 +1,4 @@
-import 'package:studentsynchsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
 
 abstract class ProfileRepository {
   Future<StudentProfile?> getProfile();

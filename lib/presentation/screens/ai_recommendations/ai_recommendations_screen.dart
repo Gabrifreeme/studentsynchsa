@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/presentation/providers/profile_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsynchsa/services/ai_service.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/ai_service.dart';
 
 class AiRecommendationsScreen extends ConsumerStatefulWidget {
   const AiRecommendationsScreen({super.key});

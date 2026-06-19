@@ -2,22 +2,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
-import 'package:studentsynchsa/presentation/screens/auth/signup_screen.dart';
-import 'package:studentsynchsa/presentation/screens/dashboard/dashboard_screen.dart';
-import 'package:studentsynchsa/presentation/screens/profile/profile_onboarding_screen.dart';
-import 'package:studentsynchsa/presentation/screens/universities/universities_screen.dart';
-import 'package:studentsynchsa/presentation/screens/universities/university_detail_screen.dart';
-import 'package:studentsynchsa/presentation/screens/aps/aps_calculator_screen.dart';
-import 'package:studentsynchsa/presentation/screens/applications/application_tracker_screen.dart';
-import 'package:studentsynchsa/presentation/screens/funding/funding_list_screen.dart';
-import 'package:studentsynchsa/presentation/screens/funding/funding_detail_screen.dart';
-import 'package:studentsynchsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
-import 'package:studentsynchsa/presentation/screens/notifications/notifications_screen.dart';
-import 'package:studentsynchsa/presentation/screens/chat/chat_screen.dart';
-import 'package:studentsynchsa/presentation/screens/settings/settings_screen.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
+import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
+import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/university_detail_screen.dart';
+import 'package:studentsyncsa/presentation/screens/aps/aps_calculator_screen.dart';
+import 'package:studentsyncsa/presentation/screens/applications/application_tracker_screen.dart';
+import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.dart';
+import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
+import 'package:studentsyncsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
+import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
+import 'package:studentsyncsa/presentation/screens/chat/chat_screen.dart';
+import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
+import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/application_helper_screen.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
 
@@ -89,6 +91,15 @@ final appRouter = GoRouter(
                     universityId: state.pathParameters['id']!,
                     initialTab: state.uri.queryParameters['tab'] ?? '',
                   ),
+                  routes: [
+                    GoRoute(
+                      path: 'helper',
+                      name: 'application-helper',
+                      builder: (context, state) => ApplicationHelperScreen(
+                        universityName: state.uri.queryParameters['name'] ?? 'University',
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -147,6 +158,11 @@ final appRouter = GoRouter(
       path: '/settings',
       name: 'settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/privacy',
+      name: 'privacy',
+      builder: (context, state) => const PrivacyScreen(),
     ),
   ],
 );

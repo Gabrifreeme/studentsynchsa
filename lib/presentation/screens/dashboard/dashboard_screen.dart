@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
-import 'package:studentsynchsa/presentation/providers/profile_provider.dart';
-import 'package:studentsynchsa/presentation/providers/sync_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsynchsa/services/sync_service.dart' as sync_service;
-import 'package:studentsynchsa/services/notification_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
+import 'package:studentsyncsa/presentation/providers/sync_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
+import 'package:studentsyncsa/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -30,7 +32,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               const StarAvatar(size: 32),
               const SizedBox(width: 8),
-              const Text('StudentSynchSA', style: TextStyle(fontSize: 16)),
+              const Text('studentsyncsa', style: TextStyle(fontSize: 16)),
             ],
           ),
           actions: [
@@ -94,6 +96,7 @@ class DashboardScreen extends ConsumerWidget {
 
               // Star — center stage
               _buildStarCta(context),
+              _PrivacyConsentBanner(),
               const SizedBox(height: 24),
 
               // Quick Links
@@ -171,7 +174,7 @@ class DashboardScreen extends ConsumerWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.starGold.withValues(alpha: 0.4),
+                    color: AppColors.primary.withValues(alpha: 0.4),
                     blurRadius: 16,
                     spreadRadius: 3,
                   ),
@@ -183,7 +186,7 @@ class DashboardScreen extends ConsumerWidget {
             const Text(
               'Click me!',
               style: TextStyle(
-                color: AppColors.starGold,
+                color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -218,6 +221,124 @@ class DashboardScreen extends ConsumerWidget {
           onTap: () => context.push('/funding'),
         ),
       ],
+    );
+  }
+}
+
+class _PrivacyConsentBanner extends StatefulWidget {
+  @override
+  State<_PrivacyConsentBanner> createState() => _PrivacyConsentBannerState();
+}
+
+class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
+  bool _consented = false;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      final val = HiveDatabase.settings.get('privacyConsentGiven');
+      if (val == 'true') {
+        _consented = true;
+      }
+    } catch (_) {}
+    _initialized = true;
+  }
+
+  void _giveConsent() {
+    HiveDatabase.settings.put('privacyConsentGiven', 'true');
+    setState(() => _consented = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized || _consented) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: AppCard(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.starGold, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      textScaleFactor: 0.92,
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: 'Star highly recommends you head over to our ',
+                          ),
+                          WidgetSpan(
+                            child: GestureDetector(
+                              onTap: () => context.push('/privacy'),
+                              child: const Text(
+                                'Privacy Status',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const TextSpan(text: ' by tapping here.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: _giveConsent,
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  children: [
+                    Icon(
+                      _consented
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'I have read and consent to the privacy policy',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You can review consent anytime via Settings > Privacy & Compliance.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

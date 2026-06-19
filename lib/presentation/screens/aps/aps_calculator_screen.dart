@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:studentsynchsa/core/constants/app_constants.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/domain/models/student_profile.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/constants/app_constants.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ApsCalculatorScreen extends StatefulWidget {
   const ApsCalculatorScreen({super.key});

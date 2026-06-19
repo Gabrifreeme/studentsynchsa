@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:studentsynchsa/core/utils/file_upload.dart';
+import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsynchsa/core/constants/app_constants.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/domain/models/student_profile.dart';
-import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
-import 'package:studentsynchsa/presentation/providers/profile_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/constants/app_constants.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
   const ProfileOnboardingScreen({super.key});
@@ -100,7 +102,9 @@ class _ProfileOnboardingScreenState
   String _upgrading = '';
   String _matricType = '';
   final _examinationNumberCtrl = TextEditingController();
-  String _schoolLeavingCertificate = '';
+  final _schoolLeavingCertCtrl = TextEditingController();
+  String get _schoolLeavingCertificate => _schoolLeavingCertCtrl.text;
+  set _schoolLeavingCertificate(String v) => _schoolLeavingCertCtrl.text = v;
   List<SubjectDetail> _resultsSubjects = [];
 
   // Educational Institution
@@ -2012,6 +2016,112 @@ class _ProfileOnboardingScreenState
       CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
     );
     _startTextReveal();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingProfile());
+  }
+
+  void _loadExistingProfile() async {
+    var profile = ref.read(profileProvider).valueOrNull
+        ?? ref.read(authProvider).valueOrNull?.profile;
+    if (profile == null) {
+      // Try reading directly from Hive in case providers haven't loaded yet
+      try {
+        profile = await ProfileRepositoryImpl().getProfile();
+      } catch (_) {}
+    }
+    if (profile == null) {
+      // Retry once after a short delay
+      await Future.delayed(const Duration(milliseconds: 500));
+      profile = ref.read(profileProvider).valueOrNull
+          ?? ref.read(authProvider).valueOrNull?.profile;
+      if (profile == null) {
+        try {
+          profile = await ProfileRepositoryImpl().getProfile();
+        } catch (_) {}
+      }
+    }
+    if (profile == null) return;
+    final p = profile;
+    setState(() { _applyProfile(p); });
+  }
+
+  void _applyProfile(StudentProfile p) {
+      _titleCtrl.text = p.personal.title;
+      _initialsCtrl.text = p.personal.initials;
+      _firstNameCtrl.text = p.personal.firstName;
+      _lastNameCtrl.text = p.personal.lastName;
+      _maidenNameCtrl.text = p.personal.maidenName;
+      _gender = p.personal.gender;
+      _selectedDob = p.personal.dateOfBirth;
+      _idCtrl.text = p.personal.idNumber;
+      _citizenship = ['SA Citizen', 'Permanent Resident', 'Foreign National']
+          .contains(p.demographic.nationality)
+          ? p.demographic.nationality
+          : 'SA Citizen';
+      _countryOfBirthCtrl.text = p.demographic.countryOfBirth;
+      _homeLanguageCtrl.text = p.demographic.homeLanguage;
+      _populationGroup = p.demographic.populationGroup;
+      _maritalStatus = p.demographic.maritalStatus;
+      _emailCtrl.text = p.contact.email;
+      _phoneCtrl.text = p.contact.phone;
+      _workPhoneCtrl.text = p.contact.workPhone;
+      _addressCtrl.text = p.address.address;
+      _addressLine2Ctrl.text = p.address.addressLine2;
+      _addressLine3Ctrl.text = p.address.addressLine3;
+      _province = p.address.province;
+      _postalCodeCtrl.text = p.address.postalCode;
+      _postalAddressCtrl.text = p.address.postalAddress;
+      _postalSameAsResidential = p.address.postalAddress == p.address.address
+          && p.address.postalAddress.isNotEmpty;
+      _disabilityStatus = p.status.disabilityStatus;
+      _bursaryRequired = p.status.bursaryRequired;
+      _employmentStatus = p.status.employmentStatus;
+      _schoolCtrl.text = p.school.schoolName;
+      _grade = p.school.currentGrade;
+      _currentlyDoing = p.school.currentlyDoing;
+      _studiedPreviously = p.school.studiedPreviously;
+      _subjects = p.grade12Subjects;
+      _careerInterests = p.careerInterests;
+      _nextOfKinNameCtrl.text = p.nextOfKin.name;
+      _nextOfKinMobileCtrl.text = p.nextOfKin.mobilePhone;
+      _nextOfKinHomePhoneCtrl.text = p.nextOfKin.homePhone;
+      _nextOfKinWorkPhoneCtrl.text = p.nextOfKin.workPhone;
+      _nextOfKinAddr1Ctrl.text = p.nextOfKin.addressLine1;
+      _nextOfKinAddr2Ctrl.text = p.nextOfKin.addressLine2;
+      _nextOfKinAddr3Ctrl.text = p.nextOfKin.addressLine3;
+      _nextOfKinAddr4Ctrl.text = p.nextOfKin.addressLine4;
+      _nextOfKinPostalCodeCtrl.text = p.nextOfKin.postalCode;
+      _nextOfKinEmailCtrl.text = p.nextOfKin.email;
+      _accountContactNameCtrl.text = p.accountContact.name;
+      _accountContactMobileCtrl.text = p.accountContact.mobilePhone;
+      _accountContactHomePhoneCtrl.text = p.accountContact.homePhone;
+      _accountContactAddr1Ctrl.text = p.accountContact.addressLine1;
+      _accountContactAddr2Ctrl.text = p.accountContact.addressLine2;
+      _accountContactAddr3Ctrl.text = p.accountContact.addressLine3;
+      _accountContactAddr4Ctrl.text = p.accountContact.addressLine4;
+      _accountContactPostalCodeCtrl.text = p.accountContact.postalCode;
+      _accountContactEmailCtrl.text = p.accountContact.email;
+      _matricYear = p.results.matricYear;
+      _applicationLevel = p.results.applicationLevel;
+      _upgrading = p.results.upgrading;
+      _matricType = p.results.matricType;
+      _examinationNumberCtrl.text = p.results.examinationNumber;
+      _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
+      _resultsSubjects = p.results.subjects;
+      _academicYear = p.qualification.academicYear;
+      if (p.qualification.choices.isNotEmpty) {
+        _facultyCtrl.text = p.qualification.choices.first.faculty;
+        _programmeCtrl.text = p.qualification.choices.first.programme;
+      }
+      _applicationPeriod = p.qualification.applicationPeriod;
+      _studyMode = p.qualification.studyMode;
+      _studyTiming = p.qualification.studyTiming;
+      _loginPinCtrl.text = p.agreement.loginPin;
+      _acceptanceStatus = p.agreement.acceptanceStatus;
+      if (p.uploadedDocuments.length >= 3) {
+        _uploadedFiles[0] = p.uploadedDocuments[0];
+        _uploadedFiles[1] = p.uploadedDocuments[1];
+        _uploadedFiles[2] = p.uploadedDocuments[2];
+      }
   }
 
   void _startTextReveal() {
@@ -2033,6 +2143,90 @@ class _ProfileOnboardingScreenState
   }
 
   @override
+  static Future<String?> _showSearchablePicker(BuildContext context, {
+    required String title,
+    required List<String> options,
+    String? initialValue,
+    String? Function(String)? displayTransformer,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final searchCtrl = TextEditingController(text: initialValue);
+        final searchNode = FocusNode();
+        String? selected = initialValue;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final filtered = options.where((o) {
+              final q = searchCtrl.text.toLowerCase();
+              if (q.isEmpty) return true;
+              return o.toLowerCase().contains(q);
+            }).toList();
+            return Dialog(
+              backgroundColor: AppColors.surface,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: TextField(
+                      controller: searchCtrl,
+                      focusNode: searchNode,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search $title...',
+                        prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                        suffixIcon: searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  searchCtrl.clear();
+                                  setDialogState(() {});
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  if (filtered.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Text('No results found', style: TextStyle(color: AppColors.textMuted)),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemBuilder: (_, i) {
+                          final item = filtered[i];
+                          final display = displayTransformer?.call(item) ?? item;
+                          return ListTile(
+                            dense: true,
+                            selected: selected == item,
+                            selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
+                            title: Text(display, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                            onTap: () {
+                              Navigator.pop(ctx, item);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void dispose() {
     _floatCtrl.dispose();
     _pageController.dispose();
@@ -2076,6 +2270,7 @@ class _ProfileOnboardingScreenState
     _facultyCtrl.dispose();
     _programmeCtrl.dispose();
     _loginPinCtrl.dispose();
+    _schoolLeavingCertCtrl.dispose();
     super.dispose();
   }
 
@@ -2579,7 +2774,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 20),
             // Citizenship
             DropdownButtonFormField<String>(
-              value: _citizenship,
+              value: _citizenship.isEmpty ? null : _citizenship,
               decoration: const InputDecoration(
                 labelText: 'Citizenship Status',
                 prefixIcon: Icon(Icons.flag_outlined),
@@ -2593,106 +2788,38 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 16),
             // Country of Birth
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _countryOfBirthCtrl.text),
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return _countryList;
-                }
-                return _countryList.where((c) => c
-                    .toLowerCase()
-                    .contains(textEditingValue.text.toLowerCase()));
-              },
-              onSelected: (v) => _countryOfBirthCtrl.text = v,
-              fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onFieldSubmitted: (_) => onSubmit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Country of Birth',
-                    prefixIcon: Icon(Icons.public_outlined),
-                    suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                  ),
-                );
-              },
-              displayStringForOption: (c) => c,
-              optionsViewBuilder: (ctx, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: options.length,
-                        itemBuilder: (_, i) {
-                          final c = options.elementAt(i);
-                          return ListTile(
-                            dense: true,
-                            title: Text(c, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                            onTap: () => onSelected(c),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
+            TextFormField(
+              controller: _countryOfBirthCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Country of Birth',
+                prefixIcon: Icon(Icons.public_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+              ),
+              onTap: () async {
+                final result = await _showSearchablePicker(context,
+                  title: 'Country',
+                  options: _countryList,
+                  initialValue: _countryOfBirthCtrl.text);
+                if (result != null) setState(() => _countryOfBirthCtrl.text = result);
               },
             ),
             const SizedBox(height: 16),
             // Home Language
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _homeLanguageCtrl.text),
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return _languages;
-                }
-                return _languages.where((l) => l
-                    .toLowerCase()
-                    .contains(textEditingValue.text.toLowerCase()));
-              },
-              onSelected: (v) => _homeLanguageCtrl.text = v,
-              fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onFieldSubmitted: (_) => onSubmit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Home Language',
-                    prefixIcon: Icon(Icons.language_outlined),
-                    suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                  ),
-                );
-              },
-              displayStringForOption: (l) => l,
-              optionsViewBuilder: (ctx, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: options.length,
-                        itemBuilder: (_, i) {
-                          final l = options.elementAt(i);
-                          return ListTile(
-                            dense: true,
-                            title: Text(l, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                            onTap: () => onSelected(l),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
+            TextFormField(
+              controller: _homeLanguageCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Home Language',
+                prefixIcon: Icon(Icons.language_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+              ),
+              onTap: () async {
+                final result = await _showSearchablePicker(context,
+                  title: 'Language',
+                  options: _languages,
+                  initialValue: _homeLanguageCtrl.text);
+                if (result != null) setState(() => _homeLanguageCtrl.text = result);
               },
             ),
             const SizedBox(height: 16),
@@ -2838,54 +2965,23 @@ class _ProfileOnboardingScreenState
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
-                  child: Autocomplete<String>(
-                    initialValue: TextEditingValue(text: _postalCodeCtrl.text),
-                    optionsBuilder: (textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return _postalCodes;
+                  child: TextFormField(
+                    controller: _postalCodeCtrl,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Postal Code',
+                      prefixIcon: Icon(Icons.pin_outlined),
+                      suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                    ),
+                    onTap: () async {
+                      final result = await _showSearchablePicker(context,
+                        title: 'Postal Code',
+                        options: _postalCodes,
+                        initialValue: _postalCodeCtrl.text,
+                        displayTransformer: (p) => p);
+                      if (result != null) {
+                        setState(() => _postalCodeCtrl.text = result.split(' - ').first.trim());
                       }
-                      return _postalCodes.where((p) => p
-                          .toLowerCase()
-                          .contains(textEditingValue.text.toLowerCase()));
-                    },
-                    onSelected: (v) => _postalCodeCtrl.text = v.split(' - ').first.trim(),
-                    fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onFieldSubmitted: (_) => onSubmit(),
-                        decoration: const InputDecoration(
-                          labelText: 'Postal Code',
-                          prefixIcon: Icon(Icons.pin_outlined),
-                          suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                        ),
-                      );
-                    },
-                    displayStringForOption: (p) => p,
-                    optionsViewBuilder: (ctx, onSelected, options) {
-                      return Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          elevation: 4,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 300),
-                            child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              itemCount: options.length,
-                              itemBuilder: (_, i) {
-                                final p = options.elementAt(i);
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(p, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                                  onTap: () => onSelected(p),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      );
                     },
                   ),
                 ),
@@ -3315,56 +3411,22 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 14),
             // School Leaving Certificate
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _schoolLeavingCertificate),
-              optionsBuilder: (textEditingValue) {
+            TextFormField(
+              controller: _schoolLeavingCertCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Final School Leaving Certificate *',
+                prefixIcon: Icon(Icons.verified_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
                 const certs = ['Cert of Complete Exemption', 'GRADE 12', 'NTC3/N3/NSC'];
-                if (textEditingValue.text.isEmpty) {
-                  return certs;
-                }
-                return certs.where((c) => c
-                    .toLowerCase()
-                    .contains(textEditingValue.text.toLowerCase()));
-              },
-              onSelected: (v) => setState(() => _schoolLeavingCertificate = v),
-              fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onFieldSubmitted: (_) => onSubmit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Final School Leaving Certificate *',
-                    prefixIcon: Icon(Icons.verified_outlined),
-                    suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                  ),
-                  validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-                );
-              },
-              displayStringForOption: (c) => c,
-              optionsViewBuilder: (ctx, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: options.length,
-                        itemBuilder: (_, i) {
-                          final c = options.elementAt(i);
-                          return ListTile(
-                            dense: true,
-                            title: Text(c, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                            onTap: () => onSelected(c),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
+                final result = await _showSearchablePicker(context,
+                  title: 'Certificate',
+                  options: certs,
+                  initialValue: _schoolLeavingCertificate);
+                if (result != null) setState(() => _schoolLeavingCertificate = result);
               },
             ),
 
@@ -3529,55 +3591,21 @@ class _ProfileOnboardingScreenState
                     fontSize: 13,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _schoolCtrl.text),
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return _schoolList;
-                }
-                return _schoolList.where((s) => s
-                    .toLowerCase()
-                    .contains(textEditingValue.text.toLowerCase()));
-              },
-              onSelected: (v) => _schoolCtrl.text = v,
-              fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-                return TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onFieldSubmitted: (_) => onSubmit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Which school did you attend last? *',
-                    prefixIcon: Icon(Icons.school_outlined),
-                    suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                  ),
-                  validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-                );
-              },
-              displayStringForOption: (s) => s,
-              optionsViewBuilder: (ctx, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: options.length,
-                        itemBuilder: (_, i) {
-                          final s = options.elementAt(i);
-                          return ListTile(
-                            dense: true,
-                            title: Text(s, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                            onTap: () => onSelected(s),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
+            TextFormField(
+              controller: _schoolCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Which school did you attend last? *',
+                prefixIcon: Icon(Icons.school_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(context,
+                  title: 'School',
+                  options: _schoolList,
+                  initialValue: _schoolCtrl.text);
+                if (result != null) setState(() => _schoolCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
@@ -4058,6 +4086,7 @@ class _ProfileOnboardingScreenState
       ),
     );
   }
+
 }
 
 class _SectionHeader extends StatelessWidget {

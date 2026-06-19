@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/data/repositories/application_repository_impl.dart';
-import 'package:studentsynchsa/domain/models/application.dart';
-import 'package:studentsynchsa/domain/models/bursary.dart';
-import 'package:studentsynchsa/domain/repositories/application_repository.dart';
+import 'package:studentsyncsa/data/repositories/application_repository_impl.dart';
+import 'package:studentsyncsa/domain/models/application.dart';
+import 'package:studentsyncsa/domain/models/bursary.dart';
+import 'package:studentsyncsa/domain/repositories/application_repository.dart';
 
 class ApplicationsNotifier extends StateNotifier<AsyncValue<List<UniversityApplication>>> {
   late final ApplicationRepository _repo;

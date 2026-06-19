@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});

@@ -1,10 +1,10 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsynchsa/core/constants/app_constants.dart';
-import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
-import 'package:studentsynchsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsynchsa/domain/models/student_profile.dart';
-import 'package:studentsynchsa/domain/repositories/auth_repository.dart';
+import 'package:studentsyncsa/core/constants/app_constants.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/domain/repositories/auth_repository.dart';
 
 class AuthService implements AuthRepository {
   GoogleSignIn? _googleSignIn;
@@ -144,9 +144,86 @@ class AuthService implements AuthRepository {
     try {
       var profile = await _profileRepo.getProfile();
       if (profile == null) {
-        // First launch — create anonymous profile, skip login + onboarding
+        // First launch — create pre-filled test profile
         final id = const Uuid().v4();
-        profile = StudentProfile(id: id, onboardingComplete: true);
+        profile = StudentProfile(
+          id: id,
+          onboardingComplete: true,
+          personal: PersonalDetails(
+            title: 'Mr',
+            initials: 'T',
+            firstName: 'Test',
+            lastName: 'User',
+            gender: 'Male',
+            dateOfBirth: DateTime(2005, 6, 15),
+            idNumber: '0506151234568',
+          ),
+          contact: ContactInfo(
+            email: 'test.user@example.com',
+            phone: '0712345678',
+          ),
+          address: AddressInfo(
+            address: '123 Test Street',
+            addressLine2: 'Test Suburb',
+            province: 'Gauteng',
+            postalCode: '2000',
+          ),
+          demographic: DemographicInfo(
+            nationality: 'SA Citizen',
+            countryOfBirth: 'South Africa',
+            homeLanguage: 'English',
+            populationGroup: 'Black',
+            maritalStatus: 'Single',
+          ),
+          status: StatusInfo(
+            disabilityStatus: 'No',
+            bursaryRequired: 'Yes',
+            employmentStatus: 'Studying at school',
+          ),
+          school: SchoolInfo(
+            schoolName: 'Test High School',
+            currentGrade: 'Grade 12',
+            currentlyDoing: 'Studying at school',
+          ),
+          nextOfKin: NextOfKin(
+            name: 'Parent Test',
+            mobilePhone: '0712345679',
+            homePhone: '0211234567',
+            addressLine1: '123 Test Street',
+            addressLine2: 'Test Suburb',
+            postalCode: '2000',
+            email: 'parent@example.com',
+          ),
+          accountContact: AccountContact(
+            name: 'Account Contact',
+            mobilePhone: '0723456789',
+            homePhone: '0217654321',
+            addressLine1: '456 Account Street',
+            addressLine2: 'Account Suburb',
+            postalCode: '2001',
+            email: 'account@example.com',
+          ),
+          results: ResultsInfo(
+            matricYear: DateTime.now().year - 1,
+            applicationLevel: 'Undergraduate',
+            upgrading: 'No',
+            matricType: 'South African',
+            examinationNumber: '1234567890',
+            schoolLeavingCertificate: 'GRADE 12',
+          ),
+          qualification: QualificationInfo(
+            academicYear: DateTime.now().year,
+            applicationPeriod: '1ST YEAR',
+            studyMode: 'FULL-TIME',
+            studyTiming: 'Full-Time',
+            choices: [
+              QualificationChoice(faculty: 'Science', programme: 'Computer Science'),
+            ],
+          ),
+          agreement: AgreementInfo(
+            acceptanceStatus: 'Accepted',
+          ),
+        );
         await _profileRepo.saveProfile(profile);
       }
       if (HiveDatabase.settings.get('auth_user_id') == null || 

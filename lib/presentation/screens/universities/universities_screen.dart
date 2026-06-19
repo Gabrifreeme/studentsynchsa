@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/domain/models/university.dart';
-import 'package:studentsynchsa/presentation/providers/university_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:studentsyncsa/presentation/providers/university_provider.dart';
+import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -255,24 +258,25 @@ class _UniversityCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Two tabs: Browse Offline | Apply Online
+                // ✨ Apply (in-app) + ↗ (external portal)
                 Row(
                   children: [
                     Expanded(
+                      flex: 3,
                       child: _buildTab(
-                        label: 'Browse Offline',
-                        icon: Icons.download_rounded,
+                        label: '✨ Apply',
+                        icon: Icons.auto_awesome_rounded,
                         color: AppColors.primary,
-                        onTap: () => _handleBrowseOffline(context, uni),
+                        onTap: () => _handleApply(context, uni),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildTab(
-                        label: 'Apply Online',
+                        label: '',
                         icon: Icons.open_in_new_rounded,
-                        color: AppColors.success,
-                        onTap: () => _handleApplyOnline(context, uni),
+                        color: AppColors.textSecondary,
+                        onTap: () => _handlePortal(context, uni),
                       ),
                     ),
                   ],
@@ -320,18 +324,28 @@ class _UniversityCard extends StatelessWidget {
     );
   }
 
-  void _handleBrowseOffline(BuildContext context, University uni) {
-    context.push('/universities/${uni.id}?tab=offline');
+  void _handleApply(BuildContext context, University uni) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ApplicationFormScreen(university: uni),
+      ),
+    );
   }
 
-  void _handleApplyOnline(BuildContext context, University uni) {
+  void _handlePortal(BuildContext context, University uni) {
     if (uni.applicationUrl.isNotEmpty) {
-      // Navigate to application URL
-      context.push('/universities/${uni.id}/apply');
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => UniversityWebViewScreen(
+            url: uni.applicationUrl,
+            universityName: uni.shortName,
+          ),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No application URL for ${uni.shortName}'),
+        const SnackBar(
+          content: Text('No online portal available'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),

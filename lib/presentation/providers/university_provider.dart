@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/data/repositories/university_repository_impl.dart';
-import 'package:studentsynchsa/domain/models/university.dart';
-import 'package:studentsynchsa/domain/repositories/university_repository.dart';
+import 'package:studentsyncsa/data/repositories/university_repository_impl.dart';
+import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:studentsyncsa/domain/repositories/university_repository.dart';
 
 class UniversitiesNotifier extends StateNotifier<AsyncValue<List<University>>> {
   late final UniversityRepository _repo;

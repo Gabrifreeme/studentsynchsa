@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'StudentSynchSA';
+  static const String appName = 'studentsyncsa';
   static const String appTagline = 'Your university application companion';
 
   // AI / Star

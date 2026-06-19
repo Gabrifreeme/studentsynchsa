@@ -1,6 +1,6 @@
 class OfflineResource {
   final String title;
-  final String type; // 'pdf' | 'image' | 'doc' | 'map'
+  final String type; // 'pdf' | 'image' | 'doc' | 'map' | 'page'
   final String assetPath; // local asset or bundled URL
   final String? description;
   final String universityId;

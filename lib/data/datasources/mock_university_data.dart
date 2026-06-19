@@ -1,8 +1,23 @@
-import 'package:studentsynchsa/domain/models/university.dart';
-import 'package:studentsynchsa/domain/models/offline_resource.dart';
+import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:studentsyncsa/domain/models/offline_resource.dart';
 
 class MockUniversityData {
+  static OfflineResource _webview(String uniId, String shortName) => OfflineResource(
+    universityId: uniId,
+    title: '$shortName Live Page',
+    type: 'page',
+    assetPath: 'assets/offline/$uniId/webview.html',
+    description: 'View the official university website live, then print to PDF for offline use',
+  );
+
   static List<OfflineResource> _cputResources = [
+    OfflineResource(
+      universityId: 'cput',
+      title: 'CPUT Homepage',
+      type: 'page',
+      assetPath: 'assets/offline/cput/homepage.html',
+      description: 'Official CPUT website captured for offline viewing',
+    ),
     OfflineResource(
       universityId: 'cput',
       title: 'CPUT Prospectus 2025',
@@ -43,7 +58,17 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 26,
       requirements: ['National Senior Certificate', 'Minimum APS of 26'],
       faculties: ['Engineering', 'Business', 'Education', 'Health & Wellness', 'Informatics & Design', 'Applied Sciences'],
-      offlineResources: _cputResources,
+      address: 'PO Box 1906, Bellville, 7535, Western Cape, South Africa',
+      phone: '+27 21 959 6111',
+      email: 'info@cput.ac.za',
+      socialMedia: {
+        'Facebook': 'https://www.facebook.com/CPUT',
+        'LinkedIn': 'https://www.linkedin.com/school/cape-peninsula-university-of-technology',
+        'Twitter': 'https://twitter.com/CPUT',
+        'Instagram': 'https://www.instagram.com/cput1967',
+        'YouTube': 'https://www.youtube.com/@CPUTVideos',
+      },
+      offlineResources: [_webview('cput', 'CPUT'), ..._cputResources],
     ),
     University(
       id: 'dut', name: 'Durban University of Technology',
@@ -55,6 +80,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 24'],
       faculties: ['Accounting & Informatics', 'Applied Sciences', 'Arts & Design', 'Engineering & Built Environment', 'Health Sciences', 'Management Sciences'],
       offlineResources: [
+        _webview('dut', 'DUT'),
         OfflineResource(universityId: 'dut', title: 'DUT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/dut/prospectus_2025.pdf', description: 'Full university prospectus'),
         OfflineResource(universityId: 'dut', title: 'DUT Campus Map', type: 'map', assetPath: 'assets/offline/dut/campus_map.pdf', description: 'Campus layout and facilities map'),
         OfflineResource(universityId: 'dut', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/dut/admission_requirements.pdf', description: 'Faculty-specific admission requirements'),
@@ -70,6 +96,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 25'],
       faculties: ['Business & Economic Sciences', 'Education', 'Engineering, Built Environment & Information Technology', 'Health Sciences', 'Humanities', 'Law', 'Science'],
       offlineResources: [
+        _webview('mandela', 'NMU'),
         OfflineResource(universityId: 'mandela', title: 'NMU Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/mandela/prospectus_2025.pdf', description: 'Full university prospectus'),
         OfflineResource(universityId: 'mandela', title: 'NMU Campus Map', type: 'map', assetPath: 'assets/offline/mandela/campus_map.pdf', description: 'Campus layout with all faculties'),
         OfflineResource(universityId: 'mandela', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/mandela/admission_requirements.pdf', description: 'Admission criteria for all programmes'),
@@ -85,6 +112,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 26'],
       faculties: ['Economic & Management Sciences', 'Education', 'Engineering', 'Health Sciences', 'Humanities', 'Law', 'Natural & Agricultural Sciences', 'Theology'],
       offlineResources: [
+        _webview('nwu', 'NWU'),
         OfflineResource(universityId: 'nwu', title: 'NWU Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/nwu/prospectus_2025.pdf', description: 'Comprehensive university prospectus'),
         OfflineResource(universityId: 'nwu', title: 'NWU Campus Maps', type: 'map', assetPath: 'assets/offline/nwu/campus_maps.pdf', description: 'Maps for all NWU campuses'),
         OfflineResource(universityId: 'nwu', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/nwu/admission_requirements.pdf', description: 'Admission criteria per faculty'),
@@ -98,6 +126,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 30,
       requirements: ['National Senior Certificate', 'Minimum APS of 30'],
       faculties: ['Commerce', 'Education', 'Humanities', 'Law', 'Pharmacy', 'Science'],
+      offlineResources: [_webview('ru', 'RU')],
     ),
     University(
       id: 'spu', name: 'Sol Plaatje University',
@@ -106,6 +135,7 @@ class MockUniversityData {
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
       faculties: ['Education', 'Humanities', 'Natural & Applied Sciences', 'Economic & Management Sciences'],
+      offlineResources: [_webview('spu', 'SPU')],
     ),
     University(
       id: 'su', name: 'Stellenbosch University',
@@ -117,6 +147,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 35', 'NBT required'],
       faculties: ['AgriSciences', 'Economic & Management Sciences', 'Education', 'Engineering', 'Health Sciences', 'Law', 'Military Science', 'Science', 'Theology'],
       offlineResources: [
+        _webview('su', 'SUN'),
         OfflineResource(universityId: 'su', title: 'SUN Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/su/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'su', title: 'SUN Campus Map', type: 'map', assetPath: 'assets/offline/su/campus_map.pdf', description: 'Main campus and satellite campuses'),
         OfflineResource(universityId: 'su', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/su/admission_requirements.pdf', description: 'Faculty-specific requirements including NBT'),
@@ -131,6 +162,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 23,
       faculties: ['Arts & Design', 'Economics & Finance', 'Education', 'Engineering & Built Environment', 'Health Care Sciences', 'Humanities', 'Information Sciences', 'Management Sciences', 'Science'],
       offlineResources: [
+        _webview('tut', 'TUT'),
         OfflineResource(universityId: 'tut', title: 'TUT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/tut/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'tut', title: 'TUT Campus Map', type: 'map', assetPath: 'assets/offline/tut/campus_map.pdf', description: 'All TUT campus locations'),
       ],
@@ -145,6 +177,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 38', 'NBT required', 'Faculty-specific requirements'],
       faculties: ['Commerce', 'Engineering & Built Environment', 'Health Sciences', 'Humanities', 'Law', 'Science'],
       offlineResources: [
+        _webview('uchenn', 'UCT'),
         OfflineResource(universityId: 'uchenn', title: 'UCT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/uct/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'uchenn', title: 'UCT Campus Map', type: 'map', assetPath: 'assets/offline/uct/campus_map.pdf', description: 'Upper, Middle, and Lower campus maps'),
         OfflineResource(universityId: 'uchenn', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/uct/admission_requirements.pdf', description: 'Faculty requirements with NBT details'),
@@ -159,6 +192,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 24,
       faculties: ['Education', 'Health Sciences', 'Law', 'Management & Commerce', 'Science & Agriculture', 'Social Sciences & Humanities'],
       offlineResources: [
+        _webview('ufh', 'UFH'),
         OfflineResource(universityId: 'ufh', title: 'UFH Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/ufh/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'ufh', title: 'UFH Campus Map', type: 'map', assetPath: 'assets/offline/ufh/campus_map.pdf', description: 'Alice, East London, and Bhisho campuses'),
       ],
@@ -172,6 +206,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 27,
       faculties: ['Art, Design & Architecture', 'Education', 'Engineering & Built Environment', 'Health Sciences', 'Humanities', 'Law', 'Management', 'Science'],
       offlineResources: [
+        _webview('uj', 'UJ'),
         OfflineResource(universityId: 'uj', title: 'UJ Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/uj/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'uj', title: 'UJ Campus Map', type: 'map', assetPath: 'assets/offline/uj/campus_map.pdf', description: 'All four UJ campuses'),
       ],
@@ -185,6 +220,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 28,
       faculties: ['Agriculture, Engineering & Science', 'Commerce', 'Education', 'Health Sciences', 'Humanities', 'Law'],
       offlineResources: [
+        _webview('ukzn', 'UKZN'),
         OfflineResource(universityId: 'ukzn', title: 'UKZN Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/ukzn/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'ukzn', title: 'UKZN Campus Maps', type: 'map', assetPath: 'assets/offline/ukzn/campus_maps.pdf', description: 'Howard College, Medical, Pietermaritzburg, Westville'),
       ],
@@ -198,6 +234,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 24,
       faculties: ['Health Sciences', 'Humanities', 'Management & Law', 'Science & Agriculture'],
       offlineResources: [
+        _webview('ul', 'UL'),
         OfflineResource(universityId: 'ul', title: 'UL Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/ul/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'ul', title: 'UL Campus Map', type: 'map', assetPath: 'assets/offline/ul/campus_map.pdf', description: 'Turfloop and Medunsa campuses'),
       ],
@@ -211,6 +248,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 23,
       faculties: ['Accounting Sciences', 'Agriculture & Environmental Sciences', 'Economic & Management Sciences', 'Education', 'Human Sciences', 'Law', 'Science, Engineering & Technology', 'Theology'],
       offlineResources: [
+        _webview('unisa', 'UNISA'),
         OfflineResource(universityId: 'unisa', title: 'UNISA Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/unisa/prospectus_2025.pdf', description: 'Distance learning prospectus'),
         OfflineResource(universityId: 'unisa', title: 'UNISA Regional Centres Map', type: 'map', assetPath: 'assets/offline/unisa/regional_centres.pdf', description: 'All UNISA regional centres and support centres'),
         OfflineResource(universityId: 'unisa', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/unisa/admission_requirements.pdf', description: 'Open distance learning admission criteria'),
@@ -224,7 +262,17 @@ class MockUniversityData {
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
       faculties: ['Agriculture', 'Education', 'Engineering', 'Health Sciences', 'Human & Social Sciences', 'Law', 'Management, Commerce & Public Administration', 'Science'],
+      phone: '+27 15 962 8000',
+      email: 'info@univen.ac.za',
+      socialMedia: {
+        'Facebook': 'https://www.facebook.com/Univen.ac.za',
+        'LinkedIn': 'https://www.linkedin.com/school/university-of-ven',
+        'Twitter': 'https://twitter.com/Univen_News',
+        'Instagram': 'https://www.instagram.com/univen official',
+        'YouTube': 'https://www.youtube.com/@univencommunication',
+      },
       offlineResources: [
+        _webview('univen', 'UNIVEN'),
         OfflineResource(universityId: 'univen', title: 'UNIVEN Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/univen/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'univen', title: 'UNIVEN Campus Map', type: 'map', assetPath: 'assets/offline/univen/campus_map.pdf', description: 'Main campus and facilities'),
       ],
@@ -238,6 +286,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 28,
       faculties: ['Economic & Management Sciences', 'Education', 'Health Sciences', 'Humanities', 'Law', 'Natural & Agricultural Sciences', 'Theology'],
       offlineResources: [
+        _webview('ufs', 'UFS'),
         OfflineResource(universityId: 'ufs', title: 'UFS Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/ufs/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'ufs', title: 'UFS Campus Map', type: 'map', assetPath: 'assets/offline/ufs/campus_map.pdf', description: 'Bloemfontein and Qwaqwa campuses'),
         OfflineResource(universityId: 'ufs', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/ufs/admission_requirements.pdf', description: 'Faculty-specific admission requirements'),
@@ -252,6 +301,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 24,
       faculties: ['Education', 'Engineering & Technology', 'Health Sciences', 'Management Sciences', 'Natural Sciences'],
       offlineResources: [
+        _webview('wsu', 'WSU'),
         OfflineResource(universityId: 'wsu', title: 'WSU Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/wsu/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'wsu', title: 'WSU Campus Maps', type: 'map', assetPath: 'assets/offline/wsu/campus_maps.pdf', description: 'Mthatha, Butterworth, Buffalo City, Komani'),
       ],
@@ -266,6 +316,7 @@ class MockUniversityData {
       requirements: ['National Senior Certificate', 'Minimum APS of 38', 'NBT required', 'Faculty-specific requirements'],
       faculties: ['Commerce, Law & Management', 'Engineering & Built Environment', 'Health Sciences', 'Humanities', 'Science'],
       offlineResources: [
+        _webview('wits', 'WITS'),
         OfflineResource(universityId: 'wits', title: 'WITS Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/wits/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'wits', title: 'WITS Campus Map', type: 'map', assetPath: 'assets/offline/wits/campus_map.pdf', description: 'Braamfontein, Education, Medical campuses'),
         OfflineResource(universityId: 'wits', title: 'Admission Requirements', type: 'pdf', assetPath: 'assets/offline/wits/admission_requirements.pdf', description: 'Faculty requirements with NBT details'),
@@ -280,6 +331,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 24,
       faculties: ['Arts & Humanities', 'Commerce, Administration & Law', 'Education', 'Science & Agriculture'],
       offlineResources: [
+        _webview('zululand', 'UNIZULU'),
         OfflineResource(universityId: 'zululand', title: 'UNIZULU Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/zululand/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'zululand', title: 'UNIZULU Campus Map', type: 'map', assetPath: 'assets/offline/zululand/campus_map.pdf', description: 'Main campus and Richards Bay campus'),
       ],
@@ -293,6 +345,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 23,
       faculties: ['Engineering', 'Management Sciences', 'Natural Sciences'],
       offlineResources: [
+        _webview('mru', 'MUT'),
         OfflineResource(universityId: 'mru', title: 'MUT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/mut/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'mru', title: 'MUT Campus Map', type: 'map', assetPath: 'assets/offline/mut/campus_map.pdf', description: 'Umlazi and KwaMnyandu campuses'),
       ],
@@ -306,6 +359,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 24,
       faculties: ['Engineering & Information Technology', 'Health & Environmental Sciences', 'Humanities', 'Management Sciences'],
       offlineResources: [
+        _webview('cut', 'CUT'),
         OfflineResource(universityId: 'cut', title: 'CUT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/cut/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'cut', title: 'CUT Campus Map', type: 'map', assetPath: 'assets/offline/cut/campus_map.pdf', description: 'Bloemfontein and Welkom campuses'),
       ],
@@ -319,6 +373,7 @@ class MockUniversityData {
       requiresNbt: false, minimumAps: 23,
       faculties: ['Applied Sciences', 'Engineering & Technology', 'Human Sciences', 'Management Sciences'],
       offlineResources: [
+        _webview('vut', 'VUT'),
         OfflineResource(universityId: 'vut', title: 'VUT Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/vut/prospectus_2025.pdf', description: 'Complete university prospectus'),
         OfflineResource(universityId: 'vut', title: 'VUT Campus Map', type: 'map', assetPath: 'assets/offline/vut/campus_map.pdf', description: 'Vanderbijlpark and Secunda campuses'),
       ],

@@ -1,5 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:studentsynchsa/core/constants/app_constants.dart';
+import 'package:studentsyncsa/core/constants/app_constants.dart';
 
 class HiveDatabase {
   static late Box<String> _profileBox;

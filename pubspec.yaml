@@ -1,5 +1,5 @@
-name: studentsynchsa
-description: "StudentSynchSA - Your university application companion"
+name: studentsyncsa
+description: "StudentSyncSA - Your university application companion"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -22,6 +22,8 @@ dependencies:
   url_launcher: ^6.3.1
   path_provider: ^2.1.5
   http: ^1.2.2
+  pdf: ^3.12.0
+  webview_flutter: ^4.14.0
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +37,7 @@ flutter:
     - assets/logos/
     - assets/icons/
     - assets/images/
+    - assets/offline/guide.html
     - assets/offline/cput/
     - assets/offline/cut/
     - assets/offline/dut/
@@ -48,6 +51,9 @@ flutter:
     - assets/offline/ufs/
     - assets/offline/uj/
     - assets/offline/ukzn/
+    - assets/offline/ru/
+    - assets/offline/spu/
+    - assets/offline/mru/
     - assets/offline/ul/
     - assets/offline/unisa/
     - assets/offline/univen/

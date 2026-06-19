@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/data/datasources/mock_bursary_data.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/mock_bursary_data.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class FundingDetailScreen extends StatelessWidget {
   final String bursaryId;

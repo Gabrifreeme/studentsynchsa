@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/domain/models/application.dart';
-import 'package:studentsynchsa/presentation/providers/application_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/domain/models/application.dart';
+import 'package:studentsyncsa/presentation/providers/application_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ApplicationTrackerScreen extends ConsumerStatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -42,10 +42,17 @@ class _ApplicationTrackerScreenState
                 subtitle: 'Tap + to add your first university application',
               );
             }
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: apps.length,
-              itemBuilder: (_, i) => _buildAppCard(apps[i]),
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(applicationsProvider);
+                // Wait for provider to reload
+                await Future.delayed(const Duration(milliseconds: 300));
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: apps.length,
+                itemBuilder: (_, i) => _buildAppCard(apps[i]),
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
-import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsynchsa/services/sync_service.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -25,12 +25,12 @@ class SettingsScreen extends ConsumerWidget {
               child: Column(
                 children: [
                   _SettingTile(
-                    icon: Icons.logout_rounded,
-                    label: 'Sign Out',
+                    icon: Icons.refresh_rounded,
+                    label: 'Reset Profile',
                     color: AppColors.error,
                     onTap: () async {
                       await ref.read(authProvider.notifier).signOut();
-                      if (context.mounted) context.go('/login');
+                      if (context.mounted) context.go('/onboarding');
                     },
                   ),
                 ],
@@ -81,6 +81,49 @@ class SettingsScreen extends ConsumerWidget {
                   _AboutRow('Made for', 'South African Students'),
                   _AboutRow('AI Assistant', 'Star ⭐'),
                 ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.shield_outlined, color: AppColors.success, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Privacy Status',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'All data is processed on-device. Nothing is sent to external servers.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => context.push('/privacy'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Row(
+                        children: [
+                          const Text('Full Privacy Notice',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 4),
+                          Icon(Icons.open_in_new, size: 14, color: AppColors.primary),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

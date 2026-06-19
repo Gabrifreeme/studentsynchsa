@@ -1,4 +1,4 @@
-import 'package:studentsynchsa/domain/models/university.dart';
+import 'package:studentsyncsa/domain/models/university.dart';
 
 abstract class UniversityRepository {
   Future<List<University>> getUniversities();

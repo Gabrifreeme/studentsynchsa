@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/services/sync_service.dart' as sync_service;
+import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
 
 class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatus>> {
   StreamSubscription? _sub;

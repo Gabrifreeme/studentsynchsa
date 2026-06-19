@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsynchsa/domain/models/student_profile.dart';
-import 'package:studentsynchsa/domain/repositories/profile_repository.dart';
+import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/domain/repositories/profile_repository.dart';
 
 class ProfileNotifier extends StateNotifier<AsyncValue<StudentProfile?>> {
   late final ProfileRepository _repo;
@@ -13,7 +13,12 @@ class ProfileNotifier extends StateNotifier<AsyncValue<StudentProfile?>> {
 
   Future<void> _init() async {
     try {
-      final profile = await _repo.getProfile();
+      var profile = await _repo.getProfile();
+      if (profile == null) {
+        // autoLogin() might still be creating the profile — wait and retry
+        await Future.delayed(const Duration(milliseconds: 800));
+        profile = await _repo.getProfile();
+      }
       state = AsyncData(profile);
     } catch (e) {
       state = AsyncError(e, StackTrace.current);

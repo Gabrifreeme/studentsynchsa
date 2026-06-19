@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
-import 'package:studentsynchsa/domain/models/application.dart';
-import 'package:studentsynchsa/domain/models/bursary.dart';
-import 'package:studentsynchsa/domain/repositories/application_repository.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/domain/models/application.dart';
+import 'package:studentsyncsa/domain/models/bursary.dart';
+import 'package:studentsyncsa/domain/repositories/application_repository.dart';
 
 class ApplicationRepositoryImpl implements ApplicationRepository {
   @override

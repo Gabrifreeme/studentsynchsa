@@ -1,0 +1,112 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UJ — Admissions & Info</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, Arial; background: #f6f7fb; color: #1f2937; }
+    header { padding: 1.5rem; text-align: center; background: linear-gradient(135deg, #1e40af, #3b82f6); color: #fff; }
+    header h1 { margin: 0 0 .3rem; font-size: 1.4rem; }
+    header p { margin: 0; font-size: .92rem; opacity: .9; }
+    .container { max-width: 980px; margin: 0 auto; padding: 0 1rem 2rem; }
+    .card { background: #fff; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .card h2 { margin: 0 0 .75rem; color: #1e40af; font-size: 1.1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: .4rem; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .info-grid .label { color: #6b7280; font-size: .82rem; }
+    .info-grid .value { font-weight: 600; font-size: .95rem; }
+    ul { margin: .5rem 0 0 0; padding-left: 1.2rem; }
+    li { margin-bottom: .25rem; font-size: .92rem; }
+    iframe { width: 100%; height: 420px; border: 1px solid #e5e7eb; border-radius: 6px; display: block; }
+    .actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .75rem; }
+    button { padding: .6rem 1.2rem; border: none; border-radius: 6px; background: #1f64f2; color: #fff; cursor: pointer; font-size: .9rem; }
+    button.secondary { background: #374151; }
+    .note { color: #6b7280; font-size: .85rem; margin: .4rem 0 0; }
+    .offline-notice { display: none; background: #fef3cd; border: 1px solid #fde68a; border-radius: 6px; padding: .75rem 1rem; margin: .75rem 0; font-size: .9rem; }
+    #offline-notice.show { display: block; }
+    .badge { display: inline-block; background: #1e40af; color: #fff; padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+    .fee { font-size: 1.1rem; font-weight: 700; color: #059669; }
+    @media print { header { background: #1e40af !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .actions, .note, .offline-notice, .live-section { display: none; } iframe { display: none; } .card { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>UJ</h1>
+    <p>University of Johannesburg — Gauteng</p>
+  </header>
+
+  <main class="container">
+    <div class="offline-notice" id="offline-notice">
+      You appear to be offline. The live website cannot load. Use Print (Ctrl+P) to save this page as PDF for offline reference.
+    </div>
+
+    <section class="card">
+      <h2>Admissions Snapshot</h2>
+      <div class="info-grid">
+        <div><div class="label">Minimum APS</div><div class="value"><span class="badge">27</span></div></div>
+        <div><div class="label">Application Fee</div><div class="value"><span class="fee">R300</span></div></div>
+        <div><div class="label">NBT Required</div><div class="value">No</div></div>
+        <div><div class="label">Province</div><div class="value">Gauteng</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Entry Requirements</h2>
+      <ul>
+      <li>National Senior Certificate</li>
+      <li>Minimum APS of 27</li>
+    </ul>
+    </section>
+
+    <section class="card">
+      <h2>Faculties</h2>
+      <ul>
+      <li>Art Design & Architecture</li>
+      <li>Education</li>
+      <li>Engineering & Built Environment</li>
+      <li>Health Sciences</li>
+      <li>Humanities</li>
+      <li>Law</li>
+      <li>Management</li>
+      <li>Science</li>
+    </ul>
+    </section>
+
+    <section class="card live-section">
+      <h2>Official Website</h2>
+      <p class="note">The official UJ website loads below when connected.</p>
+      <iframe id="live-iframe" src="https://www.uj.ac.za" title="UJ official site" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+    </section>
+
+    <section class="card">
+      <h2>Save for Offline</h2>
+      <p class="note">Use your browser's Print to PDF to save this page including all the information above.</p>
+      <div class="actions">
+        <button onclick="window.print()">Print to PDF</button>
+        <button class="secondary" onclick="window.open('https://www.uj.ac.za/apply', '_blank')">Apply Online</button>
+        <button class="secondary" onclick="document.getElementById('live-iframe').scrollIntoView({behavior:'smooth'})">View Live Site</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function() {
+      var notice = document.getElementById('offline-notice');
+      var iframe = document.getElementById('live-iframe');
+      function updateStatus() {
+        if (navigator.onLine) {
+          notice.classList.remove('show');
+          if (iframe) iframe.style.display = 'block';
+        } else {
+          notice.classList.add('show');
+          if (iframe) iframe.style.display = 'none';
+        }
+      }
+      window.addEventListener('online', updateStatus);
+      window.addEventListener('offline', updateStatus);
+      updateStatus();
+    })();
+  </script>
+</body>
+</html>

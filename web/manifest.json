@@ -1,6 +1,6 @@
 {
-    "name": "studentsynchsa",
-    "short_name": "studentsynchsa",
+    "name": "studentsyncsa",
+    "short_name": "studentsyncsa",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

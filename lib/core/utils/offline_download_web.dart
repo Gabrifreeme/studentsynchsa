@@ -15,7 +15,6 @@ Future<void> downloadAsset(String assetPath) async {
     anchor.remove();
     html.Url.revokeObjectUrl(url);
   } catch (e) {
-    // Fallback: try direct URL
     final url = '/${assetPath.startsWith('/') ? assetPath.substring(1) : assetPath}';
     final anchor = html.AnchorElement(href: url)
       ..setAttribute('download', assetPath.split('/').last)
@@ -24,4 +23,9 @@ Future<void> downloadAsset(String assetPath) async {
     anchor.click();
     anchor.remove();
   }
+}
+
+Future<void> openAsset(String assetPath) async {
+  final url = '/${assetPath.startsWith('/') ? assetPath.substring(1) : assetPath}';
+  html.window.open(url, '_blank');
 }

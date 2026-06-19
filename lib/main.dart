@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/core/router/app_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
-import 'package:studentsynchsa/services/ai_service.dart';
-import 'package:studentsynchsa/services/notification_service.dart';
-import 'package:studentsynchsa/services/sync_service.dart';
+import 'package:studentsyncsa/core/router/app_router.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/services/ai_service.dart';
+import 'package:studentsyncsa/services/notification_service.dart';
+import 'package:studentsyncsa/services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,18 +28,18 @@ void main() async {
 
   runApp(
     const ProviderScope(
-      child: StudentSynchSAApp(),
+      child: studentsyncsaApp(),
     ),
   );
 }
 
-class StudentSynchSAApp extends ConsumerWidget {
-  const StudentSynchSAApp({super.key});
+class studentsyncsaApp extends ConsumerWidget {
+  const studentsyncsaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'StudentSynchSA',
+      title: 'studentsyncsa',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       scrollBehavior: const NoScrollbarBehavior(),

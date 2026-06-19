@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsynchsa/core/router/app_router.dart';
-import 'package:studentsynchsa/domain/models/student_profile.dart';
-import 'package:studentsynchsa/domain/repositories/auth_repository.dart';
-import 'package:studentsynchsa/domain/repositories/profile_repository.dart';
-import 'package:studentsynchsa/services/auth_service.dart';
-import 'package:studentsynchsa/data/repositories/profile_repository_impl.dart';
+import 'package:studentsyncsa/core/router/app_router.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:studentsyncsa/domain/repositories/auth_repository.dart';
+import 'package:studentsyncsa/domain/repositories/profile_repository.dart';
+import 'package:studentsyncsa/services/auth_service.dart';
+import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 
 class AuthState {
   final bool authenticated;

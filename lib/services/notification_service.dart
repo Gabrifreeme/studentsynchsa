@@ -1,7 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsynchsa/data/datasources/local/hive_database.dart';
-import 'package:studentsynchsa/domain/models/notification_item.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/domain/models/notification_item.dart';
 import 'dart:convert';
 
 class NotificationService {
@@ -32,9 +32,9 @@ class NotificationService {
     String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
-      'studentsynchsa_channel',
-      'StudentSynchSA Notifications',
-      channelDescription: 'Notifications from StudentSynchSA',
+      'studentsyncsa_channel',
+      'studentsyncsa Notifications',
+      channelDescription: 'Notifications from studentsyncsa',
       importance: Importance.high,
       priority: Priority.high,
     );

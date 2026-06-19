@@ -1,4 +1,4 @@
-import 'package:studentsynchsa/domain/models/bursary.dart';
+import 'package:studentsyncsa/domain/models/bursary.dart';
 
 class MockBursaryData {
   static List<Bursary> get all => [

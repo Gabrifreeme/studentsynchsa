@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsynchsa/core/theme/app_theme.dart';
-import 'package:studentsynchsa/presentation/providers/auth_provider.dart';
-import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -75,7 +75,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     const StarAvatar(size: 56),
                     SizedBox(height: isShort ? 8 : 16),
                     const Text(
-                      'Join StudentSynchSA',
+                      'Join studentsyncsa',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 24,

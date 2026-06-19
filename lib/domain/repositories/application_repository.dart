@@ -1,5 +1,5 @@
-import 'package:studentsynchsa/domain/models/application.dart';
-import 'package:studentsynchsa/domain/models/bursary.dart';
+import 'package:studentsyncsa/domain/models/application.dart';
+import 'package:studentsyncsa/domain/models/bursary.dart';
 
 abstract class ApplicationRepository {
   Future<List<UniversityApplication>> getApplications();
