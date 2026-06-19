@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studentsynchsa/core/theme/app_theme.dart';
+import 'package:studentsynchsa/core/utils/offline_download.dart';
 import 'package:studentsynchsa/domain/models/offline_resource.dart';
 import 'package:studentsynchsa/presentation/widgets/common_widgets.dart';
 
@@ -24,7 +25,7 @@ class OfflineTab extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'How to use offline resources',
+                'Offline Resources',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -33,8 +34,7 @@ class OfflineTab extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Tap any resource to download or view. Files are cached for offline access. '
-                'Print-friendly versions available for all PDFs.',
+                'These resources are bundled with the app. Tap Download to save a copy to your device for offline viewing.',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -108,11 +108,13 @@ class OfflineTab extends StatelessWidget {
   }
 
   void _openResource(BuildContext context, OfflineResource resource) {
+    downloadAsset(resource.assetPath);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Downloading ${resource.title}...'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
