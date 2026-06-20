@@ -42,7 +42,7 @@ class _ProfileOnboardingScreenState
   DateTime? _selectedDob;
 
   // Demographic
-  String _citizenship = 'SA Citizen';
+  String _citizenship = 'RSA';
   final _countryOfBirthCtrl = TextEditingController();
   final _homeLanguageCtrl = TextEditingController();
   String _populationGroup = '';
@@ -2713,7 +2713,7 @@ class _ProfileOnboardingScreenState
                 final picked = await showDatePicker(
                   context: context,
                   initialDate: _selectedDob ?? DateTime(2006),
-                  firstDate: DateTime(1970),
+                  firstDate: DateTime(1950),
                   lastDate: DateTime.now(),
                   builder: (ctx, child) => Theme(
                     data: Theme.of(context).copyWith(

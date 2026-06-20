@@ -1,4 +1,4 @@
-package com.studentsynchsa.studentsynchsa
+package com.studentsyncsa.studentsyncsa
 
 import io.flutter.embedding.android.FlutterActivity
 

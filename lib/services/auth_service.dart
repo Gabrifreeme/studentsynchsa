@@ -1,6 +1,5 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
@@ -143,11 +142,9 @@ class AuthService implements AuthRepository {
   Future<AuthResult> autoLogin() async {
     try {
       var profile = await _profileRepo.getProfile();
-      if (profile == null) {
-        // First launch — create pre-filled test profile
-        final id = const Uuid().v4();
-        profile = StudentProfile(
-          id: id,
+      final existingId = profile?.id ?? const Uuid().v4();
+      profile = StudentProfile(
+          id: existingId,
           onboardingComplete: true,
           personal: PersonalDetails(
             title: 'Mr',
@@ -155,8 +152,8 @@ class AuthService implements AuthRepository {
             firstName: 'Test',
             lastName: 'User',
             gender: 'Male',
-            dateOfBirth: DateTime(2005, 6, 15),
-            idNumber: '0506151234568',
+            dateOfBirth: DateTime(1964, 4, 13),
+            idNumber: '6404135555555',
           ),
           contact: ContactInfo(
             email: 'test.user@example.com',
@@ -169,7 +166,7 @@ class AuthService implements AuthRepository {
             postalCode: '2000',
           ),
           demographic: DemographicInfo(
-            nationality: 'SA Citizen',
+            nationality: 'RSA',
             countryOfBirth: 'South Africa',
             homeLanguage: 'English',
             populationGroup: 'Black',
@@ -225,7 +222,6 @@ class AuthService implements AuthRepository {
           ),
         );
         await _profileRepo.saveProfile(profile);
-      }
       if (HiveDatabase.settings.get('auth_user_id') == null || 
           (HiveDatabase.settings.get('auth_user_id') ?? '').isEmpty) {
         await _setAuthData(email: profile.contact.email, id: profile.id);

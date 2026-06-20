@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/services/autofill_script.dart';
+import 'package:studentsyncsa/services/autofill_script.dart' as star;
 
 class AppWebView extends StatefulWidget {
   final String url;
@@ -17,39 +18,63 @@ class AppWebView extends StatefulWidget {
 class _AppWebViewState extends State<AppWebView> {
   late final WebViewController _controller;
   bool _loading = true;
+  Timer? _injectTimer;
+  String _profileJson = '{}';
 
   @override
   void initState() {
     super.initState();
+    _loadProfileOnce();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _loading = true),
+        onPageStarted: (_) {
+          setState(() => _loading = true);
+        },
         onPageFinished: (_) {
           setState(() => _loading = false);
           _injectStar();
+          Future.delayed(const Duration(seconds: 1), _injectStar);
+          Future.delayed(const Duration(seconds: 3), _injectStar);
         },
       ))
       ..loadRequest(Uri.parse(widget.url));
+    _injectTimer = Timer.periodic(const Duration(seconds: 3), (_) => _injectStar());
   }
 
-  Future<void> _injectStar() async {
-    final json = await _loadProfileJson();
-    final script = buildAutofillScript(json);
-    try {
-      await _controller.runJavaScript(script);
-    } catch (_) {}
-  }
-
-  Future<String> _loadProfileJson() async {
+  Future<void> _loadProfileOnce() async {
     final repo = ProfileRepositoryImpl();
     var profile = await repo.getProfile();
     if (profile == null) {
       await Future.delayed(const Duration(seconds: 1));
       profile = await repo.getProfile();
     }
-    if (profile == null) return '{}';
-    return _profileToSimpleJson(profile);
+    if (profile == null) {
+      await Future.delayed(const Duration(seconds: 2));
+      profile = await repo.getProfile();
+    }
+    if (profile != null && mounted) {
+      _profileJson = _profileToSimpleJson(profile);
+      _injectStar();
+    }
+  }
+
+  @override
+  void dispose() {
+    _injectTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _injectStar() async {
+    try {
+      await _controller.runJavaScript(star.buildAutofillScript(_profileJson));
+    } catch (_) {}
+  }
+
+  Future<void> _autofillNow() async {
+    try {
+      await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson));
+    } catch (_) {}
   }
 
   String _profileToSimpleJson(StudentProfile p) {
@@ -121,7 +146,7 @@ class _AppWebViewState extends State<AppWebView> {
           IconButton(
             icon: const Icon(Icons.star_rounded, color: Color(0xFFFFD700)),
             tooltip: 'Star Auto-Fill',
-            onPressed: () => _injectStar(),
+            onPressed: () => _autofillNow(),
           ),
         ],
       ),
