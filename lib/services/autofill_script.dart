@@ -1,342 +1,423 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+//
+// Built specifically for ITS (Oracle PL/SQL) university portals used by
+// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+// plain HTML — no React, no Angular, no framework events needed.
+// Falls back to generic matching for other university sites.
+// ─────────────────────────────────────────────────────────────────────────────
+
 String buildAutofillScript(String profileJson) {
+  return _script(profileJson, addFloatingStar: true);
+}
+
+String buildAutofillOnlyScript(String profileJson) {
+  return _script(profileJson, addFloatingStar: false);
+}
+
+String _script(String profileJson, {required bool addFloatingStar}) {
   return '''
 (function() {
+  // ── 1. Profile data ────────────────────────────────────────────────────
   var profile = $profileJson;
 
-  // ── Field mapping ──────────────────────────────────────────────
-  var fieldMap = {
-    'title':          ['title', 'salutation'],
-    'firstName':      ['firstname', 'first_name', 'fname'],
-    'lastName':       ['lastname', 'last_name', 'lname', 'surname', 'family_name'],
-    'initials':       ['initials'],
-    'gender':         ['gender', 'sex'],
-    'idNumber':       ['idnumber', 'id_number', 'identity_number', 'national_id', 'sa_id', 'passport_number', 'rsa_id'],
-    'dateOfBirth':    ['dateofbirth', 'date_of_birth', 'dob', 'birthdate', 'birth_date', 'birthday'],
-    'email':          ['email', 'e-mail', 'emailaddress', 'email_address'],
-    'phone':          ['phone', 'telephone', 'tel', 'cell', 'cellphone', 'mobile', 'mobile_number', 'contact_no', 'phone_number'],
-    'workPhone':      ['workphone', 'work_phone', 'telephone_work', 'tel_work'],
-    'address':        ['address', 'street', 'physical_address', 'residential_address'],
-    'addressLine2':   ['address2', 'address_line2', 'suburb', 'town', 'city'],
-    'province':       ['province', 'state', 'region'],
-    'postalCode':     ['postalcode', 'postal_code', 'postcode', 'zip', 'zipcode', 'code'],
-    'nationality':    ['nationality', 'citizenship', 'citizen', 'country', 'sa citizen', 'south african'],
-    'homeLanguage':   ['homelanguage', 'home_language', 'language', 'first_language'],
-    'populationGroup':['populationgroup', 'population_group', 'race', 'ethnicity'],
-    'maritalStatus':  ['maritalstatus', 'marital_status'],
-    'schoolName':     ['school', 'schoolname', 'school_name', 'highschool', 'high_school', 'institution'],
-    'currentGrade':   ['grade', 'current_grade', 'grade12', 'matric'],
-    'matricYear':     ['matricyear', 'year_of_matric', 'year', 'examination_year'],
-    'matricType':     ['matrictype', 'matric_type', 'exam_type', 'examination_type'],
-    'examinationNumber':['examinationnumber', 'exam_number', 'candidate_number'],
-    'applicationLevel':['applicationlevel', 'level_of_study', 'study_level', 'application_type'],
-    'faculty':        ['faculty', 'faculty_choice'],
-    'programme':      ['programme', 'course', 'program', 'qualification', 'course_choice', 'study_programme'],
-    'academicYear':   ['academicyear', 'academic_year', 'year_of_study', 'study_year'],
-    'studyMode':      ['studymode', 'study_mode', 'mode_of_study', 'attendance_mode', 'fulltime_parttime'],
-    'nextOfKinName':  ['nextofkin_name', 'nextofkin', 'guardian_name', 'parent_name', 'parentguardian'],
-    'nextOfKinPhone': ['nextofkin_phone', 'guardian_phone', 'parent_phone', 'emergency_contact'],
-    'nextOfKinEmail': ['nextofkin_email', 'guardian_email', 'parent_email'],
-  };
-
-  function getVal(path) {
+  function gv(path) {
     var parts = path.split('.');
-    var obj = profile;
+    var o = profile;
     for (var i = 0; i < parts.length; i++) {
-      if (!obj) return '';
-      obj = obj[parts[i]];
+      if (o == null || typeof o !== 'object') return '';
+      o = o[parts[i]];
     }
-    return (obj != null ? String(obj) : '');
+    return (o !== null && o !== undefined) ? String(o) : '';
   }
 
   function fmtDate(iso) {
-    if (!iso || iso.length < 10) return iso;
+    if (!iso || iso.length < 10) return iso || '';
     var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     var p = iso.split('T')[0].split('-');
     var m = parseInt(p[1], 10) - 1;
     return (m >= 0 && m < 12) ? p[2] + '-' + months[m] + '-' + p[0] : iso;
   }
 
-  var valueSources = {
-    'title':          getVal('personal.title'),
-    'firstName':      getVal('personal.firstName'),
-    'lastName':       getVal('personal.lastName'),
-    'initials':       getVal('personal.initials'),
-    'gender':         getVal('personal.gender'),
-    'idNumber':       getVal('personal.idNumber'),
-    'dateOfBirth':    fmtDate(getVal('personal.dateOfBirth')),
-    'email':          getVal('contact.email'),
-    'phone':          getVal('contact.phone'),
-    'workPhone':      getVal('contact.workPhone'),
-    'address':        getVal('address.address'),
-    'addressLine2':   getVal('address.addressLine2'),
-    'province':       getVal('address.province'),
-    'postalCode':     getVal('address.postalCode'),
-    'nationality':    getVal('demographic.nationality'),
-    'homeLanguage':   getVal('demographic.homeLanguage'),
-    'populationGroup':getVal('demographic.populationGroup'),
-    'maritalStatus':  getVal('demographic.maritalStatus'),
-    'schoolName':     getVal('school.schoolName'),
-    'currentGrade':   getVal('school.currentGrade'),
-    'matricYear':     getVal('results.matricYear'),
-    'matricType':     getVal('results.matricType'),
-    'examinationNumber': getVal('results.examinationNumber'),
-    'applicationLevel': getVal('results.applicationLevel'),
-    'faculty':        getVal('qualification.choices[0].faculty'),
-    'programme':      getVal('qualification.choices[0].programme'),
-    'academicYear':   getVal('qualification.academicYear'),
-    'studyMode':      getVal('qualification.studyMode'),
-    'nextOfKinName':  getVal('nextOfKin.name'),
-    'nextOfKinPhone': getVal('nextOfKin.mobilePhone'),
-    'nextOfKinEmail': getVal('nextOfKin.email'),
+  // date also as DD/MM/YYYY for ITS portals
+  function fmtDateSlash(iso) {
+    if (!iso || iso.length < 10) return iso || '';
+    var p = iso.split('T')[0].split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+
+  var firstName   = gv('personal.firstName');
+  var lastName    = gv('personal.lastName');
+  var email       = gv('contact.email');
+  var dobIso      = gv('personal.dateOfBirth');
+
+  var vs = {
+    firstName:         firstName,
+    lastName:          lastName,
+    initials:          gv('personal.initials'),
+    title:             gv('personal.title'),
+    gender:            gv('personal.gender'),
+    idNumber:          gv('personal.idNumber'),
+    dateOfBirth:       fmtDate(dobIso),
+    dateOfBirthSlash:  fmtDateSlash(dobIso),
+    email:             email,
+    phone:             gv('contact.phone'),
+    workPhone:         gv('contact.workPhone'),
+    address:           gv('address.address'),
+    addressLine2:      gv('address.addressLine2'),
+    province:          gv('address.province'),
+    postalCode:        gv('address.postalCode'),
+    nationality:       gv('demographic.nationality'),
+    homeLanguage:      gv('demographic.homeLanguage'),
+    populationGroup:   gv('demographic.populationGroup'),
+    maritalStatus:     gv('demographic.maritalStatus'),
+    schoolName:        gv('school.schoolName'),
+    currentGrade:      gv('school.currentGrade'),
+    matricYear:        gv('results.matricYear'),
+    matricType:        gv('results.matricType'),
+    examinationNumber: gv('results.examinationNumber'),
+    applicationLevel:  gv('results.applicationLevel'),
+    faculty:           gv('qualification.choices.0.faculty'),
+    programme:         gv('qualification.choices.0.programme'),
+    academicYear:      gv('qualification.academicYear'),
+    studyMode:         gv('qualification.studyMode'),
+    nextOfKinName:     gv('nextOfKin.name'),
+    nextOfKinPhone:    gv('nextOfKin.mobilePhone'),
+    nextOfKinEmail:    gv('nextOfKin.email'),
   };
 
+  // ── 2. ITS portal exact-name map (P_* Oracle fields) ──────────────────
+  // These are the actual INPUT NAME attributes used by ITS/Univen/UL/TUT etc.
+  var itsExact = {
+    // Personal
+    'P_SURNAME':           vs.lastName,
+    'P_NAME':              vs.firstName,
+    'P_INITIALS':          vs.initials,
+    'P_TITLE':             vs.title,
+    'P_GENDER':            vs.gender,
+    'P_ID_NO':             vs.idNumber,
+    'P_PASSPORT_NO':       vs.idNumber,
+    'P_DATE_OF_BIRTH':     vs.dateOfBirth,
+    'P_DOB':               vs.dateOfBirth,
+    'P_BIRTH_DATE':        vs.dateOfBirth,
+    // Contact
+    'P_EMAIL':             vs.email,
+    'P_EMAIL_ADDRESS':     vs.email,
+    'P_CONFIRM_EMAIL':     vs.email,
+    'P_EMAIL2':            vs.email,
+    'P_CELL_NO':           vs.phone,
+    'P_CELL':              vs.phone,
+    'P_CELLPHONE':         vs.phone,
+    'P_PHONE':             vs.phone,
+    'P_TEL_NO':            vs.phone,
+    'P_WORK_TEL':          vs.workPhone,
+    // Address
+    'P_ADDRESS_1':         vs.address,
+    'P_ADDRESS_2':         vs.addressLine2,
+    'P_ADDRESS1':          vs.address,
+    'P_ADDRESS2':          vs.addressLine2,
+    'P_PHYSICAL_ADDRESS':  vs.address,
+    'P_SUBURB':            vs.addressLine2,
+    'P_CITY':              vs.addressLine2,
+    'P_PROVINCE':          vs.province,
+    'P_POSTAL_CODE':       vs.postalCode,
+    'P_POST_CODE':         vs.postalCode,
+    'P_POSTAL':            vs.postalCode,
+    // Demographic
+    'P_NATIONALITY':       vs.nationality,
+    'P_CITIZEN':           vs.nationality,
+    'P_CITIZENSHIP':       vs.nationality,
+    'P_HOME_LANGUAGE':     vs.homeLanguage,
+    'P_LANGUAGE':          vs.homeLanguage,
+    'P_POPULATION_GROUP':  vs.populationGroup,
+    'P_RACE':              vs.populationGroup,
+    'P_MARITAL_STATUS':    vs.maritalStatus,
+    // School
+    'P_SCHOOL_NAME':       vs.schoolName,
+    'P_SCHOOL':            vs.schoolName,
+    'P_GRADE':             vs.currentGrade,
+    // Results
+    'P_MATRIC_YEAR':       vs.matricYear,
+    'P_EXAM_YEAR':         vs.matricYear,
+    'P_EXAM_TYPE':         vs.matricType,
+    'P_EXAM_NO':           vs.examinationNumber,
+    'P_CANDIDATE_NO':      vs.examinationNumber,
+    // Application
+    'P_FACULTY':           vs.faculty,
+    'P_PROGRAMME':         vs.programme,
+    'P_COURSE':            vs.programme,
+    'P_QUALIFICATION':     vs.programme,
+    'P_STUDY_MODE':        vs.studyMode,
+    'P_YEAR_OF_STUDY':     vs.academicYear,
+    // Next of kin
+    'P_PARENT_NAME':       vs.nextOfKinName,
+    'P_GUARDIAN_NAME':     vs.nextOfKinName,
+    'P_NOK_NAME':          vs.nextOfKinName,
+    'P_PARENT_CELL':       vs.nextOfKinPhone,
+    'P_GUARDIAN_CELL':     vs.nextOfKinPhone,
+    'P_NOK_CELL':          vs.nextOfKinPhone,
+    'P_PARENT_EMAIL':      vs.nextOfKinEmail,
+    'P_GUARDIAN_EMAIL':    vs.nextOfKinEmail,
+    'P_NOK_EMAIL':         vs.nextOfKinEmail,
+  };
+
+  // ── 3. Generic fuzzy fieldMap (fallback for non-ITS sites) ────────────
+  var fieldMap = {
+    firstName:         ['firstname','first name','fname','given name','name'],
+    lastName:          ['lastname','last name','surname','lname','family name'],
+    initials:          ['initials'],
+    title:             ['title','salutation'],
+    gender:            ['gender','sex'],
+    idNumber:          ['id number','idnumber','identity number','national id','id no','passport'],
+    dateOfBirth:       ['date of birth','dateofbirth','dob','birth date','birthdate','birthday'],
+    email:             ['email','e-mail','email address'],
+    phone:             ['cell','cellphone','mobile','phone','telephone','contact number'],
+    workPhone:         ['work phone','work tel','telephone work'],
+    address:           ['address','street','physical address'],
+    addressLine2:      ['address 2','suburb','town','city'],
+    province:          ['province','state','region'],
+    postalCode:        ['postal code','postalcode','post code','postcode','zip'],
+    nationality:       ['nationality','citizenship','citizen'],
+    homeLanguage:      ['home language','homelanguage','language'],
+    populationGroup:   ['population group','race','ethnicity'],
+    maritalStatus:     ['marital status','maritalstatus'],
+    schoolName:        ['school','high school','institution'],
+    currentGrade:      ['grade','current grade'],
+    matricYear:        ['matric year','exam year','year of matric'],
+    matricType:        ['matric type','exam type'],
+    examinationNumber: ['exam number','candidate number','examination number'],
+    faculty:           ['faculty'],
+    programme:         ['programme','course','program','qualification'],
+    academicYear:      ['academic year','year of study'],
+    studyMode:         ['study mode','mode of study','attendance'],
+    nextOfKinName:     ['next of kin','guardian','parent name','emergency contact name'],
+    nextOfKinPhone:    ['guardian phone','parent phone','emergency contact number'],
+    nextOfKinEmail:    ['guardian email','parent email'],
+  };
+
+  // ── 4. Helpers ─────────────────────────────────────────────────────────
   function showToast(msg, color) {
+    var old = document.getElementById('ssa-toast');
+    if (old) old.remove();
     var t = document.createElement('div');
+    t.id = 'ssa-toast';
     t.textContent = msg;
-    t.style.cssText = 'position:fixed;bottom:100px;right:24px;padding:12px 20px;background:' + (color || '#10B981') + ';color:#fff;border-radius:10px;z-index:9999999;font-family:Arial,sans-serif;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.3s;';
+    t.style.cssText = 'position:fixed;bottom:90px;right:20px;padding:12px 18px;'
+      + 'background:' + (color||'#10B981') + ';color:#fff;border-radius:10px;'
+      + 'z-index:2147483647;font:14px Arial,sans-serif;'
+      + 'box-shadow:0 4px 14px rgba(0,0,0,0.35);transition:opacity 0.4s;';
     document.body.appendChild(t);
-    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2500);
+    setTimeout(function() {
+      t.style.opacity = '0';
+      setTimeout(function() { if (t.parentNode) t.remove(); }, 400);
+    }, 3000);
   }
 
   function isPlaceholder(text) {
-    var t = text.toLowerCase().trim();
-    return t === '' || t === 'select' || t === 'choose' || t.indexOf('select...') === 0 || t.indexOf('choose...') === 0 || t.indexOf('--') !== -1 || t === 'please select';
+    var t = (text || '').toLowerCase().trim();
+    return !t || t === 'select' || t === 'choose' || t === 'please select'
+      || t === 'none' || t.indexOf('--') !== -1
+      || t.indexOf('select ') === 0 || t.indexOf('choose ') === 0;
   }
 
-  function isYes(text) {
-    var t = text.toLowerCase().trim();
-    return t === 'yes' || t === 'y' || t === 'true' || t === '1' || t === 'sa citizen' || t === 'south african' || t === 'rsa';
-  }
-
-  function isNo(text) {
-    var t = text.toLowerCase().trim();
-    return t === 'no' || t === 'n' || t === 'false' || t === '0' || t === 'other';
-  }
-
-  function getSearchTerms(vl) {
-    var terms = [vl];
-    if (vl === 'sa citizen' || vl === 'south african' || vl === 'south africa' || vl === 'sa' || vl === 'rsa') {
-      terms.push('south african', 'south africa', 'sa citizen', 'sa', 'rsa', 'other african countries');
+  function findOption(sel, want) {
+    if (!want) return null;
+    var wl = want.toLowerCase().trim();
+    var best = null, bestScore = -1;
+    for (var i = 0; i < sel.options.length; i++) {
+      var opt = sel.options[i];
+      if (isPlaceholder(opt.text)) continue;
+      var tl = opt.text.toLowerCase().trim();
+      var vl = opt.value.toLowerCase().trim();
+      var score = -1;
+      if (tl === wl || vl === wl)                               score = 100;
+      else if (tl.indexOf(wl) !== -1 || vl.indexOf(wl) !== -1) score = 50;
+      else if (wl.indexOf(tl) !== -1 && tl.length > 2)         score = 30;
+      else {
+        var words = wl.split(/\\s+/);
+        for (var w = 0; w < words.length; w++) {
+          if (words[w].length > 2 && (tl.indexOf(words[w]) !== -1 || vl.indexOf(words[w]) !== -1)) {
+            score = 10; break;
+          }
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = opt; }
     }
-    if (vl.indexOf('male') !== -1 || vl.indexOf('female') !== -1) {
-      terms.push('male', 'female');
-    }
-    return terms;
+    return bestScore >= 10 ? best : null;
   }
 
-  function findOption(sel, rawVal) {
-    var vl = rawVal.toLowerCase().trim();
-    var terms = getSearchTerms(vl);
-    var bestOpt = null, bestScore = -1;
-    for (var t = 0; t < terms.length; t++) {
-      var term = terms[t];
-      var tl = term.toLowerCase().trim();
-      var tWords = tl.split(/\\s+/);
-      for (var k = 0; k < sel.options.length; k++) {
-        var opt = sel.options[k];
-        if (isPlaceholder(opt.text)) continue;
-        var tt = opt.text.toLowerCase().trim();
-        var vv = opt.value.toLowerCase().trim();
-        var score = -1;
-        if (tt === tl || vv === tl) score = 100;
-        else if (tt.startsWith(tl) || vv.startsWith(tl)) score = 50;
-        else if (tt.indexOf(tl) !== -1 || vv.indexOf(tl) !== -1) score = 30;
-        else if (tl.indexOf(tt) !== -1 || tl.indexOf(vv) !== -1) score = 20;
-        else { for (var w = 0; w < tWords.length; w++) { if (tWords[w].length > 1 && (tt.indexOf(tWords[w]) !== -1 || vv.indexOf(tWords[w]) !== -1)) { score = 10; break; } } }
-        if (score > bestScore) { bestScore = score; bestOpt = opt; }
+  // Plain value setter + minimal events — ITS is plain HTML, no framework needed.
+  // We still dispatch input+change for any JS validation the portal has.
+  function fill(el, value) {
+    if (!value && value !== 0) return false;
+    var v = String(value);
+    if (el.tagName === 'SELECT') {
+      var opt = findOption(el, v);
+      if (!opt) return false;
+      el.value = opt.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    if (el.type === 'radio') {
+      var radios = document.querySelectorAll('input[type=radio][name="' + el.name + '"]');
+      var vl = v.toLowerCase().trim();
+      for (var r = 0; r < radios.length; r++) {
+        var rv = (radios[r].value || '').toLowerCase().trim();
+        var rl = (radios[r].nextSibling ? radios[r].nextSibling.textContent || '' : '').toLowerCase().trim();
+        if (rv === vl || rl.indexOf(vl) !== -1 || vl.indexOf(rv) !== -1) {
+          radios[r].checked = true;
+          radios[r].dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+      }
+      return false;
+    }
+    if (el.type === 'checkbox') return false;
+    el.value = v;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur',   { bubbles: true }));
+    return el.value.trim().length > 0;
+  }
+
+  function elText(el) {
+    var parts = [
+      el.name || '',
+      el.id   || '',
+      el.placeholder || '',
+      el.getAttribute('aria-label') || '',
+      el.getAttribute('title') || '',
+      el.getAttribute('data-field') || '',
+    ];
+    if (el.labels && el.labels.length) {
+      parts.push(el.labels[0].textContent);
+    } else {
+      var lid = el.getAttribute('for') || el.getAttribute('aria-labelledby');
+      if (lid) {
+        var lel = document.getElementById(lid);
+        if (lel) parts.push(lel.textContent);
+      }
+      var p = el.parentElement;
+      for (var d = 0; d < 3 && p; d++) {
+        if (p.tagName === 'TD' || p.tagName === 'TH' || p.tagName === 'LABEL') {
+          parts.push(p.textContent);
+          break;
+        }
+        if (p.tagName === 'TR') {
+          var cells = p.cells;
+          if (cells && cells.length >= 2) parts.push(cells[0].textContent);
+          break;
+        }
+        p = p.parentElement;
       }
     }
-    return bestOpt;
+    return parts.join(' ').toLowerCase().replace(/[_\\-]/g, ' ').replace(/\\s+/g, ' ').trim();
   }
 
-  function dispatchAll(inp) {
-    inp.dispatchEvent(new Event('input', {bubbles: true}));
-    inp.dispatchEvent(new Event('change', {bubbles: true}));
-    inp.dispatchEvent(new Event('select', {bubbles: true}));
-    inp.dispatchEvent(new Event('blur', {bubbles: true}));
-    if (inp.form) inp.form.dispatchEvent(new Event('change', {bubbles: true}));
+  function fuzzyMatch(el) {
+    var text = elText(el);
+    var bestKey = null, bestScore = 0;
+    for (var key in fieldMap) {
+      var aliases = fieldMap[key];
+      for (var j = 0; j < aliases.length; j++) {
+        if (text.indexOf(aliases[j]) !== -1) {
+          var score = aliases[j].length * 2;
+          if (score > bestScore) { bestScore = score; bestKey = key; }
+          break;
+        }
+      }
+    }
+    return bestKey;
   }
 
+  // ── 5. Main autofill ───────────────────────────────────────────────────
   function doAutofill() {
-    var hasData = valueSources['firstName'] || valueSources['lastName'] || valueSources['email'];
-    if (!hasData) {
-      showToast('No profile data found. Go to Dashboard first.', '#EF4444');
+    if (!firstName && !lastName && !email) {
+      showToast('No profile data. Please complete your profile first.', '#EF4444');
       return;
     }
-    var inputs = document.querySelectorAll('input, select, textarea');
+
+    var inputs = document.querySelectorAll(
+      'input:not([type=hidden]):not([type=submit]):not([type=button])'
+      + ':not([type=reset]):not([type=image]),'
+      + 'select, textarea'
+    );
+
     var filled = 0;
-    var retrySelects = [];
+    var alreadyHandled = {};
+
     for (var i = 0; i < inputs.length; i++) {
-      var inp = inputs[i];
-      if (inp.readOnly || inp.disabled) continue;
-      var elName = (inp.name + ' ' + inp.id + ' ' + (inp.placeholder || '') + ' ' + (inp.getAttribute('aria-label') || '') + ' ' + (inp.getAttribute('title') || '')).toLowerCase().replace(/[_-]/g, '').trim();
-      var label = '';
-      if (inp.labels && inp.labels.length) label = inp.labels[0].textContent.toLowerCase().trim();
-      var allText = elName + ' ' + label;
-      var bestKey = null;
-      var bestScore = 0;
-      for (var key in fieldMap) {
-        var aliases = fieldMap[key];
-        for (var j = 0; j < aliases.length; j++) {
-          var alias = aliases[j];
-          if (allText.indexOf(alias) !== -1) {
-            var score = alias.length;
-            if (label.indexOf(alias) !== -1) score += 5;
-            if (elName.indexOf(alias) !== -1) score += 3;
-            if (score > bestScore) { bestScore = score; bestKey = key; }
-            break;
-          }
-        }
-      }
-      if (inp.tagName === 'SELECT' || inp.type === 'select-one') {
-        inp.dispatchEvent(new Event('focus', {bubbles: true}));
-        var hasYes = false, hasNo = false;
-        for (var k = 0; k < inp.options.length; k++) {
-          if (isPlaceholder(inp.options[k].text) && k === 0) continue;
-          if (isYes(inp.options[k].text)) hasYes = true;
-          if (isNo(inp.options[k].text)) hasNo = true;
-        }
-        if (hasYes && hasNo) {
-          for (var k = 0; k < inp.options.length; k++) {
-            if (isPlaceholder(inp.options[k].text)) continue;
-            if (isYes(inp.options[k].text)) { inp.value = inp.options[k].value; filled++; dispatchAll(inp); inp.style.outline = '2px solid #10B981'; break; }
-          }
+      var el = inputs[i];
+      if (el.readOnly || el.disabled) continue;
+
+      var elName = (el.name || '').toUpperCase().trim();
+
+      // Pass 1: ITS exact name match (highest confidence)
+      if (elName && itsExact[elName] !== undefined) {
+        if (itsExact[elName] && fill(el, itsExact[elName])) {
+          el.style.outline = '3px solid #10B981';
+          filled++;
+          alreadyHandled[i] = true;
           continue;
         }
       }
-      if (bestKey && valueSources[bestKey]) {
-        var val = valueSources[bestKey];
-        var didFill = false;
-        if (inp.tagName === 'SELECT' || inp.type === 'select-one') {
-          var bestOpt = findOption(inp, val);
-          if (bestOpt) { inp.value = bestOpt.value; didFill = true; }
-          if (!didFill && inp.options.length <= 30) {
-            retrySelects.push({el: inp, vl: val});
-            for (var k = 1; k < inp.options.length; k++) {
-              if (!isPlaceholder(inp.options[k].text) && inp.options[k].value) { inp.value = inp.options[k].value; didFill = true; break; }
+
+      // Pass 2: ITS partial/case-insensitive name match
+      if (elName) {
+        for (var itk in itsExact) {
+          if (elName.indexOf(itk) !== -1 || itk.indexOf(elName) !== -1) {
+            if (itsExact[itk] && fill(el, itsExact[itk])) {
+              el.style.outline = '3px solid #10B981';
+              filled++;
+              alreadyHandled[i] = true;
+              break;
             }
           }
-        } else {
-          inp.value = val;
-          didFill = true;
         }
-        if (didFill) { filled++; dispatchAll(inp); inp.style.outline = '2px solid #10B981'; }
+        if (alreadyHandled[i]) continue;
+      }
+
+      // Pass 3: Generic fuzzy match on label/placeholder text
+      var key = fuzzyMatch(el);
+      if (key && vs[key]) {
+        if (fill(el, vs[key])) {
+          el.style.outline = '3px solid #10B981';
+          filled++;
+        }
       }
     }
-    if (retrySelects.length) {
-      var doRetry = function() {
-        for (var r = 0; r < retrySelects.length; r++) {
-          var rs = retrySelects[r];
-          var inp = rs.el, vl = rs.vl;
-          inp.dispatchEvent(new Event('focus', {bubbles: true}));
-          var bestOpt = findOption(inp, vl);
-          if (bestOpt) { inp.value = bestOpt.value; filled++; dispatchAll(inp); inp.style.outline = '2px solid #10B981'; }
-        }
-        // Re-scan for dynamically-added elements
-        var newInputs = document.querySelectorAll('input, select, textarea');
-        for (var n = 0; n < newInputs.length; n++) {
-          var ni = newInputs[n];
-          if (ni.readOnly || ni.disabled || ni.style.outline) continue;
-          var elName = (ni.name + ' ' + ni.id + ' ' + (ni.placeholder || '') + ' ' + (ni.getAttribute('aria-label') || '') + ' ' + (ni.getAttribute('title') || '')).toLowerCase().replace(/[_-]/g, '').trim();
-          var label = '';
-          if (ni.labels && ni.labels.length) label = ni.labels[0].textContent.toLowerCase().trim();
-          var allText = elName + ' ' + label;
-          var bestKey = null, bestScore = 0;
-          for (var key in fieldMap) {
-            var aliases = fieldMap[key];
-            for (var j = 0; j < aliases.length; j++) {
-              var alias = aliases[j];
-              if (allText.indexOf(alias) !== -1) {
-                var score = alias.length;
-                if (label.indexOf(alias) !== -1) score += 5;
-                if (elName.indexOf(alias) !== -1) score += 3;
-                if (score > bestScore) { bestScore = score; bestKey = key; }
-                break;
-              }
-            }
-          }
-          if (bestKey && valueSources[bestKey]) {
-            var v = valueSources[bestKey];
-            if (ni.tagName === 'SELECT' || ni.type === 'select-one') {
-              ni.dispatchEvent(new Event('focus', {bubbles: true}));
-              var bo = findOption(ni, v);
-              if (bo) { ni.value = bo.value; filled++; dispatchAll(ni); ni.style.outline = '2px solid #10B981'; }
-            } else {
-              ni.value = v; filled++; dispatchAll(ni); ni.style.outline = '2px solid #10B981';
-            }
-          }
-        }
-      };
-      setTimeout(doRetry, 800);
-      setTimeout(doRetry, 2500);
-    }
-    showToast(filled > 0 ? '✅ Filled ' + filled + ' field' + (filled > 1 ? 's' : '') + '!' : 'No fields matched.', filled > 0 ? '#10B981' : '#EF4444');
+
+    showToast(
+      filled > 0
+        ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
+        : 'No fields matched. Try scrolling to the next section.',
+      filled > 0 ? '#10B981' : '#EF4444'
+    );
   }
 
-  // Create floating Star as a convenience
-  function createStar() {
-    var old = document.getElementById('ssa-star');
-    if (old) return old;
+  ${addFloatingStar ? '''
+  // Floating star button injected into the page
+  (function() {
+    if (document.getElementById('ssa-star')) return;
     var star = document.createElement('div');
     star.id = 'ssa-star';
-    star.innerHTML = '★';
-    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:60px;height:60px;background:#0F1624;border-radius:50%;z-index:999999;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;color:#FFD700;font-size:40px;font-family:Arial,sans-serif;transition:transform 0.2s;';
+    star.innerHTML = '⭐';
+    star.title = 'Star Auto-Fill';
+    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
+      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
+      + 'color:#FFD700;font-size:32px;user-select:none;';
     star.onclick = doAutofill;
-    document.body.appendChild(star);
-    return star;
-  }
-  function tryCreate() { if (document.body) { createStar(); } else { setTimeout(tryCreate, 500); } }
-  tryCreate();
-})();
-''';
-}
+    function tryAppend() {
+      if (document.body) document.body.appendChild(star);
+      else setTimeout(tryAppend, 300);
+    }
+    tryAppend();
+  })();
+  ''' : ''}
 
-String buildAutofillOnlyScript(String profileJson) {
-  return '''
-(function() {
-  try {
-  (function(){var d=document.createElement('div');d.textContent='+';d.style.cssText='position:fixed;top:4px;left:4px;padding:4px 8px;background:#10B981;color:#fff;z-index:9999999;font-family:Arial;font-size:12px;border-radius:4px;';document.body.appendChild(d);setTimeout(function(){d.remove();},999999);})();
-  var profile = $profileJson;
-  var fieldMap = {
-    'title':['title','salutation'],    'firstName':['firstname','first_name','fname'],
-    'lastName':['lastname','last_name','lname','surname','family_name'],'initials':['initials'],
-    'gender':['gender','sex'],'idNumber':['idnumber','id_number','identity_number','national_id','sa_id','passport_number','rsa_id'],
-    'dateOfBirth':['dateofbirth','date_of_birth','dob','birthdate','birth_date','birthday'],
-    'email':['email','e-mail','emailaddress','email_address'],'phone':['phone','telephone','tel','cell','cellphone','mobile','mobile_number','contact_no','phone_number'],
-    'workPhone':['workphone','work_phone','telephone_work','tel_work'],'address':['address','street','physical_address','residential_address'],
-    'addressLine2':['address2','address_line2','suburb','town','city'],'province':['province','state','region'],
-    'postalCode':['postalcode','postal_code','postcode','zip','zipcode','code'],'nationality':['nationality','citizenship','citizen','country','sa citizen','south african'],
-    'homeLanguage':['homelanguage','home_language','language','first_language'],'populationGroup':['populationgroup','population_group','race','ethnicity'],
-    'maritalStatus':['maritalstatus','marital_status'],'schoolName':['school','schoolname','school_name','highschool','high_school','institution'],
-    'currentGrade':['grade','current_grade','grade12','matric'],'matricYear':['matricyear','year_of_matric','year','examination_year'],
-    'matricType':['matrictype','matric_type','exam_type','examination_type'],'examinationNumber':['examinationnumber','exam_number','candidate_number'],
-    'applicationLevel':['applicationlevel','level_of_study','study_level','application_type'],'faculty':['faculty','faculty_choice'],
-    'programme':['programme','course','program','qualification','course_choice','study_programme'],'academicYear':['academicyear','academic_year','year_of_study','study_year'],
-    'studyMode':['studymode','study_mode','mode_of_study','attendance_mode','fulltime_parttime'],'nextOfKinName':['nextofkin_name','nextofkin','guardian_name','parent_name','parentguardian'],
-    'nextOfKinPhone':['nextofkin_phone','guardian_phone','parent_phone','emergency_contact'],'nextOfKinEmail':['nextofkin_email','guardian_email','parent_email']
-  };
-  function g(p){var o=profile;for(var i=0;i<p.split('.').length;i++){if(!o)return'';o=o[p.split('.')[i]];}return o!=null?String(o):'';}
-  function d(i){if(!i||i.length<10)return i;var m=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];var p=i.split('T')[0].split('-');var n=parseInt(p[1],10)-1;return(n>=0&&n<12)?p[2]+'-'+m[n]+'-'+p[0]:i;}
-  var vs={'title':g('personal.title'),'firstName':g('personal.firstName'),'lastName':g('personal.lastName'),'initials':g('personal.initials'),'gender':g('personal.gender'),'idNumber':g('personal.idNumber'),'dateOfBirth':d(g('personal.dateOfBirth')),'email':g('contact.email'),'phone':g('contact.phone'),'workPhone':g('contact.workPhone'),'address':g('address.address'),'addressLine2':g('address.addressLine2'),'province':g('address.province'),'postalCode':g('address.postalCode'),'nationality':g('demographic.nationality'),'homeLanguage':g('demographic.homeLanguage'),'populationGroup':g('demographic.populationGroup'),'maritalStatus':g('demographic.maritalStatus'),'schoolName':g('school.schoolName'),'currentGrade':g('school.currentGrade'),'matricYear':g('results.matricYear'),'matricType':g('results.matricType'),'examinationNumber':g('results.examinationNumber'),'applicationLevel':g('results.applicationLevel'),'faculty':g('qualification.choices[0].faculty'),'programme':g('qualification.choices[0].programme'),'academicYear':g('qualification.academicYear'),'studyMode':g('qualification.studyMode'),'nextOfKinName':g('nextOfKin.name'),'nextOfKinPhone':g('nextOfKin.mobilePhone'),'nextOfKinEmail':g('nextOfKin.email')};
-  function t(m,c){var e=document.createElement('div');e.textContent=m;e.style.cssText='position:fixed;bottom:100px;right:24px;padding:12px 20px;background:'+(c||'#10B981')+';color:#fff;border-radius:10px;z-index:9999999;font-family:Arial,sans-serif;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';document.body.appendChild(e);setTimeout(function(){e.style.opacity='0';setTimeout(function(){e.remove();},300);},2500);}
-  function ip(t){var s=t.toLowerCase().trim();return s===''||s==='select'||s==='choose'||s.indexOf('select...')===0||s.indexOf('choose...')===0||s.indexOf('--')!==-1||s==='please select';}
-  function iy(t){var s=t.toLowerCase().trim();return s==='yes'||s==='y'||s==='true'||s==='1'||s==='sa citizen'||s==='south african'||s==='rsa';}
-  function i_n(t){var s=t.toLowerCase().trim();return s==='no'||s==='n'||s==='false'||s==='0'||s==='other';}
-  function gs(v){var r=[v];if(v==='sa citizen'||v==='south african'||v==='south africa'||v==='sa'||v==='rsa'){r.push('south african','south africa','sa citizen','sa','rsa','other african countries');}if(v.indexOf('male')!==-1||v.indexOf('female')!==-1){r.push('male','female');}return r;}
-  function fo(sel,rv){var vl=rv.toLowerCase().trim(),terms=gs(vl),bo=null,bs=-1;for(var t=0;t<terms.length;t++){var tl=terms[t].toLowerCase().trim(),tw=tl.split(/\\s+/);for(var z=0;z<sel.options.length;z++){var o=sel.options[z];if(ip(o.text))continue;var tt=o.text.toLowerCase().trim(),vv=o.value.toLowerCase().trim(),sc=-1;if(tt===tl||vv===tl)sc=100;else if(tt.startsWith(tl)||vv.startsWith(tl))sc=50;else if(tt.indexOf(tl)!==-1||vv.indexOf(tl)!==-1)sc=30;else if(tl.indexOf(tt)!==-1||tl.indexOf(vv)!==-1)sc=20;else{for(var w=0;w<tw.length;w++){if(tw[w].length>1&&(tt.indexOf(tw[w])!==-1||vv.indexOf(tw[w])!==-1)){sc=10;break;}}}if(sc>bs){bs=sc;bo=o;}}}return bo;}
-  function da(e){e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('select',{bubbles:true}));e.dispatchEvent(new Event('blur',{bubbles:true}));if(e.form)e.form.dispatchEvent(new Event('change',{bubbles:true}));}
-  var h=vs['firstName']||vs['lastName']||vs['email'];if(!h){t('No profile found. Go to Dashboard first.','#EF4444');return;}
-  var inputs=document.querySelectorAll('input,select,textarea'),filled=0,rx=[];
-  for(var i=0;i<inputs.length;i++){var inp=inputs[i];if(inp.readOnly||inp.disabled)continue;
-    var el=(inp.name+' '+inp.id+' '+(inp.placeholder||'')+' '+(inp.getAttribute('aria-label')||'')+' '+(inp.getAttribute('title')||'')).toLowerCase().replace(/[_-]/g,'').trim();
-    var lb='';if(inp.labels&&inp.labels.length)lb=inp.labels[0].textContent.toLowerCase().trim();var all=el+' '+lb;
-    var bk=null,bs=0;for(var k in fieldMap){var a=fieldMap[k];for(var j=0;j<a.length;j++){var al=a[j];if(all.indexOf(al)!==-1){var s=al.length;if(lb.indexOf(al)!==-1)s+=5;if(el.indexOf(al)!==-1)s+=3;if(s>bs){bs=s;bk=k;}break;}}}
-    if(inp.tagName==='SELECT'||inp.type==='select-one'){inp.dispatchEvent(new Event('focus',{bubbles:true}));var hy=0,hn2=0;for(var z=0;z<inp.options.length;z++){if(ip(inp.options[z].text)&&z===0)continue;if(iy(inp.options[z].text))hy=1;if(i_n(inp.options[z].text))hn2=1;}if(hy&&hn2){for(var z=0;z<inp.options.length;z++){if(ip(inp.options[z].text))continue;if(iy(inp.options[z].text)){inp.value=inp.options[z].value;filled++;da(inp);inp.style.outline='2px solid #10B981';break;}}continue;}}
-    if(bk&&vs[bk]){var v=vs[bk],mt=0;if(inp.tagName==='SELECT'||inp.type==='select-one'){var bo=fo(inp,v);if(bo){inp.value=bo.value;mt=1;}if(!mt&&inp.options.length<=30){rx.push({e:inp,vl:v});for(var z=1;z<inp.options.length;z++){if(!ip(inp.options[z].text)&&inp.options[z].value){inp.value=inp.options[z].value;break;}}}}else{inp.value=v;mt=1;}
-      if(mt){filled++;da(inp);inp.style.outline='2px solid #10B981';}}
-  if(rx.length){var dr=function(){for(var r=0;r<rx.length;r++){var rs=rx[r],e=rs.e,vl=rs.vl;e.dispatchEvent(new Event('focus',{bubbles:true}));var bo=fo(e,vl);if(bo){e.value=bo.value;filled++;da(e);e.style.outline='2px solid #10B981';}}var ni=document.querySelectorAll('input,select,textarea');for(var n=0;n<ni.length;n++){var x=ni[n];if(x.readOnly||x.disabled||x.style.outline)continue;var el2=(x.name+' '+x.id+' '+(x.placeholder||'')+' '+(x.getAttribute('aria-label')||'')+' '+(x.getAttribute('title')||'')).toLowerCase().replace(/[_-]/g,'').trim();var lb='';if(x.labels&&x.labels.length)lb=x.labels[0].textContent.toLowerCase().trim();var al2=el2+' '+lb,bk2=null,bs2=0;for(var k in fieldMap){var a=fieldMap[k];for(var j=0;j<a.length;j++){var al=a[j];if(al2.indexOf(al)!==-1){var s=al.length;if(lb.indexOf(al)!==-1)s+=5;if(el2.indexOf(al)!==-1)s+=3;if(s>bs2){bs2=s;bk2=k;}break;}}}if(bk2&&vs[bk2]){var v2=vs[bk2];if(x.tagName==='SELECT'||x.type==='select-one'){x.dispatchEvent(new Event('focus',{bubbles:true}));var bo2=fo(x,v2);if(bo2){x.value=bo2.value;filled++;da(x);x.style.outline='2px solid #10B981';}}else{x.value=v2;filled++;da(x);x.style.outline='2px solid #10B981';}}}};setTimeout(dr,800);setTimeout(dr,2500);}
-  t(filled>0?'✅ Filled '+filled+' field'+(filled>1?'s':'')+'!':'No fields matched.',filled>0?'#10B981':'#EF4444');
-  }catch(e){var d=document.createElement('div');d.textContent='⚠️ JS Error: '+e.message;d.style.cssText='position:fixed;top:10px;left:10px;padding:8px 16px;background:#EF4444;color:#fff;z-index:9999999;font-family:Arial;font-size:14px;border-radius:6px;';document.body.appendChild(d);}
+  doAutofill();
 })();
 ''';
 }

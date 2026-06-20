@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
@@ -17,123 +18,52 @@ class AppWebView extends StatefulWidget {
 
 class _AppWebViewState extends State<AppWebView> {
   late final WebViewController _controller;
-  bool _loading = true;
-  Timer? _injectTimer;
   String _profileJson = '{}';
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadProfileOnce();
+    _loadProfile();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) {
           setState(() => _loading = true);
         },
-        onPageFinished: (_) {
+        onPageFinished: (_) async {
           setState(() => _loading = false);
-          _injectStar();
-          Future.delayed(const Duration(seconds: 1), _injectStar);
-          Future.delayed(const Duration(seconds: 3), _injectStar);
+          await _injectStar();
         },
       ))
       ..loadRequest(Uri.parse(widget.url));
-    _injectTimer = Timer.periodic(const Duration(seconds: 3), (_) => _injectStar());
   }
 
-  Future<void> _loadProfileOnce() async {
+  Future<void> _loadProfile() async {
     final repo = ProfileRepositoryImpl();
     var profile = await repo.getProfile();
     if (profile == null) {
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 500));
       profile = await repo.getProfile();
     }
     if (profile == null) {
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(milliseconds: 500));
       profile = await repo.getProfile();
     }
     if (profile != null && mounted) {
-      _profileJson = _profileToSimpleJson(profile);
-      _injectStar();
+      _profileJson = jsonEncode(profile.toJson());
     }
   }
 
-  @override
-  void dispose() {
-    _injectTimer?.cancel();
-    super.dispose();
-  }
-
   Future<void> _injectStar() async {
+    if (_profileJson == '{}') {
+      await _loadProfile();
+    }
     try {
       await _controller.runJavaScript(star.buildAutofillScript(_profileJson));
-    } catch (_) {}
-  }
-
-  Future<void> _autofillNow() async {
-    try {
-      await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson));
-    } catch (_) {}
-  }
-
-  String _profileToSimpleJson(StudentProfile p) {
-    String e(String s) => s.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n');
-    return '''
-{
-  "personal": {
-    "title": "${e(p.personal.title)}",
-    "firstName": "${e(p.personal.firstName)}",
-    "lastName": "${e(p.personal.lastName)}",
-    "initials": "${e(p.personal.initials)}",
-    "gender": "${e(p.personal.gender)}",
-    "dateOfBirth": "${p.personal.dateOfBirth?.toIso8601String().split('T').first ?? ''}",
-    "idNumber": "${e(p.personal.idNumber)}"
-  },
-  "contact": {
-    "email": "${e(p.contact.email)}",
-    "phone": "${e(p.contact.phone)}",
-    "workPhone": "${e(p.contact.workPhone)}"
-  },
-  "address": {
-    "address": "${e(p.address.address)}",
-    "addressLine2": "${e(p.address.addressLine2)}",
-    "province": "${e(p.address.province)}",
-    "postalCode": "${e(p.address.postalCode)}"
-  },
-  "demographic": {
-    "nationality": "${e(p.demographic.nationality)}",
-    "citizenship": "${e(p.demographic.nationality)}",
-    "homeLanguage": "${e(p.demographic.homeLanguage)}",
-    "populationGroup": "${e(p.demographic.populationGroup)}",
-    "maritalStatus": "${e(p.demographic.maritalStatus)}"
-  },
-  "school": {
-    "schoolName": "${e(p.school.schoolName)}",
-    "currentGrade": "${e(p.school.currentGrade)}"
-  },
-  "results": {
-    "matricYear": ${p.results.matricYear},
-    "matricType": "${e(p.results.matricType)}",
-    "examinationNumber": "${e(p.results.examinationNumber)}",
-    "applicationLevel": "${e(p.results.applicationLevel)}"
-  },
-  "nextOfKin": {
-    "name": "${e(p.nextOfKin.name)}",
-    "mobilePhone": "${e(p.nextOfKin.mobilePhone)}",
-    "email": "${e(p.nextOfKin.email)}"
-  },
-  "qualification": {
-    "academicYear": ${p.qualification.academicYear},
-    "studyMode": "${e(p.qualification.studyMode)}",
-    "choices": [
-      {
-        "faculty": "${e(p.qualification.choices.isNotEmpty ? p.qualification.choices.first.faculty : '')}",
-        "programme": "${e(p.qualification.choices.isNotEmpty ? p.qualification.choices.first.programme : '')}"
-      }
-    ]
-  }
-}''';
+    } catch (e) {
+      debugPrint('Star injection failed: $e');
+    }
   }
 
   @override
@@ -142,13 +72,6 @@ class _AppWebViewState extends State<AppWebView> {
       appBar: AppBar(
         title: Text(widget.universityName),
         backgroundColor: AppColors.surface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.star_rounded, color: Color(0xFFFFD700)),
-            tooltip: 'Star Auto-Fill',
-            onPressed: () => _autofillNow(),
-          ),
-        ],
       ),
       body: Stack(
         children: [
