@@ -15,7 +15,7 @@ class AiRecommendationsScreen extends ConsumerStatefulWidget {
 
 class _AiRecommendationsScreenState
     extends ConsumerState<AiRecommendationsScreen> {
-  List<_ChatMessage> _messages = [
+  final List<_ChatMessage> _messages = [
     _ChatMessage(
       text: "Hi there! I'm Star ⭐\n\n"
           "First things first — complete your profile so I can give you the best recommendations for your needs!",
@@ -25,7 +25,7 @@ class _AiRecommendationsScreenState
   final _ctrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _loading = false;
-  bool _initialAsked = false;
+  String? _lastUserText;
 
   @override
   void initState() {
@@ -51,6 +51,7 @@ class _AiRecommendationsScreenState
   }
 
   Future<void> _sendMessage(String text) async {
+    _lastUserText = text;
     final profile = ref.read(profileProvider).valueOrNull;
     final userMsg = _ChatMessage(text: text, isUser: true);
     final starMsg = _ChatMessage(text: '', isUser: false);
@@ -65,22 +66,46 @@ class _AiRecommendationsScreenState
         ? 'The student is ${profile.personal.firstName}, studying ${profile.grade12Subjects.map((s) => s.subject).join(", ")}, APS: ${profile.apsScore}, interested in ${profile.careerInterests.join(", ")}.'
         : '';
 
-    await AiService.askStream(
-      prompt: 'You are Star, a friendly South African university advisor. '
-          'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
-          '$contextInfo\nStudent asks: $text',
-      onToken: (token) {
-        setState(() {
-          _messages.last = _ChatMessage(
-            text: _messages.last.text + token,
-            isUser: false,
-          );
-        });
-        _scrollDown();
-      },
-    );
+    String accumulated = '';
+    try {
+      await AiService.askStream(
+        prompt: 'You are Star, a friendly South African university advisor. '
+            'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
+            '$contextInfo\nStudent asks: $text',
+        onToken: (token) {
+          accumulated += token;
+          if (accumulated.startsWith('Star AI error:')) return;
+          setState(() {
+            _messages.last = _ChatMessage(
+              text: accumulated,
+              isUser: false,
+            );
+          });
+          _scrollDown();
+        },
+      );
 
-    setState(() => _loading = false);
+      if (accumulated.startsWith('Star AI error:')) {
+        throw Exception(accumulated);
+      }
+
+      setState(() {
+        _messages.last = _ChatMessage(
+          text: accumulated,
+          isUser: false,
+        );
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _messages.last = _ChatMessage(
+          text: accumulated.isEmpty ? 'Something went wrong. Tap retry to try again.' : accumulated,
+          isUser: false,
+          state: StarMessageState.error,
+        );
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _askInitial() async {
@@ -110,24 +135,55 @@ class _AiRecommendationsScreenState
     final starMsg = _ChatMessage(text: '', isUser: false);
     setState(() {
       _messages.add(starMsg);
-      _initialAsked = true;
       _loading = true;
     });
 
-    await AiService.askStream(
-      prompt: prompt,
-      onToken: (token) {
-        setState(() {
-          _messages.last = _ChatMessage(
-            text: _messages.last.text + token,
-            isUser: false,
-          );
-        });
-        _scrollDown();
-      },
-    );
+    String accumulated = '';
+    try {
+      await AiService.askStream(
+        prompt: prompt,
+        onToken: (token) {
+          accumulated += token;
+          if (accumulated.startsWith('Star AI error:')) return;
+          setState(() {
+            _messages.last = _ChatMessage(
+              text: accumulated,
+              isUser: false,
+            );
+          });
+          _scrollDown();
+        },
+      );
 
-    setState(() => _loading = false);
+      if (accumulated.startsWith('Star AI error:')) {
+        throw Exception(accumulated);
+      }
+
+      setState(() {
+        _messages.last = _ChatMessage(
+          text: accumulated,
+          isUser: false,
+        );
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _messages.last = _ChatMessage(
+          text: accumulated.isEmpty ? 'Something went wrong. Tap retry to try again.' : accumulated,
+          isUser: false,
+          state: StarMessageState.error,
+        );
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _retry() async {
+    if (_lastUserText != null) {
+      await _sendMessage(_lastUserText!);
+    } else {
+      await _askInitial();
+    }
   }
 
   void _scrollDown() {
@@ -173,7 +229,10 @@ class _AiRecommendationsScreenState
                       itemCount: _messages.length,
                       itemBuilder: (context, i) {
                         final msg = _messages[i];
-                        return _ChatBubble(message: msg);
+                        return _ChatBubble(
+                          message: msg,
+                          onRetry: msg.state == StarMessageState.error ? _retry : null,
+                        );
                       },
                     ),
             ),
@@ -234,15 +293,23 @@ class _AiRecommendationsScreenState
   }
 }
 
+enum StarMessageState { success, error }
+
 class _ChatMessage {
   final String text;
   final bool isUser;
-  const _ChatMessage({required this.text, required this.isUser});
+  final StarMessageState state;
+  const _ChatMessage({
+    required this.text,
+    required this.isUser,
+    this.state = StarMessageState.success,
+  });
 }
 
 class _ChatBubble extends StatelessWidget {
   final _ChatMessage message;
-  const _ChatBubble({required this.message});
+  final VoidCallback? onRetry;
+  const _ChatBubble({required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -273,13 +340,33 @@ class _ChatBubble extends StatelessWidget {
                       message.isUser ? 4 : 16),
                 ),
               ),
-              child: Text(
-                message.text,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.text,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                  if (message.state == StarMessageState.error && onRetry != null) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Retry'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.starGold,
+                          side: const BorderSide(color: AppColors.starGold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

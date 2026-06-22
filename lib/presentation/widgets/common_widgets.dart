@@ -34,7 +34,7 @@ class StarAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget image = ClipOval(
       child: Image.asset(
-        'assets/images/star_avatar.png',
+        'assets/images/psaa.png',
         width: size,
         height: size,
         fit: BoxFit.cover,

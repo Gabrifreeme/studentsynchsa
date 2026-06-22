@@ -8,14 +8,150 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 String buildAutofillScript(String profileJson) {
-  return _script(profileJson, addFloatingStar: true);
+  return _script(profileJson);
 }
 
 String buildAutofillOnlyScript(String profileJson) {
-  return _script(profileJson, addFloatingStar: false);
+  return _script(profileJson);
 }
 
-String _script(String profileJson, {required bool addFloatingStar}) {
+// ── iEnabler portal patches (run in onPageFinished, before autofill) ─────
+
+// Security patch: C1 (PIN credential block), C2 (ID masking), C3 (OTP audit),
+//                 A1 (PIN autocomplete/credential suppress), A3 (extension suppress)
+String buildSecurityPatch() => '''
+(function() {
+  var pin = document.querySelector('input[type="password"], input[name="P_PIN"]');
+  if (pin) {
+    pin.setAttribute('autocomplete', 'off');
+    pin.setAttribute('data-lpignore', 'true');
+    pin.setAttribute('data-1p-ignore', 'true');
+    pin.setAttribute('data-bwignore', 'true');
+    pin.setAttribute('data-dashlane-rid', 'ignore');
+    var num = document.querySelector('input[name="P_STUDENT_NO"], input[name="P_NUMB"]');
+    if (num) num.setAttribute('autocomplete', 'off');
+    var form = document.querySelector('form');
+    if (form) form.setAttribute('autocomplete', 'off');
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && pin.value) pin.value = '';
+    });
+  }
+  var idField = document.querySelector('[name="P_ID_NO"]');
+  if (idField) {
+    idField.setAttribute('autocomplete', 'off');
+    idField.addEventListener('paste', function(e) { e.stopPropagation(); }, true);
+    idField.addEventListener('blur', function() {
+      if (idField.value.length === 13) idField.setAttribute('type', 'password');
+    });
+    idField.addEventListener('focus', function() {
+      idField.setAttribute('type', 'text');
+    });
+  }
+  document.querySelectorAll('input').forEach(function(el) {
+    var ac = el.getAttribute('autocomplete') || '';
+    if (ac.includes('one-time-code')) el.setAttribute('autocomplete', 'off');
+  });
+})();
+''';
+
+// Label patch: B1 — aria-label injection for autofill heuristics + screen readers
+String buildLabelPatch() => '''
+(function() {
+  var map = {
+    'P_SURNAME':      'Surname',
+    'P_INITIALS':     'First names / Initials',
+    'P_ID_NO':        'South African ID number',
+    'P_PASSPORT_NO':  'Passport number',
+    'P_EMAIL':        'Email address',
+    'P_CELL_NO':      'Cell phone number',
+    'P_DATE_OF_BIRTH':'Date of birth',
+    'P_STUDENT_NO':   'Student number',
+    'P_PIN':          'PIN',
+    'P_GENDER':       'Gender',
+    'P_HOME_LANG':    'Home language',
+    'P_RACE':         'Population group',
+    'P_NATIONALITY':  'Nationality',
+    'P_ADDRESS_1':    'Street address line 1',
+    'P_POSTAL_CODE':  'Postal code',
+  };
+  Object.keys(map).forEach(function(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (!el) return;
+    el.setAttribute('aria-label', map[name]);
+    if (!el.id) el.id = 'ss_' + name.toLowerCase();
+  });
+})();
+''';
+
+// Autocomplete patch: B2 + A2 — WHATWG autocomplete tokens + suppress address fields
+String buildAutocompletePatch() => '''
+(function() {
+  var dangerousNames = ['P_ADDRESS_1','P_ADDRESS_2','P_POSTAL_CODE',
+                        'P_CITY','P_PROVINCE','P_COUNTRY'];
+  dangerousNames.forEach(function(n) {
+    var el = document.querySelector('[name="' + n + '"]');
+    if (el) el.setAttribute('autocomplete', 'off');
+  });
+  var tokens = {
+    'P_SURNAME':      'family-name',
+    'P_INITIALS':     'given-name',
+    'P_EMAIL':        'email',
+    'P_CELL_NO':      'tel-national',
+    'P_DATE_OF_BIRTH':'bday',
+    'P_GENDER':       'sex',
+    'P_STUDENT_NO':   'username',
+    'P_PIN':          'off',
+    'P_ID_NO':        'off',
+    'P_PASSPORT_NO':  'off',
+    'P_ADDRESS_1':    'off',
+    'P_POSTAL_CODE':  'off',
+  };
+  Object.keys(tokens).forEach(function(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (el) el.setAttribute('autocomplete', tokens[name]);
+  });
+})();
+''';
+
+// Focus patch: B3 — move autofocus from PIN to student number
+String buildFocusPatch() => '''
+(function() {
+  var pin = document.querySelector('[name="P_PIN"]');
+  if (pin) pin.removeAttribute('autofocus');
+  var num = document.querySelector('[name="P_STUDENT_NO"], [name="P_NUMB"]');
+  if (num) num.focus();
+})();
+''';
+
+// Inputmode patch: B4 — numeric inputmode for ID, phone, postal code, student no
+String buildInputmodePatch() => '''
+(function() {
+  var numericFields = ['P_ID_NO','P_CELL_NO','P_POSTAL_CODE',
+                       'P_STUDENT_NO','P_NUMB'];
+  numericFields.forEach(function(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (el) {
+      el.setAttribute('inputmode', 'numeric');
+      el.setAttribute('pattern', '[0-9]*');
+    }
+  });
+  var dob = document.querySelector('[name="P_DATE_OF_BIRTH"]');
+  if (dob) dob.setAttribute('inputmode', 'numeric');
+})();
+''';
+
+// Form label patch: B5 — name the <form> so Chrome doesn't merge across steps
+String buildFormLabelPatch() => '''
+(function() {
+  var forms = document.querySelectorAll('form');
+  if (forms.length === 1) {
+    forms[0].setAttribute('aria-label', document.title || 'University application form');
+    if (!forms[0].id) forms[0].id = 'ss_main_form';
+  }
+})();
+''';
+
+String _script(String profileJson) {
   return '''
 (function() {
   // ── 1. Profile data ────────────────────────────────────────────────────
@@ -395,29 +531,8 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     );
   }
 
-  ${addFloatingStar ? '''
-  // Floating star button injected into the page
-  (function() {
-    if (document.getElementById('ssa-star')) return;
-    var star = document.createElement('div');
-    star.id = 'ssa-star';
-    star.innerHTML = '⭐';
-    star.title = 'Star Auto-Fill';
-    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
-      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
-      + 'color:#FFD700;font-size:32px;user-select:none;';
-    star.onclick = doAutofill;
-    function tryAppend() {
-      if (document.body) document.body.appendChild(star);
-      else setTimeout(tryAppend, 300);
-    }
-    tryAppend();
-  })();
-  ''' : ''}
-
   doAutofill();
+
 })();
 ''';
 }

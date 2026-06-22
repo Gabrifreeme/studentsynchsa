@@ -4,10 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
-import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -257,30 +254,6 @@ class _UniversityCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // ✨ Apply (in-app) + ↗ (external portal)
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: _buildTab(
-                        label: '✨ Apply',
-                        icon: Icons.auto_awesome_rounded,
-                        color: AppColors.primary,
-                        onTap: () => _handleApply(context, uni),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildTab(
-                        label: '',
-                        icon: Icons.open_in_new_rounded,
-                        color: AppColors.textSecondary,
-                        onTap: () => _handlePortal(context, uni),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -289,67 +262,4 @@ class _UniversityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTab({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _handleApply(BuildContext context, University uni) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ApplicationFormScreen(university: uni),
-      ),
-    );
-  }
-
-  void _handlePortal(BuildContext context, University uni) {
-    if (uni.applicationUrl.isNotEmpty) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => UniversityWebViewScreen(
-            url: uni.applicationUrl,
-            universityName: uni.shortName,
-          ),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No online portal available'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
 }
