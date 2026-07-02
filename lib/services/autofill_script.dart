@@ -8,11 +8,520 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 String buildAutofillScript(String profileJson) {
-  return _script(profileJson);
+  return _buildFullScript(profileJson, createStar: true);
 }
 
 String buildAutofillOnlyScript(String profileJson) {
-  return _script(profileJson);
+  return _buildFullScript(profileJson, createStar: false);
+}
+
+String buildCompleteAutofillScript(String profileJson, {bool createStar = true}) {
+  return buildAutofillScript(profileJson);
+}
+
+String _buildFullScript(String profileJson, {required bool createStar}) {
+  final starBlock = createStar ? r'''
+  function createStar() {
+    if (document.getElementById('ssa-star')) return;
+    var star = document.createElement('div');
+    star.id = 'ssa-star';
+    star.innerHTML = '★';
+    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:60px;height:60px;background:#0F1624;border-radius:50%;z-index:999999;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;color:#FFD700;font-size:40px;font-family:Arial,sans-serif;transition:transform 0.2s;';
+    star.onclick = doAutofill;
+    document.body.appendChild(star);
+  }
+  function tryCreate() { if (document.body) { createStar(); } else { setTimeout(tryCreate, 500); } }
+  tryCreate();
+''' : '';
+
+  return '''
+(function() {
+  var profile = $profileJson;
+
+  var fieldMap = {
+    'title':             ['title','salutation'],
+    'firstName':         ['firstname','first name','fname','given name','givenname'],
+    'lastName':          ['lastname','last name','lname','surname','family name','familyname'],
+    'initials':          ['initials'],
+    'gender':            ['gender','sex'],
+    'idNumber':          ['idnumber','id number','identity number','national id','sa id','passport number','rsaid'],
+    'dateOfBirth':       ['dateofbirth','date of birth','dob','birthdate','birth date','birthday'],
+    'email':             ['email','e-mail','emailaddress','email address'],
+    'phone':             ['phone','telephone','tel','cell','cellphone','mobile','mobile number','contact no','phone number'],
+    'workPhone':         ['workphone','work phone','telephone work','tel work'],
+    'address':           ['address','street','physical address','residential address'],
+    'addressLine2':      ['address2','address line2','suburb','town','city'],
+    'province':          ['province','state','region'],
+    'postalCode':        ['postalcode','postal code','postcode','zip','zipcode','code'],
+    'nationality':       ['nationality','citizenship','citizen','country','sa citizen','south african'],
+    'homeLanguage':      ['homelanguage','home language','language','first language'],
+    'populationGroup':   ['populationgroup','population group','race','ethnicity'],
+    'maritalStatus':     ['maritalstatus','marital status'],
+    'schoolName':        ['school','schoolname','school name','highschool','high school','institution'],
+    'currentGrade':      ['grade','current grade','grade12','matric'],
+    'matricYear':        ['matricyear','year of matric','examination year'],
+    'matricType':        ['matrictype','matric type','exam type','examination type'],
+    'examinationNumber': ['examinationnumber','exam number','candidate number'],
+    'applicationLevel':  ['applicationlevel','level of study','study level','application type'],
+    'faculty':           ['faculty','faculty choice'],
+    'programme':         ['programme','course','program','qualification','course choice','study programme'],
+    'academicYear':      ['academicyear','academic year','year of study','study year'],
+    'studyMode':         ['studymode','study mode','mode of study','attendance mode'],
+    'nextOfKinName':     ['nextofkin name','nextofkin','guardian name','parent name','parentguardian'],
+    'nextOfKinPhone':    ['nextofkin phone','guardian phone','parent phone','emergency contact'],
+    'nextOfKinEmail':    ['nextofkin email','guardian email','parent email'],
+  };
+
+  function getVal(path) {
+    var parts = path.split('.');
+    var obj = profile;
+    for (var i = 0; i < parts.length; i++) {
+      if (obj == null || typeof obj !== 'object') return '';
+      obj = obj[parts[i]];
+    }
+    return (obj != null && obj !== undefined) ? String(obj) : '';
+  }
+
+  function fmtDate(iso) {
+    if (!iso || iso.length < 10) return iso;
+    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var p = iso.split('T')[0].split('-');
+    var m = parseInt(p[1], 10) - 1;
+    return (m >= 0 && m < 12) ? p[2] + '-' + months[m] + '-' + p[0] : iso;
+  }
+
+  var vs = {
+    'title':             getVal('personal.title'),
+    'firstName':         getVal('personal.firstName'),
+    'lastName':          getVal('personal.lastName'),
+    'initials':          getVal('personal.initials'),
+    'gender':            getVal('personal.gender'),
+    'idNumber':          getVal('personal.idNumber'),
+    'dateOfBirth':       fmtDate(getVal('personal.dateOfBirth')),
+    'email':             getVal('contact.email'),
+    'phone':             getVal('contact.phone'),
+    'workPhone':         getVal('contact.workPhone'),
+    'address':           getVal('address.address'),
+    'addressLine2':      getVal('address.addressLine2'),
+    'province':          getVal('address.province'),
+    'postalCode':        getVal('address.postalCode'),
+    'nationality':       getVal('demographic.nationality'),
+    'homeLanguage':      getVal('demographic.homeLanguage'),
+    'populationGroup':   getVal('demographic.populationGroup'),
+    'maritalStatus':     getVal('demographic.maritalStatus'),
+    'schoolName':        getVal('school.schoolName'),
+    'currentGrade':      getVal('school.currentGrade'),
+    'matricYear':        getVal('results.matricYear'),
+    'matricType':        getVal('results.matricType'),
+    'examinationNumber': getVal('results.examinationNumber'),
+    'applicationLevel':  getVal('results.applicationLevel'),
+    'faculty':           getVal('qualification.choices.0.faculty'),
+    'programme':         getVal('qualification.choices.0.programme'),
+    'academicYear':      getVal('qualification.academicYear'),
+    'studyMode':         getVal('qualification.studyMode'),
+    'nextOfKinName':     getVal('nextOfKin.name'),
+    'nextOfKinPhone':    getVal('nextOfKin.mobilePhone'),
+    'nextOfKinEmail':    getVal('nextOfKin.email'),
+  };
+
+  // ── Toast ───────────────────────────────────────────────────────────────
+  function showToast(msg, color) {
+    var old = document.getElementById('ssa-toast');
+    if (old) old.remove();
+    var t = document.createElement('div');
+    t.id = 'ssa-toast';
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:100px;right:24px;padding:12px 20px;background:' + (color||'#10B981') + ';color:#fff;border-radius:10px;z-index:9999999;font-family:Arial,sans-serif;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.4s;';
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { if(t.parentNode) t.remove(); }, 400); }, 2800);
+  }
+
+  // ── Helper functions for uniform matching ──────────────────────────────
+  function cleanText(text) {
+    if (!text) return '';
+    return text.toString()
+               .replace(/\\u00a0/g, ' ') // replace non-breaking spaces
+               .replace(/\\s+/g, ' ')    // collapse duplicate spaces
+               .toLowerCase()
+               .trim();
+  }
+
+  function isPlaceholder(text) {
+    var t = cleanText(text);
+    return t === '' || t === 'select' || t === 'choose' || t === 'please select'
+      || t.indexOf('select') === 0 || t.indexOf('choose') === 0 || t.indexOf('--') !== -1;
+  }
+
+  function isYes(text) {
+    var t = cleanText(text);
+    return t === 'yes' || t === 'y' || t === 'true' || t === '1'
+      || t === 'sa citizen' || t === 'south african' || t === 'rsa';
+  }
+
+  function isNo(text) {
+    var t = cleanText(text);
+    return t === 'no' || t === 'n' || t === 'false' || t === '0' || t === 'other';
+  }
+
+  // Recursive search to penetrate any IFRAMEs / FRAMEs in University portals
+  function getElementsFromAllFrames(selector) {
+    var elements = [];
+    function search(doc) {
+      if (!doc) return;
+      try {
+        var found = doc.querySelectorAll(selector);
+        for (var i = 0; i < found.length; i++) {
+          elements.push(found[i]);
+        }
+      } catch (e) {}
+      try {
+        var frames = doc.querySelectorAll('iframe, frame');
+        for (var j = 0; j < frames.length; j++) {
+          try {
+            var fDoc = frames[j].contentDocument || frames[j].contentWindow.document;
+            search(fDoc);
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+    search(document);
+    return elements;
+  }
+
+  // ── Option matcher for dropdowns ─────────────────────────────────────────
+  function findOption(sel, rawVal) {
+    if (!rawVal) return null;
+    var vl = cleanText(rawVal);
+    var terms = [vl];
+    if (vl === 'sa citizen' || vl === 'south african' || vl === 'south africa' || vl === 'sa' || vl === 'rsa') {
+      terms = terms.concat(['south african','south africa','sa citizen','rsa']);
+    }
+    var bestOpt = null, bestScore = -1;
+    for (var t = 0; t < terms.length; t++) {
+      var tl = terms[t];
+      var tWords = tl.split(' ');
+      for (var k = 0; k < sel.options.length; k++) {
+        var opt = sel.options[k];
+        if (isPlaceholder(opt.text)) continue;
+        var tt = cleanText(opt.text);
+        var vv = cleanText(opt.value);
+        var score = -1;
+        if (tt === tl || vv === tl)                               score = 100;
+        else if (tt.indexOf(tl) === 0 || vv.indexOf(tl) === 0)   score = 50;
+        else if (tt.indexOf(tl) !== -1 || vv.indexOf(tl) !== -1) score = 30;
+        else if (tl.indexOf(tt) !== -1 && tt.length > 2)         score = 20;
+        else {
+          for (var w = 0; w < tWords.length; w++) {
+            if (tWords[w].length > 2 && (tt.indexOf(tWords[w]) !== -1 || vv.indexOf(tWords[w]) !== -1)) {
+              score = 10; break;
+            }
+          }
+        }
+        if (score > bestScore) { bestScore = score; bestOpt = opt; }
+      }
+    }
+    return bestScore >= 10 ? bestOpt : null;
+  }
+
+  // ── Value setters + Event trigger chain (React, Angular & Legacy aware) ──
+  function setNativeValue(el, value) {
+    var nativeProto = el.tagName === 'TEXTAREA'
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+    var descriptor = Object.getOwnPropertyDescriptor(nativeProto, 'value');
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(el, value);
+    } else {
+      el.value = value;
+    }
+  }
+
+  function dispatchAll(el) {
+    el.dispatchEvent(new Event('focus', { bubbles: true }));
+
+    try {
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: el.value }));
+    } catch(e) {
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Standard modern events
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Legacy inline event trigger (CRITICAL for old university web portals)
+    if (typeof el.onchange === 'function') {
+      try { el.onchange(); } catch(e) {}
+    }
+    if (typeof el.oninput === 'function') {
+      try { el.oninput(); } catch(e) {}
+    }
+
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    if (el.form) el.form.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function setInputValue(el, value) {
+    if (!value && value !== 0) return false;
+    var before = el.value;
+    setNativeValue(el, String(value));
+    dispatchAll(el);
+    var after = el.value;
+    return after.trim().length > 0 && after !== before;
+  }
+
+  function setSelectValue(sel, value) {
+    var opt = findOption(sel, value);
+    if (!opt) return false;
+    sel.dispatchEvent(new Event('focus', { bubbles: true }));
+    sel.value = opt.value;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === opt.value) { sel.selectedIndex = i; break; }
+    }
+    dispatchAll(sel);
+    return sel.value.trim().length > 0;
+  }
+
+  // ── New radio button matcher function ────────────────────────────────────
+  function setRadioValue(radioGroup, value) {
+    if (!value) return false;
+    var targetVal = cleanText(value);
+    var isTargetYes = isYes(targetVal);
+    var isTargetNo = isNo(targetVal);
+    var matchedRadio = null;
+    var bestScore = -1;
+
+    for (var i = 0; i < radioGroup.length; i++) {
+      var radio = radioGroup[i];
+      var rVal = cleanText(radio.value);
+      var rText = '';
+
+      // Locate labels matching the radio button ID
+      if (radio.id) {
+        var labelEl = document.querySelector('label[for="' + radio.id + '"]');
+        if (labelEl) rText = cleanText(labelEl.textContent);
+      }
+      if (!rText) {
+        var parent = radio.parentElement;
+        if (parent && parent.tagName === 'LABEL') {
+          rText = cleanText(parent.textContent);
+        } else {
+          var nextNode = radio.nextSibling;
+          if (nextNode && nextNode.nodeType === 3) {
+            rText = cleanText(nextNode.textContent);
+          }
+        }
+      }
+
+      var score = -1;
+      if (rVal === targetVal || rText === targetVal) {
+        score = 100;
+      } else if (isTargetYes && (isYes(rVal) || isYes(rText))) {
+        score = 90;
+      } else if (isTargetNo && (isNo(rVal) || isNo(rText))) {
+        score = 90;
+      } else if (rText.indexOf(targetVal) !== -1 || rVal.indexOf(targetVal) !== -1) {
+        score = 50;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        matchedRadio = radio;
+      }
+    }
+
+    if (matchedRadio && bestScore >= 50) {
+      matchedRadio.checked = true;
+      matchedRadio.dispatchEvent(new Event('focus', { bubbles: true }));
+      matchedRadio.dispatchEvent(new Event('click', { bubbles: true }));
+      if (typeof matchedRadio.onclick === 'function') {
+        try { matchedRadio.onclick(); } catch(e) {}
+      }
+      matchedRadio.dispatchEvent(new Event('change', { bubbles: true }));
+      if (typeof matchedRadio.onchange === 'function') {
+        try { matchedRadio.onchange(); } catch(e) {}
+      }
+      matchedRadio.dispatchEvent(new Event('blur', { bubbles: true }));
+      return true;
+    }
+    return false;
+  }
+
+  // ── Field matching ──────────────────────────────────────────────────────
+  function matchField(el) {
+    var raw = [
+      el.name || '',
+      el.id || '',
+      el.placeholder || '',
+      el.getAttribute('aria-label') || '',
+      el.getAttribute('aria-labelledby') || '',
+      el.getAttribute('title') || '',
+      el.getAttribute('data-field') || '',
+      el.getAttribute('data-name') || '',
+    ].join(' ').toLowerCase().replace(/[_\\-]/g, ' ').trim();
+
+    var labelText = '';
+    if (el.labels && el.labels.length) {
+      labelText = el.labels[0].textContent.toLowerCase().replace(/[_\\-]/g, ' ').trim();
+    } else {
+      var lid = el.getAttribute('aria-labelledby');
+      if (lid) {
+        var labelEl = document.getElementById(lid);
+        if (labelEl) labelText = labelEl.textContent.toLowerCase().replace(/[_\\-]/g, ' ').trim();
+      }
+      var parent = el.parentElement;
+      for (var d = 0; d < 4 && parent; d++) {
+        var lbl = parent.querySelector('label');
+        if (lbl && !lbl.htmlFor) { labelText = lbl.textContent.toLowerCase().replace(/[_\\-]/g, ' ').trim(); break; }
+        parent = parent.parentElement;
+      }
+    }
+
+    var allText = raw + ' ' + labelText;
+    var bestKey = null, bestScore = 0;
+
+    for (var key in fieldMap) {
+      var aliases = fieldMap[key];
+      for (var j = 0; j < aliases.length; j++) {
+        var alias = aliases[j];
+        if (allText.indexOf(alias) !== -1) {
+          var score = alias.length * 2;
+          if (labelText.indexOf(alias) !== -1) score += 10;
+          if (raw.indexOf(alias) !== -1) score += 5;
+          if (score > bestScore) { bestScore = score; bestKey = key; }
+          break;
+        }
+      }
+    }
+    return bestKey;
+  }
+
+  // ── Main fill loop ──────────────────────────────────────────────────────
+  function doAutofill() {
+    if (!vs['firstName'] && !vs['lastName'] && !vs['email']) {
+      showToast('No profile data. Go to Dashboard first.', '#EF4444');
+      return;
+    }
+
+    // 1. Fill standard inputs, textareas, and dropdowns (select elements) across ALL nested frames
+    var normalSelector = 'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]):not([type=checkbox]):not([type=radio]), select, textarea';
+    var inputs = getElementsFromAllFrames(normalSelector);
+    var filled = 0;
+    var retries = [];
+
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      if (inp.readOnly || inp.disabled) continue;
+
+      var key = matchField(inp);
+      if (!key || !vs[key]) continue;
+
+      var ok = false;
+      if (inp.tagName === 'SELECT') {
+        ok = setSelectValue(inp, vs[key]);
+        if (!ok) retries.push({ el: inp, key: key });
+      } else {
+        ok = setInputValue(inp, vs[key]);
+      }
+
+      if (ok) {
+        filled++;
+        inp.style.outline = '3px solid #10B981';
+        inp.style.outlineOffset = '1px';
+      }
+    }
+
+    // 2. Fill radio buttons across ALL nested frames
+    var radios = getElementsFromAllFrames('input[type=radio]');
+    var radioGroups = {};
+    for (var j = 0; j < radios.length; j++) {
+      var rad = radios[j];
+      if (rad.disabled) continue;
+      var name = rad.name;
+      if (!name) continue;
+      
+      // Grouping by frame origin to avoid mixing elements with same name in separate frame documents
+      var frameKey = (rad.ownerDocument === document) ? 'main' : 'iframe_' + j;
+      var groupKey = frameKey + '_' + name;
+      
+      if (!radioGroups[groupKey]) {
+        radioGroups[groupKey] = [];
+      }
+      radioGroups[groupKey].push(rad);
+    }
+
+    for (var gKey in radioGroups) {
+      var group = radioGroups[gKey];
+      var representative = group[0];
+      var key = matchField(representative);
+      if (key && vs[key]) {
+        var ok = setRadioValue(group, vs[key]);
+        if (ok) {
+          filled++;
+          group.forEach(function(r) {
+            if (r.parentElement) {
+              r.parentElement.style.outline = '2px solid #10B981';
+              r.parentElement.style.borderRadius = '4px';
+            }
+          });
+        }
+      }
+    }
+
+    // 3. Fill checkboxes across ALL nested frames
+    var checkboxes = getElementsFromAllFrames('input[type=checkbox]');
+    for (var c = 0; c < checkboxes.length; c++) {
+      var chk = checkboxes[c];
+      if (chk.disabled || chk.readOnly) continue;
+      var key = matchField(chk);
+      if (key && vs[key]) {
+        var val = vs[key].toLowerCase().trim();
+        var shouldCheck = isYes(val);
+        if (chk.checked !== shouldCheck) {
+          chk.checked = shouldCheck;
+          chk.dispatchEvent(new Event('focus', { bubbles: true }));
+          chk.dispatchEvent(new Event('click', { bubbles: true }));
+          if (typeof chk.onclick === 'function') { try { chk.onclick(); } catch(e) {} }
+          chk.dispatchEvent(new Event('change', { bubbles: true }));
+          if (typeof chk.onchange === 'function') { try { chk.onchange(); } catch(e) {} }
+          chk.dispatchEvent(new Event('blur', { bubbles: true }));
+          filled++;
+          if (chk.parentElement) {
+            chk.parentElement.style.outline = '2px solid #10B981';
+          }
+        }
+      }
+    }
+
+    // Retry select elements asynchronously for cascade loading dropdowns
+    if (retries.length) {
+      function doRetry() {
+        for (var r = 0; r < retries.length; r++) {
+          var item = retries[r];
+          if (item.el.style.outline) continue;
+          var ok = setSelectValue(item.el, vs[item.key]);
+          if (ok) { 
+            filled++; 
+            item.el.style.outline = '3px solid #10B981'; 
+            item.el.style.outlineOffset = '1px'; 
+          }
+        }
+      }
+      setTimeout(doRetry, 600);
+      setTimeout(doRetry, 2000);
+      setTimeout(doRetry, 5000);
+    }
+
+    showToast(
+      filled > 0 ? '✅ Filled ' + filled + ' field' + (filled > 1 ? 's' : '') + '!' : 'No fields matched.',
+      filled > 0 ? '#10B981' : '#EF4444'
+    );
+  }
+
+  $starBlock
+
+  doAutofill();
+})();
+''';
 }
 
 // ── iEnabler portal patches (run in onPageFinished, before autofill) ─────
@@ -151,388 +660,207 @@ String buildFormLabelPatch() => '''
 })();
 ''';
 
-String _script(String profileJson) {
+String buildInjectScript(String oapName, String normalizedValue) {
+  final v = normalizedValue.replaceAll("'", "\\'");
   return '''
 (function() {
-  // ── 1. Profile data ────────────────────────────────────────────────────
-  var profile = $profileJson;
-
-  function gv(path) {
-    var parts = path.split('.');
-    var o = profile;
-    for (var i = 0; i < parts.length; i++) {
-      if (o == null || typeof o !== 'object') return '';
-      o = o[parts[i]];
-    }
-    return (o !== null && o !== undefined) ? String(o) : '';
-  }
-
-  function fmtDate(iso) {
-    if (!iso || iso.length < 10) return iso || '';
-    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    var p = iso.split('T')[0].split('-');
-    var m = parseInt(p[1], 10) - 1;
-    return (m >= 0 && m < 12) ? p[2] + '-' + months[m] + '-' + p[0] : iso;
-  }
-
-  // date also as DD/MM/YYYY for ITS portals
-  function fmtDateSlash(iso) {
-    if (!iso || iso.length < 10) return iso || '';
-    var p = iso.split('T')[0].split('-');
-    return p[2] + '/' + p[1] + '/' + p[0];
-  }
-
-  var firstName   = gv('personal.firstName');
-  var lastName    = gv('personal.lastName');
-  var email       = gv('contact.email');
-  var dobIso      = gv('personal.dateOfBirth');
-
-  var vs = {
-    firstName:         firstName,
-    lastName:          lastName,
-    initials:          gv('personal.initials'),
-    title:             gv('personal.title'),
-    gender:            gv('personal.gender'),
-    idNumber:          gv('personal.idNumber'),
-    dateOfBirth:       fmtDate(dobIso),
-    dateOfBirthSlash:  fmtDateSlash(dobIso),
-    email:             email,
-    phone:             gv('contact.phone'),
-    workPhone:         gv('contact.workPhone'),
-    address:           gv('address.address'),
-    addressLine2:      gv('address.addressLine2'),
-    province:          gv('address.province'),
-    postalCode:        gv('address.postalCode'),
-    nationality:       gv('demographic.nationality'),
-    homeLanguage:      gv('demographic.homeLanguage'),
-    populationGroup:   gv('demographic.populationGroup'),
-    maritalStatus:     gv('demographic.maritalStatus'),
-    schoolName:        gv('school.schoolName'),
-    currentGrade:      gv('school.currentGrade'),
-    matricYear:        gv('results.matricYear'),
-    matricType:        gv('results.matricType'),
-    examinationNumber: gv('results.examinationNumber'),
-    applicationLevel:  gv('results.applicationLevel'),
-    faculty:           gv('qualification.choices.0.faculty'),
-    programme:         gv('qualification.choices.0.programme'),
-    academicYear:      gv('qualification.academicYear'),
-    studyMode:         gv('qualification.studyMode'),
-    nextOfKinName:     gv('nextOfKin.name'),
-    nextOfKinPhone:    gv('nextOfKin.mobilePhone'),
-    nextOfKinEmail:    gv('nextOfKin.email'),
-  };
-
-  // ── 2. ITS portal exact-name map (P_* Oracle fields) ──────────────────
-  // These are the actual INPUT NAME attributes used by ITS/Univen/UL/TUT etc.
-  var itsExact = {
-    // Personal
-    'P_SURNAME':           vs.lastName,
-    'P_NAME':              vs.firstName,
-    'P_INITIALS':          vs.initials,
-    'P_TITLE':             vs.title,
-    'P_GENDER':            vs.gender,
-    'P_ID_NO':             vs.idNumber,
-    'P_PASSPORT_NO':       vs.idNumber,
-    'P_DATE_OF_BIRTH':     vs.dateOfBirth,
-    'P_DOB':               vs.dateOfBirth,
-    'P_BIRTH_DATE':        vs.dateOfBirth,
-    // Contact
-    'P_EMAIL':             vs.email,
-    'P_EMAIL_ADDRESS':     vs.email,
-    'P_CONFIRM_EMAIL':     vs.email,
-    'P_EMAIL2':            vs.email,
-    'P_CELL_NO':           vs.phone,
-    'P_CELL':              vs.phone,
-    'P_CELLPHONE':         vs.phone,
-    'P_PHONE':             vs.phone,
-    'P_TEL_NO':            vs.phone,
-    'P_WORK_TEL':          vs.workPhone,
-    // Address
-    'P_ADDRESS_1':         vs.address,
-    'P_ADDRESS_2':         vs.addressLine2,
-    'P_ADDRESS1':          vs.address,
-    'P_ADDRESS2':          vs.addressLine2,
-    'P_PHYSICAL_ADDRESS':  vs.address,
-    'P_SUBURB':            vs.addressLine2,
-    'P_CITY':              vs.addressLine2,
-    'P_PROVINCE':          vs.province,
-    'P_POSTAL_CODE':       vs.postalCode,
-    'P_POST_CODE':         vs.postalCode,
-    'P_POSTAL':            vs.postalCode,
-    // Demographic
-    'P_NATIONALITY':       vs.nationality,
-    'P_CITIZEN':           vs.nationality,
-    'P_CITIZENSHIP':       vs.nationality,
-    'P_HOME_LANGUAGE':     vs.homeLanguage,
-    'P_LANGUAGE':          vs.homeLanguage,
-    'P_POPULATION_GROUP':  vs.populationGroup,
-    'P_RACE':              vs.populationGroup,
-    'P_MARITAL_STATUS':    vs.maritalStatus,
-    // School
-    'P_SCHOOL_NAME':       vs.schoolName,
-    'P_SCHOOL':            vs.schoolName,
-    'P_GRADE':             vs.currentGrade,
-    // Results
-    'P_MATRIC_YEAR':       vs.matricYear,
-    'P_EXAM_YEAR':         vs.matricYear,
-    'P_EXAM_TYPE':         vs.matricType,
-    'P_EXAM_NO':           vs.examinationNumber,
-    'P_CANDIDATE_NO':      vs.examinationNumber,
-    // Application
-    'P_FACULTY':           vs.faculty,
-    'P_PROGRAMME':         vs.programme,
-    'P_COURSE':            vs.programme,
-    'P_QUALIFICATION':     vs.programme,
-    'P_STUDY_MODE':        vs.studyMode,
-    'P_YEAR_OF_STUDY':     vs.academicYear,
-    // Next of kin
-    'P_PARENT_NAME':       vs.nextOfKinName,
-    'P_GUARDIAN_NAME':     vs.nextOfKinName,
-    'P_NOK_NAME':          vs.nextOfKinName,
-    'P_PARENT_CELL':       vs.nextOfKinPhone,
-    'P_GUARDIAN_CELL':     vs.nextOfKinPhone,
-    'P_NOK_CELL':          vs.nextOfKinPhone,
-    'P_PARENT_EMAIL':      vs.nextOfKinEmail,
-    'P_GUARDIAN_EMAIL':    vs.nextOfKinEmail,
-    'P_NOK_EMAIL':         vs.nextOfKinEmail,
-  };
-
-  // ── 3. Generic fuzzy fieldMap (fallback for non-ITS sites) ────────────
-  var fieldMap = {
-    firstName:         ['firstname','first name','fname','given name','name'],
-    lastName:          ['lastname','last name','surname','lname','family name'],
-    initials:          ['initials'],
-    title:             ['title','salutation'],
-    gender:            ['gender','sex'],
-    idNumber:          ['id number','idnumber','identity number','national id','id no','passport'],
-    dateOfBirth:       ['date of birth','dateofbirth','dob','birth date','birthdate','birthday'],
-    email:             ['email','e-mail','email address'],
-    phone:             ['cell','cellphone','mobile','phone','telephone','contact number'],
-    workPhone:         ['work phone','work tel','telephone work'],
-    address:           ['address','street','physical address'],
-    addressLine2:      ['address 2','suburb','town','city'],
-    province:          ['province','state','region'],
-    postalCode:        ['postal code','postalcode','post code','postcode','zip'],
-    nationality:       ['nationality','citizenship','citizen'],
-    homeLanguage:      ['home language','homelanguage','language'],
-    populationGroup:   ['population group','race','ethnicity'],
-    maritalStatus:     ['marital status','maritalstatus'],
-    schoolName:        ['school','high school','institution'],
-    currentGrade:      ['grade','current grade'],
-    matricYear:        ['matric year','exam year','year of matric'],
-    matricType:        ['matric type','exam type'],
-    examinationNumber: ['exam number','candidate number','examination number'],
-    faculty:           ['faculty'],
-    programme:         ['programme','course','program','qualification'],
-    academicYear:      ['academic year','year of study'],
-    studyMode:         ['study mode','mode of study','attendance'],
-    nextOfKinName:     ['next of kin','guardian','parent name','emergency contact name'],
-    nextOfKinPhone:    ['guardian phone','parent phone','emergency contact number'],
-    nextOfKinEmail:    ['guardian email','parent email'],
-  };
-
-  // ── 4. Helpers ─────────────────────────────────────────────────────────
-  function showToast(msg, color) {
-    var old = document.getElementById('ssa-toast');
-    if (old) old.remove();
-    var t = document.createElement('div');
-    t.id = 'ssa-toast';
-    t.textContent = msg;
-    t.style.cssText = 'position:fixed;bottom:90px;right:20px;padding:12px 18px;'
-      + 'background:' + (color||'#10B981') + ';color:#fff;border-radius:10px;'
-      + 'z-index:2147483647;font:14px Arial,sans-serif;'
-      + 'box-shadow:0 4px 14px rgba(0,0,0,0.35);transition:opacity 0.4s;';
-    document.body.appendChild(t);
-    setTimeout(function() {
-      t.style.opacity = '0';
-      setTimeout(function() { if (t.parentNode) t.remove(); }, 400);
-    }, 3000);
-  }
-
-  function isPlaceholder(text) {
-    var t = (text || '').toLowerCase().trim();
-    return !t || t === 'select' || t === 'choose' || t === 'please select'
-      || t === 'none' || t.indexOf('--') !== -1
-      || t.indexOf('select ') === 0 || t.indexOf('choose ') === 0;
-  }
-
-  function findOption(sel, want) {
-    if (!want) return null;
-    var wl = want.toLowerCase().trim();
-    var best = null, bestScore = -1;
-    for (var i = 0; i < sel.options.length; i++) {
-      var opt = sel.options[i];
-      if (isPlaceholder(opt.text)) continue;
-      var tl = opt.text.toLowerCase().trim();
-      var vl = opt.value.toLowerCase().trim();
-      var score = -1;
-      if (tl === wl || vl === wl)                               score = 100;
-      else if (tl.indexOf(wl) !== -1 || vl.indexOf(wl) !== -1) score = 50;
-      else if (wl.indexOf(tl) !== -1 && tl.length > 2)         score = 30;
-      else {
-        var words = wl.split(/\\s+/);
-        for (var w = 0; w < words.length; w++) {
-          if (words[w].length > 2 && (tl.indexOf(words[w]) !== -1 || vl.indexOf(words[w]) !== -1)) {
-            score = 10; break;
-          }
+  var target = '$v';
+  if (!target) return 'false';
+  var names = ['$oapName', '${oapName.startsWith('oap') ? 'P_${oapName.substring(3).toUpperCase()}' : oapName}', '${oapName.toLowerCase()}'];
+  for (var ni = 0; ni < names.length; ni++) {
+    var name = names[ni];
+    var radios = document.querySelectorAll('input[type="radio"][name="' + name + '"]');
+    if (radios.length > 0) {
+      for (var ri = 0; ri < radios.length; ri++) {
+        if (radios[ri].value === target || radios[ri].value.toLowerCase() === target.toLowerCase()) {
+          radios[ri].checked = true;
+          radios[ri].dispatchEvent(new Event('change', { bubbles: true }));
+          return 'true';
         }
       }
-      if (score > bestScore) { bestScore = score; best = opt; }
     }
-    return bestScore >= 10 ? best : null;
-  }
-
-  // Plain value setter + minimal events — ITS is plain HTML, no framework needed.
-  // We still dispatch input+change for any JS validation the portal has.
-  function fill(el, value) {
-    if (!value && value !== 0) return false;
-    var v = String(value);
-    if (el.tagName === 'SELECT') {
-      var opt = findOption(el, v);
-      if (!opt) return false;
-      el.value = opt.value;
+    var el = document.querySelector('input[name="' + name + '"], textarea[name="' + name + '"]');
+    if (el) {
+      el.value = target;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
+      return 'true';
     }
-    if (el.type === 'radio') {
-      var radios = document.querySelectorAll('input[type=radio][name="' + el.name + '"]');
-      var vl = v.toLowerCase().trim();
-      for (var r = 0; r < radios.length; r++) {
-        var rv = (radios[r].value || '').toLowerCase().trim();
-        var rl = (radios[r].nextSibling ? radios[r].nextSibling.textContent || '' : '').toLowerCase().trim();
-        if (rv === vl || rl.indexOf(vl) !== -1 || vl.indexOf(rv) !== -1) {
-          radios[r].checked = true;
-          radios[r].dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
+    var sel = document.querySelector('select[name="' + name + '"]');
+    if (sel) {
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === target || sel.options[i].value.toLowerCase() === target.toLowerCase()) {
+          sel.selectedIndex = i;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          return 'true';
         }
       }
-      return false;
+      for (var i = 0; i < sel.options.length; i++) {
+        var txt = sel.options[i].text.trim().toLowerCase();
+        if (txt === target.toLowerCase() || txt.indexOf(target.toLowerCase()) === 0) {
+          sel.selectedIndex = i;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          return 'true';
+        }
+      }
     }
-    if (el.type === 'checkbox') return false;
-    el.value = v;
-    el.dispatchEvent(new Event('input',  { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('blur',   { bubbles: true }));
-    return el.value.trim().length > 0;
   }
-
-  function elText(el) {
-    var parts = [
-      el.name || '',
-      el.id   || '',
-      el.placeholder || '',
-      el.getAttribute('aria-label') || '',
-      el.getAttribute('title') || '',
-      el.getAttribute('data-field') || '',
-    ];
-    if (el.labels && el.labels.length) {
-      parts.push(el.labels[0].textContent);
-    } else {
-      var lid = el.getAttribute('for') || el.getAttribute('aria-labelledby');
-      if (lid) {
-        var lel = document.getElementById(lid);
-        if (lel) parts.push(lel.textContent);
-      }
-      var p = el.parentElement;
-      for (var d = 0; d < 3 && p; d++) {
-        if (p.tagName === 'TD' || p.tagName === 'TH' || p.tagName === 'LABEL') {
-          parts.push(p.textContent);
-          break;
-        }
-        if (p.tagName === 'TR') {
-          var cells = p.cells;
-          if (cells && cells.length >= 2) parts.push(cells[0].textContent);
-          break;
-        }
-        p = p.parentElement;
-      }
-    }
-    return parts.join(' ').toLowerCase().replace(/[_\\-]/g, ' ').replace(/\\s+/g, ' ').trim();
-  }
-
-  function fuzzyMatch(el) {
-    var text = elText(el);
-    var bestKey = null, bestScore = 0;
-    for (var key in fieldMap) {
-      var aliases = fieldMap[key];
-      for (var j = 0; j < aliases.length; j++) {
-        if (text.indexOf(aliases[j]) !== -1) {
-          var score = aliases[j].length * 2;
-          if (score > bestScore) { bestScore = score; bestKey = key; }
-          break;
-        }
-      }
-    }
-    return bestKey;
-  }
-
-  // ── 5. Main autofill ───────────────────────────────────────────────────
-  function doAutofill() {
-    if (!firstName && !lastName && !email) {
-      showToast('No profile data. Please complete your profile first.', '#EF4444');
-      return;
-    }
-
-    var inputs = document.querySelectorAll(
-      'input:not([type=hidden]):not([type=submit]):not([type=button])'
-      + ':not([type=reset]):not([type=image]),'
-      + 'select, textarea'
-    );
-
-    var filled = 0;
-    var alreadyHandled = {};
-
-    for (var i = 0; i < inputs.length; i++) {
-      var el = inputs[i];
-      if (el.readOnly || el.disabled) continue;
-
-      var elName = (el.name || '').toUpperCase().trim();
-
-      // Pass 1: ITS exact name match (highest confidence)
-      if (elName && itsExact[elName] !== undefined) {
-        if (itsExact[elName] && fill(el, itsExact[elName])) {
-          el.style.outline = '3px solid #10B981';
-          filled++;
-          alreadyHandled[i] = true;
-          continue;
-        }
-      }
-
-      // Pass 2: ITS partial/case-insensitive name match
-      if (elName) {
-        for (var itk in itsExact) {
-          if (elName.indexOf(itk) !== -1 || itk.indexOf(elName) !== -1) {
-            if (itsExact[itk] && fill(el, itsExact[itk])) {
-              el.style.outline = '3px solid #10B981';
-              filled++;
-              alreadyHandled[i] = true;
-              break;
-            }
-          }
-        }
-        if (alreadyHandled[i]) continue;
-      }
-
-      // Pass 3: Generic fuzzy match on label/placeholder text
-      var key = fuzzyMatch(el);
-      if (key && vs[key]) {
-        if (fill(el, vs[key])) {
-          el.style.outline = '3px solid #10B981';
-          filled++;
-        }
-      }
-    }
-
-    showToast(
-      filled > 0
-        ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
-        : 'No fields matched. Try scrolling to the next section.',
-      filled > 0 ? '#10B981' : '#EF4444'
-    );
-  }
-
-  doAutofill();
-
+  return 'false';
 })();
 ''';
 }
+
+String buildFieldScanScript() => '''
+(function() {
+  var result = [];
+
+  function scan(container) {
+    var els = container.querySelectorAll('input, select, textarea');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var name = el.getAttribute('name') || '(no name)';
+      var id = el.getAttribute('id') || '';
+      var type = el.tagName.toLowerCase();
+      if (el.type) type += '[' + el.type + ']';
+      var info = name + '|' + type;
+      if (id) info += '|id=' + id;
+      var ph = el.getAttribute('placeholder');
+      if (ph) info += '|placeholder=' + ph.substring(0, 40);
+      var aria = el.getAttribute('aria-label');
+      if (aria) info += '|aria=' + aria.substring(0, 40);
+      if (result.indexOf(info) === -1) result.push(info);
+    }
+  }
+
+  // Scan main document
+  scan(document);
+
+  // Scan iframes
+  var frames = document.querySelectorAll('iframe');
+  for (var fi = 0; fi < frames.length; fi++) {
+    try {
+      var doc = frames[fi].contentDocument || frames[fi].contentWindow.document;
+      if (doc) scan(doc);
+    } catch(e) {}
+  }
+
+  return result.join('\\\\n');
+})();
+''';
+
+String buildBlanketAutofillSuppressScript() => '''
+(function() {
+  var inputs = document.querySelectorAll(
+    'input[type="text"], input[type="email"], input[type="tel"], input[type="password"]'
+  );
+  inputs.forEach(function(el) {
+    el.setAttribute('autocomplete', 'off');
+    el.setAttribute('data-lpignore', 'true');
+    el.setAttribute('data-1p-ignore', 'true');
+  });
+})();
+''';
+
+String buildSelectAutocompletePatch() => '''
+(function() {
+  var selectTokens = {
+    'P_GENDER':         'sex',
+    'P_NATIONALITY':    'country-name',
+    'P_PROVINCE':       'address-level1',
+    'P_MARITAL_STATUS': 'off',
+    'P_HOME_LANG':      'off',
+    'P_RACE':           'off',
+    'P_DISABILITY':     'off',
+    'P_QUAL_TYPE':      'off',
+    'P_FACULTY':        'off',
+    'P_PREV_TERTIARY':  'off',
+  };
+  Object.keys(selectTokens).forEach(function(name) {
+    var el = document.querySelector('select[name="' + name + '"]');
+    if (el) el.setAttribute('autocomplete', selectTokens[name]);
+  });
+})();
+''';
+
+String buildProvinceDisambiguationPatch() => '''
+(function() {
+  var province = document.querySelector('select[name="P_PROVINCE"]');
+  if (!province) return;
+  var pageText = (document.title + ' ' + (document.body ? document.body.innerText : '')).toLowerCase();
+  var isPostal = pageText.indexOf('postal') !== -1;
+  province.id = isPostal ? 'P_PROVINCE_POSTAL' : 'P_PROVINCE_RESIDENTIAL';
+  province.setAttribute('autocomplete', 'address-level1');
+  if (isPostal) {
+    var form = province.closest('form');
+    if (form) form.setAttribute('autocomplete', 'postal-address');
+  }
+})();
+''';
+
+/// Oracle ITS portals use <select> elements alongside hidden <input> fields
+/// that mirror the selected value.  After the second autofill pass those
+/// hidden mirrors can still hold stale data; this patch force-syncs them
+/// by reading the visible <select>'s current value.
+/// Scrolls to the field and attaches a change listener so the tick turns
+/// green automatically when the student fills it in.
+/// Searches by: name (case-insensitive), id, name-suffix, and label text.
+String buildScrollToFieldScript(String oapName, String label) {
+  final bare = oapName.startsWith('oap') ? oapName.substring(3) : oapName;
+  final names = [
+    oapName,
+    'P_${bare.toUpperCase()}',
+    oapName.toLowerCase(),
+    bare.toUpperCase(),
+    bare.toLowerCase(),
+  ];
+  final quoted = names.map((n) => "'$n'").join(', ');
+  return '''
+(function() {
+  var names = [$quoted];
+  var lowers = names.map(function(t){ return t.toLowerCase(); });
+
+  function find() {
+    var f;
+    for (var i = 0; i < lowers.length; i++) {
+      f = document.getElementById(lowers[i]) ||
+          document.querySelector('[id="' + lowers[i] + '"]') ||
+          document.querySelector('[name="' + lowers[i] + '"]');
+      if (f) return f;
+    }
+    return null;
+  }
+
+  var field = find();
+  if (!field) return false;
+  field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  field.classList.add('fix-highlight');
+  field.focus();
+  if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') field.select();
+  setTimeout(function(){ field.classList.remove('fix-highlight'); }, 3000);
+  if (!field._fieldWatchAdded) {
+    field._fieldWatchAdded = true;
+    field.addEventListener('change', function() { FieldChangeChannel.postMessage('$oapName'); });
+    field.addEventListener('input', function() { FieldChangeChannel.postMessage('$oapName'); });
+  }
+  return true;
+})();
+''';
+}
+
+String buildWizardResyncPatch() => '''
+(function() {
+  var selects = document.querySelectorAll('select');
+  for (var i = 0; i < selects.length; i++) {
+    var sel = selects[i];
+    var name = sel.getAttribute('name');
+    if (!name) continue;
+    var hidden = document.querySelector('input[type="hidden"][name="' + name + '"]');
+    if (hidden) {
+      hidden.value = sel.value;
+      hidden.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+})();
+''';
+
+

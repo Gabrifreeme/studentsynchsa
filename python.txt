@@ -1,0 +1,17 @@
+Open PowerShell: Press the Windows key, type PowerShell, and press Enter.
+
+Go to Your Project Folder: Type this command and press Enter to navigate to where your test.py file is saved:
+
+powershell
+cd C:\Users\chris\StudentSyncSA
+Edit Your Question (if needed): If you want to ask a different question, open the file in Notepad:
+
+powershell
+notepad test.py
+Then, find the "content" line inside the messages list and change the question. Save the file and close Notepad.
+
+Run the Script: To get the AI's response, simply type this command and press Enter:
+
+powershell
+python test.py
+The script will run, send your question to the AI model, and print the answer right in the PowerShell window.

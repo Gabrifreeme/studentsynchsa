@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
@@ -124,7 +125,9 @@ class _ProfileOnboardingScreenState
   String _acceptanceStatus = '';
 
   // Upload Documents
-  final List<String> _uploadedFiles = ['', '', ''];
+  final _uploadedFiles = List<String>.filled(3, '');
+
+  WebViewController? _webViewController;
 
   bool _saving = false;
 
@@ -2142,7 +2145,6 @@ class _ProfileOnboardingScreenState
     setState(() => _showGreeting = false);
   }
 
-  @override
   static Future<String?> _showSearchablePicker(BuildContext context, {
     required String title,
     required List<String> options,
@@ -2227,6 +2229,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
+  @override
   void dispose() {
     _floatCtrl.dispose();
     _pageController.dispose();
@@ -2542,7 +2545,7 @@ class _ProfileOnboardingScreenState
               right: 16,
               bottom: 100,
               child: GestureDetector(
-                onTap: _showStarHelp,
+                onTap: _triggerStarAutofill,
                 child: AnimatedBuilder(
                   animation: _floatAnim,
                   builder: (context, child) {
@@ -2571,6 +2574,31 @@ class _ProfileOnboardingScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _triggerStarAutofill() async {
+    final data = {
+      'oapFirstNames': _firstNameCtrl.text,
+      'oapSurname': _lastNameCtrl.text,
+      'oapGuardCell': _nextOfKinMobileCtrl.text,
+      'oapGuardEmail': _nextOfKinEmailCtrl.text,
+      'oapStreetAddr1': _addressCtrl.text,
+    };
+    String jsCode = """
+      (function() {
+        var data = ${jsonEncode(data)};
+        for (var id in data) {
+          var el = document.getElementById(id);
+          if (el) {
+            el.value = data[id];
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+        alert('Star has filled your details!');
+      })();
+    """;
+    await _webViewController.runJavaScript(jsCode);
   }
 
   void _showStarHelp() {
@@ -2629,7 +2657,7 @@ class _ProfileOnboardingScreenState
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
-                    value: _titleCtrl.text.isEmpty ? null : _titleCtrl.text,
+                    initialValue: _titleCtrl.text.isEmpty ? null : _titleCtrl.text,
                     decoration: const InputDecoration(
                       labelText: 'Title',
                       prefixIcon: Icon(Icons.badge_outlined, size: 20),
@@ -2693,7 +2721,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Gender
             DropdownButtonFormField<String>(
-              value: _gender.isEmpty ? null : _gender,
+              initialValue: _gender.isEmpty ? null : _gender,
               decoration: const InputDecoration(
                 labelText: 'Gender',
                 prefixIcon: Icon(Icons.wc_outlined),
@@ -2774,7 +2802,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 20),
             // Citizenship
             DropdownButtonFormField<String>(
-              value: _citizenship.isEmpty ? null : _citizenship,
+              initialValue: _citizenship.isEmpty ? null : _citizenship,
               decoration: const InputDecoration(
                 labelText: 'Citizenship Status',
                 prefixIcon: Icon(Icons.flag_outlined),
@@ -2825,13 +2853,15 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Population Group
             DropdownButtonFormField<String>(
-              value: _populationGroup.isEmpty ? null : _populationGroup,
+              value: ['African', 'Coloured', 'Indian/Asian', 'White', 'Other', 'Prefer not to say', 'Black']
+                       .contains(_populationGroup) ? _populationGroup : null,
               decoration: const InputDecoration(
                 labelText: 'Population Group',
                 prefixIcon: Icon(Icons.people_outlined),
               ),
               items: const [
                 DropdownMenuItem(value: 'African', child: Text('African')),
+                DropdownMenuItem(value: 'Black', child: Text('Black')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
                 DropdownMenuItem(value: 'Indian/Asian', child: Text('Indian/Asian')),
                 DropdownMenuItem(value: 'White', child: Text('White')),
@@ -2843,7 +2873,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Marital Status
             DropdownButtonFormField<String>(
-              value: _maritalStatus.isEmpty ? null : _maritalStatus,
+              initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
               decoration: const InputDecoration(
                 labelText: 'Marital Status',
                 prefixIcon: Icon(Icons.favorite_outline),
@@ -2950,7 +2980,7 @@ class _ProfileOnboardingScreenState
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
-                    value: _province.isEmpty ? null : _province,
+                    initialValue: _province.isEmpty ? null : _province,
                     decoration: const InputDecoration(
                       labelText: 'Province',
                       prefixIcon: Icon(Icons.map_outlined),
@@ -3049,7 +3079,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 20),
             // Disability
             DropdownButtonFormField<String>(
-              value: _disabilityStatus.isEmpty ? null : _disabilityStatus,
+              initialValue: _disabilityStatus.isEmpty ? null : _disabilityStatus,
               decoration: const InputDecoration(
                 labelText: 'Do you have a disability?',
                 prefixIcon: Icon(Icons.accessible_outlined),
@@ -3068,7 +3098,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Bursary Required
             DropdownButtonFormField<String>(
-              value: _bursaryRequired.isEmpty ? null : _bursaryRequired,
+              initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
               decoration: const InputDecoration(
                 labelText: 'Do you require a bursary?',
                 prefixIcon: Icon(Icons.monetization_on_outlined),
@@ -3083,7 +3113,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Employment Status
             DropdownButtonFormField<String>(
-              value: _employmentStatus.isEmpty ? null : _employmentStatus,
+              initialValue: _employmentStatus.isEmpty ? null : _employmentStatus,
               decoration: const InputDecoration(
                 labelText: 'Employment Status',
                 prefixIcon: Icon(Icons.work_outline),
@@ -3344,7 +3374,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Matric Year
             DropdownButtonFormField<int>(
-              value: _matricYear == 0 ? null : _matricYear,
+              initialValue: _matricYear == 0 ? null : _matricYear,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Year (YYYY) *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
@@ -3358,7 +3388,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Undergraduate / Postgraduate
             DropdownButtonFormField<String>(
-              value: _applicationLevel.isEmpty ? null : _applicationLevel,
+              initialValue: _applicationLevel.isEmpty ? null : _applicationLevel,
               decoration: const InputDecoration(
                 labelText: 'Applying for Undergraduate or Postgraduate? *',
                 prefixIcon: Icon(Icons.school_outlined),
@@ -3373,7 +3403,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Upgrading
             DropdownButtonFormField<String>(
-              value: _upgrading.isEmpty ? null : _upgrading,
+              initialValue: _upgrading.isEmpty ? null : _upgrading,
               decoration: const InputDecoration(
                 labelText: 'Are you Upgrading? *',
                 prefixIcon: Icon(Icons.refresh_outlined),
@@ -3388,7 +3418,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Matric Type
             DropdownButtonFormField<String>(
-              value: _matricType.isEmpty ? null : _matricType,
+              initialValue: _matricType.isEmpty ? null : _matricType,
               decoration: const InputDecoration(
                 labelText: 'Completing/Completed South African or International Matric *',
                 prefixIcon: Icon(Icons.public_outlined),
@@ -3447,7 +3477,7 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
-                        value: _resultsSubjects[i].subject.isEmpty
+                        initialValue: _resultsSubjects[i].subject.isEmpty
                             ? null
                             : _resultsSubjects[i].subject,
                         decoration: const InputDecoration(
@@ -3474,7 +3504,7 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<String>(
-                        value: _resultsSubjects[i].grade.isEmpty
+                        initialValue: _resultsSubjects[i].grade.isEmpty
                             ? null
                             : _resultsSubjects[i].grade,
                         decoration: const InputDecoration(
@@ -3505,7 +3535,7 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<int>(
-                        value: _resultsSubjects[i].result.isEmpty
+                        initialValue: _resultsSubjects[i].result.isEmpty
                             ? null
                             : int.tryParse(_resultsSubjects[i].result),
                         decoration: const InputDecoration(
@@ -3610,7 +3640,7 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _currentlyDoing.isEmpty ? null : _currentlyDoing,
+              initialValue: _currentlyDoing.isEmpty ? null : _currentlyDoing,
               decoration: const InputDecoration(
                 labelText: 'What are you currently doing? *',
                 prefixIcon: Icon(Icons.work_outlined),
@@ -3634,7 +3664,7 @@ class _ProfileOnboardingScreenState
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _studiedPreviously.isEmpty ? null : _studiedPreviously,
+              initialValue: _studiedPreviously.isEmpty ? null : _studiedPreviously,
               decoration: const InputDecoration(
                 labelText: 'Have you studied at another institution previously? *',
                 prefixIcon: Icon(Icons.account_balance_outlined),
@@ -3665,7 +3695,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Academic Year
             DropdownButtonFormField<int>(
-              value: _academicYear == 0 ? null : _academicYear,
+              initialValue: _academicYear == 0 ? null : _academicYear,
               decoration: const InputDecoration(
                 labelText: 'Academic Year *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
@@ -3679,7 +3709,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Faculty/School
             DropdownButtonFormField<String>(
-              value: _facultyCtrl.text.isEmpty ? null : _facultyCtrl.text,
+              initialValue: _facultyCtrl.text.isEmpty ? null : _facultyCtrl.text,
               decoration: const InputDecoration(
                 labelText: 'Limit your selection to a specific Faculty/School *',
                 prefixIcon: Icon(Icons.school_outlined),
@@ -3696,7 +3726,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Programme
             DropdownButtonFormField<String>(
-              value: _programmeCtrl.text.isEmpty ? null : _programmeCtrl.text,
+              initialValue: _programmeCtrl.text.isEmpty ? null : _programmeCtrl.text,
               decoration: const InputDecoration(
                 labelText: 'Choose a programme *',
                 prefixIcon: Icon(Icons.auto_stories_outlined),
@@ -3732,7 +3762,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Application Period
             DropdownButtonFormField<String>(
-              value: _applicationPeriod.isEmpty ? null : _applicationPeriod,
+              initialValue: _applicationPeriod.isEmpty ? null : _applicationPeriod,
               decoration: const InputDecoration(
                 labelText: 'For which period are you applying? *',
                 prefixIcon: Icon(Icons.date_range_outlined),
@@ -3746,7 +3776,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Study Mode
             DropdownButtonFormField<String>(
-              value: _studyMode.isEmpty ? null : _studyMode,
+              initialValue: _studyMode.isEmpty ? null : _studyMode,
               decoration: const InputDecoration(
                 labelText: 'How would you like to study for this programme? *',
                 prefixIcon: Icon(Icons.school_outlined),
@@ -3760,7 +3790,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Study Timing
             DropdownButtonFormField<String>(
-              value: _studyTiming.isEmpty ? null : _studyTiming,
+              initialValue: _studyTiming.isEmpty ? null : _studyTiming,
               decoration: const InputDecoration(
                 labelText: 'When would you like to study for the qualification? *',
                 prefixIcon: Icon(Icons.access_time_outlined),
@@ -3805,7 +3835,7 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _acceptanceStatus.isEmpty ? null : _acceptanceStatus,
+              initialValue: _acceptanceStatus.isEmpty ? null : _acceptanceStatus,
               decoration: const InputDecoration(
                 labelText: 'Acceptance Status *',
                 prefixIcon: Icon(Icons.assignment_turned_in_outlined),

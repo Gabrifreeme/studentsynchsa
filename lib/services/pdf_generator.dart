@@ -184,7 +184,7 @@ class PdfGenerator {
           if (label.isNotEmpty)
             pw.SizedBox(
               width: 140,
-              child: pw.Text(label + ':',
+              child: pw.Text('$label:',
                 style: pw.TextStyle(
                   fontSize: 10,
                   fontWeight: pw.FontWeight.bold,
@@ -246,8 +246,6 @@ class PdfGenerator {
       ],
     );
   }
-
-  List<int> _grade12Subjects() => [];
 }
 
 class _PdfTheme {

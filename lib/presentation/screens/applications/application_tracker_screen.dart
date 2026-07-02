@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
@@ -215,7 +214,7 @@ class _ApplicationTrackerScreenState
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<ApplicationStatus>(
-                    value: status,
+                    initialValue: status,
                     decoration: const InputDecoration(labelText: 'Status'),
                     items: ApplicationStatus.values
                         .map((s) => DropdownMenuItem(

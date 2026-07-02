@@ -6,7 +6,6 @@ import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
-import 'package:studentsyncsa/domain/repositories/application_repository.dart';
 
 class ApplicationFormScreen extends StatefulWidget {
   final University university;
@@ -184,7 +183,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _studyMode,
+              initialValue: _studyMode,
               decoration: _inputDecoration('Study Mode'),
               dropdownColor: AppColors.card,
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),

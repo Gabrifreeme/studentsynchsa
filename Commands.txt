@@ -1,0 +1,17 @@
+cd C:\Users\chris\StudentSyncSA
+
+python chat.py
+
+notepad chat.py
+
+ollama list
+
+ollama ps
+
+ollama stop phi3:mini
+
+ollama run qwen2.5
+
+ollama stop qwen2.5
+
+ollama kill

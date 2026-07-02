@@ -33,12 +33,20 @@ class StarAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget image = ClipOval(
-      child: Image.asset(
-        'assets/images/psaa.png',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        filterQuality: FilterQuality.high,
+      child: ColorFiltered(
+        colorFilter: ColorFilter.matrix([
+          1, 0, 0, 0, 35,
+          0, 1, 0, 0, 35,
+          0, 0, 1, 0, 35,
+          0, 0, 0, 1, 0,
+        ]),
+        child: Image.asset(
+          'assets/images/psaa.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+        ),
       ),
     );
     if (pulse) {

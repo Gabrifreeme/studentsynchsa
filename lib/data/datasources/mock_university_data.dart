@@ -10,7 +10,7 @@ class MockUniversityData {
     description: 'View the official university website live, then print to PDF for offline use',
   );
 
-  static List<OfflineResource> _cputResources = [
+  static final List<OfflineResource> _cputResources = [
     OfflineResource(
       universityId: 'cput',
       title: 'CPUT Homepage',
@@ -257,24 +257,15 @@ class MockUniversityData {
     University(
       id: 'univen', name: 'University of Venda',
       shortName: 'UNIVEN', province: 'Limpopo',
-      website: 'https://www.univen.ac.za', applicationUrl: 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
+      website: 'https://www.univen.ac.za', applicationUrl: 'https://univenerp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'https://logo.clearbit.com/univen.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
-      faculties: ['Agriculture', 'Education', 'Engineering', 'Health Sciences', 'Human & Social Sciences', 'Law', 'Management, Commerce & Public Administration', 'Science'],
-      phone: '+27 15 962 8000',
-      email: 'info@univen.ac.za',
-      socialMedia: {
-        'Facebook': 'https://www.facebook.com/Univen.ac.za',
-        'LinkedIn': 'https://www.linkedin.com/school/university-of-ven',
-        'Twitter': 'https://twitter.com/Univen_News',
-        'Instagram': 'https://www.instagram.com/univen official',
-        'YouTube': 'https://www.youtube.com/@univencommunication',
-      },
+      faculties: ['Agriculture, Science & Technology', 'Education', 'Health Sciences', 'Humanities, Social Sciences & Law', 'Management, Commerce & Law'],
       offlineResources: [
         _webview('univen', 'UNIVEN'),
         OfflineResource(universityId: 'univen', title: 'UNIVEN Prospectus 2025', type: 'pdf', assetPath: 'assets/offline/univen/prospectus_2025.pdf', description: 'Complete university prospectus'),
-        OfflineResource(universityId: 'univen', title: 'UNIVEN Campus Map', type: 'map', assetPath: 'assets/offline/univen/campus_map.pdf', description: 'Main campus and facilities'),
+        OfflineResource(universityId: 'univen', title: 'UNIVEN Campus Map', type: 'map', assetPath: 'assets/offline/univen/campus_map.pdf', description: 'Main campus and satellite campuses'),
       ],
     ),
     University(

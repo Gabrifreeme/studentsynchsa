@@ -1,0 +1,6 @@
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+C:\Users\chris\AppData\Roaming\Python\Python314\site-packages\litserve\server.py:1397: UserWarning: Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'
+  warnings.warn(
+INFO:     Started server process [8648]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

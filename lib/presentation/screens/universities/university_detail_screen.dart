@@ -1,10 +1,14 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart';
 import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+
+final _random = math.Random();
 
 
 const Map<String, List<String>> _uniImages = {
@@ -59,7 +63,7 @@ class UniversityDetailScreen extends ConsumerWidget {
             children: [
               // Apply button (top)
               _SparkleStar(
-                onTap: () => _launchUrl(context, uni.applicationUrl),
+                onTap: () => _launchUniv(context),
               ),
               const SizedBox(height: 16),
 
@@ -171,22 +175,13 @@ class UniversityDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _launchUrl(BuildContext context, String url) async {
-    if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No online portal available'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    Navigator.of(context).push(
+  void _launchUniv(BuildContext context) {
+    Navigator.push(
+      context,
       MaterialPageRoute(
         builder: (_) => UniversityWebViewScreen(
-          url: url,
-          universityName: '',
+          url: "https://www.univen.ac.za/",
+          universityName: "UNIVEN",
         ),
       ),
     );
@@ -204,25 +199,26 @@ class _SparkleStar extends StatefulWidget {
 class _SparkleStarState extends State<_SparkleStar>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _rotation;
   late Animation<double> _scale;
-  late Animation<double> _rotate;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _scale = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    _rotation = Tween<double>(begin: 0, end: 8 * math.pi).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInCubic),
     );
-    _rotate = Tween<double>(begin: 0, end: 0.15).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(weight: 0.5, tween: ConstantTween(1.0)),
+      TweenSequenceItem(weight: 0.5, tween: Tween(begin: 1.0, end: 0.0)),
+    ]).animate(_controller);
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        _controller.reverse();
+        widget.onTap();
       }
     });
   }
@@ -235,63 +231,156 @@ class _SparkleStarState extends State<_SparkleStar>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scale.value,
-          child: Transform.rotate(
-            angle: _rotate.value,
-            child: child,
-          ),
-        );
-      },
-      child: Material(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            _controller.forward();
-            widget.onTap();
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scale.value,
+              child: Transform.rotate(
+                angle: _rotation.value,
+                child: child,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('✨',
-                    style: TextStyle(fontSize: 20)),
-                SizedBox(width: 10),
-                Text(
-                  'Apply Now',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            );
+          },
+          child: Material(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                if (!_controller.isAnimating) {
+                  _controller.forward(from: 0);
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('✨',
+                        style: TextStyle(fontSize: 20)),
+                    SizedBox(width: 10),
+                    Text(
+                      'Apply Now',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return CustomPaint(
+              painter: _FirecrackerPainter(progress: _controller.value),
+              size: Size.zero,
+            );
+          },
+        ),
+      ],
     );
   }
+}
+
+class _FirecrackerPainter extends CustomPainter {
+  final double progress;
+  static List<_Particle>? _particles;
+
+  _FirecrackerPainter({required this.progress}) {
+    if (_particles == null) {
+      _generate();
+    }
+  }
+
+  static void _generate() {
+    _particles = List.generate(45, (i) {
+      final angle = _random.nextDouble() * 2 * math.pi;
+      final speed = 60.0 + _random.nextDouble() * 120.0;
+      final colors = [
+        Colors.red,
+        Colors.white,
+        Colors.blue,
+        Colors.amber,
+        Colors.purple,
+        Colors.orange,
+        Colors.cyan,
+      ];
+      return _Particle(
+        angle: angle,
+        speed: speed,
+        color: colors[i % colors.length],
+        size: 2.5 + _random.nextDouble() * 4.5,
+        delay: _random.nextDouble() * 0.25,
+      );
+    });
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0 || progress >= 1) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final particles = _particles;
+    if (particles == null) return;
+
+    for (final p in particles) {
+      final local = (progress - p.delay).clamp(0.0, 1.0);
+      if (local <= 0) continue;
+
+      final dist = p.speed * local;
+      final x = center.dx + math.cos(p.angle) * dist;
+      final y = center.dy + math.sin(p.angle) * dist;
+      final opacity = (1.0 - local).clamp(0.0, 1.0);
+      final pSize = p.size * (1.0 - local * 0.4);
+
+      canvas.drawCircle(
+        Offset(x, y),
+        pSize,
+        Paint()..color = p.color.withValues(alpha: opacity),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FirecrackerPainter old) => old.progress != progress;
+}
+
+class _Particle {
+  final double angle;
+  final double speed;
+  final Color color;
+  final double size;
+  final double delay;
+  const _Particle({
+    required this.angle,
+    required this.speed,
+    required this.color,
+    required this.size,
+    required this.delay,
+  });
 }

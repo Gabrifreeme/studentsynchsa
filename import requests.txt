@@ -1,0 +1,25 @@
+import requests
+
+url = "http://localhost:8000/api/v1/workspace/my-workspace/chat"
+
+headers = {
+    "Authorization": "Bearer 4HF5GRQ-DNB4CT8-QDNFZRK-9ARM0MF",
+    "Content-Type": "application/json"
+}
+
+data = {
+    "message": "Hello, can you help me?",
+    "mode": "chat"
+}
+
+try:
+    response = requests.post(url, json=data, headers=headers)
+    print("Status Code:", response.status_code)
+    print("Response:", response.json())
+except requests.exceptions.ConnectionError:
+    print("❌ Error: Can't connect to server on port 3001")
+    print("   Make sure the server is running!")
+except requests.exceptions.HTTPError as e:
+    print(f"❌ HTTP Error: {e}")
+except Exception as e:
+    print(f"❌ Error: {e}")

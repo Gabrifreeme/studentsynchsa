@@ -1,0 +1,789 @@
+
+# 2026-06-23 13:31:07.035734
++y
+
+# 2026-06-23 13:32:13.419246
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:32:13.498882
++// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+
+# 2026-06-23 13:32:13.551180
++//
+
+# 2026-06-23 13:32:13.622723
++// Built specifically for ITS (Oracle PL/SQL) university portals used by
+
+# 2026-06-23 13:32:13.699394
++// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+
+# 2026-06-23 13:32:13.791251
++// plain HTML — no React, no Angular, no framework events needed.
+
+# 2026-06-23 13:32:13.941026
++// Falls back to generic matching for other university sites.
+
+# 2026-06-23 13:32:14.012033
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:32:14.123558
++String buildAutofillScript(String profileJson) {
+
+# 2026-06-23 13:32:27.676140
++  return _script(profileJson, addFloatingStar: true);
+
+# 2026-06-23 13:32:29.701006
++}
+
+# 2026-06-23 13:32:30.097245
++String buildAutofillOnlyScript(String profileJson) {
+
+# 2026-06-23 13:32:32.086691
++  return _script(profileJson, addFloatingStar: false);
+
+# 2026-06-23 13:32:34.121279
++}
+
+# 2026-06-23 13:32:34.522094
++String _script(String profileJson, {required bool addFloatingStar}) {
+
+# 2026-06-23 13:32:36.670721
++  return '''
+
+# 2026-06-23 13:32:37.020945
++(function() {
+
+# 2026-06-23 13:32:39.120528
++  // ── 1. Profile data ────────────────────────────────────────────────────
+
+# 2026-06-23 13:32:41.091826
++  var profile = $profileJson;
+
+# 2026-06-23 13:32:43.091645
++  function gv(path) {
+
+# 2026-06-23 13:32:45.131730
++    var parts = path.split('.');
+
+# 2026-06-23 13:32:47.062721
++    var o = profile;
+
+# 2026-06-23 13:32:49.099470
++    for (var i = 0; i < parts.length; i++) {
+
+# 2026-06-23 13:32:51.199212
++      if (o == null || typeof o !== 'object') return '';
+
+# 2026-06-23 13:32:52.225213
++      o = o[parts[i]];
+
+# 2026-06-23 13:32:52.554288
++    }
+
+# 2026-06-23 13:32:52.941875
++    return (o !== null && o !== undefined) ? String(o) : '';
+
+# 2026-06-23 13:32:54.915390
++  }
+
+# 2026-06-23 13:32:55.339598
++  function fmtDate(iso) {
+
+# 2026-06-23 13:32:57.334383
++    if (!iso || iso.length < 10) return iso || '';
+
+# 2026-06-23 13:32:59.334992
++    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+# 2026-06-23 13:33:01.301648
++    var p = iso.split('T')[0].split('-');
+
+# 2026-06-23 13:33:03.393957
++    var m = parseInt(p[1], 10) - 1;
+
+# 2026-06-23 13:33:05.430199
++    return (m >= 0 && m < 12) ? p[2] + '-' + months[m] + '-' + p[0] : iso;
+
+# 2026-06-23 13:33:07.453950
++  }
+
+# 2026-06-23 13:33:07.837302
++  // date also as DD/MM/YYYY for ITS portals
+
+# 2026-06-23 13:33:10.135800
++  function fmtDateSlash(iso) {
+
+# 2026-06-23 13:33:12.116918
++    if (!iso || iso.length < 10) return iso || '';
+
+# 2026-06-23 13:33:12.459558
++    var p = iso.split('T')[0].split('-');
+
+# 2026-06-23 13:33:12.813589
++    return p[2] + '/' + p[1] + '/' + p[0];
+
+# 2026-06-23 13:33:13.165581
++  }
+
+# 2026-06-23 13:33:13.565398
++  var firstName   = gv('personal.firstName');
+
+# 2026-06-23 13:33:15.540354
++  var lastName    = gv('personal.lastName');
+
+# 2026-06-23 13:33:17.756836
++  var email       = gv('contact.email');
+
+# 2026-06-23 13:33:19.780945
++  var dobIso      = gv('personal.dateOfBirth');
+
+# 2026-06-23 13:33:21.767091
++  var vs = {
+
+# 2026-06-23 13:33:24.052905
++    firstName:         firstName,
+
+# 2026-06-23 13:33:24.404702
++    lastName:          lastName,
+
+# 2026-06-23 13:33:24.780857
++    initials:          gv('personal.initials'),
+
+# 2026-06-23 13:33:26.883512
++    title:             gv('personal.title'),
+
+# 2026-06-23 13:33:28.894573
++    gender:            gv('personal.gender'),
+
+# 2026-06-23 13:33:30.877514
++    idNumber:          gv('personal.idNumber'),
+
+# 2026-06-23 13:33:32.884440
++    dateOfBirth:       fmtDate(dobIso),
+
+# 2026-06-23 13:33:33.239042
++    dateOfBirthSlash:  fmtDateSlash(dobIso),
+
+# 2026-06-23 13:33:35.208256
++    email:             email,
+
+# 2026-06-23 13:33:35.580526
++    phone:             gv('contact.phone'),
+
+# 2026-06-23 13:33:37.612070
++    workPhone:         gv('contact.workPhone'),
+
+# 2026-06-23 13:33:39.649744
++    address:           gv('address.address'),
+
+# 2026-06-23 13:33:41.824910
++    addressLine2:      gv('address.addressLine2'),
+
+# 2026-06-23 13:33:43.878115
++    province:          gv('address.province'),
+
+# 2026-06-23 13:33:45.838517
++    postalCode:        gv('address.postalCode'),
+
+# 2026-06-23 13:33:47.825609
++    nationality:       gv('demographic.nationality'),
+
+# 2026-06-23 13:33:49.834932
++    homeLanguage:      gv('demographic.homeLanguage'),
+
+# 2026-06-23 13:33:51.828522
++    populationGroup:   gv('demographic.populationGroup'),
+
+# 2026-06-23 13:33:53.976593
++    maritalStatus:     gv('demographic.maritalStatus'),
+
+# 2026-06-23 13:33:55.965035
++    schoolName:        gv('school.schoolName'),
+
+# 2026-06-23 13:33:58.114657
++    currentGrade:      gv('school.currentGrade'),
+
+# 2026-06-23 13:34:00.085287
++    matricYear:        gv('results.matricYear'),
+
+# 2026-06-23 13:34:02.059500
++    matricType:        gv('results.matricType'),
+
+# 2026-06-23 13:34:04.037060
++    examinationNumber: gv('results.examinationNumber'),
+
+# 2026-06-23 13:34:06.001237
++    applicationLevel:  gv('results.applicationLevel'),
+
+# 2026-06-23 13:34:08.033212
++    faculty:           gv('qualification.choices.0.faculty'),
+
+# 2026-06-23 13:34:10.045893
++    programme:         gv('qualification.choices.0.programme'),
+
+# 2026-06-23 13:34:12.177417
++    academicYear:      gv('qualification.academicYear'),
+
+# 2026-06-23 13:34:14.174701
++    studyMode:         gv('qualification.studyMode'),
+
+# 2026-06-23 13:34:16.179041
++    nextOfKinName:     gv('nextOfKin.name'),
+
+# 2026-06-23 13:34:18.138996
++    nextOfKinPhone:    gv('nextOfKin.mobilePhone'),
+
+# 2026-06-23 13:34:20.187566
++    nextOfKinEmail:    gv('nextOfKin.email'),
+
+# 2026-06-23 13:34:22.102390
++  };
+
+# 2026-06-23 13:34:22.517050
++  // ── 2. ITS portal exact-name map (P_* Oracle fields) ──────────────────
+
+# 2026-06-23 13:34:24.863086
++  // These are the actual INPUT NAME attributes used by ITS/Univen/UL/TUT etc.
+
+# 2026-06-23 13:34:26.967778
++  var itsExact = {
+
+# 2026-06-23 13:34:28.950889
++    // Personal
+
+# 2026-06-23 13:34:30.906350
++    'P_SURNAME':           vs.lastName,
+
+# 2026-06-23 13:34:32.888569
++    'P_NAME':              vs.firstName,
+
+# 2026-06-23 13:34:34.852847
++    'P_INITIALS':          vs.initials,
+
+# 2026-06-23 13:34:36.800598
++    'P_TITLE':             vs.title,
+
+# 2026-06-23 13:34:38.850354
++    'P_GENDER':            vs.gender,
+
+# 2026-06-23 13:34:40.797546
++    'P_ID_NO':             vs.idNumber,
+
+# 2026-06-23 13:34:42.930864
++    'P_PASSPORT_NO':       vs.idNumber,
+
+# 2026-06-23 13:34:44.965894
++    'P_DATE_OF_BIRTH':     vs.dateOfBirth,
+
+# 2026-06-23 13:34:46.963512
++    'P_DOB':               vs.dateOfBirth,
+
+# 2026-06-23 13:34:48.875204
++    'P_BIRTH_DATE':        vs.dateOfBirth,
+
+# 2026-06-23 13:34:50.879871
++    // Contact
+
+# 2026-06-23 13:34:52.817471
++    'P_EMAIL':             vs.email,
+
+# 2026-06-23 13:34:54.881389
++    'P_EMAIL_ADDRESS':     vs.email,
+
+# 2026-06-23 13:34:57.354883
++    'P_CONFIRM_EMAIL':     vs.email,
+
+# 2026-06-23 13:34:59.324273
++    'P_EMAIL2':            vs.email,
+
+# 2026-06-23 13:35:01.276609
++    'P_CELL_NO':           vs.phone,
+
+# 2026-06-23 13:35:03.231522
++    'P_CELL':              vs.phone,
+
+# 2026-06-23 13:35:05.167158
++    'P_CELLPHONE':         vs.phone,
+
+# 2026-06-23 13:35:07.122515
++    'P_PHONE':             vs.phone,
+
+# 2026-06-23 13:35:09.156989
++    'P_TEL_NO':            vs.phone,
+
+# 2026-06-23 13:35:11.208132
++    'P_WORK_TEL':          vs.workPhone,
+
+# 2026-06-23 13:35:13.491145
++    // Address
+
+# 2026-06-23 13:35:15.588777
++    'P_ADDRESS_1':         vs.address,
+
+# 2026-06-23 13:35:17.615327
++    'P_ADDRESS_2':         vs.addressLine2,
+
+# 2026-06-23 13:35:19.641787
++    'P_ADDRESS1':          vs.address,
+
+# 2026-06-23 13:35:21.651886
++    'P_ADDRESS2':          vs.addressLine2,
+
+# 2026-06-23 13:35:23.627722
++    'P_PHYSICAL_ADDRESS':  vs.address,
+
+# 2026-06-23 13:35:25.664373
++    'P_SUBURB':            vs.addressLine2,
+
+# 2026-06-23 13:35:27.933685
++    'P_CITY':              vs.addressLine2,
+
+# 2026-06-23 13:35:30.096875
++    'P_PROVINCE':          vs.province,
+
+# 2026-06-23 13:35:32.124073
++    'P_POSTAL_CODE':       vs.postalCode,
+
+# 2026-06-23 13:35:34.109560
++    'P_POST_CODE':         vs.postalCode,
+
+# 2026-06-23 13:35:36.150695
++    'P_POSTAL':            vs.postalCode,
+
+# 2026-06-23 13:35:38.115727
++    // Demographic
+
+# 2026-06-23 13:35:40.123211
++    'P_NATIONALITY':       vs.nationality,
+
+# 2026-06-23 13:35:42.060357
++    'P_CITIZEN':           vs.nationality,
+
+# 2026-06-23 13:35:44.072690
++    'P_CITIZENSHIP':       vs.nationality,
+
+# 2026-06-23 13:35:46.190786
++    'P_HOME_LANGUAGE':     vs.homeLanguage,
+
+# 2026-06-23 13:35:48.173410
++    'P_LANGUAGE':          vs.homeLanguage,
+
+# 2026-06-23 13:35:49.162426
++    'P_POPULATION_GROUP':  vs.populationGroup,
+
+# 2026-06-23 13:37:00.701652
++I'm trying to autofill a Venda website application form, but it's not working. Can you help me fix it?// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:37:06.852803
++// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+
+# 2026-06-23 13:37:06.912567
++//
+
+# 2026-06-23 13:37:06.984801
++// Built specifically for ITS (Oracle PL/SQL) university portals used by
+
+# 2026-06-23 13:37:07.067568
++// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+
+# 2026-06-23 13:37:07.214035
++// plain HTML — no React, no Angular, no framework events needed.
+
+# 2026-06-23 13:37:07.285564
++// Falls back to generic matching for other university sites.
+
+# 2026-06-23 13:37:07.353894
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:37:07.466019
++String buildAutofillScript(String profileJson) {
+
+# 2026-06-23 13:37:09.777908
++  return _script(profileJson, addFloatingStar: true);
+
+# 2026-06-23 13:37:11.927295
++}
+
+# 2026-06-23 13:37:12.327944
++String buildAutofillOnlyScript(String profileJson) {
+
+# 2026-06-23 13:37:14.572139
++  return _script(profileJson, addFloatingStar: false);
+
+# 2026-06-23 13:37:16.894233
++}
+
+# 2026-06-23 13:37:17.282961
++String _script(String profileJson, {required bool addFloatingStar}) {
+
+# 2026-06-23 13:37:19.711454
++  return '''
+
+# 2026-06-23 13:37:20.039006
++(function() {
+
+# 2026-06-23 13:37:22.316976
++  // ── 1. Profile data ────────────────────────────────────────────────────
+
+# 2026-06-23 13:37:24.558684
++  var profile = $profileJson;
+
+# 2026-06-23 13:37:26.909130
++  function gv(path) {
+
+# 2026-06-23 13:37:29.101751
++    var parts = path.split('.');
+
+# 2026-06-23 13:37:31.595277
++    var o = profile;
+
+# 2026-06-23 13:37:33.734009
++    for (var i = 0; i < parts.length; i++) {
+
+# 2026-06-23 13:37:35.862463
++      if (o == null || typeof o !== 'object') return '';
+
+# 2026-06-23 13:37:36.749747
++      o = o[parts[i]];
+
+# 2026-06-23 13:38:16.992967
++I'm trying to autofill a Venda website application form, but it's not working. Can you help me fix it?// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:38:23.358972
++// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+
+# 2026-06-23 13:38:23.409097
++//
+
+# 2026-06-23 13:38:23.492255
++// Built specifically for ITS (Oracle PL/SQL) university portals used by
+
+# 2026-06-23 13:38:23.645985
++// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+
+# 2026-06-23 13:38:23.729795
++// plain HTML — no React, no Angular, no framework events needed.
+
+# 2026-06-23 13:38:23.803395
++// Falls back to generic matching for other university sites.
+
+# 2026-06-23 13:38:23.873619
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:38:23.981907
++String buildAutofillScript(String profileJson) {
+
+# 2026-06-23 13:38:26.269767
++  return _script(profileJson, addFloatingStar: true);
+
+# 2026-06-23 13:38:28.432688
++}
+
+# 2026-06-23 13:38:28.843013
++String buildAutofillOnlyScript(String profileJson) {
+
+# 2026-06-23 13:38:31.087705
++  return _script(profileJson, addFloatingStar: false);
+
+# 2026-06-23 13:38:33.785322
++}
+
+# 2026-06-23 13:38:34.181008
++String _script(String profileJson, {required bool addFloatingStar}) {
+
+# 2026-06-23 13:38:36.366107
++  return '''
+
+# 2026-06-23 13:38:36.691174
++(function() {
+
+# 2026-06-23 13:38:39.047247
++  // ── 1. Profile data ────────────────────────────────────────────────────
+
+# 2026-06-23 13:38:41.327766
++  var profile = $profileJson;
+
+# 2026-06-23 13:38:43.442470
++  function gv(path) {
+
+# 2026-06-23 13:38:45.578958
++    var parts = path.split('.');
+
+# 2026-06-23 13:38:47.703231
++    var o = profile;
+
+# 2026-06-23 13:38:49.795743
++    for (var i = 0; i < parts.length; i++) {
+
+# 2026-06-23 13:38:51.967662
++      if (o == null || typeof o !== 'object') return '';
+
+# 2026-06-23 13:38:53.331742
++      o = o[parts[i]];
+
+# 2026-06-23 13:39:38.190318
++/help
+
+# 2026-06-23 13:40:23.362678
++/add yourfilename.js
+
+# 2026-06-23 13:40:52.587758
++n
+
+# 2026-06-23 13:40:57.569105
++/ls
+
+# 2026-06-23 13:41:45.304968
++/run grep -r "venda" .
+
+# 2026-06-23 13:43:52.467687
++/run find /mnt/c/Users/chris -name "*.js" -o -name "*.html" -o -name "*.dart" 2>/dev/null | grep -v node_modules | grep -v build | head -30/add lib/core/constants/app_constants.dart/add lib/presentation/screens/profile/profile_onboarding_screen.dart
+
+# 2026-06-23 13:44:25.001803
++n
+
+# 2026-06-23 13:44:41.241403
++/add lib/core/constants/app_constants.dart
+
+# 2026-06-23 13:45:03.279439
++/add lib/presentation/screens/profile/profile_onboarding_screen.dart
+
+# 2026-06-23 13:45:39.601371
++I'm trying to autofill a Venda website application form, but it's not working. The autofill code is in these Dart files. Can you help me fix it?// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:45:42.680532
++// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+
+# 2026-06-23 13:45:42.733601
++//
+
+# 2026-06-23 13:45:42.824195
++// Built specifically for ITS (Oracle PL/SQL) university portals used by
+
+# 2026-06-23 13:45:43.298021
++// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+
+# 2026-06-23 13:45:43.375664
++// plain HTML — no React, no Angular, no framework events needed.
+
+# 2026-06-23 13:45:43.452125
++// Falls back to generic matching for other university sites.
+
+# 2026-06-23 13:45:43.526486
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:45:43.642970
++String buildAutofillScript(String profileJson) {
+
+# 2026-06-23 13:45:44.293607
++  return _script(profileJson, addFloatingStar: true);
+
+# 2026-06-23 13:45:46.292978
++}
+
+# 2026-06-23 13:45:46.752740
++String buildAutofillOnlyScript(String profileJson) {
+
+# 2026-06-23 13:45:48.764480
++  return _script(profileJson, addFloatingStar: false);
+
+# 2026-06-23 13:45:50.875622
++}
+
+# 2026-06-23 13:45:51.337999
++String _script(String profileJson, {required bool addFloatingStar}) {
+
+# 2026-06-23 13:45:53.415820
++  return '''
+
+# 2026-06-23 13:45:53.810628
++(function() {
+
+# 2026-06-23 13:45:56.104708
++  // ── 1. Profile data ────────────────────────────────────────────────────
+
+# 2026-06-23 13:45:58.237928
++  var profile = $profileJson;
+
+# 2026-06-23 13:46:00.399709
++  function gv(path) {
+
+# 2026-06-23 13:46:02.484269
++    var parts = path.split('.');
+
+# 2026-06-23 13:46:04.504246
++    var o = profile;
+
+# 2026-06-23 13:46:06.660992
++    for (var i = 0; i < parts.length; i++) {
+
+# 2026-06-23 13:46:08.136947
++      if (o == null || typeof o !== 'object') return '';
+
+# 2026-06-23 13:47:44.950922
++n
+
+# 2026-06-23 13:48:06.939243
++/add lib/core/constants/app_constants.dart
+
+# 2026-06-23 13:48:14.765294
++/add lib/presentation/screens/profile/profile_onboarding_screen.dart
+
+# 2026-06-23 13:48:34.498074
++I'm trying to autofill a Venda website application form, but it's not working. The autofill code is in these Dart files. Can you help me fix it?// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:48:41.636084
++// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+
+# 2026-06-23 13:48:41.692018
++//
+
+# 2026-06-23 13:48:41.770029
++// Built specifically for ITS (Oracle PL/SQL) university portals used by
+
+# 2026-06-23 13:48:41.864185
++// UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
+
+# 2026-06-23 13:48:42.217788
++// plain HTML — no React, no Angular, no framework events needed.
+
+# 2026-06-23 13:48:42.292518
++// Falls back to generic matching for other university sites.
+
+# 2026-06-23 13:48:42.365739
++// ─────────────────────────────────────────────────────────────────────────────
+
+# 2026-06-23 13:48:42.482261
++String buildAutofillScript(String profileJson) {
+
+# 2026-06-23 13:48:44.666343
++  return _script(profileJson, addFloatingStar: true);
+
+# 2026-06-23 13:48:46.981843
++}
+
+# 2026-06-23 13:48:47.579452
++String buildAutofillOnlyScript(String profileJson) {
+
+# 2026-06-23 13:48:48.449389
++  return _script(profileJson, addFloatingStar: false);
+
+# 2026-06-23 13:48:50.618544
++}
+
+# 2026-06-23 13:48:51.160495
++String _script(String profileJson, {required bool addFloatingStar}) {
+
+# 2026-06-23 13:48:53.445746
++  return '''
+
+# 2026-06-23 13:48:53.946172
++(function() {
+
+# 2026-06-23 13:48:56.085502
++  // ── 1. Profile data ────────────────────────────────────────────────────
+
+# 2026-06-23 13:48:58.341996
++  var profile = $profileJson;
+
+# 2026-06-23 13:49:00.723238
++  function gv(path) {
+
+# 2026-06-23 13:49:02.795922
++    var parts = path.split('.');
+
+# 2026-06-23 13:49:04.862689
++    var o = profile;
+
+# 2026-06-23 13:49:07.019999
++    for (var i = 0; i < parts.length; i++) {
+
+# 2026-06-23 13:49:09.155100
++      if (o == null || typeof o !== 'object') return '';
+
+# 2026-06-23 13:49:11.458149
++      o = o[parts[i]];
+
+# 2026-06-23 13:49:11.962428
++    }
+
+# 2026-06-23 13:49:12.522075
++    return (o !== null && o !== undefined) ? String(o) : '';
+
+# 2026-06-23 13:49:14.897274
++  }
+
+# 2026-06-23 13:49:15.505934
++  function fmtDate(iso) {
+
+# 2026-06-23 13:49:17.829484
++    if (!iso || iso.length < 10) return iso || '';
+
+# 2026-06-23 13:49:20.049185
++    var months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+# 2026-06-23 13:49:20.888621
++    var p = iso.split('T')[0].split('-');
+
+# 2026-06-23 13:49:23.132916
++    var m = parseInt(p[1], 10) - 1;
+
+# 2026-06-23 13:49:25.504435
++    return (m >= 0 && m < 12) ? p[2] + '-' + months[m] + '-' + p[0] : iso;
+
+# 2026-06-23 13:49:27.577203
++  }
+
+# 2026-06-23 13:49:28.171761
++  // date also as DD/MM/YYYY for ITS portals
+
+# 2026-06-23 13:49:30.284529
++  function fmtDateSlash(iso) {
+
+# 2026-06-23 13:49:32.366725
++    if (!iso || iso.length < 10) return iso || '';
+
+# 2026-06-23 13:49:32.877939
++    var p = iso.split('T')[0].split('-');
+
+# 2026-06-23 13:49:33.387479
++    return p[2] + '/' + p[1] + '/' + p[0];
+
+# 2026-06-23 13:49:33.899783
++  }
+
+# 2026-06-23 13:49:34.461180
++  var firstName   = gv('personal.firstName');
+
+# 2026-06-23 13:49:36.647358
++  var lastName    = gv('personal.lastName');
+
+# 2026-06-23 13:49:38.832858
++  var email       = gv('contact.email');
+
+# 2026-06-23 13:49:41.212449
++  var dobIso      = gv('personal.dateOfBirth');
+
+# 2026-06-23 13:49:43.460702
++  var vs = {
+
+# 2026-06-23 13:49:45.575031
++    firstName:         firstName,
+
+# 2026-06-23 13:49:46.102257
++    lastName:          lastName,
+
+# 2026-06-23 13:49:46.639684
++    initials:          gv('personal.initials'),
+
+# 2026-06-23 13:49:48.743663
++    title:             gv('personal.title'),
+
+# 2026-06-23 13:49:50.850765
++    gender:            gv('personal.gender'),
+
+# 2026-06-23 13:49:51.692935
++    idNumber:          gv('personal.idNumber'),
+
+# 2026-06-23 13:49:52.539995
++    dateOfBirth:       fmtDate(dobIso),

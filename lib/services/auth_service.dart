@@ -169,13 +169,13 @@ class AuthService implements AuthRepository {
             nationality: 'RSA',
             countryOfBirth: 'South Africa',
             homeLanguage: 'English',
-            populationGroup: 'Black',
+            populationGroup: 'African',
             maritalStatus: 'Single',
           ),
           status: StatusInfo(
             disabilityStatus: 'No',
             bursaryRequired: 'Yes',
-            employmentStatus: 'Studying at school',
+            employmentStatus: 'Unemployed',
           ),
           school: SchoolInfo(
             schoolName: 'Test High School',
@@ -212,13 +212,13 @@ class AuthService implements AuthRepository {
             academicYear: DateTime.now().year,
             applicationPeriod: '1ST YEAR',
             studyMode: 'FULL-TIME',
-            studyTiming: 'Full-Time',
+            studyTiming: 'YEAR',
             choices: [
-              QualificationChoice(faculty: 'Science', programme: 'Computer Science'),
+              QualificationChoice(faculty: 'SCIENCE, ENGINEERING AND AGRIC', programme: 'SEBECP'),
             ],
           ),
           agreement: AgreementInfo(
-            acceptanceStatus: 'Accepted',
+            acceptanceStatus: 'I Accept',
           ),
         );
         await _profileRepo.saveProfile(profile);

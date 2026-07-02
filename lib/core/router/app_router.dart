@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
@@ -237,36 +237,74 @@ class _DashboardShellState extends State<DashboardShell>
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          widget.navigationShell.goBranch(
-            index,
-            initialLocation: index == widget.navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
+      bottomNavigationBar: BottomAppBar(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: _NavItem(
+                  icon: currentIndex == 0
+                      ? Icons.home_rounded
+                      : Icons.home_outlined,
+                  label: 'Home',
+                  selected: currentIndex == 0,
+                  onTap: () {
+                    widget.navigationShell.goBranch(0,
+                        initialLocation: currentIndex == 0);
+                  },
+                ),
+              ),
+              const Spacer(),
+              _NavItem(
+                icon: Icons.exit_to_app_rounded,
+                label: 'Exit',
+                selected: false,
+                onTap: () => SystemNavigator.pop(),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school_rounded),
-            label: 'Universities',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment_rounded),
-            label: 'Applications',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_outlined),
-            selectedIcon: Icon(Icons.account_balance_rounded),
-            label: 'Funding',
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 22,
+                color: selected ? AppColors.primary : AppColors.textMuted),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: selected ? AppColors.primary : AppColors.textMuted,
+                    fontWeight:
+                        selected ? FontWeight.w600 : FontWeight.normal)),
+          ],
+        ),
       ),
     );
   }

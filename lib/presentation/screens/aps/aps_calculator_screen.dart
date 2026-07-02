@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ApsCalculatorScreen extends StatefulWidget {
@@ -13,17 +12,15 @@ class ApsCalculatorScreen extends StatefulWidget {
 
 class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
   final List<_SubjectEntry> _subjects = [];
-  bool _lifeOrientationIncluded = false;
+  final bool _lifeOrientationIncluded = false;
 
   int get _aps => _calculateAps();
 
   int _calculateAps() {
     int total = 0;
-    int count = 0;
     for (final s in _subjects) {
       if (s.mark > 0 && (s.isLifeOrientation ? _lifeOrientationIncluded : true)) {
         total += _percentageToAps(s.mark);
-        count++;
       }
     }
     // APS is best 6 subjects excluding Life Orientation unless selected
@@ -148,7 +145,7 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
             Expanded(
               flex: 3,
               child: DropdownButtonFormField<String>(
-                value: subject.name.isEmpty ? null : subject.name,
+                initialValue: subject.name.isEmpty ? null : subject.name,
                 hint: const Text('Subject', style: TextStyle(fontSize: 13)),
                 items: AppConstants.subjects
                     .map((s) => DropdownMenuItem(

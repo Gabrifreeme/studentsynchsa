@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
@@ -9,7 +8,6 @@ import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sync_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
-import 'package:studentsyncsa/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -99,15 +97,9 @@ class DashboardScreen extends ConsumerWidget {
               _PrivacyConsentBanner(),
               const SizedBox(height: 24),
 
-              // Quick Links
-              const SectionHeader(title: 'QUICK LINKS'),
-              const SizedBox(height: 12),
+              // All tiles
               _buildQuickLinks(context),
-              const SizedBox(height: 24),
-
-              // Recent / Status
-              const SectionHeader(title: 'YOUR PROGRESS'),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               _buildProgressCards(context),
             ],
           ),
@@ -137,7 +129,7 @@ class DashboardScreen extends ConsumerWidget {
             return SyncStatusBadge(status: label);
           },
           loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
         );
   }
 
@@ -168,19 +160,12 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    spreadRadius: 3,
-                  ),
-                ],
-              ),
-              child: const StarAvatar(size: 80, pulse: true),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                ),
+                child: const StarAvatar(size: 80, pulse: true),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -270,7 +255,6 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
-                      textScaleFactor: 0.92,
                       text: TextSpan(
                         style: const TextStyle(
                           fontSize: 13,
@@ -296,7 +280,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                           ),
                           const TextSpan(text: ' by tapping here.'),
                         ],
-                      ),
+                      ), textScaler: TextScaler.linear(0.92),
                     ),
                   ),
                 ],
