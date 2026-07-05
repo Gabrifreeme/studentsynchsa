@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
+import 'package:studentsyncsa/presentation/screens/auth/fake_download_screen.dart';
 import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
@@ -31,7 +32,7 @@ void triggerAuthRedirect() {
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigator,
-  initialLocation: '/dashboard',
+  initialLocation: '/fake-download',
   refreshListenable: _authRefresh,
   redirect: (context, state) {
     try {
@@ -39,6 +40,9 @@ final appRouter = GoRouter(
       final auth = container.read(authProvider);
       final authState = auth.valueOrNull;
       final loc = state.matchedLocation;
+
+      // Don't redirect away from the fake download screen
+      if (loc == '/fake-download') return null;
 
       if (authState == null || !authState.authenticated) {
         // Should never happen now — autoLogin creates anonymous profile
@@ -53,6 +57,11 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
+    GoRoute(
+      path: '/fake-download',
+      name: 'fake-download',
+      builder: (context, state) => const FakeDownloadScreen(),
+    ),
     GoRoute(
       path: '/signup',
       name: 'signup',

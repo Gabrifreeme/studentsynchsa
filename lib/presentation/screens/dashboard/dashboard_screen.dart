@@ -30,7 +30,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               const StarAvatar(size: 32),
               const SizedBox(width: 8),
-              const Text('studentsyncsa', style: TextStyle(fontSize: 16)),
+              const Text('Student Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
             ],
           ),
           actions: [
@@ -72,15 +72,16 @@ class DashboardScreen extends ConsumerWidget {
                           Text(
                             'Welcome, $firstName!',
                             style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary),
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.5),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             profile?.contact.email ?? '',
                             style: const TextStyle(
-                                fontSize: 12, color: AppColors.textSecondary),
+                                fontSize: 14, color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 4),
                           _buildSyncStatus(ref),
@@ -169,11 +170,12 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Click me!',
+              'Tap here!',
               style: TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
               ),
             ),
           ],
@@ -257,13 +259,13 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                     child: RichText(
                       text: TextSpan(
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: AppColors.textSecondary,
                           height: 1.4,
                         ),
                         children: [
                           const TextSpan(
-                            text: 'Star highly recommends you head over to our ',
+                            text: 'Star recommends reviewing your ',
                           ),
                           WidgetSpan(
                             child: GestureDetector(
@@ -271,14 +273,15 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                               child: const Text(
                                 'Privacy Status',
                                 style: TextStyle(
+                                  fontSize: 14,
                                   color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                   decoration: TextDecoration.underline,
                                 ),
                               ),
                             ),
                           ),
-                          const TextSpan(text: ' by tapping here.'),
+                          const TextSpan(text: ' here.'),
                         ],
                       ), textScaler: TextScaler.linear(0.92),
                     ),
@@ -303,7 +306,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                       child: Text(
                         'I have read and consent to the privacy policy',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -315,7 +318,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
               Text(
                 'You can review consent anytime via Settings > Privacy & Compliance.',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppColors.textMuted,
                 ),
               ),
@@ -356,10 +359,12 @@ class _ProgressTile extends StatelessWidget {
                   Text(label,
                       style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600)),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3)),
                   Text(value,
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
+                          color: AppColors.textSecondary, fontSize: 14)),
                 ],
               ),
             ),

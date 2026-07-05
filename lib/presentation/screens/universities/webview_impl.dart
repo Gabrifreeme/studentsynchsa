@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
@@ -83,8 +84,16 @@ class _AppWebViewState extends State<AppWebView> {
     WebViewCookieManager().clearCookies();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..enableZoom(true)
       ..setUserAgent(
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+    if (_controller.platform is AndroidWebViewController) {
+      final androidController = _controller.platform as AndroidWebViewController;
+      androidController.setTextZoom(175);
+    }
+
+    _controller
       ..setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: (request) {
           final url = request.url.toString();
@@ -130,12 +139,11 @@ class _AppWebViewState extends State<AppWebView> {
         onPageFinished: (url) async {
           setState(() => _loading = false);
 
-          // ── Force desktop scaling + click Apply Online ──
+          // ── Force readable text sizes + allow pinch-zoom ──
+          await _controller.runJavaScript(star.buildViewportPatch());
+
+          // ── Click Apply Online link if present ──
           await _controller.runJavaScript('''
-var meta = document.createElement('meta');
-meta.name = 'viewport';
-meta.content = 'width=1200, initial-scale=0.5';
-document.getElementsByTagName('head')[0].appendChild(meta);
 var links = document.querySelectorAll('a');
 for (var i = 0; i < links.length; i++) {
   if (links[i].innerText.includes('Apply Online')) {
@@ -364,6 +372,7 @@ if (link) {
 
   Future<void> _runPortalPatches() async {
     try {
+      await _controller.runJavaScript(star.buildViewportPatch());
       await _controller.runJavaScript(star.buildBlanketAutofillSuppressScript());
       await _controller.runJavaScript(star.buildSecurityPatch());
       await _controller.runJavaScript(star.buildLabelPatch());

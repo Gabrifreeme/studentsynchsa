@@ -863,4 +863,40 @@ String buildWizardResyncPatch() => '''
 })();
 ''';
 
+String buildViewportPatch() => '''
+(function() {
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'viewport';
+    document.head.appendChild(meta);
+  }
+  meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0';
 
+  var css = 'body, td, th, span, p, a, div, input, select, textarea { font-size: 16px !important; -webkit-text-size-adjust: 100% !important; text-size-adjust: 100% !important; }';
+
+  function injectStyles(doc) {
+    if (!doc) return;
+    try {
+      var style = doc.getElementById('ssa-accessibility-styles');
+      if (!style) {
+        style = doc.createElement('style');
+        style.id = 'ssa-accessibility-styles';
+        doc.head.appendChild(style);
+      }
+      style.textContent = css;
+    } catch (e) {}
+    try {
+      var frames = doc.querySelectorAll('iframe, frame');
+      for (var i = 0; i < frames.length; i++) {
+        try {
+          var frameDoc = frames[i].contentDocument || frames[i].contentWindow.document;
+          injectStyles(frameDoc);
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  injectStyles(document);
+})();
+''';

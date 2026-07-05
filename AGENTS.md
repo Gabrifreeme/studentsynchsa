@@ -65,3 +65,13 @@ scrcpy -e                     # -e selects TCP/IP device
 # To find current phone IP:
 adb shell ip addr show wlan0 | findstr "inet "
 ```
+
+## Execution Rules
+- Always run the app on the connected phone (ABR NX1) via ADB WiFi and launch screen mirroring with `scrcpy -e` in a separate command, unless specified otherwise by the user.
+- Always run the app after build, modify or bug fix, unless the user says otherwise.
+
+## Web Dashboard (Next.js)
+- Located in `D:\Downloads\project_extracted` (companion web app)
+- Run: `npx --package=next@15.5.9 next dev -p 9002` from that directory
+- Open: `http://localhost:9002`
+- Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev

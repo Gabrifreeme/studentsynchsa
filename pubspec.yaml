@@ -23,11 +23,13 @@ dependencies:
   path_provider: ^2.1.5
   http: ^1.2.2
   pdf: ^3.12.0
-  webview_flutter: ^4.10.0
   html: ^0.15.4
   dio: ^5.7.0
   dio_cookie_manager: ^3.1.2
   cookie_jar: ^4.0.8
+  webview_flutter: ^4.10.0
+  webview_flutter_android: ^4.13.0
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -38,9 +40,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/js/
     - assets/logos/
     - assets/icons/
     - assets/images/
+    - assets/audio/
     - assets/offline/guide.html
     - assets/offline/cput/
     - assets/offline/cut/

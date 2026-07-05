@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -126,8 +124,6 @@ class _ProfileOnboardingScreenState
 
   // Upload Documents
   final _uploadedFiles = List<String>.filled(3, '');
-
-  WebViewController? _webViewController;
 
   bool _saving = false;
 
@@ -2545,7 +2541,7 @@ class _ProfileOnboardingScreenState
               right: 16,
               bottom: 100,
               child: GestureDetector(
-                onTap: _triggerStarAutofill,
+                onTap: _showStarHelp,
                 child: AnimatedBuilder(
                   animation: _floatAnim,
                   builder: (context, child) {
@@ -2574,31 +2570,6 @@ class _ProfileOnboardingScreenState
         ),
       ),
     );
-  }
-
-  Future<void> _triggerStarAutofill() async {
-    final data = {
-      'oapFirstNames': _firstNameCtrl.text,
-      'oapSurname': _lastNameCtrl.text,
-      'oapGuardCell': _nextOfKinMobileCtrl.text,
-      'oapGuardEmail': _nextOfKinEmailCtrl.text,
-      'oapStreetAddr1': _addressCtrl.text,
-    };
-    String jsCode = """
-      (function() {
-        var data = ${jsonEncode(data)};
-        for (var id in data) {
-          var el = document.getElementById(id);
-          if (el) {
-            el.value = data[id];
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }
-        alert('Star has filled your details!');
-      })();
-    """;
-    await _webViewController.runJavaScript(jsCode);
   }
 
   void _showStarHelp() {
