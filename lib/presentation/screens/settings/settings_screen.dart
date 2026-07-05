@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/sync_service.dart';
 
@@ -12,6 +13,8 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sidebarPos = ref.watch(sidebarProvider);
+
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -19,6 +22,48 @@ class SettingsScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Student Preferences
+            const SectionHeader(title: 'STUDENT PREFERENCES'),
+            const SizedBox(height: 8),
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Choose your dominant thumb for sidebar placement:',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ThumbOption(
+                            emoji: '👈',
+                            label: 'Left Thumb',
+                            subtitle: 'Sidebar on left',
+                            selected: sidebarPos == SidebarPosition.left,
+                            onTap: () => ref.read(sidebarProvider.notifier).setPosition(SidebarPosition.left),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ThumbOption(
+                            emoji: '👉',
+                            label: 'Right Thumb',
+                            subtitle: 'Sidebar on right',
+                            selected: sidebarPos == SidebarPosition.right,
+                            onTap: () => ref.read(sidebarProvider.notifier).setPosition(SidebarPosition.right),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             const SectionHeader(title: 'ACCOUNT'),
             const SizedBox(height: 8),
             AppCard(
@@ -207,6 +252,56 @@ class _AboutRow extends StatelessWidget {
           Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: const TextStyle(color: AppColors.textPrimary)),
         ],
+      ),
+    );
+  }
+}
+
+class _ThumbOption extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThumbOption({
+    required this.emoji,
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: 8),
+            Text(label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                )),
+            const SizedBox(height: 4),
+            Text(subtitle,
+                style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+          ],
+        ),
       ),
     );
   }

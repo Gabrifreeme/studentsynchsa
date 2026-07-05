@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
 import 'package:studentsyncsa/presentation/screens/auth/fake_download_screen.dart';
 import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
@@ -41,15 +41,12 @@ final appRouter = GoRouter(
       final authState = auth.valueOrNull;
       final loc = state.matchedLocation;
 
-      // Don't redirect away from the fake download screen
       if (loc == '/fake-download') return null;
 
       if (authState == null || !authState.authenticated) {
-        // Should never happen now — autoLogin creates anonymous profile
         return '/dashboard';
       }
 
-      // Always go to dashboard, no login/signup gate
       if (loc == '/signup') {
         return '/dashboard';
       }
@@ -175,117 +172,134 @@ final appRouter = GoRouter(
   ],
 );
 
-class DashboardShell extends StatefulWidget {
+class DashboardShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
   const DashboardShell({super.key, required this.navigationShell});
 
   @override
-  State<DashboardShell> createState() => _DashboardShellState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sidebarPos = ref.watch(sidebarProvider);
+    final currentIndex = navigationShell.currentIndex;
+    final isRight = sidebarPos == SidebarPosition.right;
 
-class _DashboardShellState extends State<DashboardShell>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _floatCtrl;
-  late Animation<double> _floatAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _floatCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-    _floatAnim = Tween<double>(begin: -6, end: 6).animate(
-      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
+    return Scaffold(
+      drawer: isRight ? null : _buildDrawer(context, ref, currentIndex),
+      endDrawer: isRight ? _buildDrawer(context, ref, currentIndex) : null,
+      body: Stack(
+        children: [
+          navigationShell,
+          if (currentIndex != 0)
+            Positioned(
+              right: 16,
+              bottom: 80,
+              child: GestureDetector(
+                onTap: () => context.push('/ai-recommendations'),
+                child: const StarAvatar(size: 40, pulse: true),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  @override
-  void dispose() {
-    _floatCtrl.dispose();
-    super.dispose();
-  }
+  Widget _buildDrawer(BuildContext context, WidgetRef ref, int currentIndex) {
+    final navItems = [
+      _NavItemData(icon: Icons.home_rounded, label: 'Home', route: '/dashboard', index: 0),
+      _NavItemData(icon: Icons.person_rounded, label: 'My Profile', route: '/onboarding'),
+      _NavItemData(icon: Icons.notifications_rounded, label: 'Notifications', route: '/notifications'),
+      _NavItemData(icon: Icons.auto_awesome_rounded, label: 'Advisor', route: '/ai-recommendations'),
+      _NavItemData(icon: Icons.account_balance_wallet_rounded, label: 'Funding', route: '/funding', index: 3),
+      _NavItemData(icon: Icons.school_rounded, label: 'Universities', route: '/universities', index: 1),
+      _NavItemData(icon: Icons.assignment_rounded, label: 'Applications', route: '/applications', index: 2),
+      _NavItemData(icon: Icons.chat_rounded, label: 'Community', route: '/chat'),
+      _NavItemData(icon: Icons.settings_rounded, label: 'Settings', route: '/settings'),
+    ];
 
-  @override
-  Widget build(BuildContext context) {
-    final currentIndex = widget.navigationShell.currentIndex;
-    return Scaffold(
-      body: Stack(
-        children: [
-          widget.navigationShell,
-          if (currentIndex != 0)
-            Positioned(
-            right: 16,
-            bottom: 80,
-            child: GestureDetector(
-              onTap: () => context.push('/ai-recommendations'),
-              child: AnimatedBuilder(
-                animation: _floatAnim,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _floatAnim.value),
-                    child: child,
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.starGold.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
+    return Drawer(
+      backgroundColor: AppColors.surface,
+      width: 260,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+              child: Row(
+                children: [
+                  Text(
+                    'StudentSync',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  child: const StarAvatar(size: 40, pulse: true),
-                ),
+                  Text(
+                    'SA',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _NavItem(
-                  icon: currentIndex == 0
-                      ? Icons.home_rounded
-                      : Icons.home_outlined,
-                  label: 'Home',
-                  selected: currentIndex == 0,
-                  onTap: () {
-                    widget.navigationShell.goBranch(0,
-                        initialLocation: currentIndex == 0);
-                  },
-                ),
+            const Divider(color: AppColors.divider, thickness: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: navItems.map((item) {
+                  final isSelected = item.index != null
+                      ? currentIndex == item.index
+                      : item.route == '/dashboard'
+                          ? currentIndex == 0
+                          : false;
+                  return _SidebarItem(
+                    icon: item.icon,
+                    label: item.label,
+                    selected: isSelected,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      if (item.index != null) {
+                        navigationShell.goBranch(item.index!,
+                            initialLocation: currentIndex == item.index);
+                      } else {
+                        context.push(item.route);
+                      }
+                    },
+                  );
+                }).toList(),
               ),
-              const Spacer(),
-              _NavItem(
-                icon: Icons.exit_to_app_rounded,
-                label: 'Exit',
-                selected: false,
-                onTap: () => SystemNavigator.pop(),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItemData {
+  final IconData icon;
+  final String label;
+  final String route;
+  final int? index;
+  const _NavItemData({
+    required this.icon,
+    required this.label,
+    required this.route,
+    this.index,
+  });
+}
+
+class _SidebarItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavItem({
+  const _SidebarItem({
     required this.icon,
     required this.label,
     required this.selected,
@@ -294,25 +308,39 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                size: 22,
-                color: selected ? AppColors.primary : AppColors.textMuted),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: selected ? AppColors.primary : AppColors.textMuted,
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.normal)),
-          ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary.withValues(alpha: 0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: selected ? Border.all(color: AppColors.primary.withValues(alpha: 0.3)) : null,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: selected ? AppColors.primary : AppColors.textMuted,
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

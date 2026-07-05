@@ -5,9 +5,8 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
-import 'package:studentsyncsa/presentation/providers/sync_provider.dart';
+import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -20,88 +19,45 @@ class DashboardScreen extends ConsumerWidget {
     final firstName = profile?.personal.firstName.isNotEmpty == true
         ? profile!.personal.firstName
         : 'Student';
+    final isRight = ref.watch(sidebarProvider) == SidebarPosition.right;
 
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const StarAvatar(size: 32),
-              const SizedBox(width: 8),
-              const Text('Student Hub', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-            ],
+          leading: IconButton(
+            icon: Icon(isRight ? Icons.menu_open_rounded : Icons.menu_rounded),
+            onPressed: () {
+              final scaffold = Scaffold.of(context);
+              if (isRight) {
+                scaffold.openEndDrawer();
+              } else {
+                scaffold.openDrawer();
+              }
+            },
           ),
+          title: const Text('StudentSyncSA',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
               onPressed: () => context.push('/notifications'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => context.push('/settings'),
             ),
           ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome Card
-              AppCard(
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: AppColors.primary,
-                      child: Text(
-                        firstName[0].toUpperCase(),
-                        style: const TextStyle(
-                            fontSize: 24,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome, $firstName!',
-                            style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.textPrimary,
-                                letterSpacing: -0.5),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            profile?.contact.email ?? '',
-                            style: const TextStyle(
-                                fontSize: 14, color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: 4),
-                          _buildSyncStatus(ref),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Star — center stage
-              _buildStarCta(context),
+              const SizedBox(height: 32),
+              _buildStarCta(context, firstName),
+              const SizedBox(height: 48),
               _PrivacyConsentBanner(),
               const SizedBox(height: 24),
-
-              // All tiles
               _buildQuickLinks(context),
               const SizedBox(height: 8),
               _buildProgressCards(context),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -109,29 +65,51 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSyncStatus(WidgetRef ref) {
-    return ref.watch(syncStatusNotifierProvider).when(
-          data: (status) {
-            String label;
-            switch (status) {
-              case sync_service.SyncStatus.syncing:
-                label = 'syncing';
-                break;
-              case sync_service.SyncStatus.synced:
-                label = 'synced';
-                break;
-              case sync_service.SyncStatus.failed:
-                label = 'failed';
-                break;
-              case sync_service.SyncStatus.offline:
-                label = 'offline';
-                break;
-            }
-            return SyncStatusBadge(status: label);
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
-        );
+  Widget _buildStarCta(BuildContext context, String firstName) {
+    return GestureDetector(
+      onTap: () => context.push('/ai-recommendations'),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    blurRadius: 60,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+              child: const StarAvatar(size: 120, pulse: true),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Welcome, $firstName!',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tap the Star to begin',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 13,
+                letterSpacing: 3,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildQuickLinks(BuildContext context) {
@@ -151,36 +129,6 @@ class DashboardScreen extends ConsumerWidget {
           onTap: () => context.push('/chat'),
         ),
       ],
-    );
-  }
-
-  Widget _buildStarCta(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/ai-recommendations'),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                ),
-                child: const StarAvatar(size: 80, pulse: true),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Tap here!',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -242,88 +190,86 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
   Widget build(BuildContext context) {
     if (!_initialized || _consented) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: AppCard(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: AppColors.starGold, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                          height: 1.4,
+    return AppCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, color: AppColors.starGold, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'Star recommends reviewing your ',
                         ),
-                        children: [
-                          const TextSpan(
-                            text: 'Star recommends reviewing your ',
-                          ),
-                          WidgetSpan(
-                            child: GestureDetector(
-                              onTap: () => context.push('/privacy'),
-                              child: const Text(
-                                'Privacy Status',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
-                                ),
+                        WidgetSpan(
+                          child: GestureDetector(
+                            onTap: () => context.push('/privacy'),
+                            child: const Text(
+                              'Privacy Status',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
                               ),
                             ),
                           ),
-                          const TextSpan(text: ' here.'),
-                        ],
-                      ), textScaler: TextScaler.linear(0.92),
+                        ),
+                        const TextSpan(text: ' here.'),
+                      ],
+                    ),
+                    textScaler: TextScaler.linear(0.92),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: _giveConsent,
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Icon(
+                    _consented
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'I have read and consent to the privacy policy',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: _giveConsent,
-                borderRadius: BorderRadius.circular(8),
-                child: Row(
-                  children: [
-                    Icon(
-                      _consented
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'I have read and consent to the privacy policy',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can review consent anytime via Settings > Privacy & Compliance.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textMuted,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'You can review consent anytime via Settings > Privacy & Compliance.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
