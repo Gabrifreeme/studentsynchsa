@@ -1,24 +1,24 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
+import 'package:studentsyncsa/presentation/screens/applications/application_tracker_screen.dart';
+import 'package:studentsyncsa/presentation/screens/aps/aps_calculator_screen.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
+import 'package:studentsyncsa/presentation/screens/chat/chat_screen.dart';
 import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
+import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
+import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.dart';
 import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
+import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
+import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
+import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/application_helper_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/university_detail_screen.dart';
-import 'package:studentsyncsa/presentation/screens/aps/aps_calculator_screen.dart';
-import 'package:studentsyncsa/presentation/screens/applications/application_tracker_screen.dart';
-import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.dart';
-import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
-import 'package:studentsyncsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
-import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
-import 'package:studentsyncsa/presentation/screens/chat/chat_screen.dart';
-import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
-import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/application_helper_screen.dart';
+import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
@@ -41,7 +41,7 @@ final appRouter = GoRouter(
       final loc = state.matchedLocation;
 
       if (authState == null || !authState.authenticated) {
-        // Should never happen now — autoLogin creates anonymous profile
+        // Should never happen now â€” autoLogin creates anonymous profile
         return '/dashboard';
       }
 
@@ -96,8 +96,21 @@ final appRouter = GoRouter(
                       path: 'helper',
                       name: 'application-helper',
                       builder: (context, state) => ApplicationHelperScreen(
-                        universityName: state.uri.queryParameters['name'] ?? 'University',
+                        universityName:
+                            state.uri.queryParameters['name'] ?? 'University',
                       ),
+                    ),
+                    GoRoute(
+                      path: 'webview',
+                      name: 'university-webview',
+                      builder: (context, state) {
+                        final rawUrl = state.uri.queryParameters['url'] ?? '';
+                        final rawName = state.uri.queryParameters['name'] ?? 'University';
+                        return UniversityWebViewScreen(
+                          url: Uri.decodeComponent(rawUrl),
+                          universityName: Uri.decodeComponent(rawName),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -187,9 +200,10 @@ class _DashboardShellState extends State<DashboardShell>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _floatAnim = Tween<double>(begin: -6, end: 6).animate(
-      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
-    );
+    _floatAnim = Tween<double>(
+      begin: -6,
+      end: 6,
+    ).animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -207,35 +221,35 @@ class _DashboardShellState extends State<DashboardShell>
           widget.navigationShell,
           if (currentIndex != 0)
             Positioned(
-            right: 16,
-            bottom: 80,
-            child: GestureDetector(
-              onTap: () => context.push('/ai-recommendations'),
-              child: AnimatedBuilder(
-                animation: _floatAnim,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _floatAnim.value),
-                    child: child,
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.starGold.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
+              right: 16,
+              bottom: 80,
+              child: GestureDetector(
+                onTap: () => context.push('/ai-recommendations'),
+                child: AnimatedBuilder(
+                  animation: _floatAnim,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(0, _floatAnim.value),
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.starGold.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: const StarAvatar(size: 40, pulse: true),
                   ),
-                  child: const StarAvatar(size: 40, pulse: true),
                 ),
               ),
             ),
-          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

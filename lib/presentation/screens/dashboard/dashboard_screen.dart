@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
@@ -9,7 +8,6 @@ import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sync_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
-import 'package:studentsyncsa/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -61,9 +59,10 @@ class DashboardScreen extends ConsumerWidget {
                       child: Text(
                         firstName[0].toUpperCase(),
                         style: const TextStyle(
-                            fontSize: 24,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold),
+                          fontSize: 24,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -74,15 +73,18 @@ class DashboardScreen extends ConsumerWidget {
                           Text(
                             'Welcome, $firstName!',
                             style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary),
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             profile?.contact.email ?? '',
                             style: const TextStyle(
-                                fontSize: 12, color: AppColors.textSecondary),
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           _buildSyncStatus(ref),
@@ -117,7 +119,9 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildSyncStatus(WidgetRef ref) {
-    return ref.watch(syncStatusNotifierProvider).when(
+    return ref
+        .watch(syncStatusNotifierProvider)
+        .when(
           data: (status) {
             String label;
             switch (status) {
@@ -137,7 +141,7 @@ class DashboardScreen extends ConsumerWidget {
             return SyncStatusBadge(status: label);
           },
           loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
         );
   }
 
@@ -270,7 +274,6 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
-                      textScaleFactor: 0.92,
                       text: TextSpan(
                         style: const TextStyle(
                           fontSize: 13,
@@ -279,7 +282,8 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                         ),
                         children: [
                           const TextSpan(
-                            text: 'Star highly recommends you head over to our ',
+                            text:
+                                'Star highly recommends you head over to our ',
                           ),
                           WidgetSpan(
                             child: GestureDetector(
@@ -297,6 +301,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                           const TextSpan(text: ' by tapping here.'),
                         ],
                       ),
+                      textScaler: TextScaler.linear(0.92),
                     ),
                   ),
                 ],
@@ -330,10 +335,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
               const SizedBox(height: 8),
               Text(
                 'You can review consent anytime via Settings > Privacy & Compliance.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -369,18 +371,28 @@ class _ProgressTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600)),
-                  Text(value,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textMuted, size: 20),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+              size: 20,
+            ),
           ],
         ),
       ),

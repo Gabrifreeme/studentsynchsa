@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -200,6 +201,34 @@ class UniversityDetailScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // ⭐ Star Autofill
+                if (uni.applicationUrl.isNotEmpty && _isItsPortal(uni.applicationUrl))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        if (_copyProfileToClipboard(ref)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profile copied — paste in Chrome'),
+                              duration: Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: Image.asset('assets/images/star_avatar.png', width: 20, height: 20),
+                      label: const Text('Star Autofill — Copy Profile'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 24),
 
                 // ✨ Apply (in-app form)
@@ -228,14 +257,9 @@ class UniversityDetailScreen extends ConsumerWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => UniversityWebViewScreen(
-                                  url: uni.applicationUrl,
-                                  universityName: uni.shortName,
-                                ),
-                              ),
-                            );
+                            final url = Uri.encodeComponent(uni.applicationUrl);
+                            final name = Uri.encodeComponent(uni.shortName);
+                            context.push('/universities/${uni.id}/webview?url=$url&name=$name');
                           },
                           icon: const Icon(Icons.open_in_new, size: 18),
                           label: const Text('↗ Online Portal'),
@@ -410,6 +434,41 @@ class UniversityDetailScreen extends ConsumerWidget {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+
+  bool _isItsPortal(String url) {
+    return url.contains('pls/prodi41') ||
+        url.contains('univenerp01') ||
+        url.contains('gw1startup');
+  }
+
+  bool _copyProfileToClipboard(WidgetRef ref) {
+    final profile = ref.read(profileProvider).valueOrNull;
+    if (profile != null) {
+      final data = StringBuffer();
+      data.writeln('StudentSyncSA Profile Data');
+      data.writeln('──────────────────────────');
+      data.writeln('Name: ${profile.personal.firstName} ${profile.personal.lastName}');
+      data.writeln('ID: ${profile.personal.idNumber}');
+      data.writeln('Email: ${profile.contact.email}');
+      data.writeln('Phone: ${profile.contact.phone}');
+      data.writeln('Address: ${profile.address.address}');
+      final dob = profile.personal.dateOfBirth;
+      data.writeln('DOB: ${dob?.toIso8601String().split('T')[0] ?? ''}');
+      data.writeln('Nationality: ${profile.demographic.nationality}');
+      data.writeln('Matric Year: ${profile.results.matricYear}');
+      Clipboard.setData(ClipboardData(text: data.toString()));
+    }
+    return profile != null;
+  }
+
+  void _openPortalInChrome(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+
 }
 
 class _ReqRow extends StatelessWidget {

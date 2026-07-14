@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -21,15 +23,27 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   String _selectedProvince = 'All';
 
   static const _provinces = [
-    'All', 'Eastern Cape', 'Free State', 'Gauteng',
-    'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
-    'Northern Cape', 'North West', 'Western Cape',
+    'All',
+    'Eastern Cape',
+    'Free State',
+    'Gauteng',
+    'KwaZulu-Natal',
+    'Limpopo',
+    'Mpumalanga',
+    'Northern Cape',
+    'North West',
+    'Western Cape',
   ];
 
   static const _logoColors = [
-    Color(0xFF7C3AED), Color(0xFF3B82F6), Color(0xFF10B981),
-    Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899),
-    Color(0xFF14B8A6), Color(0xFF8B5CF6),
+    Color(0xFF7C3AED),
+    Color(0xFF3B82F6),
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFFEF4444),
+    Color(0xFFEC4899),
+    Color(0xFF14B8A6),
+    Color(0xFF8B5CF6),
   ];
 
   @override
@@ -49,7 +63,8 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
           child: universitiesAsync.when(
             data: (universities) {
               var filtered = universities.where((u) {
-                if (_selectedProvince != 'All' && u.province != _selectedProvince) {
+                if (_selectedProvince != 'All' &&
+                    u.province != _selectedProvince) {
                   return false;
                 }
                 if (_searchCtrl.text.isNotEmpty) {
@@ -70,36 +85,58 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Universities',
-                            style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Universities',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text('All ${universities.length} SA public universities',
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14)),
+                        Text(
+                          'All ${universities.length} SA public universities',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (_) => setState(() {}),
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Search universities...',
                         hintStyle: const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 22),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: AppColors.textMuted,
+                          size: 22,
+                        ),
                         suffixIcon: IconButton(
-                          icon: const Icon(Icons.tune_rounded, color: AppColors.textMuted, size: 20),
+                          icon: const Icon(
+                            Icons.tune_rounded,
+                            color: AppColors.textMuted,
+                            size: 20,
+                          ),
                           onPressed: () {},
                         ),
                         filled: true,
                         fillColor: AppColors.card,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide.none,
@@ -119,14 +156,25 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
-                            label: Text(p, style: TextStyle(fontSize: 12, color: selected ? Colors.white : AppColors.textSecondary)),
+                            label: Text(
+                              p,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: selected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
                             selected: selected,
                             selectedColor: AppColors.primary,
                             backgroundColor: AppColors.surfaceLight,
                             checkmarkColor: Colors.white,
                             side: BorderSide.none,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            onSelected: (_) => setState(() => _selectedProvince = p),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            onSelected: (_) =>
+                                setState(() => _selectedProvince = p),
                           ),
                         );
                       },
@@ -135,15 +183,25 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                   const SizedBox(height: 8),
                   Expanded(
                     child: filtered.isEmpty
-                        ? const Center(child: Text('No universities found', style: TextStyle(color: AppColors.textMuted)))
+                        ? const Center(
+                            child: Text(
+                              'No universities found',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
                             itemCount: filtered.length,
                             itemBuilder: (_, i) {
                               return _UniversityCard(
                                 university: filtered[i],
                                 logoColor: _logoColors[i % _logoColors.length],
-                                onTap: () => context.push('/universities/${filtered[i].id}'),
+                                onTap: () => context.push(
+                                  '/universities/${filtered[i].id}',
+                                ),
                               );
                             },
                           ),
@@ -211,7 +269,11 @@ class _UniversityCard extends StatelessWidget {
                             : null,
                       ),
                       child: uni.logoUrl.isEmpty
-                          ? Icon(Icons.account_balance_outlined, color: logoColor, size: 28)
+                          ? Icon(
+                              Icons.account_balance_outlined,
+                              color: logoColor,
+                              size: 28,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 12),
@@ -246,7 +308,11 @@ class _UniversityCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       uni.province,
@@ -326,23 +392,12 @@ class _UniversityCard extends StatelessWidget {
 
   void _handleApply(BuildContext context, University uni) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ApplicationFormScreen(university: uni),
-      ),
+      MaterialPageRoute(builder: (_) => ApplicationFormScreen(university: uni)),
     );
   }
 
   void _handlePortal(BuildContext context, University uni) {
-    if (uni.applicationUrl.isNotEmpty) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => UniversityWebViewScreen(
-            url: uni.applicationUrl,
-            universityName: uni.shortName,
-          ),
-        ),
-      );
-    } else {
+    if (uni.applicationUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No online portal available'),
@@ -350,6 +405,39 @@ class _UniversityCard extends StatelessWidget {
           behavior: SnackBarBehavior.floating,
         ),
       );
+      return;
     }
+
+    final url = Uri.encodeComponent(uni.applicationUrl);
+    final name = Uri.encodeComponent(uni.shortName);
+    context.push('/universities/${uni.id}/webview?url=$url&name=$name');
+  }
+
+  bool _copyProfileToClipboard(BuildContext context) {
+    final profile = ProviderScope.containerOf(context).read(profileProvider).valueOrNull;
+    if (profile != null) {
+      final data = StringBuffer();
+      data.writeln('StudentSyncSA Profile Data');
+      data.writeln('──────────────────────────');
+      data.writeln('Name: ${profile.personal.firstName} ${profile.personal.lastName}');
+      data.writeln('ID: ${profile.personal.idNumber}');
+      data.writeln('Email: ${profile.contact.email}');
+      data.writeln('Phone: ${profile.contact.phone}');
+      data.writeln('Address: ${profile.address.address}');
+      final dob = profile.personal.dateOfBirth;
+      data.writeln('DOB: ${dob?.toIso8601String().split('T')[0] ?? ''}');
+      data.writeln('Nationality: ${profile.demographic.nationality}');
+      data.writeln('Matric Year: ${profile.results.matricYear}');
+      Clipboard.setData(ClipboardData(text: data.toString()));
+      return true;
+    }
+    return false;
+  }
+
+  void _openPortalInChrome(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 }

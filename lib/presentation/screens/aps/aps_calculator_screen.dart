@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ApsCalculatorScreen extends StatefulWidget {
@@ -13,7 +12,7 @@ class ApsCalculatorScreen extends StatefulWidget {
 
 class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
   final List<_SubjectEntry> _subjects = [];
-  bool _lifeOrientationIncluded = false;
+  final bool _lifeOrientationIncluded = false;
 
   int get _aps => _calculateAps();
 
@@ -21,7 +20,8 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
     int total = 0;
     int count = 0;
     for (final s in _subjects) {
-      if (s.mark > 0 && (s.isLifeOrientation ? _lifeOrientationIncluded : true)) {
+      if (s.mark > 0 &&
+          (s.isLifeOrientation ? _lifeOrientationIncluded : true)) {
         total += _percentageToAps(s.mark);
         count++;
       }
@@ -68,8 +68,10 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
               ),
               child: Column(
                 children: [
-                  const Text('Your APS Score',
-                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  const Text(
+                    'Your APS Score',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     '$_aps',
@@ -148,19 +150,23 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
             Expanded(
               flex: 3,
               child: DropdownButtonFormField<String>(
-                value: subject.name.isEmpty ? null : subject.name,
+                initialValue: subject.name.isEmpty ? null : subject.name,
                 hint: const Text('Subject', style: TextStyle(fontSize: 13)),
                 items: AppConstants.subjects
-                    .map((s) => DropdownMenuItem(
+                    .map(
+                      (s) => DropdownMenuItem(
                         value: s,
-                        child: Text(s, style: const TextStyle(fontSize: 12))))
+                        child: Text(s, style: const TextStyle(fontSize: 12)),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) {
                   if (v != null) {
                     setState(() {
                       subject.name = v;
-                      subject.isLifeOrientation =
-                          v.toLowerCase().contains('life orientation');
+                      subject.isLifeOrientation = v.toLowerCase().contains(
+                        'life orientation',
+                      );
                     });
                   }
                 },
@@ -170,11 +176,16 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
             SizedBox(
               width: 60,
               child: TextFormField(
-                initialValue: subject.mark == 0 ? '' : subject.mark.toInt().toString(),
+                initialValue: subject.mark == 0
+                    ? ''
+                    : subject.mark.toInt().toString(),
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: '%',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
                 ),
                 onChanged: (v) {
                   setState(() => subject.mark = double.tryParse(v) ?? 0);
@@ -191,8 +202,11 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.remove_circle_outline,
-                  color: AppColors.error, size: 20),
+              icon: const Icon(
+                Icons.remove_circle_outline,
+                color: AppColors.error,
+                size: 20,
+              ),
               onPressed: () => setState(() => _subjects.removeAt(index)),
             ),
           ],

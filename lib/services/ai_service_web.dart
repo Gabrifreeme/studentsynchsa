@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
+import 'package:universal_html/html.dart';
 
 class AiService {
   static Future<void> warmUp() async {}

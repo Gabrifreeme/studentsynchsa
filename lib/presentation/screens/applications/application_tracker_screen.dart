@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
 import 'package:studentsyncsa/presentation/providers/application_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:uuid/uuid.dart';
 
 class ApplicationTrackerScreen extends ConsumerStatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -76,31 +75,42 @@ class _ApplicationTrackerScreenState
             Row(
               children: [
                 Expanded(
-                  child: Text(app.universityName,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15)),
+                  child: Text(
+                    app.universityName,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
                 ),
                 _StatusChip(app.status),
               ],
             ),
             if (app.course.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(app.course,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 13)),
+              Text(
+                app.course,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
             ],
             const SizedBox(height: 8),
             Row(
               children: [
-                _InfoChip(Icons.monetization_on_outlined,
-                    app.feePaid ? 'Fee Paid' : 'Fee Not Paid',
-                    app.feePaid),
+                _InfoChip(
+                  Icons.monetization_on_outlined,
+                  app.feePaid ? 'Fee Paid' : 'Fee Not Paid',
+                  app.feePaid,
+                ),
                 const SizedBox(width: 8),
-                _InfoChip(Icons.assignment_outlined,
-                    app.nbtCompleted ? 'NBT Done' : 'NBT Pending',
-                    app.nbtCompleted),
+                _InfoChip(
+                  Icons.assignment_outlined,
+                  app.nbtCompleted ? 'NBT Done' : 'NBT Pending',
+                  app.nbtCompleted,
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -115,9 +125,8 @@ class _ApplicationTrackerScreenState
                 IconButton(
                   icon: const Icon(Icons.delete_outlined, size: 18),
                   color: AppColors.error,
-                  onPressed: () => ref
-                      .read(applicationsProvider.notifier)
-                      .delete(app.id),
+                  onPressed: () =>
+                      ref.read(applicationsProvider.notifier).delete(app.id),
                 ),
               ],
             ),
@@ -136,8 +145,10 @@ class _ApplicationTrackerScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('New Application',
-            style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          'New Application',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: Form(
           key: formKey,
           child: Column(
@@ -151,7 +162,9 @@ class _ApplicationTrackerScreenState
               const SizedBox(height: 12),
               TextFormField(
                 controller: courseCtrl,
-                decoration: const InputDecoration(labelText: 'Course / Programme'),
+                decoration: const InputDecoration(
+                  labelText: 'Course / Programme',
+                ),
               ),
             ],
           ),
@@ -194,8 +207,10 @@ class _ApplicationTrackerScreenState
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('Edit Application',
-              style: TextStyle(color: AppColors.textPrimary)),
+          title: const Text(
+            'Edit Application',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
@@ -204,22 +219,26 @@ class _ApplicationTrackerScreenState
                 children: [
                   TextFormField(
                     controller: uniCtrl,
-                    decoration:
-                        const InputDecoration(labelText: 'University Name'),
+                    decoration: const InputDecoration(
+                      labelText: 'University Name',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: courseCtrl,
-                    decoration:
-                        const InputDecoration(labelText: 'Course / Programme'),
+                    decoration: const InputDecoration(
+                      labelText: 'Course / Programme',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<ApplicationStatus>(
-                    value: status,
+                    initialValue: status,
                     decoration: const InputDecoration(labelText: 'Status'),
                     items: ApplicationStatus.values
-                        .map((s) => DropdownMenuItem(
-                            value: s, child: Text(s.label)))
+                        .map(
+                          (s) =>
+                              DropdownMenuItem(value: s, child: Text(s.label)),
+                        )
                         .toList(),
                     onChanged: (v) =>
                         setDialogState(() => status = v ?? status),
@@ -228,13 +247,15 @@ class _ApplicationTrackerScreenState
                   CheckboxListTile(
                     title: const Text('Application Fee Paid'),
                     value: feePaid,
-                    onChanged: (v) => setDialogState(() => feePaid = v ?? false),
+                    onChanged: (v) =>
+                        setDialogState(() => feePaid = v ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
                     title: const Text('NBT Completed'),
                     value: nbtDone,
-                    onChanged: (v) => setDialogState(() => nbtDone = v ?? false),
+                    onChanged: (v) =>
+                        setDialogState(() => nbtDone = v ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                 ],
@@ -294,8 +315,14 @@ class _StatusChip extends StatelessWidget {
         color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(status.label,
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      child: Text(
+        status.label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
@@ -311,21 +338,27 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (active ? AppColors.success : AppColors.textMuted)
-            .withValues(alpha: 0.15),
+        color: (active ? AppColors.success : AppColors.textMuted).withValues(
+          alpha: 0.15,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon,
-              size: 12,
-              color: active ? AppColors.success : AppColors.textMuted),
+          Icon(
+            icon,
+            size: 12,
+            color: active ? AppColors.success : AppColors.textMuted,
+          ),
           const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  color: active ? AppColors.success : AppColors.textMuted,
-                  fontSize: 10)),
+          Text(
+            label,
+            style: TextStyle(
+              color: active ? AppColors.success : AppColors.textMuted,
+              fontSize: 10,
+            ),
+          ),
         ],
       ),
     );

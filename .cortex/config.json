@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "projectName": "StudentSyncSA",
+  "projectPath": "c:\\Users\\chris\\StudentSyncSA",
+  "createdAt": "2026-06-29T00:03:36.108Z",
+  "maxWorkingMemoryTokens": 800,
+  "autoInject": true,
+  "extractionModel": "claude-haiku-4-5-20251001",
+  "teamSyncEnabled": false,
+  "ignorePaths": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "coverage"
+  ]
+}

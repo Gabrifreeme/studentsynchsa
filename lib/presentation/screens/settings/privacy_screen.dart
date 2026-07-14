@@ -83,13 +83,25 @@ class PrivacyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _ContactLine(label: 'Data Protection', value: 'Privacy Team'),
-                        _ContactLine(label: 'Email', value: 'privacy@studentsyncsa.app'),
-                        _ContactLine(label: 'Response time', value: 'Within 72 hours'),
+                        _ContactLine(
+                          label: 'Data Protection',
+                          value: 'Privacy Team',
+                        ),
+                        _ContactLine(
+                          label: 'Email',
+                          value: 'privacy@studentsyncsa.app',
+                        ),
+                        _ContactLine(
+                          label: 'Response time',
+                          value: 'Within 72 hours',
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Or use the Settings → Clear All Local Data option to remove all stored information immediately.',
-                          style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ],
                     ),
@@ -130,12 +142,30 @@ class PrivacyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _PrincipleRow('On-device processing', 'All analytics, recommendations, and data processing happen inside the app. Raw data is never uploaded to servers.'),
-                        _PrincipleRow('Data minimization', 'Only strictly necessary data is collected — enough to pre-fill forms and check eligibility. No data hoarding.'),
-                        _PrincipleRow('No PII retained unnecessarily', 'Personal identifiers (ID numbers, names, contact details) are stored only as long as you keep them in the app. No external persistence.'),
-                        _PrincipleRow('Explicit consent', 'Any tracking or data sharing requires your explicit opt-in. Consent dialogs state the purpose concisely before any action.'),
-                        _PrincipleRow('Auto-discard', 'Session data and intermediate processing results are discarded when no longer needed. Non-identifiable state may persist for app functionality.'),
-                        _PrincipleRow('Real-time processing', 'Recommendations and matches are computed in-memory at the moment you need them. Only the result is displayed; intermediate data is ephemeral.'),
+                        _PrincipleRow(
+                          'On-device processing',
+                          'All analytics, recommendations, and data processing happen inside the app. Raw data is never uploaded to servers.',
+                        ),
+                        _PrincipleRow(
+                          'Data minimization',
+                          'Only strictly necessary data is collected — enough to pre-fill forms and check eligibility. No data hoarding.',
+                        ),
+                        _PrincipleRow(
+                          'No PII retained unnecessarily',
+                          'Personal identifiers (ID numbers, names, contact details) are stored only as long as you keep them in the app. No external persistence.',
+                        ),
+                        _PrincipleRow(
+                          'Explicit consent',
+                          'Any tracking or data sharing requires your explicit opt-in. Consent dialogs state the purpose concisely before any action.',
+                        ),
+                        _PrincipleRow(
+                          'Auto-discard',
+                          'Session data and intermediate processing results are discarded when no longer needed. Non-identifiable state may persist for app functionality.',
+                        ),
+                        _PrincipleRow(
+                          'Real-time processing',
+                          'Recommendations and matches are computed in-memory at the moment you need them. Only the result is displayed; intermediate data is ephemeral.',
+                        ),
                       ],
                     ),
                   ),
@@ -148,9 +178,7 @@ class PrivacyScreen extends StatelessWidget {
             _Section(
               icon: Icons.code_outlined,
               title: 'Implementation Patterns',
-              children: [
-                'How these principles are implemented in practice:',
-              ],
+              children: ['How these principles are implemented in practice:'],
               trailing: Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: AppCard(
@@ -159,10 +187,22 @@ class PrivacyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _PrincipleRow('Local-only analytics', 'Feature usage and interaction signals are stored in a local Hive box or in-memory. Never synced to external servers.'),
-                        _PrincipleRow('On-device recommender', 'The Star AI runs locally via Ollama. No prompts or responses leave your machine. University/bursary matching uses local data only.'),
-                        _PrincipleRow('Ephemeral sessions', 'When you close the app, any temporary session state is purged. Only explicitly saved profile data persists.'),
-                        _PrincipleRow('Clear exit path', 'Settings → Clear All Local Data removes all stored information permanently. Uninstalling the app achieves the same result.'),
+                        _PrincipleRow(
+                          'Local-only analytics',
+                          'Feature usage and interaction signals are stored in a local Hive box or in-memory. Never synced to external servers.',
+                        ),
+                        _PrincipleRow(
+                          'On-device recommender',
+                          'The Star AI runs locally via Ollama. No prompts or responses leave your machine. University/bursary matching uses local data only.',
+                        ),
+                        _PrincipleRow(
+                          'Ephemeral sessions',
+                          'When you close the app, any temporary session state is purged. Only explicitly saved profile data persists.',
+                        ),
+                        _PrincipleRow(
+                          'Clear exit path',
+                          'Settings → Clear All Local Data removes all stored information permanently. Uninstalling the app achieves the same result.',
+                        ),
                       ],
                     ),
                   ),
@@ -198,12 +238,24 @@ class PrivacyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _Bullet('Data category — personal info, academic records, application data, usage stats'),
-                        _Bullet('Purpose — pre-fill forms, check eligibility, track applications, improve app'),
-                        _Bullet('Lawful basis — user consent (POPIA Section 11), contractual necessity (application submissions)'),
-                        _Bullet('Storage location — local device (Hive), never on external servers'),
-                        _Bullet('Retention period — until user deletes (see Retention section)'),
-                        _Bullet('Recipients — only the universities/bursaries you choose to apply to'),
+                        _Bullet(
+                          'Data category — personal info, academic records, application data, usage stats',
+                        ),
+                        _Bullet(
+                          'Purpose — pre-fill forms, check eligibility, track applications, improve app',
+                        ),
+                        _Bullet(
+                          'Lawful basis — user consent (POPIA Section 11), contractual necessity (application submissions)',
+                        ),
+                        _Bullet(
+                          'Storage location — local device (Hive), never on external servers',
+                        ),
+                        _Bullet(
+                          'Retention period — until user deletes (see Retention section)',
+                        ),
+                        _Bullet(
+                          'Recipients — only the universities/bursaries you choose to apply to',
+                        ),
                       ],
                     ),
                   ),
@@ -227,16 +279,32 @@ class PrivacyScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _RetentionRow('Profile info', 'Until deleted (Settings → Clear Data)'),
+                        _RetentionRow(
+                          'Profile info',
+                          'Until deleted (Settings → Clear Data)',
+                        ),
                         _RetentionRow('Academic records', 'Until deleted'),
-                        _RetentionRow('Application drafts', 'Until submitted or deleted'),
-                        _RetentionRow('Submitted applications', 'Until you delete or request removal'),
+                        _RetentionRow(
+                          'Application drafts',
+                          'Until submitted or deleted',
+                        ),
+                        _RetentionRow(
+                          'Submitted applications',
+                          'Until you delete or request removal',
+                        ),
                         _RetentionRow('Document uploads', 'Until deleted'),
-                        _RetentionRow('Usage analytics', 'Aggregated only, no personal data'),
+                        _RetentionRow(
+                          'Usage analytics',
+                          'Aggregated only, no personal data',
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           'Disposal: when you clear data via Settings or uninstall the app, all stored information is permanently deleted. No residual copies are retained. For deletion requests, email privacy@studentsyncsa.app — we will confirm within 72 hours.',
-                          style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                            height: 1.4,
+                          ),
                         ),
                       ],
                     ),
@@ -300,18 +368,20 @@ class _Section extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            ...children.map((text) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
+            ...children.map(
+              (text) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
                 ),
               ),
-            )),
-            if (trailing != null) trailing!,
+            ),
+            ?trailing,
           ],
         ),
       ),
@@ -332,17 +402,20 @@ class _ContactLine extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted)),
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -361,16 +434,19 @@ class _Bullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ',
-              style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textMuted)),
+          const Text(
+            '• ',
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+          ),
           Expanded(
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.4)),
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
           ),
         ],
       ),
@@ -392,16 +468,19 @@ class _RetentionRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(category,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary)),
+            child: Text(
+              category,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(period,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted)),
+            child: Text(
+              period,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
           ),
         ],
       ),
@@ -421,17 +500,23 @@ class _PrincipleRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(description,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  height: 1.4)),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );

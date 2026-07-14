@@ -15,9 +15,10 @@ class AiRecommendationsScreen extends ConsumerStatefulWidget {
 
 class _AiRecommendationsScreenState
     extends ConsumerState<AiRecommendationsScreen> {
-  List<_ChatMessage> _messages = [
+  final List<_ChatMessage> _messages = [
     _ChatMessage(
-      text: "Hi there! I'm Star ⭐\n\n"
+      text:
+          "Hi there! I'm Star ⭐\n\n"
           "First things first — complete your profile so I can give you the best recommendations for your needs!",
       isUser: false,
     ),
@@ -33,15 +34,19 @@ class _AiRecommendationsScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final profile = ref.read(profileProvider).valueOrNull;
-      final name = profile?.personal.firstName.isNotEmpty == true ? profile!.personal.firstName : 'there';
-      final isProfileComplete = profile != null && profile.personal.firstName.isNotEmpty &&
+      final name = profile?.personal.firstName.isNotEmpty == true
+          ? profile!.personal.firstName
+          : 'there';
+      final isProfileComplete =
+          profile != null &&
+          profile.personal.firstName.isNotEmpty &&
           profile.grade12Subjects.isNotEmpty;
       final greeting = isProfileComplete
           ? "Hi there $name! I'm Star ⭐\n\n"
-              "I can help you find the right university/bursary that fits your needs and style. "
-              "I can do more than that — wherever you see me, just tap/click on me and ask away."
+                "I can help you find the right university/bursary that fits your needs and style. "
+                "I can do more than that — wherever you see me, just tap/click on me and ask away."
           : "Hi there $name! I'm Star ⭐\n\n"
-              "First things first — complete your profile so I can give you the best recommendations for your needs!";
+                "First things first — complete your profile so I can give you the best recommendations for your needs!";
       if (_messages.isNotEmpty && !_messages.first.text.contains(name)) {
         setState(() {
           _messages[0] = _ChatMessage(text: greeting, isUser: false);
@@ -66,7 +71,8 @@ class _AiRecommendationsScreenState
         : '';
 
     await AiService.askStream(
-      prompt: 'You are Star, a friendly South African university advisor. '
+      prompt:
+          'You are Star, a friendly South African university advisor. '
           'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
           '$contextInfo\nStudent asks: $text',
       onToken: (token) {
@@ -96,8 +102,12 @@ class _AiRecommendationsScreenState
     }
 
     final subjects = profile.grade12Subjects.isNotEmpty
-        ? profile.grade12Subjects.map((s) => '${s.subject} (${s.mark}%)').toList()
-        : profile.grade11Subjects.map((s) => '${s.subject} (${s.mark}%)').toList();
+        ? profile.grade12Subjects
+              .map((s) => '${s.subject} (${s.mark}%)')
+              .toList()
+        : profile.grade11Subjects
+              .map((s) => '${s.subject} (${s.mark}%)')
+              .toList();
 
     final prompt = AiService.buildPrompt(
       firstName: profile.personal.firstName,
@@ -157,31 +167,28 @@ class _AiRecommendationsScreenState
         appBar: AppBar(
           title: const Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              StarAvatar(size: 28),
-              SizedBox(width: 8),
-              Text('Star'),
-            ],
+            children: [StarAvatar(size: 28), SizedBox(width: 8), Text('Star')],
           ),
         ),
         body: Column(
           children: [
             Expanded(
               child: ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, i) {
-                        final msg = _messages[i];
-                        return _ChatBubble(message: msg);
-                      },
-                    ),
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length,
+                itemBuilder: (context, i) {
+                  final msg = _messages[i];
+                  return _ChatBubble(message: msg);
+                },
+              ),
             ),
             Container(
               decoration: const BoxDecoration(
                 color: AppColors.surface,
                 border: Border(
-                    top: BorderSide(color: AppColors.surfaceLight, width: 1)),
+                  top: BorderSide(color: AppColors.surfaceLight, width: 1),
+                ),
               ),
               padding: EdgeInsets.only(
                 left: 12,
@@ -207,7 +214,9 @@ class _AiRecommendationsScreenState
                         hintText: 'Ask Star anything...',
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -221,8 +230,10 @@ class _AiRecommendationsScreenState
                               _ctrl.clear();
                             }
                           },
-                    icon: const Icon(Icons.send_rounded,
-                        color: AppColors.starGold),
+                    icon: const Icon(
+                      Icons.send_rounded,
+                      color: AppColors.starGold,
+                    ),
                   ),
                 ],
               ),
@@ -249,8 +260,9 @@ class _ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser) ...[
@@ -267,10 +279,8 @@ class _ChatBubble extends StatelessWidget {
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(
-                      message.isUser ? 16 : 4),
-                  bottomRight: Radius.circular(
-                      message.isUser ? 4 : 16),
+                  bottomLeft: Radius.circular(message.isUser ? 16 : 4),
+                  bottomRight: Radius.circular(message.isUser ? 4 : 16),
                 ),
               ),
               child: Text(

@@ -1,5 +1,6 @@
-import 'dart:html' as html;
 import 'dart:async';
+
+import 'package:universal_html/html.dart' as html;
 
 Future<String?> pickFile([String accept = '']) {
   final completer = Completer<String?>();
@@ -7,7 +8,7 @@ Future<String?> pickFile([String accept = '']) {
   input.click();
   input.onChange.listen((_) {
     if (input.files!.isNotEmpty) {
-      completer.complete(input.files![0]!.name ?? '');
+      completer.complete(input.files![0].name ?? '');
     } else {
       completer.complete(null);
     }

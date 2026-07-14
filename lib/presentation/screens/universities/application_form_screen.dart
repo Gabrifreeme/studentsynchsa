@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/repositories/application_repository_impl.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
-import 'package:studentsyncsa/domain/repositories/application_repository.dart';
+import 'package:uuid/uuid.dart';
 
 class ApplicationFormScreen extends StatefulWidget {
   final University university;
@@ -42,7 +41,11 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       await Future.delayed(const Duration(seconds: 1));
       p = await repo.getProfile();
     }
-    if (mounted) setState(() { _profile = p; _loading = false; });
+    if (mounted)
+      setState(() {
+        _profile = p;
+        _loading = false;
+      });
   }
 
   @override
@@ -68,8 +71,11 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Text('No profile found. Complete your profile first, then come back.',
-                textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              'No profile found. Complete your profile first, then come back.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
         ),
       );
@@ -84,42 +90,95 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
           children: [
             _sectionHeader('University', Icons.school),
             _readOnlyRow('University', uni.name),
-            _readOnlyRow('Faculty', uni.faculties.isNotEmpty ? (uni.faculties.length > 1 ? 'Select below' : uni.faculties.first) : '—'),
+            _readOnlyRow(
+              'Faculty',
+              uni.faculties.isNotEmpty
+                  ? (uni.faculties.length > 1
+                        ? 'Select below'
+                        : uni.faculties.first)
+                  : '—',
+            ),
 
             const SizedBox(height: 20),
             _sectionHeader('Personal', Icons.person),
-            _readOnlyRow('Name', '${profile.personal.title} ${profile.personal.firstName} ${profile.personal.lastName}'),
-            if (profile.personal.gender.isNotEmpty) _readOnlyRow('Gender', profile.personal.gender),
-            if (profile.personal.dateOfBirth != null) _readOnlyRow('Date of Birth', profile.personal.dateOfBirth!.toIso8601String().split('T').first),
-            if (profile.personal.idNumber.isNotEmpty) _readOnlyRow('ID Number', profile.personal.idNumber),
+            _readOnlyRow(
+              'Name',
+              '${profile.personal.title} ${profile.personal.firstName} ${profile.personal.lastName}',
+            ),
+            if (profile.personal.gender.isNotEmpty)
+              _readOnlyRow('Gender', profile.personal.gender),
+            if (profile.personal.dateOfBirth != null)
+              _readOnlyRow(
+                'Date of Birth',
+                profile.personal.dateOfBirth!
+                    .toIso8601String()
+                    .split('T')
+                    .first,
+              ),
+            if (profile.personal.idNumber.isNotEmpty)
+              _readOnlyRow('ID Number', profile.personal.idNumber),
 
             const SizedBox(height: 20),
             _sectionHeader('Contact', Icons.contact_mail),
-            if (profile.contact.email.isNotEmpty) _readOnlyRow('Email', profile.contact.email),
-            if (profile.contact.phone.isNotEmpty) _readOnlyRow('Phone', profile.contact.phone),
+            if (profile.contact.email.isNotEmpty)
+              _readOnlyRow('Email', profile.contact.email),
+            if (profile.contact.phone.isNotEmpty)
+              _readOnlyRow('Phone', profile.contact.phone),
 
             const SizedBox(height: 20),
             _sectionHeader('Address', Icons.location_on),
-            if (profile.address.address.isNotEmpty) _readOnlyRow('Address', profile.address.address),
-            if (profile.address.province.isNotEmpty) _readOnlyRow('Province', profile.address.province),
-            if (profile.address.postalCode.isNotEmpty) _readOnlyRow('Postal Code', profile.address.postalCode),
+            if (profile.address.address.isNotEmpty)
+              _readOnlyRow('Address', profile.address.address),
+            if (profile.address.province.isNotEmpty)
+              _readOnlyRow('Province', profile.address.province),
+            if (profile.address.postalCode.isNotEmpty)
+              _readOnlyRow('Postal Code', profile.address.postalCode),
 
             const SizedBox(height: 20),
             _sectionHeader('School', Icons.school_outlined),
-            if (profile.school.schoolName.isNotEmpty) _readOnlyRow('School', profile.school.schoolName),
-            if (profile.school.currentGrade.isNotEmpty) _readOnlyRow('Current Grade', profile.school.currentGrade),
+            if (profile.school.schoolName.isNotEmpty)
+              _readOnlyRow('School', profile.school.schoolName),
+            if (profile.school.currentGrade.isNotEmpty)
+              _readOnlyRow('Current Grade', profile.school.currentGrade),
 
             if (profile.results.subjects.isNotEmpty) ...[
               const SizedBox(height: 20),
               _sectionHeader('Subjects & Results', Icons.assignment),
-              ...profile.results.subjects.map((s) =>
-                Padding(
+              ...profile.results.subjects.map(
+                (s) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Expanded(flex: 3, child: Text(s.subject, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
-                      Expanded(flex: 1, child: Text(s.grade, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
-                      SizedBox(width: 60, child: Text('${s.result} ${s.symbol}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          s.subject,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          s.grade,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          '${s.result} ${s.symbol}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -134,7 +193,10 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(12),
@@ -145,12 +207,17 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                       child: Text(
                         _selectedFaculty ?? 'Select Faculty',
                         style: TextStyle(
-                          color: _selectedFaculty != null ? AppColors.textPrimary : AppColors.textMuted,
+                          color: _selectedFaculty != null
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
                           fontSize: 14,
                         ),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: AppColors.textMuted,
+                    ),
                   ],
                 ),
               ),
@@ -161,7 +228,10 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(12),
@@ -170,25 +240,42 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        _courseCtrl.text.isEmpty ? 'Course / Programme' : _courseCtrl.text,
+                        _courseCtrl.text.isEmpty
+                            ? 'Course / Programme'
+                            : _courseCtrl.text,
                         style: TextStyle(
-                          color: _courseCtrl.text.isNotEmpty ? AppColors.textPrimary : AppColors.textMuted,
+                          color: _courseCtrl.text.isNotEmpty
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
                           fontSize: 14,
                         ),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: AppColors.textMuted,
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _studyMode,
+              initialValue: _studyMode,
               decoration: _inputDecoration('Study Mode'),
               dropdownColor: AppColors.card,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              items: _studyModes.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
+              items: _studyModes
+                  .map(
+                    (m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m, style: const TextStyle(fontSize: 13)),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => setState(() => _studyMode = v ?? 'Full-Time'),
             ),
 
@@ -198,8 +285,10 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
             CheckboxListTile(
               value: _agreed,
               onChanged: (v) => setState(() => _agreed = v ?? false),
-              title: const Text('I confirm that all the information above is correct to the best of my knowledge.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              title: const Text(
+                'I confirm that all the information above is correct to the best of my knowledge.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
               activeColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
@@ -211,9 +300,15 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               child: FilledButton.icon(
                 onPressed: _agreed && !_submitting ? _submit : null,
                 icon: _submitting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.send_rounded, size: 20),
-                label: Text(_submitting ? 'Submitting...' : '✨ Submit Application'),
+                label: Text(
+                  _submitting ? 'Submitting...' : '✨ Submit Application',
+                ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: AppColors.primary,
@@ -251,22 +346,52 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.textMuted,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           const SizedBox(height: 16),
-          const Text('Select Faculty', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const Text(
+            'Select Faculty',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 12),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 400),
             child: ListView(
               shrinkWrap: true,
-              children: faculties.map((f) => ListTile(
-                title: Text(f, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
-                trailing: _selectedFaculty == f ? const Icon(Icons.check, color: AppColors.primary, size: 20) : null,
-                onTap: () {
-                  setState(() => _selectedFaculty = f);
-                  Navigator.pop(ctx);
-                },
-              )).toList(),
+              children: faculties
+                  .map(
+                    (f) => ListTile(
+                      title: Text(
+                        f,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      trailing: _selectedFaculty == f
+                          ? const Icon(
+                              Icons.check,
+                              color: AppColors.primary,
+                              size: 20,
+                            )
+                          : null,
+                      onTap: () {
+                        setState(() => _selectedFaculty = f);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  )
+                  .toList(),
             ),
           ),
           const SizedBox(height: 16),
@@ -277,9 +402,16 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
 
   void _showCoursePicker(StudentProfile profile) {
     final choices = profile.qualification.choices;
-    var courses = choices.map((c) => c.programme).where((p) => p.isNotEmpty).toList();
+    var courses = choices
+        .map((c) => c.programme)
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (_selectedFaculty != null) {
-      final matching = choices.where((c) => c.faculty == _selectedFaculty).map((c) => c.programme).where((p) => p.isNotEmpty).toList();
+      final matching = choices
+          .where((c) => c.faculty == _selectedFaculty)
+          .map((c) => c.programme)
+          .where((p) => p.isNotEmpty)
+          .toList();
       if (matching.isNotEmpty) courses = matching;
     }
     courses = courses.toSet().toList()..sort();
@@ -295,7 +427,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             final q = searchCtrl.text.toLowerCase();
-            final filtered = courses.where((c) => q.isEmpty || c.toLowerCase().contains(q)).toList();
+            final filtered = courses
+                .where((c) => q.isEmpty || c.toLowerCase().contains(q))
+                .toList();
             return DraggableScrollableSheet(
               initialChildSize: 0.7,
               maxChildSize: 0.9,
@@ -304,9 +438,23 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               builder: (ctx, scrollCtrl) => Column(
                 children: [
                   const SizedBox(height: 12),
-                  Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textMuted,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  const Text('Select Course / Programme', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const Text(
+                    'Select Course / Programme',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -315,11 +463,17 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Search courses...',
-                        prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: AppColors.textMuted,
+                        ),
                         suffixIcon: searchCtrl.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () { searchCtrl.clear(); setDialogState(() {}); },
+                                onPressed: () {
+                                  searchCtrl.clear();
+                                  setDialogState(() {});
+                                },
                               )
                             : null,
                       ),
@@ -329,13 +483,30 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                   const Divider(height: 1),
                   Expanded(
                     child: filtered.isEmpty
-                        ? const Center(child: Text('No matching courses', style: TextStyle(color: AppColors.textMuted)))
+                        ? const Center(
+                            child: Text(
+                              'No matching courses',
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
                         : ListView.builder(
                             controller: scrollCtrl,
                             itemCount: filtered.length,
                             itemBuilder: (ctx, i) => ListTile(
-                              title: Text(filtered[i], style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
-                              trailing: _courseCtrl.text == filtered[i] ? const Icon(Icons.check, color: AppColors.primary, size: 20) : null,
+                              title: Text(
+                                filtered[i],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              trailing: _courseCtrl.text == filtered[i]
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    )
+                                  : null,
                               onTap: () {
                                 _courseCtrl.text = filtered[i];
                                 setState(() {});
@@ -369,7 +540,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Application to ${widget.university.shortName} submitted!'),
+          content: Text(
+            '✅ Application to ${widget.university.shortName} submitted!',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -389,7 +562,14 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       children: [
         Icon(icon, size: 16, color: AppColors.primaryLight),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ],
     );
   }
@@ -400,8 +580,22 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
         ],
       ),
     );

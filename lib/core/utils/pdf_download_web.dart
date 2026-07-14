@@ -1,4 +1,4 @@
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 
 void downloadPdfBytes(List<int> bytes, String filename) {
   final blob = html.Blob([bytes], 'application/pdf');

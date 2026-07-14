@@ -1,17 +1,17 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:uuid/uuid.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
   const ProfileOnboardingScreen({super.key});
@@ -129,53 +129,206 @@ class _ProfileOnboardingScreenState
   bool _saving = false;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
-  static const _greetingText = "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
+  static const _greetingText =
+      "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
   static const _countryList = [
-    'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
-    'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
-    'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize',
-    'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil',
-    'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
-    'Cambodia', 'Cameroon', 'Canada', 'Cape Verde', 'Central African Republic',
-    'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
-    "Côte d'Ivoire", 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
-    'Democratic Republic of the Congo', 'Denmark', 'Djibouti', 'Dominica',
+    'Afghanistan',
+    'Albania',
+    'Algeria',
+    'Andorra',
+    'Angola',
+    'Antigua and Barbuda',
+    'Argentina',
+    'Armenia',
+    'Australia',
+    'Austria',
+    'Azerbaijan',
+    'Bahamas',
+    'Bahrain',
+    'Bangladesh',
+    'Barbados',
+    'Belarus',
+    'Belgium',
+    'Belize',
+    'Benin',
+    'Bhutan',
+    'Bolivia',
+    'Bosnia and Herzegovina',
+    'Botswana',
+    'Brazil',
+    'Brunei',
+    'Bulgaria',
+    'Burkina Faso',
+    'Burundi',
+    'Cambodia',
+    'Cameroon',
+    'Canada',
+    'Cape Verde',
+    'Central African Republic',
+    'Chad',
+    'Chile',
+    'China',
+    'Colombia',
+    'Comoros',
+    'Congo',
+    'Costa Rica',
+    "Côte d'Ivoire",
+    'Croatia',
+    'Cuba',
+    'Cyprus',
+    'Czech Republic',
+    'Democratic Republic of the Congo',
+    'Denmark',
+    'Djibouti',
+    'Dominica',
     'Dominican Republic',
-    'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia',
-    'Eswatini', 'Ethiopia',
-    'Fiji', 'Finland', 'France',
-    'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada',
-    'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
-    'Haiti', 'Honduras', 'Hungary',
-    'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
-    'Jamaica', 'Japan', 'Jordan',
-    'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
-    'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein',
-    'Lithuania', 'Luxembourg',
-    'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta',
-    'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
-    'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique',
+    'Ecuador',
+    'Egypt',
+    'El Salvador',
+    'Equatorial Guinea',
+    'Eritrea',
+    'Estonia',
+    'Eswatini',
+    'Ethiopia',
+    'Fiji',
+    'Finland',
+    'France',
+    'Gabon',
+    'Gambia',
+    'Georgia',
+    'Germany',
+    'Ghana',
+    'Greece',
+    'Grenada',
+    'Guatemala',
+    'Guinea',
+    'Guinea-Bissau',
+    'Guyana',
+    'Haiti',
+    'Honduras',
+    'Hungary',
+    'Iceland',
+    'India',
+    'Indonesia',
+    'Iran',
+    'Iraq',
+    'Ireland',
+    'Israel',
+    'Italy',
+    'Jamaica',
+    'Japan',
+    'Jordan',
+    'Kazakhstan',
+    'Kenya',
+    'Kiribati',
+    'Kuwait',
+    'Kyrgyzstan',
+    'Laos',
+    'Latvia',
+    'Lebanon',
+    'Lesotho',
+    'Liberia',
+    'Libya',
+    'Liechtenstein',
+    'Lithuania',
+    'Luxembourg',
+    'Madagascar',
+    'Malawi',
+    'Malaysia',
+    'Maldives',
+    'Mali',
+    'Malta',
+    'Marshall Islands',
+    'Mauritania',
+    'Mauritius',
+    'Mexico',
+    'Micronesia',
+    'Moldova',
+    'Monaco',
+    'Mongolia',
+    'Montenegro',
+    'Morocco',
+    'Mozambique',
     'Myanmar',
-    'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua',
-    'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+    'Namibia',
+    'Nauru',
+    'Nepal',
+    'Netherlands',
+    'New Zealand',
+    'Nicaragua',
+    'Niger',
+    'Nigeria',
+    'North Korea',
+    'North Macedonia',
+    'Norway',
     'Oman',
-    'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay',
-    'Peru', 'Philippines', 'Poland', 'Portugal',
+    'Pakistan',
+    'Palau',
+    'Palestine',
+    'Panama',
+    'Papua New Guinea',
+    'Paraguay',
+    'Peru',
+    'Philippines',
+    'Poland',
+    'Portugal',
     'Qatar',
-    'Romania', 'Russia', 'Rwanda',
-    'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines',
-    'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal',
-    'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
-    'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan',
-    'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
-    'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo',
-    'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
-    'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom',
-    'United States of America', 'Uruguay', 'Uzbekistan',
-    'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+    'Romania',
+    'Russia',
+    'Rwanda',
+    'Saint Kitts and Nevis',
+    'Saint Lucia',
+    'Saint Vincent and the Grenadines',
+    'Samoa',
+    'San Marino',
+    'Sao Tome and Principe',
+    'Saudi Arabia',
+    'Senegal',
+    'Serbia',
+    'Seychelles',
+    'Sierra Leone',
+    'Singapore',
+    'Slovakia',
+    'Slovenia',
+    'Solomon Islands',
+    'Somalia',
+    'South Africa',
+    'South Korea',
+    'South Sudan',
+    'Spain',
+    'Sri Lanka',
+    'Sudan',
+    'Suriname',
+    'Sweden',
+    'Switzerland',
+    'Syria',
+    'Taiwan',
+    'Tajikistan',
+    'Tanzania',
+    'Thailand',
+    'Timor-Leste',
+    'Togo',
+    'Tonga',
+    'Trinidad and Tobago',
+    'Tunisia',
+    'Turkey',
+    'Turkmenistan',
+    'Tuvalu',
+    'Uganda',
+    'Ukraine',
+    'United Arab Emirates',
+    'United Kingdom',
+    'United States of America',
+    'Uruguay',
+    'Uzbekistan',
+    'Vanuatu',
+    'Vatican City',
+    'Venezuela',
+    'Vietnam',
     'Yemen',
-    'Zambia', 'Zimbabwe',
+    'Zambia',
+    'Zimbabwe',
   ];
 
   static const _languages = [
@@ -2012,16 +2165,18 @@ class _ProfileOnboardingScreenState
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _floatAnim = Tween<double>(begin: -8, end: 8).animate(
-      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
-    );
+    _floatAnim = Tween<double>(
+      begin: -8,
+      end: 8,
+    ).animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
     _startTextReveal();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingProfile());
   }
 
   void _loadExistingProfile() async {
-    var profile = ref.read(profileProvider).valueOrNull
-        ?? ref.read(authProvider).valueOrNull?.profile;
+    var profile =
+        ref.read(profileProvider).valueOrNull ??
+        ref.read(authProvider).valueOrNull?.profile;
     if (profile == null) {
       // Try reading directly from Hive in case providers haven't loaded yet
       try {
@@ -2031,8 +2186,9 @@ class _ProfileOnboardingScreenState
     if (profile == null) {
       // Retry once after a short delay
       await Future.delayed(const Duration(milliseconds: 500));
-      profile = ref.read(profileProvider).valueOrNull
-          ?? ref.read(authProvider).valueOrNull?.profile;
+      profile =
+          ref.read(profileProvider).valueOrNull ??
+          ref.read(authProvider).valueOrNull?.profile;
       if (profile == null) {
         try {
           profile = await ProfileRepositoryImpl().getProfile();
@@ -2041,87 +2197,104 @@ class _ProfileOnboardingScreenState
     }
     if (profile == null) return;
     final p = profile;
-    setState(() { _applyProfile(p); });
+    setState(() {
+      _applyProfile(p);
+    });
   }
 
   void _applyProfile(StudentProfile p) {
-      _titleCtrl.text = p.personal.title;
-      _initialsCtrl.text = p.personal.initials;
-      _firstNameCtrl.text = p.personal.firstName;
-      _lastNameCtrl.text = p.personal.lastName;
-      _maidenNameCtrl.text = p.personal.maidenName;
-      _gender = p.personal.gender;
-      _selectedDob = p.personal.dateOfBirth;
-      _idCtrl.text = p.personal.idNumber;
-      _citizenship = ['SA Citizen', 'Permanent Resident', 'Foreign National']
-          .contains(p.demographic.nationality)
-          ? p.demographic.nationality
-          : 'SA Citizen';
-      _countryOfBirthCtrl.text = p.demographic.countryOfBirth;
-      _homeLanguageCtrl.text = p.demographic.homeLanguage;
-      _populationGroup = p.demographic.populationGroup;
-      _maritalStatus = p.demographic.maritalStatus;
-      _emailCtrl.text = p.contact.email;
-      _phoneCtrl.text = p.contact.phone;
-      _workPhoneCtrl.text = p.contact.workPhone;
-      _addressCtrl.text = p.address.address;
-      _addressLine2Ctrl.text = p.address.addressLine2;
-      _addressLine3Ctrl.text = p.address.addressLine3;
-      _province = p.address.province;
-      _postalCodeCtrl.text = p.address.postalCode;
-      _postalAddressCtrl.text = p.address.postalAddress;
-      _postalSameAsResidential = p.address.postalAddress == p.address.address
-          && p.address.postalAddress.isNotEmpty;
-      _disabilityStatus = p.status.disabilityStatus;
-      _bursaryRequired = p.status.bursaryRequired;
-      _employmentStatus = p.status.employmentStatus;
-      _schoolCtrl.text = p.school.schoolName;
-      _grade = p.school.currentGrade;
-      _currentlyDoing = p.school.currentlyDoing;
-      _studiedPreviously = p.school.studiedPreviously;
-      _subjects = p.grade12Subjects;
-      _careerInterests = p.careerInterests;
-      _nextOfKinNameCtrl.text = p.nextOfKin.name;
-      _nextOfKinMobileCtrl.text = p.nextOfKin.mobilePhone;
-      _nextOfKinHomePhoneCtrl.text = p.nextOfKin.homePhone;
-      _nextOfKinWorkPhoneCtrl.text = p.nextOfKin.workPhone;
-      _nextOfKinAddr1Ctrl.text = p.nextOfKin.addressLine1;
-      _nextOfKinAddr2Ctrl.text = p.nextOfKin.addressLine2;
-      _nextOfKinAddr3Ctrl.text = p.nextOfKin.addressLine3;
-      _nextOfKinAddr4Ctrl.text = p.nextOfKin.addressLine4;
-      _nextOfKinPostalCodeCtrl.text = p.nextOfKin.postalCode;
-      _nextOfKinEmailCtrl.text = p.nextOfKin.email;
-      _accountContactNameCtrl.text = p.accountContact.name;
-      _accountContactMobileCtrl.text = p.accountContact.mobilePhone;
-      _accountContactHomePhoneCtrl.text = p.accountContact.homePhone;
-      _accountContactAddr1Ctrl.text = p.accountContact.addressLine1;
-      _accountContactAddr2Ctrl.text = p.accountContact.addressLine2;
-      _accountContactAddr3Ctrl.text = p.accountContact.addressLine3;
-      _accountContactAddr4Ctrl.text = p.accountContact.addressLine4;
-      _accountContactPostalCodeCtrl.text = p.accountContact.postalCode;
-      _accountContactEmailCtrl.text = p.accountContact.email;
-      _matricYear = p.results.matricYear;
-      _applicationLevel = p.results.applicationLevel;
-      _upgrading = p.results.upgrading;
-      _matricType = p.results.matricType;
-      _examinationNumberCtrl.text = p.results.examinationNumber;
-      _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
-      _resultsSubjects = p.results.subjects;
-      _academicYear = p.qualification.academicYear;
-      if (p.qualification.choices.isNotEmpty) {
-        _facultyCtrl.text = p.qualification.choices.first.faculty;
-        _programmeCtrl.text = p.qualification.choices.first.programme;
-      }
-      _applicationPeriod = p.qualification.applicationPeriod;
-      _studyMode = p.qualification.studyMode;
-      _studyTiming = p.qualification.studyTiming;
-      _loginPinCtrl.text = p.agreement.loginPin;
-      _acceptanceStatus = p.agreement.acceptanceStatus;
-      if (p.uploadedDocuments.length >= 3) {
-        _uploadedFiles[0] = p.uploadedDocuments[0];
-        _uploadedFiles[1] = p.uploadedDocuments[1];
-        _uploadedFiles[2] = p.uploadedDocuments[2];
-      }
+    _titleCtrl.text = p.personal.title.trim();
+    _initialsCtrl.text = p.personal.initials;
+    _firstNameCtrl.text = p.personal.firstName;
+    _lastNameCtrl.text = p.personal.lastName;
+    _maidenNameCtrl.text = p.personal.maidenName;
+    _gender = p.personal.gender.trim();
+    _selectedDob = p.personal.dateOfBirth;
+    _idCtrl.text = p.personal.idNumber;
+    _citizenship =
+        [
+          'SA Citizen',
+          'Permanent Resident',
+          'Foreign National',
+        ].contains(p.demographic.nationality.trim())
+        ? p.demographic.nationality.trim()
+        : 'SA Citizen';
+    _countryOfBirthCtrl.text = p.demographic.countryOfBirth;
+    _homeLanguageCtrl.text = p.demographic.homeLanguage;
+    final rawPop = p.demographic.populationGroup.trim();
+    _populationGroup = rawPop == 'Black' ? 'African' : rawPop;
+    _maritalStatus = p.demographic.maritalStatus.trim();
+    _emailCtrl.text = p.contact.email;
+    _phoneCtrl.text = p.contact.phone;
+    _workPhoneCtrl.text = p.contact.workPhone;
+    _addressCtrl.text = p.address.address;
+    _addressLine2Ctrl.text = p.address.addressLine2;
+    _addressLine3Ctrl.text = p.address.addressLine3;
+    _province = p.address.province.trim();
+    _postalCodeCtrl.text = p.address.postalCode;
+    _postalAddressCtrl.text = p.address.postalAddress;
+    _postalSameAsResidential =
+        p.address.postalAddress == p.address.address &&
+        p.address.postalAddress.isNotEmpty;
+    _disabilityStatus = p.status.disabilityStatus.trim();
+    _bursaryRequired = p.status.bursaryRequired.trim();
+    final es = p.status.employmentStatus.trim();
+    _employmentStatus =
+        const {
+          'Unemployed',
+          'Employed (part-time)',
+          'Employed (full-time)',
+          'Self-employed',
+        }.contains(es)
+        ? es
+        : '';
+    _schoolCtrl.text = p.school.schoolName;
+    _grade = p.school.currentGrade.trim();
+    _currentlyDoing = p.school.currentlyDoing.trim();
+    _studiedPreviously = p.school.studiedPreviously.trim();
+    _subjects = p.grade12Subjects;
+    _careerInterests = p.careerInterests;
+    _nextOfKinNameCtrl.text = p.nextOfKin.name;
+    _nextOfKinMobileCtrl.text = p.nextOfKin.mobilePhone;
+    _nextOfKinHomePhoneCtrl.text = p.nextOfKin.homePhone;
+    _nextOfKinWorkPhoneCtrl.text = p.nextOfKin.workPhone;
+    _nextOfKinAddr1Ctrl.text = p.nextOfKin.addressLine1;
+    _nextOfKinAddr2Ctrl.text = p.nextOfKin.addressLine2;
+    _nextOfKinAddr3Ctrl.text = p.nextOfKin.addressLine3;
+    _nextOfKinAddr4Ctrl.text = p.nextOfKin.addressLine4;
+    _nextOfKinPostalCodeCtrl.text = p.nextOfKin.postalCode;
+    _nextOfKinEmailCtrl.text = p.nextOfKin.email;
+    _accountContactNameCtrl.text = p.accountContact.name;
+    _accountContactMobileCtrl.text = p.accountContact.mobilePhone;
+    _accountContactHomePhoneCtrl.text = p.accountContact.homePhone;
+    _accountContactAddr1Ctrl.text = p.accountContact.addressLine1;
+    _accountContactAddr2Ctrl.text = p.accountContact.addressLine2;
+    _accountContactAddr3Ctrl.text = p.accountContact.addressLine3;
+    _accountContactAddr4Ctrl.text = p.accountContact.addressLine4;
+    _accountContactPostalCodeCtrl.text = p.accountContact.postalCode;
+    _accountContactEmailCtrl.text = p.accountContact.email;
+    _matricYear = p.results.matricYear;
+    _applicationLevel = p.results.applicationLevel.trim();
+    _upgrading = p.results.upgrading.trim();
+    _matricType = p.results.matricType.trim();
+    _examinationNumberCtrl.text = p.results.examinationNumber;
+    _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
+    _resultsSubjects = p.results.subjects;
+    _academicYear = p.qualification.academicYear;
+    if (p.qualification.choices.isNotEmpty) {
+      _facultyCtrl.text = p.qualification.choices.first.faculty;
+      _programmeCtrl.text = p.qualification.choices.first.programme;
+    }
+    _applicationPeriod = p.qualification.applicationPeriod.trim();
+    _studyMode = p.qualification.studyMode.trim();
+    _studyTiming = p.qualification.studyTiming.trim();
+    _loginPinCtrl.text = p.agreement.loginPin;
+    _acceptanceStatus = p.agreement.acceptanceStatus.trim();
+    if (p.uploadedDocuments.length >= 3) {
+      _uploadedFiles[0] = p.uploadedDocuments[0];
+      _uploadedFiles[1] = p.uploadedDocuments[1];
+      _uploadedFiles[2] = p.uploadedDocuments[2];
+    }
   }
 
   void _startTextReveal() {
@@ -2143,7 +2316,8 @@ class _ProfileOnboardingScreenState
   }
 
   @override
-  static Future<String?> _showSearchablePicker(BuildContext context, {
+  static Future<String?> _showSearchablePicker(
+    BuildContext context, {
     required String title,
     required List<String> options,
     String? initialValue,
@@ -2164,8 +2338,13 @@ class _ProfileOnboardingScreenState
             }).toList();
             return Dialog(
               backgroundColor: AppColors.surface,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 40,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2177,7 +2356,10 @@ class _ProfileOnboardingScreenState
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Search $title...',
-                        prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: AppColors.textMuted,
+                        ),
                         suffixIcon: searchCtrl.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18),
@@ -2195,7 +2377,10 @@ class _ProfileOnboardingScreenState
                   if (filtered.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(32),
-                      child: Text('No results found', style: TextStyle(color: AppColors.textMuted)),
+                      child: Text(
+                        'No results found',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
                     )
                   else
                     Flexible(
@@ -2205,12 +2390,21 @@ class _ProfileOnboardingScreenState
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         itemBuilder: (_, i) {
                           final item = filtered[i];
-                          final display = displayTransformer?.call(item) ?? item;
+                          final display =
+                              displayTransformer?.call(item) ?? item;
                           return ListTile(
                             dense: true,
                             selected: selected == item,
-                            selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
-                            title: Text(display, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                            selectedTileColor: AppColors.primary.withValues(
+                              alpha: 0.08,
+                            ),
+                            title: Text(
+                              display,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pop(ctx, item);
                             },
@@ -2227,6 +2421,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
+  @override
   void dispose() {
     _floatCtrl.dispose();
     _pageController.dispose();
@@ -2403,7 +2598,10 @@ class _ProfileOnboardingScreenState
       setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save profile: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Failed to save profile: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -2458,7 +2656,10 @@ class _ProfileOnboardingScreenState
                       ),
                       const SizedBox(height: 40),
                       Text(
-                        _greetingText.substring(0, _visibleChars.clamp(0, _greetingText.length)),
+                        _greetingText.substring(
+                          0,
+                          _visibleChars.clamp(0, _greetingText.length),
+                        ),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
@@ -2476,7 +2677,9 @@ class _ProfileOnboardingScreenState
                             backgroundColor: AppColors.starGold,
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 16),
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
                             textStyle: const TextStyle(fontSize: 16),
                           ),
                         ),
@@ -2499,9 +2702,9 @@ class _ProfileOnboardingScreenState
             icon: const Icon(Icons.arrow_back_ios),
             onPressed: _currentPage > 0
                 ? () => _pageController.previousPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    )
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  )
                 : () => context.pop(),
           ),
         ),
@@ -2594,12 +2797,19 @@ class _ProfileOnboardingScreenState
         ),
         content: Text(
           tips[_currentPage.clamp(0, tips.length - 1)],
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, height: 1.5),
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Got it!', style: TextStyle(color: AppColors.primaryLight)),
+            child: const Text(
+              'Got it!',
+              style: TextStyle(color: AppColors.primaryLight),
+            ),
           ),
         ],
       ),
@@ -2614,14 +2824,19 @@ class _ProfileOnboardingScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Personal Details',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Personal Details',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text("Let's get to know you",
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              "Let's get to know you",
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 20),
             // Title + Initials
             Row(
@@ -2629,7 +2844,9 @@ class _ProfileOnboardingScreenState
                 Expanded(
                   flex: 2,
                   child: DropdownButtonFormField<String>(
-                    value: _titleCtrl.text.isEmpty ? null : _titleCtrl.text,
+                    initialValue: _titleCtrl.text.isEmpty
+                        ? null
+                        : _titleCtrl.text,
                     decoration: const InputDecoration(
                       labelText: 'Title',
                       prefixIcon: Icon(Icons.badge_outlined, size: 20),
@@ -2650,8 +2867,9 @@ class _ProfileOnboardingScreenState
                   child: TextFormField(
                     controller: _initialsCtrl,
                     decoration: const InputDecoration(
-                        labelText: 'Initials',
-                        prefixIcon: Icon(Icons.short_text, size: 20)),
+                      labelText: 'Initials',
+                      prefixIcon: Icon(Icons.short_text, size: 20),
+                    ),
                   ),
                 ),
               ],
@@ -2664,8 +2882,9 @@ class _ProfileOnboardingScreenState
                   child: TextFormField(
                     controller: _firstNameCtrl,
                     decoration: const InputDecoration(
-                        labelText: 'First Name',
-                        prefixIcon: Icon(Icons.person_outline)),
+                      labelText: 'First Name',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
                 ),
@@ -2674,8 +2893,9 @@ class _ProfileOnboardingScreenState
                   child: TextFormField(
                     controller: _lastNameCtrl,
                     decoration: const InputDecoration(
-                        labelText: 'Surname',
-                        prefixIcon: Icon(Icons.person_outline)),
+                      labelText: 'Surname',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
                 ),
@@ -2693,7 +2913,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Gender
             DropdownButtonFormField<String>(
-              value: _gender.isEmpty ? null : _gender,
+              initialValue: _gender.isEmpty ? null : _gender,
               decoration: const InputDecoration(
                 labelText: 'Gender',
                 prefixIcon: Icon(Icons.wc_outlined),
@@ -2702,7 +2922,10 @@ class _ProfileOnboardingScreenState
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                DropdownMenuItem(
+                  value: 'Prefer not to say',
+                  child: Text('Prefer not to say'),
+                ),
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
             ),
@@ -2763,28 +2986,43 @@ class _ProfileOnboardingScreenState
               color: AppColors.border,
             ),
             const SizedBox(height: 20),
-            const Text('Citizenship & Demographics',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Citizenship & Demographics',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('For South African universities',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'For South African universities',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 20),
             // Citizenship
             DropdownButtonFormField<String>(
-              value: _citizenship.isEmpty ? null : _citizenship,
+              initialValue: _citizenship.isEmpty ? null : _citizenship,
               decoration: const InputDecoration(
                 labelText: 'Citizenship Status',
                 prefixIcon: Icon(Icons.flag_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'SA Citizen', child: Text('SA Citizen')),
-                DropdownMenuItem(value: 'Permanent Resident', child: Text('Permanent Resident')),
-                DropdownMenuItem(value: 'Foreign National', child: Text('Foreign National')),
+                DropdownMenuItem(
+                  value: 'SA Citizen',
+                  child: Text('SA Citizen'),
+                ),
+                DropdownMenuItem(
+                  value: 'Permanent Resident',
+                  child: Text('Permanent Resident'),
+                ),
+                DropdownMenuItem(
+                  value: 'Foreign National',
+                  child: Text('Foreign National'),
+                ),
               ],
-              onChanged: (v) => setState(() => _citizenship = v ?? 'SA Citizen'),
+              onChanged: (v) =>
+                  setState(() => _citizenship = v ?? 'SA Citizen'),
             ),
             const SizedBox(height: 16),
             // Country of Birth
@@ -2794,14 +3032,20 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Country of Birth',
                 prefixIcon: Icon(Icons.public_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               onTap: () async {
-                final result = await _showSearchablePicker(context,
+                final result = await _showSearchablePicker(
+                  context,
                   title: 'Country',
                   options: _countryList,
-                  initialValue: _countryOfBirthCtrl.text);
-                if (result != null) setState(() => _countryOfBirthCtrl.text = result);
+                  initialValue: _countryOfBirthCtrl.text,
+                );
+                if (result != null)
+                  setState(() => _countryOfBirthCtrl.text = result);
               },
             ),
             const SizedBox(height: 16),
@@ -2812,20 +3056,26 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Home Language',
                 prefixIcon: Icon(Icons.language_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               onTap: () async {
-                final result = await _showSearchablePicker(context,
+                final result = await _showSearchablePicker(
+                  context,
                   title: 'Language',
                   options: _languages,
-                  initialValue: _homeLanguageCtrl.text);
-                if (result != null) setState(() => _homeLanguageCtrl.text = result);
+                  initialValue: _homeLanguageCtrl.text,
+                );
+                if (result != null)
+                  setState(() => _homeLanguageCtrl.text = result);
               },
             ),
             const SizedBox(height: 16),
             // Population Group
             DropdownButtonFormField<String>(
-              value: _populationGroup.isEmpty ? null : _populationGroup,
+              initialValue: _populationGroup.isEmpty ? null : _populationGroup,
               decoration: const InputDecoration(
                 labelText: 'Population Group',
                 prefixIcon: Icon(Icons.people_outlined),
@@ -2833,17 +3083,23 @@ class _ProfileOnboardingScreenState
               items: const [
                 DropdownMenuItem(value: 'African', child: Text('African')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
-                DropdownMenuItem(value: 'Indian/Asian', child: Text('Indian/Asian')),
+                DropdownMenuItem(
+                  value: 'Indian/Asian',
+                  child: Text('Indian/Asian'),
+                ),
                 DropdownMenuItem(value: 'White', child: Text('White')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                DropdownMenuItem(
+                  value: 'Prefer not to say',
+                  child: Text('Prefer not to say'),
+                ),
               ],
               onChanged: (v) => setState(() => _populationGroup = v ?? ''),
             ),
             const SizedBox(height: 16),
             // Marital Status
             DropdownButtonFormField<String>(
-              value: _maritalStatus.isEmpty ? null : _maritalStatus,
+              initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
               decoration: const InputDecoration(
                 labelText: 'Marital Status',
                 prefixIcon: Icon(Icons.favorite_outline),
@@ -2864,14 +3120,19 @@ class _ProfileOnboardingScreenState
               color: AppColors.border,
             ),
             const SizedBox(height: 20),
-            const Text('Contact Details',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Contact Details',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('How universities can reach you',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'How universities can reach you',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 20),
             // Email
             TextFormField(
@@ -2910,14 +3171,19 @@ class _ProfileOnboardingScreenState
               color: AppColors.border,
             ),
             const SizedBox(height: 20),
-            const Text('Residential Address',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Residential Address',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Where you live',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Where you live',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 20),
             // Street Address
             TextFormField(
@@ -2950,7 +3216,7 @@ class _ProfileOnboardingScreenState
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField<String>(
-                    value: _province.isEmpty ? null : _province,
+                    initialValue: _province.isEmpty ? null : _province,
                     decoration: const InputDecoration(
                       labelText: 'Province',
                       prefixIcon: Icon(Icons.map_outlined),
@@ -2971,16 +3237,26 @@ class _ProfileOnboardingScreenState
                     decoration: const InputDecoration(
                       labelText: 'Postal Code',
                       prefixIcon: Icon(Icons.pin_outlined),
-                      suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                      suffixIcon: Icon(
+                        Icons.arrow_drop_down,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     onTap: () async {
-                      final result = await _showSearchablePicker(context,
+                      final result = await _showSearchablePicker(
+                        context,
                         title: 'Postal Code',
                         options: _postalCodes,
                         initialValue: _postalCodeCtrl.text,
-                        displayTransformer: (p) => p);
+                        displayTransformer: (p) => p,
+                      );
                       if (result != null) {
-                        setState(() => _postalCodeCtrl.text = result.split(' - ').first.trim());
+                        setState(
+                          () => _postalCodeCtrl.text = result
+                              .split(' - ')
+                              .first
+                              .trim(),
+                        );
                       }
                     },
                   ),
@@ -3010,12 +3286,15 @@ class _ProfileOnboardingScreenState
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Same',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: _postalSameAsResidential
-                                        ? AppColors.primaryLight
-                                        : AppColors.textSecondary)),
+                            Text(
+                              'Same',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _postalSameAsResidential
+                                    ? AppColors.primaryLight
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
                             Icon(
                               _postalSameAsResidential
                                   ? Icons.check_box
@@ -3041,34 +3320,57 @@ class _ProfileOnboardingScreenState
               color: AppColors.border,
             ),
             const SizedBox(height: 20),
-            const Text('Additional Information',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Additional Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 20),
             // Disability
             DropdownButtonFormField<String>(
-              value: _disabilityStatus.isEmpty ? null : _disabilityStatus,
+              initialValue: _disabilityStatus.isEmpty
+                  ? null
+                  : _disabilityStatus,
               decoration: const InputDecoration(
                 labelText: 'Do you have a disability?',
                 prefixIcon: Icon(Icons.accessible_outlined),
               ),
               items: const [
                 DropdownMenuItem(value: 'No', child: Text('No')),
-                DropdownMenuItem(value: 'Yes, physical', child: Text('Yes, physical')),
-                DropdownMenuItem(value: 'Yes, visual', child: Text('Yes, visual')),
-                DropdownMenuItem(value: 'Yes, hearing', child: Text('Yes, hearing')),
-                DropdownMenuItem(value: 'Yes, learning', child: Text('Yes, learning')),
-                DropdownMenuItem(value: 'Yes, other', child: Text('Yes, other')),
-                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                DropdownMenuItem(
+                  value: 'Yes, physical',
+                  child: Text('Yes, physical'),
+                ),
+                DropdownMenuItem(
+                  value: 'Yes, visual',
+                  child: Text('Yes, visual'),
+                ),
+                DropdownMenuItem(
+                  value: 'Yes, hearing',
+                  child: Text('Yes, hearing'),
+                ),
+                DropdownMenuItem(
+                  value: 'Yes, learning',
+                  child: Text('Yes, learning'),
+                ),
+                DropdownMenuItem(
+                  value: 'Yes, other',
+                  child: Text('Yes, other'),
+                ),
+                DropdownMenuItem(
+                  value: 'Prefer not to say',
+                  child: Text('Prefer not to say'),
+                ),
               ],
               onChanged: (v) => setState(() => _disabilityStatus = v ?? ''),
             ),
             const SizedBox(height: 16),
             // Bursary Required
             DropdownButtonFormField<String>(
-              value: _bursaryRequired.isEmpty ? null : _bursaryRequired,
+              initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
               decoration: const InputDecoration(
                 labelText: 'Do you require a bursary?',
                 prefixIcon: Icon(Icons.monetization_on_outlined),
@@ -3083,16 +3385,30 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Employment Status
             DropdownButtonFormField<String>(
-              value: _employmentStatus.isEmpty ? null : _employmentStatus,
+              initialValue: _employmentStatus.isEmpty
+                  ? null
+                  : _employmentStatus,
               decoration: const InputDecoration(
                 labelText: 'Employment Status',
                 prefixIcon: Icon(Icons.work_outline),
               ),
               items: const [
-                DropdownMenuItem(value: 'Unemployed', child: Text('Unemployed')),
-                DropdownMenuItem(value: 'Employed (part-time)', child: Text('Employed (part-time)')),
-                DropdownMenuItem(value: 'Employed (full-time)', child: Text('Employed (full-time)')),
-                DropdownMenuItem(value: 'Self-employed', child: Text('Self-employed')),
+                DropdownMenuItem(
+                  value: 'Unemployed',
+                  child: Text('Unemployed'),
+                ),
+                DropdownMenuItem(
+                  value: 'Employed (part-time)',
+                  child: Text('Employed (part-time)'),
+                ),
+                DropdownMenuItem(
+                  value: 'Employed (full-time)',
+                  child: Text('Employed (full-time)'),
+                ),
+                DropdownMenuItem(
+                  value: 'Self-employed',
+                  child: Text('Self-employed'),
+                ),
               ],
               onChanged: (v) => setState(() => _employmentStatus = v ?? ''),
             ),
@@ -3114,11 +3430,14 @@ class _ProfileOnboardingScreenState
             // ── Next of Kin Details ──
             const _SectionHeader(title: 'Next of Kin Details'),
             const SizedBox(height: 16),
-            const Text('Personal and Contact Information',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Personal and Contact Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _nextOfKinNameCtrl,
@@ -3158,11 +3477,14 @@ class _ProfileOnboardingScreenState
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Address Information',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Address Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _nextOfKinAddr1Ctrl,
@@ -3227,11 +3549,14 @@ class _ProfileOnboardingScreenState
             // ── Account Contact Details ──
             const _SectionHeader(title: 'Account Contact Details'),
             const SizedBox(height: 16),
-            const Text('Account Contact Information',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Account Contact Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _accountContactNameCtrl,
@@ -3262,11 +3587,14 @@ class _ProfileOnboardingScreenState
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
             const SizedBox(height: 20),
-            const Text('Address Information',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Address Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _accountContactAddr1Ctrl,
@@ -3344,7 +3672,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Matric Year
             DropdownButtonFormField<int>(
-              value: _matricYear == 0 ? null : _matricYear,
+              initialValue: _matricYear == 0 ? null : _matricYear,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Year (YYYY) *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
@@ -3358,14 +3686,22 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Undergraduate / Postgraduate
             DropdownButtonFormField<String>(
-              value: _applicationLevel.isEmpty ? null : _applicationLevel,
+              initialValue: _applicationLevel.isEmpty
+                  ? null
+                  : _applicationLevel,
               decoration: const InputDecoration(
                 labelText: 'Applying for Undergraduate or Postgraduate? *',
                 prefixIcon: Icon(Icons.school_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'Undergraduate', child: Text('Undergraduate')),
-                DropdownMenuItem(value: 'Postgraduate', child: Text('Postgraduate')),
+                DropdownMenuItem(
+                  value: 'Undergraduate',
+                  child: Text('Undergraduate'),
+                ),
+                DropdownMenuItem(
+                  value: 'Postgraduate',
+                  child: Text('Postgraduate'),
+                ),
               ],
               onChanged: (v) => setState(() => _applicationLevel = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
@@ -3373,7 +3709,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Upgrading
             DropdownButtonFormField<String>(
-              value: _upgrading.isEmpty ? null : _upgrading,
+              initialValue: _upgrading.isEmpty ? null : _upgrading,
               decoration: const InputDecoration(
                 labelText: 'Are you Upgrading? *',
                 prefixIcon: Icon(Icons.refresh_outlined),
@@ -3388,14 +3724,21 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Matric Type
             DropdownButtonFormField<String>(
-              value: _matricType.isEmpty ? null : _matricType,
+              initialValue: _matricType.isEmpty ? null : _matricType,
               decoration: const InputDecoration(
-                labelText: 'Completing/Completed South African or International Matric *',
+                labelText:
+                    'Completing/Completed South African or International Matric *',
                 prefixIcon: Icon(Icons.public_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'South African', child: Text('South African')),
-                DropdownMenuItem(value: 'International', child: Text('International')),
+                DropdownMenuItem(
+                  value: 'South African',
+                  child: Text('South African'),
+                ),
+                DropdownMenuItem(
+                  value: 'International',
+                  child: Text('International'),
+                ),
               ],
               onChanged: (v) => setState(() => _matricType = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
@@ -3417,25 +3760,38 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Final School Leaving Certificate *',
                 prefixIcon: Icon(Icons.verified_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                const certs = ['Cert of Complete Exemption', 'GRADE 12', 'NTC3/N3/NSC'];
-                final result = await _showSearchablePicker(context,
+                const certs = [
+                  'Cert of Complete Exemption',
+                  'GRADE 12',
+                  'NTC3/N3/NSC',
+                ];
+                final result = await _showSearchablePicker(
+                  context,
                   title: 'Certificate',
                   options: certs,
-                  initialValue: _schoolLeavingCertificate);
-                if (result != null) setState(() => _schoolLeavingCertificate = result);
+                  initialValue: _schoolLeavingCertificate,
+                );
+                if (result != null)
+                  setState(() => _schoolLeavingCertificate = result);
               },
             ),
 
             const SizedBox(height: 24),
-            const Text('Subject Details (Repeated Entry List)',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Subject Details (Repeated Entry List)',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             // Subject list
             ..._resultsSubjects.asMap().entries.map((entry) {
@@ -3447,24 +3803,33 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
-                        value: _resultsSubjects[i].subject.isEmpty
+                        initialValue: _resultsSubjects[i].subject.isEmpty
                             ? null
                             : _resultsSubjects[i].subject,
                         decoration: const InputDecoration(
                           labelText: 'Subject *',
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
                         ),
                         items: _schoolSubjects
-                            .map((s) => DropdownMenuItem(
+                            .map(
+                              (s) => DropdownMenuItem(
                                 value: s,
-                                child: Text(s,
-                                    style: const TextStyle(fontSize: 12))))
+                                child: Text(
+                                  s,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            )
                             .toList(),
                         onChanged: (v) {
                           if (v != null) {
-                            setState(() => _resultsSubjects[i] =
-                                _resultsSubjects[i].copyWith(subject: v));
+                            setState(
+                              () => _resultsSubjects[i] = _resultsSubjects[i]
+                                  .copyWith(subject: v),
+                            );
                           }
                         },
                         validator: (v) => v == null ? 'Required' : null,
@@ -3474,28 +3839,77 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<String>(
-                        value: _resultsSubjects[i].grade.isEmpty
+                        initialValue: _resultsSubjects[i].grade.isEmpty
                             ? null
                             : _resultsSubjects[i].grade,
                         decoration: const InputDecoration(
                           labelText: 'Grade *',
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 10,
+                          ),
                         ),
                         items: const [
-                          DropdownMenuItem(value: 'NOT ACHIEVED', child: Text('NOT ACHIEVED', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'ELEMENTARY ACHIEVEMENT', child: Text('ELEMENTARY ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'MODERATE ACHIEVEMENT', child: Text('MODERATE ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'ADEQUATE ACHIEVEMENT', child: Text('ADEQUATE ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'SUBSTANTIAL ACHIEVEMENT', child: Text('SUBSTANTIAL ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'MERITORIUS ACHIEVEMENT', child: Text('MERITORIUS ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'OUTSTANDING ACHIEVEMENT', child: Text('OUTSTANDING ACHIEVEMENT', style: TextStyle(fontSize: 11))),
-                          DropdownMenuItem(value: 'NSC', child: Text('NSC', style: TextStyle(fontSize: 11))),
+                          DropdownMenuItem(
+                            value: 'NOT ACHIEVED',
+                            child: Text(
+                              'NOT ACHIEVED',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ELEMENTARY ACHIEVEMENT',
+                            child: Text(
+                              'ELEMENTARY ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'MODERATE ACHIEVEMENT',
+                            child: Text(
+                              'MODERATE ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ADEQUATE ACHIEVEMENT',
+                            child: Text(
+                              'ADEQUATE ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'SUBSTANTIAL ACHIEVEMENT',
+                            child: Text(
+                              'SUBSTANTIAL ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'MERITORIUS ACHIEVEMENT',
+                            child: Text(
+                              'MERITORIUS ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'OUTSTANDING ACHIEVEMENT',
+                            child: Text(
+                              'OUTSTANDING ACHIEVEMENT',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'NSC',
+                            child: Text('NSC', style: TextStyle(fontSize: 11)),
+                          ),
                         ],
                         onChanged: (v) {
                           if (v != null) {
-                            setState(() => _resultsSubjects[i] =
-                                _resultsSubjects[i].copyWith(grade: v));
+                            setState(
+                              () => _resultsSubjects[i] = _resultsSubjects[i]
+                                  .copyWith(grade: v),
+                            );
                           }
                         },
                         validator: (v) => v == null ? 'Required' : null,
@@ -3505,24 +3919,33 @@ class _ProfileOnboardingScreenState
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<int>(
-                        value: _resultsSubjects[i].result.isEmpty
+                        initialValue: _resultsSubjects[i].result.isEmpty
                             ? null
                             : int.tryParse(_resultsSubjects[i].result),
                         decoration: const InputDecoration(
                           labelText: 'Level',
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 10,
+                          ),
                         ),
                         items: List.generate(7, (i) => i + 1)
-                            .map((l) => DropdownMenuItem(
+                            .map(
+                              (l) => DropdownMenuItem(
                                 value: l,
-                                child: Text('$l',
-                                    style: const TextStyle(fontSize: 12))))
+                                child: Text(
+                                  '$l',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            )
                             .toList(),
                         onChanged: (v) {
                           if (v != null) {
-                            setState(() => _resultsSubjects[i] =
-                                _resultsSubjects[i].copyWith(result: '$v'));
+                            setState(
+                              () => _resultsSubjects[i] = _resultsSubjects[i]
+                                  .copyWith(result: '$v'),
+                            );
                           }
                         },
                       ),
@@ -3535,20 +3958,27 @@ class _ProfileOnboardingScreenState
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: '% *',
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 10,
+                          ),
                         ),
                         onChanged: (v) {
-                          setState(() => _resultsSubjects[i] =
-                              _resultsSubjects[i].copyWith(symbol: v));
+                          setState(
+                            () => _resultsSubjects[i] = _resultsSubjects[i]
+                                .copyWith(symbol: v),
+                          );
                         },
                         validator: (v) =>
                             v?.trim().isEmpty == true ? 'Required' : null,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: AppColors.error, size: 20),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
                       onPressed: () =>
                           setState(() => _resultsSubjects.removeAt(i)),
                     ),
@@ -3558,8 +3988,7 @@ class _ProfileOnboardingScreenState
             }),
             OutlinedButton.icon(
               onPressed: () {
-                setState(() => _resultsSubjects
-                    .add(const SubjectDetail()));
+                setState(() => _resultsSubjects.add(const SubjectDetail()));
               },
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Add Subject'),
@@ -3585,11 +4014,14 @@ class _ProfileOnboardingScreenState
           children: [
             const _SectionHeader(title: 'Educational Institution Details'),
             const SizedBox(height: 16),
-            const Text('School Details',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'School Details',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _schoolCtrl,
@@ -3597,46 +4029,66 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Which school did you attend last? *',
                 prefixIcon: Icon(Icons.school_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(context,
+                final result = await _showSearchablePicker(
+                  context,
                   title: 'School',
                   options: _schoolList,
-                  initialValue: _schoolCtrl.text);
+                  initialValue: _schoolCtrl.text,
+                );
                 if (result != null) setState(() => _schoolCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _currentlyDoing.isEmpty ? null : _currentlyDoing,
+              initialValue: _currentlyDoing.isEmpty ? null : _currentlyDoing,
               decoration: const InputDecoration(
                 labelText: 'What are you currently doing? *',
                 prefixIcon: Icon(Icons.work_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'Studying at school', child: Text('Studying at school')),
-                DropdownMenuItem(value: 'Studying at tertiary institution', child: Text('Studying at tertiary institution')),
+                DropdownMenuItem(
+                  value: 'Studying at school',
+                  child: Text('Studying at school'),
+                ),
+                DropdownMenuItem(
+                  value: 'Studying at tertiary institution',
+                  child: Text('Studying at tertiary institution'),
+                ),
                 DropdownMenuItem(value: 'Working', child: Text('Working')),
                 DropdownMenuItem(value: 'Gap Year', child: Text('Gap Year')),
-                DropdownMenuItem(value: 'Unemployed', child: Text('Unemployed')),
+                DropdownMenuItem(
+                  value: 'Unemployed',
+                  child: Text('Unemployed'),
+                ),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
               ],
               onChanged: (v) => setState(() => _currentlyDoing = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
             const SizedBox(height: 24),
-            const Text('Other Tertiary Institution Details',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Other Tertiary Institution Details',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _studiedPreviously.isEmpty ? null : _studiedPreviously,
+              initialValue: _studiedPreviously.isEmpty
+                  ? null
+                  : _studiedPreviously,
               decoration: const InputDecoration(
-                labelText: 'Have you studied at another institution previously? *',
+                labelText:
+                    'Have you studied at another institution previously? *',
                 prefixIcon: Icon(Icons.account_balance_outlined),
               ),
               items: const [
@@ -3665,7 +4117,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Academic Year
             DropdownButtonFormField<int>(
-              value: _academicYear == 0 ? null : _academicYear,
+              initialValue: _academicYear == 0 ? null : _academicYear,
               decoration: const InputDecoration(
                 labelText: 'Academic Year *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
@@ -3679,16 +4131,31 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Faculty/School
             DropdownButtonFormField<String>(
-              value: _facultyCtrl.text.isEmpty ? null : _facultyCtrl.text,
+              initialValue: _facultyCtrl.text.isEmpty
+                  ? null
+                  : _facultyCtrl.text,
               decoration: const InputDecoration(
-                labelText: 'Limit your selection to a specific Faculty/School *',
+                labelText:
+                    'Limit your selection to a specific Faculty/School *',
                 prefixIcon: Icon(Icons.school_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'HEALTH SCIENCES', child: Text('HEALTH SCIENCES')),
-                DropdownMenuItem(value: 'HUMANITIES, SOCIAL SCIENCES AN', child: Text('HUMANITIES, SOCIAL SCIENCES AN')),
-                DropdownMenuItem(value: 'MANAGEMENT, COMMERC', child: Text('MANAGEMENT, COMMERC')),
-                DropdownMenuItem(value: 'SCIENCE, ENGINEERING AND AGRIC', child: Text('SCIENCE, ENGINEERING AND AGRIC')),
+                DropdownMenuItem(
+                  value: 'HEALTH SCIENCES',
+                  child: Text('HEALTH SCIENCES'),
+                ),
+                DropdownMenuItem(
+                  value: 'HUMANITIES, SOCIAL SCIENCES AN',
+                  child: Text('HUMANITIES, SOCIAL SCIENCES AN'),
+                ),
+                DropdownMenuItem(
+                  value: 'MANAGEMENT, COMMERC',
+                  child: Text('MANAGEMENT, COMMERC'),
+                ),
+                DropdownMenuItem(
+                  value: 'SCIENCE, ENGINEERING AND AGRIC',
+                  child: Text('SCIENCE, ENGINEERING AND AGRIC'),
+                ),
               ],
               onChanged: (v) => setState(() => _facultyCtrl.text = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
@@ -3696,35 +4163,118 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Programme
             DropdownButtonFormField<String>(
-              value: _programmeCtrl.text.isEmpty ? null : _programmeCtrl.text,
+              initialValue: _programmeCtrl.text.isEmpty
+                  ? null
+                  : _programmeCtrl.text,
               decoration: const InputDecoration(
                 labelText: 'Choose a programme *',
                 prefixIcon: Icon(Icons.auto_stories_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'HSBAMS', child: Text('HSBAMS - BA (MEDIA STUDIES)')),
-                DropdownMenuItem(value: 'HSBADS', child: Text('HSBADS - BA IN DEVELOPMENT STUDIES')),
-                DropdownMenuItem(value: 'HSBAIR', child: Text('HSBAIR - BA IN INTERNATIONAL RELATIONS')),
-                DropdownMenuItem(value: 'HSBALP', child: Text('HSBALP - BA IN LANGUAGE PRACTICE')),
-                DropdownMenuItem(value: 'HSBAYD', child: Text('HSBAYD - BA IN YOUTH DEVELOPMENT')),
-                DropdownMenuItem(value: 'SEBECP', child: Text('SEBECP - BACHELOR OF EDUCATION IN SENIOR PHASE')),
-                DropdownMenuItem(value: 'SEBELP', child: Text('SEBELP - BACHELOR OF EDUCATION IN SENIOR PHASE')),
-                DropdownMenuItem(value: 'SEBESP', child: Text('SEBESP - BACHELOR OF EDUCATION IN SENIOR PHASE')),
-                DropdownMenuItem(value: 'HSBBA', child: Text('HSBBA - BACHELOR OF ARTS')),
-                DropdownMenuItem(value: 'HSBAEL', child: Text('HSBAEL - BACHELOR OF ARTS (ENGLISH LANG AND LIT)')),
-                DropdownMenuItem(value: 'HSBBAH', child: Text('HSBBAH - BACHELOR OF ARTS HISTORY STREAM')),
-                DropdownMenuItem(value: 'SEBEFP', child: Text('SEBEFP - BACHELOR OF EDUCATION IN FOUNDATION PHAS')),
-                DropdownMenuItem(value: 'HSBIKA', child: Text('HSBIKA - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS')),
-                DropdownMenuItem(value: 'HSBIKC', child: Text('HSBIKC - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS')),
-                DropdownMenuItem(value: 'HSBIKH', child: Text('HSBIKH - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS')),
-                DropdownMenuItem(value: 'HSBIKS', child: Text('HSBIKS - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS')),
-                DropdownMenuItem(value: 'HSBBSW', child: Text('HSBBSW - BACHELOR OF SOCIAL WORK')),
-                DropdownMenuItem(value: 'HSBBT', child: Text('HSBBT - BACHELOR OF THEOLOGY')),
-                DropdownMenuItem(value: 'HSCCCS', child: Text('HSCCCS - HIGHER CERTIFICATE IN CHORAL STUDIES')),
-                DropdownMenuItem(value: 'HSCHCM', child: Text('HSCHCM - HIGHER CERTIFICATE IN MUSIC')),
-                DropdownMenuItem(value: 'HSBDAS', child: Text('HSBDAS - PGDIP IN AFRICAN STUDIES')),
-                DropdownMenuItem(value: 'HSBDGS', child: Text('HSBDGS - PGDIP IN GENDER STUDIES')),
-                DropdownMenuItem(value: 'SEPGCE', child: Text('SEPGCE - POSTGRADUATE CERTIFICATE IN EDUCATION')),
+                DropdownMenuItem(
+                  value: 'HSBAMS',
+                  child: Text('HSBAMS - BA (MEDIA STUDIES)'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBADS',
+                  child: Text('HSBADS - BA IN DEVELOPMENT STUDIES'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBAIR',
+                  child: Text('HSBAIR - BA IN INTERNATIONAL RELATIONS'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBALP',
+                  child: Text('HSBALP - BA IN LANGUAGE PRACTICE'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBAYD',
+                  child: Text('HSBAYD - BA IN YOUTH DEVELOPMENT'),
+                ),
+                DropdownMenuItem(
+                  value: 'SEBECP',
+                  child: Text('SEBECP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
+                ),
+                DropdownMenuItem(
+                  value: 'SEBELP',
+                  child: Text('SEBELP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
+                ),
+                DropdownMenuItem(
+                  value: 'SEBESP',
+                  child: Text('SEBESP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBBA',
+                  child: Text('HSBBA - BACHELOR OF ARTS'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBAEL',
+                  child: Text(
+                    'HSBAEL - BACHELOR OF ARTS (ENGLISH LANG AND LIT)',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBBAH',
+                  child: Text('HSBBAH - BACHELOR OF ARTS HISTORY STREAM'),
+                ),
+                DropdownMenuItem(
+                  value: 'SEBEFP',
+                  child: Text(
+                    'SEBEFP - BACHELOR OF EDUCATION IN FOUNDATION PHAS',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBIKA',
+                  child: Text(
+                    'HSBIKA - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBIKC',
+                  child: Text(
+                    'HSBIKC - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBIKH',
+                  child: Text(
+                    'HSBIKH - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBIKS',
+                  child: Text(
+                    'HSBIKS - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBBSW',
+                  child: Text('HSBBSW - BACHELOR OF SOCIAL WORK'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBBT',
+                  child: Text('HSBBT - BACHELOR OF THEOLOGY'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSCCCS',
+                  child: Text('HSCCCS - HIGHER CERTIFICATE IN CHORAL STUDIES'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSCHCM',
+                  child: Text('HSCHCM - HIGHER CERTIFICATE IN MUSIC'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBDAS',
+                  child: Text('HSBDAS - PGDIP IN AFRICAN STUDIES'),
+                ),
+                DropdownMenuItem(
+                  value: 'HSBDGS',
+                  child: Text('HSBDGS - PGDIP IN GENDER STUDIES'),
+                ),
+                DropdownMenuItem(
+                  value: 'SEPGCE',
+                  child: Text('SEPGCE - POSTGRADUATE CERTIFICATE IN EDUCATION'),
+                ),
               ],
               onChanged: (v) => setState(() => _programmeCtrl.text = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
@@ -3732,7 +4282,9 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Application Period
             DropdownButtonFormField<String>(
-              value: _applicationPeriod.isEmpty ? null : _applicationPeriod,
+              initialValue: _applicationPeriod.isEmpty
+                  ? null
+                  : _applicationPeriod,
               decoration: const InputDecoration(
                 labelText: 'For which period are you applying? *',
                 prefixIcon: Icon(Icons.date_range_outlined),
@@ -3746,7 +4298,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Study Mode
             DropdownButtonFormField<String>(
-              value: _studyMode.isEmpty ? null : _studyMode,
+              initialValue: _studyMode.isEmpty ? null : _studyMode,
               decoration: const InputDecoration(
                 labelText: 'How would you like to study for this programme? *',
                 prefixIcon: Icon(Icons.school_outlined),
@@ -3760,9 +4312,10 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             // Study Timing
             DropdownButtonFormField<String>(
-              value: _studyTiming.isEmpty ? null : _studyTiming,
+              initialValue: _studyTiming.isEmpty ? null : _studyTiming,
               decoration: const InputDecoration(
-                labelText: 'When would you like to study for the qualification? *',
+                labelText:
+                    'When would you like to study for the qualification? *',
                 prefixIcon: Icon(Icons.access_time_outlined),
               ),
               items: const [
@@ -3805,14 +4358,19 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _acceptanceStatus.isEmpty ? null : _acceptanceStatus,
+              initialValue: _acceptanceStatus.isEmpty
+                  ? null
+                  : _acceptanceStatus,
               decoration: const InputDecoration(
                 labelText: 'Acceptance Status *',
                 prefixIcon: Icon(Icons.assignment_turned_in_outlined),
               ),
               items: const [
                 DropdownMenuItem(value: 'I Accept', child: Text('I Accept')),
-                DropdownMenuItem(value: 'I do not Accept', child: Text('I do not Accept')),
+                DropdownMenuItem(
+                  value: 'I do not Accept',
+                  child: Text('I do not Accept'),
+                ),
               ],
               onChanged: (v) => setState(() => _acceptanceStatus = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
@@ -3943,7 +4501,10 @@ class _ProfileOnboardingScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -3982,10 +4543,13 @@ class _ProfileOnboardingScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(labels[i],
-                        style: const TextStyle(
-                            color: AppColors.primaryLight,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      labels[i],
+                      style: const TextStyle(
+                        color: AppColors.primaryLight,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -4063,7 +4627,9 @@ class _ProfileOnboardingScreenState
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary),
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
                     )
                   : const Text('Save'),
             ),
@@ -4077,7 +4643,9 @@ class _ProfileOnboardingScreenState
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(_currentPage < 6 ? 'Next' : 'Finish'),
             ),
@@ -4086,7 +4654,6 @@ class _ProfileOnboardingScreenState
       ),
     );
   }
-
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -4095,10 +4662,13 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(title,
-        style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.bold));
+    return Text(
+      title,
+      style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+      ),
+    );
   }
 }
