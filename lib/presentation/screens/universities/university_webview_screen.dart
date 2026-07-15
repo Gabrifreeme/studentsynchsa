@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class UniversityWebViewScreen extends StatefulWidget {
   final String url;
@@ -232,10 +233,12 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
         backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.star, color: Colors.amber, size: 30),
-            onPressed: _showGuidance,
-            tooltip: 'Application Guide',
+          GestureDetector(
+            onTap: _showGuidance,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: StarAvatar(size: 30, pulse: true),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),

@@ -66,9 +66,9 @@ class _PulseWrapperState extends State<_PulseWrapper>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.85, end: 1.0).animate(
+    _anim = Tween<double>(begin: 0.6, end: 1.15).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
   }
