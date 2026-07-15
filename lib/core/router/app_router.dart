@@ -140,6 +140,20 @@ final appRouter = GoRouter(
                   builder: (context, state) => FundingDetailScreen(
                     bursaryId: state.pathParameters['id']!,
                   ),
+                  routes: [
+                    GoRoute(
+                      path: 'webview',
+                      name: 'funding-webview',
+                      builder: (context, state) {
+                        final rawUrl = state.uri.queryParameters['url'] ?? '';
+                        final rawName = state.uri.queryParameters['name'] ?? 'Funding';
+                        return UniversityWebViewScreen(
+                          url: Uri.decodeComponent(rawUrl),
+                          universityName: Uri.decodeComponent(rawName),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -252,36 +266,34 @@ class _DashboardShellState extends State<DashboardShell>
             ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          widget.navigationShell.goBranch(
-            index,
-            initialLocation: index == widget.navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school_rounded),
-            label: 'Universities',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment_rounded),
-            label: 'Applications',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_outlined),
-            selectedIcon: Icon(Icons.account_balance_rounded),
-            label: 'Funding',
-          ),
-        ],
+      bottomNavigationBar: BottomAppBar(
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(currentIndex == 0 ? Icons.home_rounded : Icons.home_outlined),
+              onPressed: () {
+                widget.navigationShell.goBranch(0, initialLocation: true);
+              },
+              tooltip: 'Home',
+            ),
+            const SizedBox(width: 4),
+            Text('Home', style: TextStyle(
+              color: currentIndex == 0 ? AppColors.primary : AppColors.textSecondary,
+              fontSize: 12,
+            )),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.exit_to_app),
+              onPressed: () => context.push('/signup'),
+              tooltip: 'Exit',
+            ),
+            const SizedBox(width: 4),
+            const Text('Exit', style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            )),
+          ],
+        ),
       ),
     );
   }

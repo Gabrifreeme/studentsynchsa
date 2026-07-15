@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/mock_bursary_data.dart';
@@ -129,9 +130,9 @@ class FundingDetailScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(bursary.applicationUrl),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Apply Now'),
+                  onPressed: () => context.push('/funding/${bursary.id}/webview?url=${Uri.encodeComponent(bursary.applicationUrl)}&name=${Uri.encodeComponent(bursary.name)}'),
+                  icon: const Icon(Icons.star, color: Colors.amber),
+                  label: const Text('Apply ⭐ Now'),
                 ),
               ),
               if (bursary.website.isNotEmpty) ...[

@@ -67,18 +67,22 @@ class ContactInfo {
   final String email;
   final String phone;
   final String workPhone;
+  final String hasSACellphone;
+  final String verifyEmail;
 
-  const ContactInfo({this.email = '', this.phone = '', this.workPhone = ''});
+  const ContactInfo({this.email = '', this.phone = '', this.workPhone = '', this.hasSACellphone = '', this.verifyEmail = ''});
 
-  ContactInfo copyWith({String? email, String? phone, String? workPhone}) =>
-      ContactInfo(email: email ?? this.email, phone: phone ?? this.phone, workPhone: workPhone ?? this.workPhone);
+  ContactInfo copyWith({String? email, String? phone, String? workPhone, String? hasSACellphone, String? verifyEmail}) =>
+      ContactInfo(email: email ?? this.email, phone: phone ?? this.phone, workPhone: workPhone ?? this.workPhone, hasSACellphone: hasSACellphone ?? this.hasSACellphone, verifyEmail: verifyEmail ?? this.verifyEmail);
 
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'workPhone': workPhone};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'workPhone': workPhone, 'hasSACellphone': hasSACellphone, 'verifyEmail': verifyEmail};
 
   factory ContactInfo.fromJson(Map<String, dynamic> json) => ContactInfo(
     email: json['email'] ?? '',
     phone: json['phone'] ?? '',
     workPhone: json['workPhone'] ?? '',
+    hasSACellphone: json['hasSACellphone'] ?? '',
+    verifyEmail: json['verifyEmail'] ?? '',
   );
 }
 
@@ -141,6 +145,8 @@ class DemographicInfo {
   final String homeLanguage;
   final String populationGroup;
   final String maritalStatus;
+  final String citizenshipCode;
+  final String heardAboutUs;
 
   const DemographicInfo({
     this.nationality = 'South African',
@@ -148,6 +154,8 @@ class DemographicInfo {
     this.homeLanguage = '',
     this.populationGroup = '',
     this.maritalStatus = '',
+    this.citizenshipCode = '',
+    this.heardAboutUs = '',
   });
 
   DemographicInfo copyWith({
@@ -156,6 +164,8 @@ class DemographicInfo {
     String? homeLanguage,
     String? populationGroup,
     String? maritalStatus,
+    String? citizenshipCode,
+    String? heardAboutUs,
   }) =>
       DemographicInfo(
         nationality: nationality ?? this.nationality,
@@ -163,6 +173,8 @@ class DemographicInfo {
         homeLanguage: homeLanguage ?? this.homeLanguage,
         populationGroup: populationGroup ?? this.populationGroup,
         maritalStatus: maritalStatus ?? this.maritalStatus,
+        citizenshipCode: citizenshipCode ?? this.citizenshipCode,
+        heardAboutUs: heardAboutUs ?? this.heardAboutUs,
       );
 
   Map<String, dynamic> toJson() => {
@@ -171,6 +183,8 @@ class DemographicInfo {
     'homeLanguage': homeLanguage,
     'populationGroup': populationGroup,
     'maritalStatus': maritalStatus,
+    'citizenshipCode': citizenshipCode,
+    'heardAboutUs': heardAboutUs,
   };
 
   factory DemographicInfo.fromJson(Map<String, dynamic> json) => DemographicInfo(
@@ -179,6 +193,8 @@ class DemographicInfo {
     homeLanguage: json['homeLanguage'] ?? '',
     populationGroup: json['populationGroup'] ?? '',
     maritalStatus: json['maritalStatus'] ?? '',
+    citizenshipCode: json['citizenshipCode'] ?? '',
+    heardAboutUs: json['heardAboutUs'] ?? '',
   );
 }
 
@@ -186,26 +202,30 @@ class StatusInfo {
   final String disabilityStatus;
   final String bursaryRequired;
   final String employmentStatus;
+  final String wantsResidence;
 
-  const StatusInfo({this.disabilityStatus = '', this.bursaryRequired = '', this.employmentStatus = ''});
+  const StatusInfo({this.disabilityStatus = '', this.bursaryRequired = '', this.employmentStatus = '', this.wantsResidence = ''});
 
-  StatusInfo copyWith({String? disabilityStatus, String? bursaryRequired, String? employmentStatus}) =>
+  StatusInfo copyWith({String? disabilityStatus, String? bursaryRequired, String? employmentStatus, String? wantsResidence}) =>
       StatusInfo(
         disabilityStatus: disabilityStatus ?? this.disabilityStatus,
         bursaryRequired: bursaryRequired ?? this.bursaryRequired,
         employmentStatus: employmentStatus ?? this.employmentStatus,
+        wantsResidence: wantsResidence ?? this.wantsResidence,
       );
 
   Map<String, dynamic> toJson() => {
     'disabilityStatus': disabilityStatus,
     'bursaryRequired': bursaryRequired,
     'employmentStatus': employmentStatus,
+    'wantsResidence': wantsResidence,
   };
 
   factory StatusInfo.fromJson(Map<String, dynamic> json) => StatusInfo(
     disabilityStatus: json['disabilityStatus'] ?? '',
     bursaryRequired: json['bursaryRequired'] ?? '',
     employmentStatus: json['employmentStatus'] ?? '',
+    wantsResidence: json['wantsResidence'] ?? '',
   );
 }
 
@@ -494,6 +514,9 @@ class QualificationInfo {
   final String applicationPeriod;
   final String studyMode;
   final String studyTiming;
+  final String applicationType;
+  final String applicationTypeDescription;
+  final int numApplicationsAllowed;
 
   const QualificationInfo({
     this.academicYear = 0,
@@ -501,6 +524,9 @@ class QualificationInfo {
     this.applicationPeriod = '',
     this.studyMode = '',
     this.studyTiming = '',
+    this.applicationType = '',
+    this.applicationTypeDescription = '',
+    this.numApplicationsAllowed = 4,
   });
 
   QualificationInfo copyWith({
@@ -509,6 +535,9 @@ class QualificationInfo {
     String? applicationPeriod,
     String? studyMode,
     String? studyTiming,
+    String? applicationType,
+    String? applicationTypeDescription,
+    int? numApplicationsAllowed,
   }) =>
       QualificationInfo(
         academicYear: academicYear ?? this.academicYear,
@@ -516,6 +545,9 @@ class QualificationInfo {
         applicationPeriod: applicationPeriod ?? this.applicationPeriod,
         studyMode: studyMode ?? this.studyMode,
         studyTiming: studyTiming ?? this.studyTiming,
+        applicationType: applicationType ?? this.applicationType,
+        applicationTypeDescription: applicationTypeDescription ?? this.applicationTypeDescription,
+        numApplicationsAllowed: numApplicationsAllowed ?? this.numApplicationsAllowed,
       );
 
   Map<String, dynamic> toJson() => {
@@ -524,6 +556,9 @@ class QualificationInfo {
     'applicationPeriod': applicationPeriod,
     'studyMode': studyMode,
     'studyTiming': studyTiming,
+    'applicationType': applicationType,
+    'applicationTypeDescription': applicationTypeDescription,
+    'numApplicationsAllowed': numApplicationsAllowed,
   };
 
   factory QualificationInfo.fromJson(Map<String, dynamic> json) => QualificationInfo(
@@ -532,6 +567,9 @@ class QualificationInfo {
     applicationPeriod: json['applicationPeriod'] ?? '',
     studyMode: json['studyMode'] ?? '',
     studyTiming: json['studyTiming'] ?? '',
+    applicationType: json['applicationType'] ?? '',
+    applicationTypeDescription: json['applicationTypeDescription'] ?? '',
+    numApplicationsAllowed: json['numApplicationsAllowed'] ?? 4,
   );
 }
 

@@ -88,17 +88,30 @@ class _FundingListScreenState extends State<FundingListScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search programmes...',
                     hintStyle: const TextStyle(color: AppColors.textMuted),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 22),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryLight, size: 22),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.tune_rounded, color: AppColors.textMuted, size: 20),
+                      icon: const Icon(Icons.tune_rounded, color: AppColors.primaryLight, size: 20),
                       onPressed: () {},
                     ),
                     filled: true,
-                    fillColor: AppColors.card,
+                    fillColor: AppColors.surface,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: AppColors.border.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -118,14 +131,21 @@ class _FundingListScreenState extends State<FundingListScreen> {
                         label: Text(t,
                             style: TextStyle(
                                 fontSize: 12,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                                 color: selected
                                     ? Colors.white
                                     : AppColors.textSecondary)),
                         selected: selected,
                         selectedColor: AppColors.primary,
-                        backgroundColor: AppColors.surfaceLight,
+                        backgroundColor: AppColors.surface,
                         checkmarkColor: Colors.white,
-                        side: BorderSide.none,
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.border.withValues(alpha: 0.5),
+                        ),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20)),
                         onSelected: (_) => setState(() => _selectedType = t),
@@ -175,7 +195,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
   }
 }
 
-class _FundingCard extends StatelessWidget {
+class _FundingCard extends StatefulWidget {
   final Bursary bursary;
   final Color logoColor;
   final Color typeColor;
@@ -195,17 +215,79 @@ class _FundingCard extends StatelessWidget {
   });
 
   @override
+  State<_FundingCard> createState() => _FundingCardState();
+}
+
+class _FundingCardState extends State<_FundingCard>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+  late final AnimationController _spinCtrl;
+  late final Animation<double> _pulse;
+  late final Animation<double> _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _pulse = Tween<double>(begin: 0.6, end: 1.4).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+    _spin = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _spinCtrl, curve: Curves.easeOutCubic),
+    );
+    _pulseCtrl.addListener(() => setState(() {}));
+    _spinCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    _spinCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleApplyNow(BuildContext context, Bursary b) async {
+    final url = b.applicationUrl.isNotEmpty ? b.applicationUrl : b.website;
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No application link available'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_spinCtrl.isCompleted || _spinCtrl.status == AnimationStatus.dismissed) {
+      await _spinCtrl.forward(from: 0.0);
+    }
+    if (!context.mounted) return;
+    final uri = Uri.encodeComponent(b.applicationUrl);
+    final name = Uri.encodeComponent(b.name);
+    context.push('/funding/${b.id}/webview?url=$uri&name=$name');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final b = bursary;
+    final b = widget.bursary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: AppColors.card,
+        color: AppColors.surface,
+        elevation: 2,
+        shadowColor: AppColors.primary.withValues(alpha: 0.15),
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -219,10 +301,10 @@ class _FundingCard extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: logoColor.withValues(alpha: 0.2),
+                        color: widget.logoColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.school_outlined, color: logoColor, size: 24),
+                      child: Icon(Icons.school_outlined, color: widget.logoColor, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -251,7 +333,7 @@ class _FundingCard extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.open_in_new,
                           size: 18, color: AppColors.textMuted),
-                      onPressed: onOpenLink,
+                      onPressed: widget.onOpenLink,
                       splashRadius: 20,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -259,11 +341,11 @@ class _FundingCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     IconButton(
                       icon: Icon(
-                        isSaved ? Icons.bookmark : Icons.bookmark_border,
+                        widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
                         size: 20,
-                        color: isSaved ? AppColors.primaryLight : AppColors.textMuted,
+                        color: widget.isSaved ? AppColors.primaryLight : AppColors.textMuted,
                       ),
-                      onPressed: onSave,
+                      onPressed: widget.onSave,
                       splashRadius: 20,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -274,13 +356,13 @@ class _FundingCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: typeColor.withValues(alpha: 0.15),
+                    color: widget.typeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     b.type,
                     style: TextStyle(
-                      color: typeColor,
+                      color: widget.typeColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -295,6 +377,89 @@ class _FundingCard extends StatelessWidget {
                     color: AppColors.textMuted,
                     fontSize: 12,
                     height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Apply [Star] Now – star pulsates, whole button spins & shrinks on tap
+                Opacity(
+                  opacity: 1.0 - _spin.value,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..rotateZ(_spin.value * 4 * 6.2832),
+                    child: Transform.scale(
+                      scale: 1.0 - _spin.value,
+                      child: InkWell(
+                        onTap: () => _handleApplyNow(context, b),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary.withValues(alpha: 0.2),
+                                AppColors.primary.withValues(alpha: 0.08),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Apply',
+                                style: TextStyle(
+                                  color: AppColors.primaryLight,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Transform.scale(
+                                scale: _pulse.value,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.4),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Image.asset(
+                                    'assets/images/star_avatar.png',
+                                    width: 22,
+                                    height: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Now',
+                                style: TextStyle(
+                                  color: AppColors.primaryLight,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/core/utils/file_upload.dart';
+
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
@@ -31,49 +31,74 @@ class _ProfileOnboardingScreenState
   late AnimationController _floatCtrl;
   late Animation<double> _floatAnim;
 
-  // Personal Details
-  final _titleCtrl = TextEditingController();
-  final _initialsCtrl = TextEditingController();
-  final _firstNameCtrl = TextEditingController();
-  final _lastNameCtrl = TextEditingController();
-  final _maidenNameCtrl = TextEditingController();
-  final _idCtrl = TextEditingController();
+
+
+  // Page 2 - Biographical
+  String _isSACitizen = '';
+  final _citizenshipCodeCtrl = TextEditingController();
   String _gender = '';
   DateTime? _selectedDob;
-
-  // Demographic
-  String _citizenship = 'RSA';
-  final _countryOfBirthCtrl = TextEditingController();
-  final _homeLanguageCtrl = TextEditingController();
-  String _populationGroup = '';
+  String _title = '';
+  final _initialsCtrl = TextEditingController();
+  final _surnameCtrl = TextEditingController();
+  final _firstNamesCtrl = TextEditingController();
+  final _maidenNameCtrl = TextEditingController();
   String _maritalStatus = '';
-
-  // Contact
-  final _emailCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _workPhoneCtrl = TextEditingController();
-
-  // Address
-  final _addressCtrl = TextEditingController();
-  final _addressLine2Ctrl = TextEditingController();
-  final _addressLine3Ctrl = TextEditingController();
-  String _province = '';
-  final _postalCodeCtrl = TextEditingController();
-  final _postalAddressCtrl = TextEditingController();
-  bool _postalSameAsResidential = false;
-
-  // Status
-  String _disabilityStatus = '';
+  final _homeLanguageCtrl = TextEditingController();
+  String _ethnicGroup = '';
+  String _isEmployed = '';
   String _bursaryRequired = '';
-  String _employmentStatus = '';
+  final _heardAboutUsCtrl = TextEditingController();
 
-  // School & Subjects
-  final _schoolCtrl = TextEditingController();
-  String _grade = '';
-  List<SubjectMark> _subjects = [];
-  List<String> _careerInterests = [];
+  // Page 3 - Address + Contact + Residence + Disability
+  final _streetAddr1Ctrl = TextEditingController();
+  final _streetAddr2Ctrl = TextEditingController();
+  final _streetAddr3Ctrl = TextEditingController();
+  String _streetProvince = '';
+  final _streetPostalCodeCtrl = TextEditingController();
+  final _streetPostalCodeConfirmCtrl = TextEditingController();
+  bool _postalDifferent = false;
+  final _postalAddr1Ctrl = TextEditingController();
+  final _postalAddr2Ctrl = TextEditingController();
+  final _postalAddr3Ctrl = TextEditingController();
+  String _postalProvince = '';
+  final _postalPostalCodeCtrl = TextEditingController();
+  String _hasSACellphone = '';
+  final _workPhoneCtrl = TextEditingController();
+  final _homePhoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _verifyEmailCtrl = TextEditingController();
+  String _wantsResidence = '';
+  bool _hasDisability = false;
 
-  // Next of Kin
+  // Page 4 - Results
+  int _matricYear = 0;
+  String _applicationLevel = '';
+  String _isUpgrading = '';
+  String _matricType = '';
+  final _examNumberCtrl = TextEditingController();
+  final _schoolLeavingCertCtrl = TextEditingController();
+  String get _schoolLeavingCertificate => _schoolLeavingCertCtrl.text;
+  set _schoolLeavingCertificate(String v) => _schoolLeavingCertCtrl.text = v;
+  List<SubjectDetail> _resultsSubjects = [];
+  final _subjectCtrl = TextEditingController();
+  final _gradeCtrl = TextEditingController();
+  String _subjectResult = '';
+  String _subjectSymbol = '';
+
+  // Page 5 - Qualifications
+  int _academicYear = 0;
+  final _facultyCtrl = TextEditingController();
+  final _programmeCtrl = TextEditingController();
+  String _applicationPeriod = '';
+  String _studyMode = '';
+  String _studyTiming = '';
+  String _applicationType = 'AT';
+  String _applicationTypeDesc = 'SA Undergrad Applicant - Currently Gr 12';
+  int _numAppsAllowed = 4;
+  List<QualificationChoice> _qualificationChoices = [];
+
+  // Page 1 - Next of Kin
   final _nextOfKinNameCtrl = TextEditingController();
   final _nextOfKinMobileCtrl = TextEditingController();
   final _nextOfKinHomePhoneCtrl = TextEditingController();
@@ -96,39 +121,9 @@ class _ProfileOnboardingScreenState
   final _accountContactPostalCodeCtrl = TextEditingController();
   final _accountContactEmailCtrl = TextEditingController();
 
-  // Results
-  int _matricYear = 0;
-  String _applicationLevel = '';
-  String _upgrading = '';
-  String _matricType = '';
-  final _examinationNumberCtrl = TextEditingController();
-  final _schoolLeavingCertCtrl = TextEditingController();
-  String get _schoolLeavingCertificate => _schoolLeavingCertCtrl.text;
-  set _schoolLeavingCertificate(String v) => _schoolLeavingCertCtrl.text = v;
-  List<SubjectDetail> _resultsSubjects = [];
-
-  // Educational Institution
-  String _currentlyDoing = '';
-  String _studiedPreviously = '';
-
-  // Qualification
-  int _academicYear = 0;
-  final _facultyCtrl = TextEditingController();
-  final _programmeCtrl = TextEditingController();
-  String _applicationPeriod = '';
-  String _studyMode = '';
-  String _studyTiming = '';
-
-  // Agreement
-  final _loginPinCtrl = TextEditingController();
-  String _acceptanceStatus = '';
-
-  // Upload Documents
-  final List<String> _uploadedFiles = ['', '', ''];
-
   bool _saving = false;
 
-  final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
+  final _formKeys = List.generate(5, (_) => GlobalKey<FormState>());
   static const _greetingText =
       "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
@@ -2203,57 +2198,73 @@ class _ProfileOnboardingScreenState
   }
 
   void _applyProfile(StudentProfile p) {
-    _titleCtrl.text = p.personal.title.trim();
-    _initialsCtrl.text = p.personal.initials;
-    _firstNameCtrl.text = p.personal.firstName;
-    _lastNameCtrl.text = p.personal.lastName;
-    _maidenNameCtrl.text = p.personal.maidenName;
+    _isSACitizen = [
+      'SA Citizen',
+      'Permanent Resident',
+      'Foreign National',
+    ].contains(p.demographic.nationality.trim())
+        ? p.demographic.nationality.trim()
+        : '';
+    _citizenshipCodeCtrl.text = p.demographic.citizenshipCode;
     _gender = p.personal.gender.trim();
     _selectedDob = p.personal.dateOfBirth;
-    _idCtrl.text = p.personal.idNumber;
-    _citizenship =
-        [
-          'SA Citizen',
-          'Permanent Resident',
-          'Foreign National',
-        ].contains(p.demographic.nationality.trim())
-        ? p.demographic.nationality.trim()
-        : 'SA Citizen';
-    _countryOfBirthCtrl.text = p.demographic.countryOfBirth;
+    _title = p.personal.title.trim();
+    _initialsCtrl.text = p.personal.initials;
+    _surnameCtrl.text = p.personal.lastName;
+    _firstNamesCtrl.text = p.personal.firstName;
+    _maidenNameCtrl.text = p.personal.maidenName;
+    _maritalStatus = p.demographic.maritalStatus.trim();
     _homeLanguageCtrl.text = p.demographic.homeLanguage;
     final rawPop = p.demographic.populationGroup.trim();
-    _populationGroup = rawPop == 'Black' ? 'African' : rawPop;
-    _maritalStatus = p.demographic.maritalStatus.trim();
-    _emailCtrl.text = p.contact.email;
-    _phoneCtrl.text = p.contact.phone;
-    _workPhoneCtrl.text = p.contact.workPhone;
-    _addressCtrl.text = p.address.address;
-    _addressLine2Ctrl.text = p.address.addressLine2;
-    _addressLine3Ctrl.text = p.address.addressLine3;
-    _province = p.address.province.trim();
-    _postalCodeCtrl.text = p.address.postalCode;
-    _postalAddressCtrl.text = p.address.postalAddress;
-    _postalSameAsResidential =
-        p.address.postalAddress == p.address.address &&
-        p.address.postalAddress.isNotEmpty;
-    _disabilityStatus = p.status.disabilityStatus.trim();
-    _bursaryRequired = p.status.bursaryRequired.trim();
+    _ethnicGroup = rawPop == 'Black' ? 'African' : rawPop;
     final es = p.status.employmentStatus.trim();
-    _employmentStatus =
-        const {
-          'Unemployed',
-          'Employed (part-time)',
-          'Employed (full-time)',
-          'Self-employed',
-        }.contains(es)
+    _isEmployed = const {
+      'Unemployed',
+      'Employed (part-time)',
+      'Employed (full-time)',
+      'Self-employed',
+    }.contains(es)
         ? es
         : '';
-    _schoolCtrl.text = p.school.schoolName;
-    _grade = p.school.currentGrade.trim();
-    _currentlyDoing = p.school.currentlyDoing.trim();
-    _studiedPreviously = p.school.studiedPreviously.trim();
-    _subjects = p.grade12Subjects;
-    _careerInterests = p.careerInterests;
+    _bursaryRequired = p.status.bursaryRequired.trim();
+    _heardAboutUsCtrl.text = p.demographic.heardAboutUs;
+    _streetAddr1Ctrl.text = p.address.address;
+    _streetAddr2Ctrl.text = p.address.addressLine2;
+    _streetAddr3Ctrl.text = p.address.addressLine3;
+    _streetProvince = p.address.province.trim();
+    _streetPostalCodeCtrl.text = p.address.postalCode;
+    _postalDifferent = p.address.postalAddress.isNotEmpty &&
+        p.address.postalAddress != p.address.address;
+    if (_postalDifferent) {
+      final lines = p.address.postalAddress.split('\n');
+      if (lines.isNotEmpty) _postalAddr1Ctrl.text = lines[0];
+      if (lines.length > 1) _postalAddr2Ctrl.text = lines[1];
+      if (lines.length > 2) _postalAddr3Ctrl.text = lines[2];
+    }
+    _hasSACellphone = p.contact.hasSACellphone;
+    _workPhoneCtrl.text = p.contact.workPhone;
+    _homePhoneCtrl.text = p.contact.phone;
+    _emailCtrl.text = p.contact.email;
+    _verifyEmailCtrl.text = p.contact.verifyEmail;
+    _wantsResidence = p.status.wantsResidence;
+    _hasDisability = p.status.disabilityStatus == 'Yes';
+    _matricYear = p.results.matricYear;
+    _applicationLevel = p.results.applicationLevel.trim();
+    _isUpgrading = p.results.upgrading.trim();
+    _matricType = p.results.matricType.trim();
+    _examNumberCtrl.text = p.results.examinationNumber;
+    _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
+    _resultsSubjects = p.results.subjects;
+    _academicYear = p.qualification.academicYear;
+    _facultyCtrl.text = p.qualification.choices.isNotEmpty ? p.qualification.choices.first.faculty : '';
+    _programmeCtrl.text = p.qualification.choices.isNotEmpty ? p.qualification.choices.first.programme : '';
+    _applicationPeriod = p.qualification.applicationPeriod.trim();
+    _studyMode = p.qualification.studyMode.trim();
+    _studyTiming = p.qualification.studyTiming.trim();
+    _applicationType = p.qualification.applicationType;
+    _applicationTypeDesc = p.qualification.applicationTypeDescription;
+    _numAppsAllowed = p.qualification.numApplicationsAllowed;
+    _qualificationChoices = p.qualification.choices;
     _nextOfKinNameCtrl.text = p.nextOfKin.name;
     _nextOfKinMobileCtrl.text = p.nextOfKin.mobilePhone;
     _nextOfKinHomePhoneCtrl.text = p.nextOfKin.homePhone;
@@ -2273,28 +2284,6 @@ class _ProfileOnboardingScreenState
     _accountContactAddr4Ctrl.text = p.accountContact.addressLine4;
     _accountContactPostalCodeCtrl.text = p.accountContact.postalCode;
     _accountContactEmailCtrl.text = p.accountContact.email;
-    _matricYear = p.results.matricYear;
-    _applicationLevel = p.results.applicationLevel.trim();
-    _upgrading = p.results.upgrading.trim();
-    _matricType = p.results.matricType.trim();
-    _examinationNumberCtrl.text = p.results.examinationNumber;
-    _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
-    _resultsSubjects = p.results.subjects;
-    _academicYear = p.qualification.academicYear;
-    if (p.qualification.choices.isNotEmpty) {
-      _facultyCtrl.text = p.qualification.choices.first.faculty;
-      _programmeCtrl.text = p.qualification.choices.first.programme;
-    }
-    _applicationPeriod = p.qualification.applicationPeriod.trim();
-    _studyMode = p.qualification.studyMode.trim();
-    _studyTiming = p.qualification.studyTiming.trim();
-    _loginPinCtrl.text = p.agreement.loginPin;
-    _acceptanceStatus = p.agreement.acceptanceStatus.trim();
-    if (p.uploadedDocuments.length >= 3) {
-      _uploadedFiles[0] = p.uploadedDocuments[0];
-      _uploadedFiles[1] = p.uploadedDocuments[1];
-      _uploadedFiles[2] = p.uploadedDocuments[2];
-    }
   }
 
   void _startTextReveal() {
@@ -2425,23 +2414,32 @@ class _ProfileOnboardingScreenState
   void dispose() {
     _floatCtrl.dispose();
     _pageController.dispose();
-    _titleCtrl.dispose();
     _initialsCtrl.dispose();
-    _firstNameCtrl.dispose();
-    _lastNameCtrl.dispose();
+    _surnameCtrl.dispose();
+    _firstNamesCtrl.dispose();
     _maidenNameCtrl.dispose();
-    _idCtrl.dispose();
-    _countryOfBirthCtrl.dispose();
+    _citizenshipCodeCtrl.dispose();
+    _heardAboutUsCtrl.dispose();
     _homeLanguageCtrl.dispose();
-    _emailCtrl.dispose();
-    _phoneCtrl.dispose();
+    _streetAddr1Ctrl.dispose();
+    _streetAddr2Ctrl.dispose();
+    _streetAddr3Ctrl.dispose();
+    _streetPostalCodeCtrl.dispose();
+    _streetPostalCodeConfirmCtrl.dispose();
+    _postalAddr1Ctrl.dispose();
+    _postalAddr2Ctrl.dispose();
+    _postalAddr3Ctrl.dispose();
+    _postalPostalCodeCtrl.dispose();
+    _homePhoneCtrl.dispose();
     _workPhoneCtrl.dispose();
-    _addressCtrl.dispose();
-    _addressLine2Ctrl.dispose();
-    _addressLine3Ctrl.dispose();
-    _postalCodeCtrl.dispose();
-    _postalAddressCtrl.dispose();
-    _schoolCtrl.dispose();
+    _emailCtrl.dispose();
+    _verifyEmailCtrl.dispose();
+    _examNumberCtrl.dispose();
+    _subjectCtrl.dispose();
+    _gradeCtrl.dispose();
+    _schoolLeavingCertCtrl.dispose();
+    _facultyCtrl.dispose();
+    _programmeCtrl.dispose();
     _nextOfKinNameCtrl.dispose();
     _nextOfKinMobileCtrl.dispose();
     _nextOfKinHomePhoneCtrl.dispose();
@@ -2461,11 +2459,6 @@ class _ProfileOnboardingScreenState
     _accountContactAddr4Ctrl.dispose();
     _accountContactPostalCodeCtrl.dispose();
     _accountContactEmailCtrl.dispose();
-    _examinationNumberCtrl.dispose();
-    _facultyCtrl.dispose();
-    _programmeCtrl.dispose();
-    _loginPinCtrl.dispose();
-    _schoolLeavingCertCtrl.dispose();
     super.dispose();
   }
 
@@ -2475,7 +2468,7 @@ class _ProfileOnboardingScreenState
 
   Future<void> _saveAndContinue() async {
     if (!_validateCurrentPage()) return;
-    if (_currentPage < 6) {
+    if (_currentPage < 4) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -2495,47 +2488,44 @@ class _ProfileOnboardingScreenState
       final profile = StudentProfile(
         id: id,
         personal: PersonalDetails(
-          title: _titleCtrl.text.trim(),
+          title: _title,
           initials: _initialsCtrl.text.trim(),
-          firstName: _firstNameCtrl.text.trim(),
-          lastName: _lastNameCtrl.text.trim(),
+          firstName: _firstNamesCtrl.text.trim(),
+          lastName: _surnameCtrl.text.trim(),
           maidenName: _maidenNameCtrl.text.trim(),
           gender: _gender,
           dateOfBirth: _selectedDob,
-          idNumber: _idCtrl.text.trim(),
         ),
         contact: ContactInfo(
           email: _emailCtrl.text.trim(),
-          phone: _phoneCtrl.text.trim(),
+          phone: _homePhoneCtrl.text.trim(),
           workPhone: _workPhoneCtrl.text.trim(),
+          hasSACellphone: _hasSACellphone,
+          verifyEmail: _verifyEmailCtrl.text.trim(),
         ),
         address: AddressInfo(
-          address: _addressCtrl.text.trim(),
-          addressLine2: _addressLine2Ctrl.text.trim(),
-          addressLine3: _addressLine3Ctrl.text.trim(),
-          province: _province,
-          postalCode: _postalCodeCtrl.text.trim(),
-          postalAddress: _postalSameAsResidential
-              ? _addressCtrl.text.trim()
-              : _postalAddressCtrl.text.trim(),
+          address: _streetAddr1Ctrl.text.trim(),
+          addressLine2: _streetAddr2Ctrl.text.trim(),
+          addressLine3: _streetAddr3Ctrl.text.trim(),
+          province: _streetProvince,
+          postalCode: _streetPostalCodeCtrl.text.trim(),
+          postalAddress: _postalDifferent
+              ? _postalAddr1Ctrl.text.trim()
+              : _streetAddr1Ctrl.text.trim(),
         ),
         demographic: DemographicInfo(
-          nationality: _citizenship,
-          countryOfBirth: _countryOfBirthCtrl.text.trim(),
+          nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
-          populationGroup: _populationGroup,
+          populationGroup: _ethnicGroup,
           maritalStatus: _maritalStatus,
+          citizenshipCode: _citizenshipCodeCtrl.text.trim(),
+          heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
         status: StatusInfo(
-          disabilityStatus: _disabilityStatus,
+          disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
-          employmentStatus: _employmentStatus,
-        ),
-        school: SchoolInfo(
-          schoolName: _schoolCtrl.text.trim(),
-          currentGrade: _grade,
-          currentlyDoing: _currentlyDoing,
-          studiedPreviously: _studiedPreviously,
+          employmentStatus: _isEmployed,
+          wantsResidence: _wantsResidence,
         ),
         nextOfKin: NextOfKin(
           name: _nextOfKinNameCtrl.text.trim(),
@@ -2563,31 +2553,22 @@ class _ProfileOnboardingScreenState
         results: ResultsInfo(
           matricYear: _matricYear,
           applicationLevel: _applicationLevel,
-          upgrading: _upgrading,
+          upgrading: _isUpgrading,
           matricType: _matricType,
-          examinationNumber: _examinationNumberCtrl.text.trim(),
+          examinationNumber: _examNumberCtrl.text.trim(),
           schoolLeavingCertificate: _schoolLeavingCertificate,
           subjects: _resultsSubjects,
         ),
         qualification: QualificationInfo(
           academicYear: _academicYear,
-          choices: [
-            QualificationChoice(
-              faculty: _facultyCtrl.text.trim(),
-              programme: _programmeCtrl.text.trim(),
-            ),
-          ],
+          choices: _qualificationChoices,
           applicationPeriod: _applicationPeriod,
           studyMode: _studyMode,
           studyTiming: _studyTiming,
+          applicationType: _applicationType,
+          applicationTypeDescription: _applicationTypeDesc,
+          numApplicationsAllowed: _numAppsAllowed,
         ),
-        agreement: AgreementInfo(
-          loginPin: _loginPinCtrl.text.trim(),
-          acceptanceStatus: _acceptanceStatus,
-        ),
-        uploadedDocuments: _uploadedFiles,
-        grade12Subjects: _subjects,
-        careerInterests: _careerInterests,
         onboardingComplete: true,
       );
 
@@ -2611,7 +2592,7 @@ class _ProfileOnboardingScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
-        children: List.generate(7, (i) {
+        children: List.generate(5, (i) {
           return Expanded(
             child: Container(
               height: 4,
@@ -2714,7 +2695,7 @@ class _ProfileOnboardingScreenState
               children: [
                 _buildProgressBar(),
                 Text(
-                  'Step ${_currentPage + 1} of 7',
+                  'Step ${_currentPage + 1} of 5',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -2727,13 +2708,11 @@ class _ProfileOnboardingScreenState
                     physics: const NeverScrollableScrollPhysics(),
                     onPageChanged: (i) => setState(() => _currentPage = i),
                     children: [
-                      _buildPersonalInfo(),
-                      _buildSchoolInfo(),
-                      _buildSubjectsPage(),
-                      _buildPreferencesPage(),
-                      _buildQualificationPage(),
-                      _buildAgreementPage(),
-                      _buildUploadDocumentsPage(),
+                      _buildPage1NextOfKin(),
+                      _buildPage2Biographical(),
+                      _buildPage3AddressContact(),
+                      _buildPage4Results(),
+                      _buildPage5Qualifications(),
                     ],
                   ),
                 ),
@@ -2816,7 +2795,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Widget _buildPersonalInfo() {
+  Widget _buildPage1NextOfKin() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
@@ -2824,101 +2803,416 @@ class _ProfileOnboardingScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _SectionHeader(title: 'Next of Kin Details'),
+            const SizedBox(height: 16),
             const Text(
-              'Personal Details',
+              'Please enter the information of your Next of Kin. This can be a parent or a guardian.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Next of Kin Personal and Contact Information',
               style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _nextOfKinNameCtrl,
+              decoration: const InputDecoration(
+                labelText: "Next of kin's name(s) *",
+                prefixIcon: Icon(Icons.person_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinMobileCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Next of kin's mobile/cellular phone number *",
+                prefixIcon: Icon(Icons.phone_android_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinHomePhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Next of kin's home phone number *",
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinWorkPhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Next of kin's work phone number",
+                prefixIcon: Icon(Icons.business_outlined),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Next of Kin Address Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _nextOfKinAddr1Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 1 *',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinAddr2Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 2 *',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinAddr3Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 3',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinAddr4Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 4',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinPostalCodeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              readOnly: true,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _nextOfKinPostalCodeCtrl.text,
+                  displayTransformer: (p) => p,
+                );
+                if (result != null) {
+                  setState(
+                    () => _nextOfKinPostalCodeCtrl.text = result
+                        .split(' - ')
+                        .first
+                        .trim(),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _nextOfKinEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email address *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                if (!v!.contains('@')) return 'Enter a valid email';
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 32),
+
+            const _SectionHeader(title: 'Account Contact Details'),
+            const SizedBox(height: 16),
+            const Text(
+              'Please enter the information of the person responsible for any payments made to this institution. This can be yourself or any other party.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Account Contact Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _accountContactNameCtrl,
+              decoration: const InputDecoration(
+                labelText: "Account Contact's name(s) *",
+                prefixIcon: Icon(Icons.person_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactMobileCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Account Contact's mobile/cellular phone number *",
+                prefixIcon: Icon(Icons.phone_android_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactHomePhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Account Contact's home phone number *",
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Account Contact Address Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _accountContactAddr1Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 1 *',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactAddr2Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 2 *',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactAddr3Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 3',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactAddr4Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal address Line 4',
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactPostalCodeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              readOnly: true,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _accountContactPostalCodeCtrl.text,
+                  displayTransformer: (p) => p,
+                );
+                if (result != null) {
+                  setState(
+                    () => _accountContactPostalCodeCtrl.text = result
+                        .split(' - ')
+                        .first
+                        .trim(),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _accountContactEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email address *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                if (!v!.contains('@')) return 'Enter a valid email';
+                return null;
+              },
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPage2Biographical() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Form(
+        key: _formKeys[1],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Biographical Details'),
+            const SizedBox(height: 16),
+            const Text(
+              'In this section you are required to enter your biographical details.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Nationality',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 4),
             const Text(
-              "Let's get to know you",
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              'Please select your current nationality and capture your ID or passport number.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
-            const SizedBox(height: 20),
-            // Title + Initials
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _titleCtrl.text.isEmpty
-                        ? null
-                        : _titleCtrl.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
-                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'Mr', child: Text('Mr')),
-                      DropdownMenuItem(value: 'Ms', child: Text('Ms')),
-                      DropdownMenuItem(value: 'Mx', child: Text('Mx')),
-                      DropdownMenuItem(value: 'Dr', child: Text('Dr')),
-                      DropdownMenuItem(value: 'Prof', child: Text('Prof')),
-                    ],
-                    onChanged: (v) => setState(() => _titleCtrl.text = v ?? ''),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _initialsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Initials',
-                      prefixIcon: Icon(Icons.short_text, size: 20),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // First + Last Name
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _firstNameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'First Name',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _lastNameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Surname',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Maiden Name (optional)
-            TextFormField(
-              controller: _maidenNameCtrl,
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _isSACitizen.isEmpty ? null : _isSACitizen,
               decoration: const InputDecoration(
-                labelText: 'Maiden Name (if applicable)',
-                prefixIcon: Icon(Icons.person_outline),
+                labelText: 'Are you a SA Citizen? *',
+                prefixIcon: Icon(Icons.flag_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(
+                  value: 'SA Citizen',
+                  child: Text('SA Citizen'),
+                ),
+                DropdownMenuItem(
+                  value: 'Permanent Resident',
+                  child: Text('Permanent Resident'),
+                ),
+                DropdownMenuItem(
+                  value: 'Foreign National',
+                  child: Text('Foreign National'),
+                ),
+              ],
+              onChanged: (v) => setState(() => _isSACitizen = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _citizenshipCodeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Citizenship Code *',
+                prefixIcon: Icon(Icons.badge_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              readOnly: true,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                const codes = [
+                  'SA - South African',
+                  'NA - Namibian',
+                  'ZW - Zimbabwean',
+                  'MZ - Mozambican',
+                  'NG - Nigerian',
+                  'KE - Kenyan',
+                  'GH - Ghanaian',
+                  'ET - Ethiopian',
+                  'AO - Angolan',
+                  'ZM - Zambian',
+                  'MW - Malawian',
+                  'BW - Botswanan',
+                  'LS - Basotho',
+                  'SZ - Swazi',
+                  'ZA - Other SADC',
+                  'OT - Other',
+                ];
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Citizenship Code',
+                  options: codes,
+                  initialValue: _citizenshipCodeCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _citizenshipCodeCtrl.text = result);
+                }
+              },
+            ),
+
+            const SizedBox(height: 24),
+            const Text(
+              'Personal Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 16),
-            // Gender
+            const SizedBox(height: 4),
+            const Text(
+              'Please enter your personal information.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _gender.isEmpty ? null : _gender,
               decoration: const InputDecoration(
-                labelText: 'Gender',
+                labelText: 'Gender *',
                 prefixIcon: Icon(Icons.wc_outlined),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
@@ -2928,9 +3222,10 @@ class _ProfileOnboardingScreenState
                 ),
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
-            const SizedBox(height: 16),
-            // Date of Birth
+            const SizedBox(height: 14),
             InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
@@ -2952,7 +3247,7 @@ class _ProfileOnboardingScreenState
               },
               child: InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Date of Birth',
+                  labelText: 'Date of birth *',
                   prefixIcon: const Icon(Icons.calendar_today_outlined),
                   suffixIcon: _selectedDob != null
                       ? IconButton(
@@ -2969,98 +3264,97 @@ class _ProfileOnboardingScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            // ID Number
-            TextFormField(
-              controller: _idCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ID / Passport Number',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-            ),
-            // --- Citizenship & Demographics ---
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Citizenship & Demographics',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'For South African universities',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            // Citizenship
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              initialValue: _citizenship.isEmpty ? null : _citizenship,
+              initialValue: _title.isEmpty ? null : _title,
               decoration: const InputDecoration(
-                labelText: 'Citizenship Status',
-                prefixIcon: Icon(Icons.flag_outlined),
+                labelText: 'Title *',
+                prefixIcon: Icon(Icons.badge_outlined, size: 20),
               ),
               items: const [
                 DropdownMenuItem(
-                  value: 'SA Citizen',
-                  child: Text('SA Citizen'),
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
                 ),
-                DropdownMenuItem(
-                  value: 'Permanent Resident',
-                  child: Text('Permanent Resident'),
-                ),
-                DropdownMenuItem(
-                  value: 'Foreign National',
-                  child: Text('Foreign National'),
-                ),
+                DropdownMenuItem(value: 'Mr', child: Text('Mr')),
+                DropdownMenuItem(value: 'Ms', child: Text('Ms')),
+                DropdownMenuItem(value: 'Mx', child: Text('Mx')),
+                DropdownMenuItem(value: 'Dr', child: Text('Dr')),
+                DropdownMenuItem(value: 'Prof', child: Text('Prof')),
               ],
-              onChanged: (v) =>
-                  setState(() => _citizenship = v ?? 'SA Citizen'),
+              onChanged: (v) => setState(() => _title = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
-            const SizedBox(height: 16),
-            // Country of Birth
+            const SizedBox(height: 14),
             TextFormField(
-              controller: _countryOfBirthCtrl,
-              readOnly: true,
+              controller: _initialsCtrl,
               decoration: const InputDecoration(
-                labelText: 'Country of Birth',
-                prefixIcon: Icon(Icons.public_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
+                labelText: 'Initials *',
+                prefixIcon: Icon(Icons.short_text, size: 20),
               ),
-              onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Country',
-                  options: _countryList,
-                  initialValue: _countryOfBirthCtrl.text,
-                );
-                if (result != null)
-                  setState(() => _countryOfBirthCtrl.text = result);
-              },
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 16),
-            // Home Language
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _surnameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Surname *',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _firstNamesCtrl,
+              decoration: const InputDecoration(
+                labelText: 'First names *',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _maidenNameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Maiden name',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
+              decoration: const InputDecoration(
+                labelText: 'Marital status *',
+                prefixIcon: Icon(Icons.favorite_outline),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(value: 'Single', child: Text('Single')),
+                DropdownMenuItem(value: 'Married', child: Text('Married')),
+                DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
+                DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
+              ],
+              onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _homeLanguageCtrl,
               readOnly: true,
               decoration: const InputDecoration(
-                labelText: 'Home Language',
+                labelText: 'Home language *',
                 prefixIcon: Icon(Icons.language_outlined),
                 suffixIcon: Icon(
                   Icons.arrow_drop_down,
                   color: AppColors.textMuted,
                 ),
               ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
                 final result = await _showSearchablePicker(
                   context,
@@ -3068,19 +3362,23 @@ class _ProfileOnboardingScreenState
                   options: _languages,
                   initialValue: _homeLanguageCtrl.text,
                 );
-                if (result != null)
+                if (result != null) {
                   setState(() => _homeLanguageCtrl.text = result);
+                }
               },
             ),
-            const SizedBox(height: 16),
-            // Population Group
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              initialValue: _populationGroup.isEmpty ? null : _populationGroup,
+              initialValue: _ethnicGroup.isEmpty ? null : _ethnicGroup,
               decoration: const InputDecoration(
-                labelText: 'Population Group',
+                labelText: 'Ethnic group *',
                 prefixIcon: Icon(Icons.people_outlined),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'African', child: Text('African')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
                 DropdownMenuItem(
@@ -3094,305 +3392,22 @@ class _ProfileOnboardingScreenState
                   child: Text('Prefer not to say'),
                 ),
               ],
-              onChanged: (v) => setState(() => _populationGroup = v ?? ''),
+              onChanged: (v) => setState(() => _ethnicGroup = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
-            const SizedBox(height: 16),
-            // Marital Status
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
+              initialValue: _isEmployed.isEmpty ? null : _isEmployed,
               decoration: const InputDecoration(
-                labelText: 'Marital Status',
-                prefixIcon: Icon(Icons.favorite_outline),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'Single', child: Text('Single')),
-                DropdownMenuItem(value: 'Married', child: Text('Married')),
-                DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
-                DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
-              ],
-              onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
-            ),
-            // --- Contact Details ---
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Contact Details',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'How universities can reach you',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            // Email
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email Address',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Cell Phone
-            TextFormField(
-              controller: _phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Cell Phone Number',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Work Phone (optional)
-            TextFormField(
-              controller: _workPhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Work / Alternative Phone (optional)',
-                prefixIcon: Icon(Icons.phone_forwarded_outlined),
-              ),
-            ),
-            // --- Residential Address ---
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Residential Address',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Where you live',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            // Street Address
-            TextFormField(
-              controller: _addressCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Street Address',
-                prefixIcon: Icon(Icons.home_outlined),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Address Line 2
-            TextFormField(
-              controller: _addressLine2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Address Line 2 (optional)',
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Address Line 3
-            TextFormField(
-              controller: _addressLine3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Street Address Line Three (Name of Town)',
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Province + Postal Code
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _province.isEmpty ? null : _province,
-                    decoration: const InputDecoration(
-                      labelText: 'Province',
-                      prefixIcon: Icon(Icons.map_outlined),
-                    ),
-                    items: AppConstants.provinces
-                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _province = v ?? ''),
-                    validator: (v) => v == null ? 'Select your province' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _postalCodeCtrl,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Postal Code',
-                      prefixIcon: Icon(Icons.pin_outlined),
-                      suffixIcon: Icon(
-                        Icons.arrow_drop_down,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    onTap: () async {
-                      final result = await _showSearchablePicker(
-                        context,
-                        title: 'Postal Code',
-                        options: _postalCodes,
-                        initialValue: _postalCodeCtrl.text,
-                        displayTransformer: (p) => p,
-                      );
-                      if (result != null) {
-                        setState(
-                          () => _postalCodeCtrl.text = result
-                              .split(' - ')
-                              .first
-                              .trim(),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Postal Address
-            TextFormField(
-              controller: _postalAddressCtrl,
-              enabled: !_postalSameAsResidential,
-              decoration: InputDecoration(
-                labelText: 'Postal Address',
-                prefixIcon: const Icon(Icons.mail_outlined),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _postalSameAsResidential = !_postalSameAsResidential;
-                        if (_postalSameAsResidential) {
-                          _postalAddressCtrl.clear();
-                        }
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Same',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: _postalSameAsResidential
-                                    ? AppColors.primaryLight
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                            Icon(
-                              _postalSameAsResidential
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                              color: _postalSameAsResidential
-                                  ? AppColors.primaryLight
-                                  : AppColors.textSecondary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // --- Additional Info ---
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Additional Information',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Disability
-            DropdownButtonFormField<String>(
-              initialValue: _disabilityStatus.isEmpty
-                  ? null
-                  : _disabilityStatus,
-              decoration: const InputDecoration(
-                labelText: 'Do you have a disability?',
-                prefixIcon: Icon(Icons.accessible_outlined),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'No', child: Text('No')),
-                DropdownMenuItem(
-                  value: 'Yes, physical',
-                  child: Text('Yes, physical'),
-                ),
-                DropdownMenuItem(
-                  value: 'Yes, visual',
-                  child: Text('Yes, visual'),
-                ),
-                DropdownMenuItem(
-                  value: 'Yes, hearing',
-                  child: Text('Yes, hearing'),
-                ),
-                DropdownMenuItem(
-                  value: 'Yes, learning',
-                  child: Text('Yes, learning'),
-                ),
-                DropdownMenuItem(
-                  value: 'Yes, other',
-                  child: Text('Yes, other'),
-                ),
-                DropdownMenuItem(
-                  value: 'Prefer not to say',
-                  child: Text('Prefer not to say'),
-                ),
-              ],
-              onChanged: (v) => setState(() => _disabilityStatus = v ?? ''),
-            ),
-            const SizedBox(height: 16),
-            // Bursary Required
-            DropdownButtonFormField<String>(
-              initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
-              decoration: const InputDecoration(
-                labelText: 'Do you require a bursary?',
-                prefixIcon: Icon(Icons.monetization_on_outlined),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                DropdownMenuItem(value: 'No', child: Text('No')),
-                DropdownMenuItem(value: 'Unsure', child: Text('Unsure')),
-              ],
-              onChanged: (v) => setState(() => _bursaryRequired = v ?? ''),
-            ),
-            const SizedBox(height: 16),
-            // Employment Status
-            DropdownButtonFormField<String>(
-              initialValue: _employmentStatus.isEmpty
-                  ? null
-                  : _employmentStatus,
-              decoration: const InputDecoration(
-                labelText: 'Employment Status',
+                labelText: 'Are you Employed?',
                 prefixIcon: Icon(Icons.work_outline),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(
                   value: 'Unemployed',
                   child: Text('Unemployed'),
@@ -3410,7 +3425,61 @@ class _ProfileOnboardingScreenState
                   child: Text('Self-employed'),
                 ),
               ],
-              onChanged: (v) => setState(() => _employmentStatus = v ?? ''),
+              onChanged: (v) => setState(() => _isEmployed = v ?? ''),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _heardAboutUsCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Where did you hear about us?',
+                prefixIcon: Icon(Icons.info_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              onTap: () async {
+                const sources = [
+                  '--- Please select ---',
+                  'Radio',
+                  'Television',
+                  'Newspaper',
+                  'Internet',
+                  'Friend/Family',
+                  'School/Teacher',
+                  'Career Fair',
+                  'Social Media',
+                  'Other',
+                ];
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Source',
+                  options: sources,
+                  initialValue: _heardAboutUsCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _heardAboutUsCtrl.text = result);
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
+              decoration: const InputDecoration(
+                labelText: 'Is a bursary required?',
+                prefixIcon: Icon(Icons.monetization_on_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                DropdownMenuItem(value: 'No', child: Text('No')),
+                DropdownMenuItem(value: 'Unsure', child: Text('Unsure')),
+              ],
+              onChanged: (v) => setState(() => _bursaryRequired = v ?? ''),
             ),
             const SizedBox(height: 32),
           ],
@@ -3419,248 +3488,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Widget _buildSchoolInfo() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[1],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Next of Kin Details ──
-            const _SectionHeader(title: 'Next of Kin Details'),
-            const SizedBox(height: 16),
-            const Text(
-              'Personal and Contact Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nextOfKinNameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Name(s) *',
-                prefixIcon: Icon(Icons.person_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinMobileCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Mobile/Cellular Phone Number *',
-                prefixIcon: Icon(Icons.phone_android_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinHomePhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Home Phone Number *',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinWorkPhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Work Phone Number',
-                prefixIcon: Icon(Icons.business_outlined),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Address Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nextOfKinAddr1Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr4Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinPostalCodeCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email Address *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (!v!.contains('@')) return 'Enter a valid email';
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Account Contact Details ──
-            const _SectionHeader(title: 'Account Contact Details'),
-            const SizedBox(height: 16),
-            const Text(
-              'Account Contact Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _accountContactNameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Name(s) *',
-                prefixIcon: Icon(Icons.person_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactMobileCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Mobile/Cellular Phone Number *',
-                prefixIcon: Icon(Icons.phone_android_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactHomePhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Home Phone Number *',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Address Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _accountContactAddr1Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr4Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactPostalCodeCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email Address *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (!v!.contains('@')) return 'Enter a valid email';
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubjectsPage() {
+  Widget _buildPage3AddressContact() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
@@ -3668,32 +3496,408 @@ class _ProfileOnboardingScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _SectionHeader(title: 'Address & Contact Information'),
+            const SizedBox(height: 20),
+            const Text(
+              'Street Address',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _streetAddr1Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 1 *',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _streetAddr2Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 2 *',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _streetAddr3Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 3',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _streetProvince.isEmpty ? null : _streetProvince,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 4 (Province) *',
+                prefixIcon: Icon(Icons.map_outlined),
+              ),
+              items: AppConstants.provinces
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) => setState(() => _streetProvince = v ?? ''),
+              validator: (v) => v == null ? 'Select your province' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _streetPostalCodeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              readOnly: true,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _streetPostalCodeCtrl.text,
+                  displayTransformer: (p) => p,
+                );
+                if (result != null) {
+                  setState(
+                    () => _streetPostalCodeCtrl.text = result
+                        .split(' - ')
+                        .first
+                        .trim(),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _streetPostalCodeConfirmCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Confirm Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+              ),
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                if (v!.trim() != _streetPostalCodeCtrl.text.trim()) {
+                  return 'Postal codes do not match';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Tick if your Postal Address is different from your Street Address',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              value: _postalDifferent,
+              onChanged: (v) => setState(() => _postalDifferent = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+            ),
+            if (_postalDifferent) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Postal Address',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _postalAddr1Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 1 *',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+                validator: (v) =>
+                    _postalDifferent && v?.trim().isEmpty == true
+                        ? 'Required'
+                        : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _postalAddr2Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 2 *',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+                validator: (v) =>
+                    _postalDifferent && v?.trim().isEmpty == true
+                        ? 'Required'
+                        : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _postalAddr3Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 3',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _postalProvince.isEmpty ? null : _postalProvince,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 4 (Province) *',
+                  prefixIcon: Icon(Icons.map_outlined),
+                ),
+                items: AppConstants.provinces
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                    .toList(),
+                onChanged: (v) => setState(() => _postalProvince = v ?? ''),
+                validator: (v) =>
+                    _postalDifferent && v == null
+                        ? 'Select province'
+                        : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _postalPostalCodeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Code *',
+                  prefixIcon: Icon(Icons.pin_outlined),
+                  suffixIcon: Icon(
+                    Icons.arrow_drop_down,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                readOnly: true,
+                validator: (v) =>
+                    _postalDifferent && v?.trim().isEmpty == true
+                        ? 'Required'
+                        : null,
+                onTap: () async {
+                  final result = await _showSearchablePicker(
+                    context,
+                    title: 'Postal Code',
+                    options: _postalCodes,
+                    initialValue: _postalPostalCodeCtrl.text,
+                    displayTransformer: (p) => p,
+                  );
+                  if (result != null) {
+                    setState(
+                      () => _postalPostalCodeCtrl.text = result
+                          .split(' - ')
+                          .first
+                          .trim(),
+                    );
+                  }
+                },
+              ),
+            ],
+
+            const SizedBox(height: 28),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Contact Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Please enter your contact information.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              initialValue: _hasSACellphone.isEmpty ? null : _hasSACellphone,
+              decoration: const InputDecoration(
+                labelText: 'Do you have a South African Cell Phone Number? *',
+                prefixIcon: Icon(Icons.phone_android_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                DropdownMenuItem(value: 'No', child: Text('No')),
+              ],
+              onChanged: (v) => setState(() => _hasSACellphone = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _workPhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Work Telephone Number',
+                prefixIcon: Icon(Icons.phone_forwarded_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _homePhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Home Telephone Number',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _verifyEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Verify email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                if (v!.trim() != _emailCtrl.text.trim()) {
+                  return 'Emails do not match';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 28),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Residence Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _wantsResidence.isEmpty ? null : _wantsResidence,
+              decoration: const InputDecoration(
+                labelText: 'Do you want to apply for residence? *',
+                prefixIcon: Icon(Icons.bed_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                DropdownMenuItem(value: 'No', child: Text('No')),
+              ],
+              onChanged: (v) => setState(() => _wantsResidence = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
+            ),
+
+            const SizedBox(height: 28),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Disability Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Do you have a disability or impairment?',
+                style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              ),
+              value: _hasDisability,
+              onChanged: (v) => setState(() => _hasDisability = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPage4Results() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Form(
+        key: _formKeys[3],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const _SectionHeader(title: 'Results Details'),
             const SizedBox(height: 16),
+            const Text(
+              'Please select whether you are applying for a postgraduate or undergraduate qualification.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
             // Matric Year
-            DropdownButtonFormField<int>(
-              initialValue: _matricYear == 0 ? null : _matricYear,
+            TextFormField(
+              initialValue: _matricYear == 0 ? null : _matricYear.toString(),
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Year (YYYY) *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
               ),
-              items: List.generate(31, (i) => 2000 + i)
-                  .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
-                  .toList(),
-              onChanged: (v) => setState(() => _matricYear = v ?? 0),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                final year = int.tryParse(v!.trim());
+                if (year == null) return 'Enter a valid year';
+                if (year > DateTime.now().year) return 'Year cannot be in the future';
+                return null;
+              },
+              onChanged: (v) => setState(
+                () => _matricYear = int.tryParse(v) ?? 0,
+              ),
             ),
             const SizedBox(height: 14),
             // Undergraduate / Postgraduate
             DropdownButtonFormField<String>(
-              initialValue: _applicationLevel.isEmpty
-                  ? null
-                  : _applicationLevel,
+              initialValue:
+                  _applicationLevel.isEmpty ? null : _applicationLevel,
               decoration: const InputDecoration(
-                labelText: 'Applying for Undergraduate or Postgraduate? *',
+                labelText: 'Are you applying for Undergraduate or Postgraduate? *',
                 prefixIcon: Icon(Icons.school_outlined),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(
                   value: 'Undergraduate',
                   child: Text('Undergraduate'),
@@ -3704,33 +3908,42 @@ class _ProfileOnboardingScreenState
                 ),
               ],
               onChanged: (v) => setState(() => _applicationLevel = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Upgrading
             DropdownButtonFormField<String>(
-              initialValue: _upgrading.isEmpty ? null : _upgrading,
+              initialValue: _isUpgrading.isEmpty ? null : _isUpgrading,
               decoration: const InputDecoration(
                 labelText: 'Are you Upgrading? *',
                 prefixIcon: Icon(Icons.refresh_outlined),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
-              onChanged: (v) => setState(() => _upgrading = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              onChanged: (v) => setState(() => _isUpgrading = v ?? ''),
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Matric Type
             DropdownButtonFormField<String>(
               initialValue: _matricType.isEmpty ? null : _matricType,
               decoration: const InputDecoration(
-                labelText:
-                    'Completing/Completed South African or International Matric *',
+                labelText: 'Matric type *',
                 prefixIcon: Icon(Icons.public_outlined),
               ),
               items: const [
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(
                   value: 'South African',
                   child: Text('South African'),
@@ -3741,12 +3954,13 @@ class _ProfileOnboardingScreenState
                 ),
               ],
               onChanged: (v) => setState(() => _matricType = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Examination Number
             TextFormField(
-              controller: _examinationNumberCtrl,
+              controller: _examNumberCtrl,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Examination Number',
                 prefixIcon: Icon(Icons.numbers_outlined),
@@ -3778,217 +3992,174 @@ class _ProfileOnboardingScreenState
                   options: certs,
                   initialValue: _schoolLeavingCertificate,
                 );
-                if (result != null)
+                if (result != null) {
                   setState(() => _schoolLeavingCertificate = result);
+                }
               },
             ),
 
             const SizedBox(height: 24),
             const Text(
-              'Subject Details (Repeated Entry List)',
+              'Subject details',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Fill in or select the requested information. Click on the button below to add your subject detail.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _subjectCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'School Leaving Subject',
+                prefixIcon: Icon(Icons.book_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Subject',
+                  options: _schoolSubjects,
+                  initialValue: _subjectCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _subjectCtrl.text = result);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _gradeCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Grade',
+                prefixIcon: Icon(Icons.grade_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              onTap: () async {
+                const grades = [
+                  'NOT ACHIEVED',
+                  'ELEMENTARY ACHIEVEMENT',
+                  'MODERATE ACHIEVEMENT',
+                  'ADEQUATE ACHIEVEMENT',
+                  'SUBSTANTIAL ACHIEVEMENT',
+                  'MERITORIUS ACHIEVEMENT',
+                  'OUTSTANDING ACHIEVEMENT',
+                  'NSC',
+                ];
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Grade',
+                  options: grades,
+                  initialValue: _gradeCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _gradeCtrl.text = result);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _subjectResult.isEmpty ? null : _subjectResult,
+              decoration: const InputDecoration(
+                labelText: 'Result',
+                prefixIcon: Icon(Icons.assessment_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Not Achieved', child: Text('Not Achieved')),
+                DropdownMenuItem(value: 'Elementary', child: Text('Elementary')),
+                DropdownMenuItem(value: 'Moderate', child: Text('Moderate')),
+                DropdownMenuItem(value: 'Adequate', child: Text('Adequate')),
+                DropdownMenuItem(value: 'Substantial', child: Text('Substantial')),
+                DropdownMenuItem(value: 'Meritorius', child: Text('Meritorius')),
+                DropdownMenuItem(value: 'Outstanding', child: Text('Outstanding')),
+              ],
+              onChanged: (v) => setState(() => _subjectResult = v ?? ''),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _subjectSymbol.isEmpty ? null : _subjectSymbol,
+              decoration: const InputDecoration(
+                labelText: 'Symbol *',
+                prefixIcon: Icon(Icons.grade_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'A', child: Text('A')),
+                DropdownMenuItem(value: 'B', child: Text('B')),
+                DropdownMenuItem(value: 'C', child: Text('C')),
+                DropdownMenuItem(value: 'D', child: Text('D')),
+                DropdownMenuItem(value: 'E', child: Text('E')),
+                DropdownMenuItem(value: 'F', child: Text('F')),
+              ],
+              onChanged: (v) => setState(() => _subjectSymbol = v ?? ''),
+            ),
             const SizedBox(height: 12),
             // Subject list
             ..._resultsSubjects.asMap().entries.map((entry) {
               final i = entry.key;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _resultsSubjects[i].subject.isEmpty
-                            ? null
-                            : _resultsSubjects[i].subject,
-                        decoration: const InputDecoration(
-                          labelText: 'Subject *',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 10,
-                          ),
-                        ),
-                        items: _schoolSubjects
-                            .map(
-                              (s) => DropdownMenuItem(
-                                value: s,
-                                child: Text(
-                                  s,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(
-                              () => _resultsSubjects[i] = _resultsSubjects[i]
-                                  .copyWith(subject: v),
-                            );
-                          }
-                        },
-                        validator: (v) => v == null ? 'Required' : null,
-                      ),
+              return Card(
+                color: AppColors.surfaceLight,
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  dense: true,
+                  title: Text(
+                    _resultsSubjects[i].subject,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    'Grade: ${_resultsSubjects[i].grade} | Symbol: ${_resultsSubjects[i].symbol}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.remove_circle_outline,
+                      color: AppColors.error,
+                      size: 20,
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      flex: 1,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _resultsSubjects[i].grade.isEmpty
-                            ? null
-                            : _resultsSubjects[i].grade,
-                        decoration: const InputDecoration(
-                          labelText: 'Grade *',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 10,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'NOT ACHIEVED',
-                            child: Text(
-                              'NOT ACHIEVED',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ELEMENTARY ACHIEVEMENT',
-                            child: Text(
-                              'ELEMENTARY ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'MODERATE ACHIEVEMENT',
-                            child: Text(
-                              'MODERATE ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ADEQUATE ACHIEVEMENT',
-                            child: Text(
-                              'ADEQUATE ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'SUBSTANTIAL ACHIEVEMENT',
-                            child: Text(
-                              'SUBSTANTIAL ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'MERITORIUS ACHIEVEMENT',
-                            child: Text(
-                              'MERITORIUS ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'OUTSTANDING ACHIEVEMENT',
-                            child: Text(
-                              'OUTSTANDING ACHIEVEMENT',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'NSC',
-                            child: Text('NSC', style: TextStyle(fontSize: 11)),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(
-                              () => _resultsSubjects[i] = _resultsSubjects[i]
-                                  .copyWith(grade: v),
-                            );
-                          }
-                        },
-                        validator: (v) => v == null ? 'Required' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      flex: 1,
-                      child: DropdownButtonFormField<int>(
-                        initialValue: _resultsSubjects[i].result.isEmpty
-                            ? null
-                            : int.tryParse(_resultsSubjects[i].result),
-                        decoration: const InputDecoration(
-                          labelText: 'Level',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 10,
-                          ),
-                        ),
-                        items: List.generate(7, (i) => i + 1)
-                            .map(
-                              (l) => DropdownMenuItem(
-                                value: l,
-                                child: Text(
-                                  '$l',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(
-                              () => _resultsSubjects[i] = _resultsSubjects[i]
-                                  .copyWith(result: '$v'),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                        initialValue: _resultsSubjects[i].symbol,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: '% *',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 10,
-                          ),
-                        ),
-                        onChanged: (v) {
-                          setState(
-                            () => _resultsSubjects[i] = _resultsSubjects[i]
-                                .copyWith(symbol: v),
-                          );
-                        },
-                        validator: (v) =>
-                            v?.trim().isEmpty == true ? 'Required' : null,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.remove_circle_outline,
-                        color: AppColors.error,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          setState(() => _resultsSubjects.removeAt(i)),
-                    ),
-                  ],
+                    onPressed: () =>
+                        setState(() => _resultsSubjects.removeAt(i)),
+                  ),
                 ),
               );
             }),
             OutlinedButton.icon(
               onPressed: () {
-                setState(() => _resultsSubjects.add(const SubjectDetail()));
+                if (_subjectCtrl.text.trim().isEmpty ||
+                    _gradeCtrl.text.trim().isEmpty ||
+                    _subjectSymbol.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in subject, grade and symbol'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _resultsSubjects.add(SubjectDetail(
+                    subject: _subjectCtrl.text.trim(),
+                    grade: _gradeCtrl.text.trim(),
+                    result: _subjectResult,
+                    symbol: _subjectSymbol,
+                  ));
+                  _subjectCtrl.clear();
+                  _gradeCtrl.clear();
+                  _subjectResult = '';
+                  _subjectSymbol = '';
+                });
               },
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Add Subject'),
@@ -4004,108 +4175,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Widget _buildPreferencesPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[3],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'Educational Institution Details'),
-            const SizedBox(height: 16),
-            const Text(
-              'School Details',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _schoolCtrl,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Which school did you attend last? *',
-                prefixIcon: Icon(Icons.school_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-              onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'School',
-                  options: _schoolList,
-                  initialValue: _schoolCtrl.text,
-                );
-                if (result != null) setState(() => _schoolCtrl.text = result);
-              },
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _currentlyDoing.isEmpty ? null : _currentlyDoing,
-              decoration: const InputDecoration(
-                labelText: 'What are you currently doing? *',
-                prefixIcon: Icon(Icons.work_outlined),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'Studying at school',
-                  child: Text('Studying at school'),
-                ),
-                DropdownMenuItem(
-                  value: 'Studying at tertiary institution',
-                  child: Text('Studying at tertiary institution'),
-                ),
-                DropdownMenuItem(value: 'Working', child: Text('Working')),
-                DropdownMenuItem(value: 'Gap Year', child: Text('Gap Year')),
-                DropdownMenuItem(
-                  value: 'Unemployed',
-                  child: Text('Unemployed'),
-                ),
-                DropdownMenuItem(value: 'Other', child: Text('Other')),
-              ],
-              onChanged: (v) => setState(() => _currentlyDoing = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Other Tertiary Institution Details',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _studiedPreviously.isEmpty
-                  ? null
-                  : _studiedPreviously,
-              decoration: const InputDecoration(
-                labelText:
-                    'Have you studied at another institution previously? *',
-                prefixIcon: Icon(Icons.account_balance_outlined),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                DropdownMenuItem(value: 'No', child: Text('No')),
-              ],
-              onChanged: (v) => setState(() => _studiedPreviously = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQualificationPage() {
+  Widget _buildPage5Qualifications() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
@@ -4113,217 +4183,246 @@ class _ProfileOnboardingScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Qualification Details'),
+            const _SectionHeader(title: 'Academic Application'),
             const SizedBox(height: 16),
+            const Text(
+              'Qualification details',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'The list of qualifications provided can in some cases only be the qualifications you qualify for.\n\n'
+              'If you have written a South African matric we will take the subjects and marks on the Matric page as the guide to determine for which qualifications you qualify.\n\n'
+              'If you have not written a South African matric or if you are applying for a post-graduate qualification the list will be exhaustive.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+
             // Academic Year
-            DropdownButtonFormField<int>(
-              initialValue: _academicYear == 0 ? null : _academicYear,
+            DropdownButtonFormField<String>(
+              initialValue: _academicYear == 0 ? null : _academicYear.toString(),
               decoration: const InputDecoration(
                 labelText: 'Academic Year *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
               ),
-              items: List.generate(6, (i) => DateTime.now().year + i)
-                  .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
-                  .toList(),
-              onChanged: (v) => setState(() => _academicYear = v ?? 0),
+              items: List.generate(10, (i) {
+                final year = DateTime.now().year + i;
+                return DropdownMenuItem(
+                  value: year.toString(),
+                  child: Text(year.toString()),
+                );
+              }),
+              onChanged: (v) => setState(() => _academicYear = int.tryParse(v ?? '0') ?? 0),
               validator: (v) => v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            // Faculty/School
-            DropdownButtonFormField<String>(
-              initialValue: _facultyCtrl.text.isEmpty
-                  ? null
-                  : _facultyCtrl.text,
+
+            // Faculty
+            TextFormField(
+              controller: _facultyCtrl,
+              readOnly: true,
               decoration: const InputDecoration(
-                labelText:
-                    'Limit your selection to a specific Faculty/School *',
-                prefixIcon: Icon(Icons.school_outlined),
+                labelText: 'Limit your selection to a specific Faculty/School *',
+                prefixIcon: Icon(Icons.account_balance_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'HEALTH SCIENCES',
-                  child: Text('HEALTH SCIENCES'),
-                ),
-                DropdownMenuItem(
-                  value: 'HUMANITIES, SOCIAL SCIENCES AN',
-                  child: Text('HUMANITIES, SOCIAL SCIENCES AN'),
-                ),
-                DropdownMenuItem(
-                  value: 'MANAGEMENT, COMMERC',
-                  child: Text('MANAGEMENT, COMMERC'),
-                ),
-                DropdownMenuItem(
-                  value: 'SCIENCE, ENGINEERING AND AGRIC',
-                  child: Text('SCIENCE, ENGINEERING AND AGRIC'),
-                ),
-              ],
-              onChanged: (v) => setState(() => _facultyCtrl.text = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Faculty',
+                  options: const [
+                    'HEALTH SCIENCES',
+                    'HUMANITIES, SOCIAL SCIENCES AND EDUCATION',
+                    'MANAGEMENT, COMMERCE AND LAW',
+                    'SCIENCE, ENGINEERING AND AGRICULTURE',
+                  ],
+                  initialValue: _facultyCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _facultyCtrl.text = result);
+                }
+              },
             ),
             const SizedBox(height: 14),
+
             // Programme
-            DropdownButtonFormField<String>(
-              initialValue: _programmeCtrl.text.isEmpty
-                  ? null
-                  : _programmeCtrl.text,
+            TextFormField(
+              controller: _programmeCtrl,
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Choose a programme *',
-                prefixIcon: Icon(Icons.auto_stories_outlined),
+                prefixIcon: Icon(Icons.school_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'HSBAMS',
-                  child: Text('HSBAMS - BA (MEDIA STUDIES)'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBADS',
-                  child: Text('HSBADS - BA IN DEVELOPMENT STUDIES'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBAIR',
-                  child: Text('HSBAIR - BA IN INTERNATIONAL RELATIONS'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBALP',
-                  child: Text('HSBALP - BA IN LANGUAGE PRACTICE'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBAYD',
-                  child: Text('HSBAYD - BA IN YOUTH DEVELOPMENT'),
-                ),
-                DropdownMenuItem(
-                  value: 'SEBECP',
-                  child: Text('SEBECP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
-                ),
-                DropdownMenuItem(
-                  value: 'SEBELP',
-                  child: Text('SEBELP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
-                ),
-                DropdownMenuItem(
-                  value: 'SEBESP',
-                  child: Text('SEBESP - BACHELOR OF EDUCATION IN SENIOR PHASE'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBBA',
-                  child: Text('HSBBA - BACHELOR OF ARTS'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBAEL',
-                  child: Text(
-                    'HSBAEL - BACHELOR OF ARTS (ENGLISH LANG AND LIT)',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBBAH',
-                  child: Text('HSBBAH - BACHELOR OF ARTS HISTORY STREAM'),
-                ),
-                DropdownMenuItem(
-                  value: 'SEBEFP',
-                  child: Text(
-                    'SEBEFP - BACHELOR OF EDUCATION IN FOUNDATION PHAS',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBIKA',
-                  child: Text(
-                    'HSBIKA - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBIKC',
-                  child: Text(
-                    'HSBIKC - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBIKH',
-                  child: Text(
-                    'HSBIKH - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBIKS',
-                  child: Text(
-                    'HSBIKS - BACHELOR OF INDIGENOUS KNOWLEDGE SYSTEMS',
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBBSW',
-                  child: Text('HSBBSW - BACHELOR OF SOCIAL WORK'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBBT',
-                  child: Text('HSBBT - BACHELOR OF THEOLOGY'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSCCCS',
-                  child: Text('HSCCCS - HIGHER CERTIFICATE IN CHORAL STUDIES'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSCHCM',
-                  child: Text('HSCHCM - HIGHER CERTIFICATE IN MUSIC'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBDAS',
-                  child: Text('HSBDAS - PGDIP IN AFRICAN STUDIES'),
-                ),
-                DropdownMenuItem(
-                  value: 'HSBDGS',
-                  child: Text('HSBDGS - PGDIP IN GENDER STUDIES'),
-                ),
-                DropdownMenuItem(
-                  value: 'SEPGCE',
-                  child: Text('SEPGCE - POSTGRADUATE CERTIFICATE IN EDUCATION'),
-                ),
-              ],
-              onChanged: (v) => setState(() => _programmeCtrl.text = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Programme',
+                  options: const ['HSBAMS - BA (MEDIA STUDIES)', 'HSBADS - BA IN DEVELOPMENT STUDIES', 'HSBAIR - BA IN INTERNATIONAL RELATIONS'],
+                  initialValue: _programmeCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _programmeCtrl.text = result);
+                }
+              },
             ),
             const SizedBox(height: 14),
+
             // Application Period
-            DropdownButtonFormField<String>(
-              initialValue: _applicationPeriod.isEmpty
-                  ? null
-                  : _applicationPeriod,
+            TextFormField(
+              controller: TextEditingController(text: _applicationPeriod.isEmpty ? null : _applicationPeriod),
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'For which period are you applying? *',
                 prefixIcon: Icon(Icons.date_range_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
-              items: const [
-                DropdownMenuItem(value: '1ST YEAR', child: Text('1ST YEAR')),
-              ],
-              onChanged: (v) => setState(() => _applicationPeriod = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Period',
+                  options: const ['YEAR', 'SEMESTER 1', 'SEMESTER 2'],
+                  initialValue: _applicationPeriod,
+                );
+                if (result != null) {
+                  setState(() => _applicationPeriod = result);
+                }
+              },
             ),
             const SizedBox(height: 14),
+
             // Study Mode
-            DropdownButtonFormField<String>(
-              initialValue: _studyMode.isEmpty ? null : _studyMode,
+            TextFormField(
+              controller: TextEditingController(text: _studyMode.isEmpty ? null : _studyMode),
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'How would you like to study for this programme? *',
                 prefixIcon: Icon(Icons.school_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
-              items: const [
-                DropdownMenuItem(value: 'FULL-TIME', child: Text('FULL-TIME')),
-              ],
-              onChanged: (v) => setState(() => _studyMode = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Study Mode',
+                  options: const ['FULL-TIME', 'PART-TIME', 'DISTANCE'],
+                  initialValue: _studyMode,
+                );
+                if (result != null) {
+                  setState(() => _studyMode = result);
+                }
+              },
             ),
             const SizedBox(height: 14),
+
             // Study Timing
-            DropdownButtonFormField<String>(
-              initialValue: _studyTiming.isEmpty ? null : _studyTiming,
+            TextFormField(
+              controller: TextEditingController(text: _studyTiming.isEmpty ? null : _studyTiming),
+              readOnly: true,
               decoration: const InputDecoration(
-                labelText:
-                    'When would you like to study for the qualification? *',
+                labelText: 'When would you like to study for the qualification? *',
                 prefixIcon: Icon(Icons.access_time_outlined),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
-              items: const [
-                DropdownMenuItem(value: 'YEAR', child: Text('YEAR')),
-              ],
-              onChanged: (v) => setState(() => _studyTiming = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+              onTap: () async {
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Study Timing',
+                  options: const ['YEAR'],
+                  initialValue: _studyTiming,
+                );
+                if (result != null) {
+                  setState(() => _studyTiming = result);
+                }
+              },
             ),
+            const SizedBox(height: 24),
+
+            // Application Type (read-only display)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Application Type',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'AT: $_applicationType',
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  ),
+                  Text(
+                    _applicationTypeDesc,
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                  Text(
+                    'Number of applications allowed for this Application type: $_numAppsAllowed',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Add Qualification button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _addQualification,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Qualification'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+
+            // Qualification list
+            if (_qualificationChoices.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Added Qualifications',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._qualificationChoices.asMap().entries.map((entry) {
+                final i = entry.key;
+                final q = entry.value;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    title: Text(q.programme, style: const TextStyle(fontSize: 13)),
+                    subtitle: Text(q.faculty, style: const TextStyle(fontSize: 11)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 20),
+                      onPressed: () => setState(() => _qualificationChoices.removeAt(i)),
+                    ),
+                  ),
+                );
+              }),
+            ],
             const SizedBox(height: 32),
           ],
         ),
@@ -4331,55 +4430,23 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Widget _buildAgreementPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[5],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'Rules and Agreement'),
-            const SizedBox(height: 16),
-            const Text(
-              'Before continuing, please review and accept the terms.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: _loginPinCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Login Pin Number *',
-                prefixIcon: Icon(Icons.lock_outline),
-              ),
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              initialValue: _acceptanceStatus.isEmpty
-                  ? null
-                  : _acceptanceStatus,
-              decoration: const InputDecoration(
-                labelText: 'Acceptance Status *',
-                prefixIcon: Icon(Icons.assignment_turned_in_outlined),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'I Accept', child: Text('I Accept')),
-                DropdownMenuItem(
-                  value: 'I do not Accept',
-                  child: Text('I do not Accept'),
-                ),
-              ],
-              onChanged: (v) => setState(() => _acceptanceStatus = v ?? ''),
-              validator: (v) => v == null ? 'Required' : null,
-            ),
-            const SizedBox(height: 32),
-          ],
+  void _addQualification() {
+    final faculty = _facultyCtrl.text.trim();
+    final programme = _programmeCtrl.text.trim();
+    if (faculty.isEmpty || programme.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a faculty and programme first'),
+          backgroundColor: AppColors.error,
         ),
-      ),
-    );
+      );
+      return;
+    }
+    setState(() {
+      _qualificationChoices.add(QualificationChoice(faculty: faculty, programme: programme));
+      _facultyCtrl.clear();
+      _programmeCtrl.clear();
+    });
   }
 
   Future<void> _saveCurrentPage() async {
@@ -4392,47 +4459,54 @@ class _ProfileOnboardingScreenState
       final profile = StudentProfile(
         id: id,
         personal: PersonalDetails(
-          title: _titleCtrl.text.trim(),
+          title: _title,
           initials: _initialsCtrl.text.trim(),
-          firstName: _firstNameCtrl.text.trim(),
-          lastName: _lastNameCtrl.text.trim(),
+          firstName: _firstNamesCtrl.text.trim(),
+          lastName: _surnameCtrl.text.trim(),
           maidenName: _maidenNameCtrl.text.trim(),
           gender: _gender,
           dateOfBirth: _selectedDob,
-          idNumber: _idCtrl.text.trim(),
         ),
         contact: ContactInfo(
           email: _emailCtrl.text.trim(),
-          phone: _phoneCtrl.text.trim(),
+          phone: _homePhoneCtrl.text.trim(),
           workPhone: _workPhoneCtrl.text.trim(),
+          hasSACellphone: _hasSACellphone,
+          verifyEmail: _verifyEmailCtrl.text.trim(),
         ),
         address: AddressInfo(
-          address: _addressCtrl.text.trim(),
-          addressLine2: _addressLine2Ctrl.text.trim(),
-          addressLine3: _addressLine3Ctrl.text.trim(),
-          province: _province,
-          postalCode: _postalCodeCtrl.text.trim(),
-          postalAddress: _postalSameAsResidential
-              ? _addressCtrl.text.trim()
-              : _postalAddressCtrl.text.trim(),
+          address: _streetAddr1Ctrl.text.trim(),
+          addressLine2: _streetAddr2Ctrl.text.trim(),
+          addressLine3: _streetAddr3Ctrl.text.trim(),
+          province: _streetProvince,
+          postalCode: _streetPostalCodeCtrl.text.trim(),
+          postalAddress: _postalDifferent
+              ? _postalAddr1Ctrl.text.trim()
+              : _streetAddr1Ctrl.text.trim(),
         ),
         demographic: DemographicInfo(
-          nationality: _citizenship,
-          countryOfBirth: _countryOfBirthCtrl.text.trim(),
+          nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
-          populationGroup: _populationGroup,
+          populationGroup: _ethnicGroup,
           maritalStatus: _maritalStatus,
+          citizenshipCode: _citizenshipCodeCtrl.text.trim(),
+          heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
         status: StatusInfo(
-          disabilityStatus: _disabilityStatus,
+          disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
-          employmentStatus: _employmentStatus,
+          employmentStatus: _isEmployed,
+          wantsResidence: _wantsResidence,
         ),
-        school: SchoolInfo(
-          schoolName: _schoolCtrl.text.trim(),
-          currentGrade: _grade,
-          currentlyDoing: _currentlyDoing,
-          studiedPreviously: _studiedPreviously,
+        qualification: QualificationInfo(
+          academicYear: _academicYear,
+          choices: _qualificationChoices,
+          applicationPeriod: _applicationPeriod,
+          studyMode: _studyMode,
+          studyTiming: _studyTiming,
+          applicationType: _applicationType,
+          applicationTypeDescription: _applicationTypeDesc,
+          numApplicationsAllowed: _numAppsAllowed,
         ),
         nextOfKin: NextOfKin(
           name: _nextOfKinNameCtrl.text.trim(),
@@ -4460,31 +4534,12 @@ class _ProfileOnboardingScreenState
         results: ResultsInfo(
           matricYear: _matricYear,
           applicationLevel: _applicationLevel,
-          upgrading: _upgrading,
+          upgrading: _isUpgrading,
           matricType: _matricType,
-          examinationNumber: _examinationNumberCtrl.text.trim(),
+          examinationNumber: _examNumberCtrl.text.trim(),
           schoolLeavingCertificate: _schoolLeavingCertificate,
           subjects: _resultsSubjects,
         ),
-        qualification: QualificationInfo(
-          academicYear: _academicYear,
-          choices: [
-            QualificationChoice(
-              faculty: _facultyCtrl.text.trim(),
-              programme: _programmeCtrl.text.trim(),
-            ),
-          ],
-          applicationPeriod: _applicationPeriod,
-          studyMode: _studyMode,
-          studyTiming: _studyTiming,
-        ),
-        agreement: AgreementInfo(
-          loginPin: _loginPinCtrl.text.trim(),
-          acceptanceStatus: _acceptanceStatus,
-        ),
-        uploadedDocuments: _uploadedFiles,
-        grade12Subjects: _subjects,
-        careerInterests: _careerInterests,
         onboardingComplete: existingProfile?.onboardingComplete ?? false,
       );
 
@@ -4509,95 +4564,6 @@ class _ProfileOnboardingScreenState
       }
     }
     setState(() => _saving = false);
-  }
-
-  Widget _buildUploadDocumentsPage() {
-    const labels = [
-      'Final Grade 11 Report',
-      'Term 1 Grade 12 Report',
-      'Mid Year Grade 12 Report',
-    ];
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[6],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'Upload Documents'),
-            const SizedBox(height: 16),
-            const Text(
-              'Please upload the following supporting documents.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            ...List.generate(3, (i) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      labels[i],
-                      style: const TextStyle(
-                        color: AppColors.primaryLight,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _pickFile(i),
-                        icon: Icon(
-                          _uploadedFiles[i].isEmpty
-                              ? Icons.cloud_upload_outlined
-                              : Icons.check_circle_outline,
-                          size: 18,
-                          color: _uploadedFiles[i].isEmpty
-                              ? AppColors.primaryLight
-                              : AppColors.success,
-                        ),
-                        label: Text(
-                          _uploadedFiles[i].isEmpty
-                              ? 'Tap to upload'
-                              : _uploadedFiles[i],
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _uploadedFiles[i].isEmpty
-                              ? AppColors.primaryLight
-                              : AppColors.success,
-                          side: BorderSide(
-                            color: _uploadedFiles[i].isEmpty
-                                ? AppColors.border
-                                : AppColors.success,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickFile(int index) async {
-    final name = await pickFile('.pdf,.doc,.docx,.jpg,.jpeg,.png');
-    if (name != null && mounted) {
-      setState(() => _uploadedFiles[index] = name);
-    }
   }
 
   Widget _buildBottomButtons() {
@@ -4647,7 +4613,7 @@ class _ProfileOnboardingScreenState
                         color: Colors.white,
                       ),
                     )
-                  : Text(_currentPage < 6 ? 'Next' : 'Finish'),
+                  : Text(_currentPage < 4 ? 'Next' : 'Finish'),
             ),
           ),
         ],

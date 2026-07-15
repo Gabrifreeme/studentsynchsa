@@ -105,12 +105,6 @@ class DashboardScreen extends ConsumerWidget {
               const SectionHeader(title: 'QUICK LINKS'),
               const SizedBox(height: 12),
               _buildQuickLinks(context),
-              const SizedBox(height: 24),
-
-              // Recent / Status
-              const SectionHeader(title: 'YOUR PROGRESS'),
-              const SizedBox(height: 12),
-              _buildProgressCards(context),
             ],
           ),
         ),
@@ -153,6 +147,27 @@ class DashboardScreen extends ConsumerWidget {
           label: 'My Profile',
           value: 'View and edit your profile',
           onTap: () => context.push('/onboarding'),
+        ),
+        const SizedBox(height: 8),
+        _ProgressTile(
+          icon: Icons.assignment_rounded,
+          label: 'Applications',
+          value: 'Track your progress',
+          onTap: () => context.push('/applications'),
+        ),
+        const SizedBox(height: 8),
+        _ProgressTile(
+          icon: Icons.school_rounded,
+          label: 'Universities',
+          value: '26 available',
+          onTap: () => context.push('/universities'),
+        ),
+        const SizedBox(height: 8),
+        _ProgressTile(
+          icon: Icons.account_balance_rounded,
+          label: 'Funding',
+          value: 'Bursaries & scholarships',
+          onTap: () => context.push('/funding'),
         ),
         const SizedBox(height: 8),
         _ProgressTile(
@@ -201,32 +216,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProgressCards(BuildContext context) {
-    return Column(
-      children: [
-        _ProgressTile(
-          icon: Icons.school_rounded,
-          label: 'Universities',
-          value: '26 available',
-          onTap: () => context.push('/universities'),
-        ),
-        const SizedBox(height: 8),
-        _ProgressTile(
-          icon: Icons.assignment_rounded,
-          label: 'Applications',
-          value: 'Track your progress',
-          onTap: () => context.push('/applications'),
-        ),
-        const SizedBox(height: 8),
-        _ProgressTile(
-          icon: Icons.account_balance_rounded,
-          label: 'Funding',
-          value: 'Bursaries & scholarships',
-          onTap: () => context.push('/funding'),
-        ),
-      ],
-    );
-  }
 }
 
 class _PrivacyConsentBanner extends StatefulWidget {

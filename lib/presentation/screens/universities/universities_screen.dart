@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
-import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
-import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
@@ -121,25 +116,40 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         hintStyle: const TextStyle(color: AppColors.textMuted),
                         prefixIcon: const Icon(
                           Icons.search_rounded,
-                          color: AppColors.textMuted,
+                          color: AppColors.primaryLight,
                           size: 22,
                         ),
                         suffixIcon: IconButton(
                           icon: const Icon(
                             Icons.tune_rounded,
-                            color: AppColors.textMuted,
+                            color: AppColors.primaryLight,
                             size: 20,
                           ),
                           onPressed: () {},
                         ),
                         filled: true,
-                        fillColor: AppColors.card,
+                        fillColor: AppColors.surface,
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 12,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(
+                            color: AppColors.border,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: AppColors.border.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -153,30 +163,37 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                       itemBuilder: (_, i) {
                         final p = _provinces[i];
                         final selected = p == _selectedProvince;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(
-                              p,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: selected
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(
+                                p,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: selected
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                ),
                               ),
+                              selected: selected,
+                              selectedColor: AppColors.primary,
+                              backgroundColor: AppColors.surface,
+                              checkmarkColor: Colors.white,
+                              side: BorderSide(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.border.withValues(alpha: 0.5),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              onSelected: (_) =>
+                                  setState(() => _selectedProvince = p),
                             ),
-                            selected: selected,
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.surfaceLight,
-                            checkmarkColor: Colors.white,
-                            side: BorderSide.none,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            onSelected: (_) =>
-                                setState(() => _selectedProvince = p),
-                          ),
-                        );
+                          );
                       },
                     ),
                   ),
@@ -222,7 +239,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   }
 }
 
-class _UniversityCard extends StatelessWidget {
+class _UniversityCard extends StatefulWidget {
   final University university;
   final Color logoColor;
   final VoidCallback onTap;
@@ -234,17 +251,78 @@ class _UniversityCard extends StatelessWidget {
   });
 
   @override
+  State<_UniversityCard> createState() => _UniversityCardState();
+}
+
+class _UniversityCardState extends State<_UniversityCard>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+  late final AnimationController _spinCtrl;
+  late final Animation<double> _pulse;
+  late final Animation<double> _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _pulse = Tween<double>(begin: 0.6, end: 1.4).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+    _spin = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _spinCtrl, curve: Curves.easeOutCubic),
+    );
+    _pulseCtrl.addListener(() => setState(() {}));
+    _spinCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    _spinCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleApplyNow(BuildContext context, University uni) async {
+    if (uni.applicationUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No online portal available'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_spinCtrl.isCompleted || _spinCtrl.status == AnimationStatus.dismissed) {
+      await _spinCtrl.forward(from: 0.0);
+    }
+    if (!context.mounted) return;
+    final url = Uri.encodeComponent(uni.applicationUrl);
+    final name = Uri.encodeComponent(uni.shortName);
+    context.push('/universities/${uni.id}/webview?url=$url&name=$name');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final uni = university;
+    final uni = widget.university;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: AppColors.card,
+        color: AppColors.surface,
+        elevation: 2,
+        shadowColor: AppColors.primary.withValues(alpha: 0.15),
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -254,13 +332,12 @@ class _UniversityCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // University logo/image
                     Container(
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: logoColor.withValues(alpha: 0.1),
+                        color: widget.logoColor.withValues(alpha: 0.2),
                         image: uni.logoUrl.isNotEmpty
                             ? DecorationImage(
                                 image: NetworkImage(uni.logoUrl),
@@ -271,7 +348,7 @@ class _UniversityCard extends StatelessWidget {
                       child: uni.logoUrl.isEmpty
                           ? Icon(
                               Icons.account_balance_outlined,
-                              color: logoColor,
+                              color: widget.logoColor,
                               size: 28,
                             )
                           : null,
@@ -285,19 +362,30 @@ class _UniversityCard extends StatelessWidget {
                             uni.name,
                             style: const TextStyle(
                               color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            uni.shortName,
-                            style: const TextStyle(
-                              color: AppColors.primaryLight,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              uni.shortName,
+                              style: const TextStyle(
+                                color: AppColors.primaryLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
                         ],
@@ -305,13 +393,13 @@ class _UniversityCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Icon(
                       Icons.location_on_outlined,
-                      size: 14,
-                      color: AppColors.textSecondary,
+                      size: 15,
+                      color: AppColors.primaryLight,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -319,125 +407,140 @@ class _UniversityCard extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // ✨ Apply (in-app) + ↗ (external portal)
+                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _buildTab(
-                        label: '✨ Apply',
-                        icon: Icons.auto_awesome_rounded,
-                        color: AppColors.primary,
-                        onTap: () => _handleApply(context, uni),
-                      ),
+                    _buildChip(
+                      uni.hasApplicationFee
+                          ? 'Fee: R${uni.applicationFee?.toStringAsFixed(0) ?? ''}'
+                          : 'Free',
+                      uni.hasApplicationFee
+                          ? Colors.orange.shade400
+                          : Colors.green.shade400,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildTab(
-                        label: '',
-                        icon: Icons.open_in_new_rounded,
-                        color: AppColors.textSecondary,
-                        onTap: () => _handlePortal(context, uni),
-                      ),
+                    _buildChip(
+                      uni.requiresNbt ? 'NBT Required' : 'No NBT',
+                      uni.requiresNbt
+                          ? Colors.red.shade400
+                          : Colors.grey.shade400,
                     ),
                   ],
                 ),
-              ],
-            ),
+                const SizedBox(height: 12),
+                // Apply [Star] Now – star pulsates, button spins & shrinks on tap
+                Opacity(
+                  opacity: 1.0 - _spin.value,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..rotateZ(_spin.value * 4 * 6.2832),
+                    child: Transform.scale(
+                      scale: 1.0 - _spin.value,
+                      child: InkWell(
+                      onTap: () => _handleApplyNow(context, uni),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.withValues(alpha: 0.2),
+                              AppColors.primary.withValues(alpha: 0.08),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Apply',
+                              style: TextStyle(
+                                color: AppColors.primaryLight,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Transform.scale(
+                              scale: _pulse.value,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.4),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                child: Image.asset(
+                                  'assets/images/star_avatar.png',
+                                  width: 22,
+                                  height: 22,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Now',
+                              style: TextStyle(
+                                color: AppColors.primaryLight,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
-  Widget _buildTab({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+  Widget _buildChip(String label, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: bgColor.withValues(alpha: 0.3),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: bgColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
-  }
-
-  void _handleApply(BuildContext context, University uni) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ApplicationFormScreen(university: uni)),
-    );
-  }
-
-  void _handlePortal(BuildContext context, University uni) {
-    if (uni.applicationUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No online portal available'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final url = Uri.encodeComponent(uni.applicationUrl);
-    final name = Uri.encodeComponent(uni.shortName);
-    context.push('/universities/${uni.id}/webview?url=$url&name=$name');
-  }
-
-  bool _copyProfileToClipboard(BuildContext context) {
-    final profile = ProviderScope.containerOf(context).read(profileProvider).valueOrNull;
-    if (profile != null) {
-      final data = StringBuffer();
-      data.writeln('StudentSyncSA Profile Data');
-      data.writeln('──────────────────────────');
-      data.writeln('Name: ${profile.personal.firstName} ${profile.personal.lastName}');
-      data.writeln('ID: ${profile.personal.idNumber}');
-      data.writeln('Email: ${profile.contact.email}');
-      data.writeln('Phone: ${profile.contact.phone}');
-      data.writeln('Address: ${profile.address.address}');
-      final dob = profile.personal.dateOfBirth;
-      data.writeln('DOB: ${dob?.toIso8601String().split('T')[0] ?? ''}');
-      data.writeln('Nationality: ${profile.demographic.nationality}');
-      data.writeln('Matric Year: ${profile.results.matricYear}');
-      Clipboard.setData(ClipboardData(text: data.toString()));
-      return true;
-    }
-    return false;
-  }
-
-  void _openPortalInChrome(String url) async {
-    final uri = Uri.parse(url);
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
   }
 }
