@@ -36,6 +36,7 @@ class _ProfileOnboardingScreenState
   // Page 2 - Biographical
   String _isSACitizen = '';
   final _citizenshipCodeCtrl = TextEditingController();
+  final _idNumberCtrl = TextEditingController();
   String _gender = '';
   DateTime? _selectedDob;
   String _title = '';
@@ -123,7 +124,7 @@ class _ProfileOnboardingScreenState
 
   bool _saving = false;
 
-  final _formKeys = List.generate(5, (_) => GlobalKey<FormState>());
+  final _formKeys = List.generate(3, (_) => GlobalKey<FormState>());
   static const _greetingText =
       "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
@@ -2206,6 +2207,7 @@ class _ProfileOnboardingScreenState
         ? p.demographic.nationality.trim()
         : '';
     _citizenshipCodeCtrl.text = p.demographic.citizenshipCode;
+    _idNumberCtrl.text = p.personal.idNumber;
     _gender = p.personal.gender.trim();
     _selectedDob = p.personal.dateOfBirth;
     _title = p.personal.title.trim();
@@ -2304,7 +2306,6 @@ class _ProfileOnboardingScreenState
     setState(() => _showGreeting = false);
   }
 
-  @override
   static Future<String?> _showSearchablePicker(
     BuildContext context, {
     required String title,
@@ -2419,6 +2420,7 @@ class _ProfileOnboardingScreenState
     _firstNamesCtrl.dispose();
     _maidenNameCtrl.dispose();
     _citizenshipCodeCtrl.dispose();
+    _idNumberCtrl.dispose();
     _heardAboutUsCtrl.dispose();
     _homeLanguageCtrl.dispose();
     _streetAddr1Ctrl.dispose();
@@ -2467,8 +2469,19 @@ class _ProfileOnboardingScreenState
   }
 
   Future<void> _saveAndContinue() async {
-    if (!_validateCurrentPage()) return;
-    if (_currentPage < 4) {
+    if (!_validateCurrentPage()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all required fields'),
+            duration: Duration(seconds: 2),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+    if (_currentPage < 2) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -2495,6 +2508,7 @@ class _ProfileOnboardingScreenState
           maidenName: _maidenNameCtrl.text.trim(),
           gender: _gender,
           dateOfBirth: _selectedDob,
+          idNumber: _idNumberCtrl.text.trim(),
         ),
         contact: ContactInfo(
           email: _emailCtrl.text.trim(),
@@ -2573,11 +2587,13 @@ class _ProfileOnboardingScreenState
       );
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
-      setState(() => _saving = false);
-      if (mounted) context.go('/dashboard');
-    } catch (e) {
-      setState(() => _saving = false);
       if (mounted) {
+        setState(() => _saving = false);
+        context.go('/dashboard');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save profile: $e'),
@@ -2695,7 +2711,7 @@ class _ProfileOnboardingScreenState
               children: [
                 _buildProgressBar(),
                 Text(
-                  'Step ${_currentPage + 1} of 5',
+                  'Step ${_currentPage + 1} of 3',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -2708,9 +2724,7 @@ class _ProfileOnboardingScreenState
                     physics: const NeverScrollableScrollPhysics(),
                     onPageChanged: (i) => setState(() => _currentPage = i),
                     children: [
-                      _buildPage1NextOfKin(),
-                      _buildPage2Biographical(),
-                      _buildPage3AddressContact(),
+                      _buildPage1BiographicalCombined(),
                       _buildPage4Results(),
                       _buildPage5Qualifications(),
                     ],
@@ -2795,302 +2809,11 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Widget _buildPage1NextOfKin() {
+  Widget _buildPage1BiographicalCombined() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
         key: _formKeys[0],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'Next of Kin Details'),
-            const SizedBox(height: 16),
-            const Text(
-              'Please enter the information of your Next of Kin. This can be a parent or a guardian.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Next of Kin Personal and Contact Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nextOfKinNameCtrl,
-              decoration: const InputDecoration(
-                labelText: "Next of kin's name(s) *",
-                prefixIcon: Icon(Icons.person_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinMobileCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Next of kin's mobile/cellular phone number *",
-                prefixIcon: Icon(Icons.phone_android_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinHomePhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Next of kin's home phone number *",
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinWorkPhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Next of kin's work phone number",
-                prefixIcon: Icon(Icons.business_outlined),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Next of Kin Address Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _nextOfKinAddr1Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinAddr4Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinPostalCodeCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              readOnly: true,
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-              onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Postal Code',
-                  options: _postalCodes,
-                  initialValue: _nextOfKinPostalCodeCtrl.text,
-                  displayTransformer: (p) => p,
-                );
-                if (result != null) {
-                  setState(
-                    () => _nextOfKinPostalCodeCtrl.text = result
-                        .split(' - ')
-                        .first
-                        .trim(),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nextOfKinEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email address *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (!v!.contains('@')) return 'Enter a valid email';
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 32),
-
-            const _SectionHeader(title: 'Account Contact Details'),
-            const SizedBox(height: 16),
-            const Text(
-              'Please enter the information of the person responsible for any payments made to this institution. This can be yourself or any other party.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Account Contact Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _accountContactNameCtrl,
-              decoration: const InputDecoration(
-                labelText: "Account Contact's name(s) *",
-                prefixIcon: Icon(Icons.person_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactMobileCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Account Contact's mobile/cellular phone number *",
-                prefixIcon: Icon(Icons.phone_android_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactHomePhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Account Contact's home phone number *",
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Account Contact Address Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _accountContactAddr1Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactAddr4Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactPostalCodeCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              readOnly: true,
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-              onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Postal Code',
-                  options: _postalCodes,
-                  initialValue: _accountContactPostalCodeCtrl.text,
-                  displayTransformer: (p) => p,
-                );
-                if (result != null) {
-                  setState(
-                    () => _accountContactPostalCodeCtrl.text = result
-                        .split(' - ')
-                        .first
-                        .trim(),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _accountContactEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email address *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (!v!.contains('@')) return 'Enter a valid email';
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPage2Biographical() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[1],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3103,11 +2826,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 20),
             const Text(
               'Nationality',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -3118,30 +2837,17 @@ class _ProfileOnboardingScreenState
             DropdownButtonFormField<String>(
               initialValue: _isSACitizen.isEmpty ? null : _isSACitizen,
               decoration: const InputDecoration(
-                labelText: 'Are you a SA Citizen? *',
+                labelText: 'Are you a SA Citizen in possession of a valid SA ID/Birth Certificate? *',
                 prefixIcon: Icon(Icons.flag_outlined),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
-                  value: 'SA Citizen',
-                  child: Text('SA Citizen'),
-                ),
-                DropdownMenuItem(
-                  value: 'Permanent Resident',
-                  child: Text('Permanent Resident'),
-                ),
-                DropdownMenuItem(
-                  value: 'Foreign National',
-                  child: Text('Foreign National'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(value: 'SA Citizen', child: Text('SA Citizen')),
+                DropdownMenuItem(value: 'Permanent Resident', child: Text('Permanent Resident')),
+                DropdownMenuItem(value: 'Foreign National', child: Text('Foreign National')),
               ],
               onChanged: (v) => setState(() => _isSACitizen = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -3149,97 +2855,57 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Citizenship Code *',
                 prefixIcon: Icon(Icons.badge_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
+                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
                 const codes = [
-                  'SA - South African',
-                  'NA - Namibian',
-                  'ZW - Zimbabwean',
-                  'MZ - Mozambican',
-                  'NG - Nigerian',
-                  'KE - Kenyan',
-                  'GH - Ghanaian',
-                  'ET - Ethiopian',
-                  'AO - Angolan',
-                  'ZM - Zambian',
-                  'MW - Malawian',
-                  'BW - Botswanan',
-                  'LS - Basotho',
-                  'SZ - Swazi',
-                  'ZA - Other SADC',
-                  'OT - Other',
+                  'SA - South African', 'NA - Namibian', 'ZW - Zimbabwean', 'MZ - Mozambican',
+                  'NG - Nigerian', 'KE - Kenyan', 'GH - Ghanaian', 'ET - Ethiopian',
+                  'AO - Angolan', 'ZM - Zambian', 'MW - Malawian', 'BW - Botswanan',
+                  'LS - Basotho', 'SZ - Swazi', 'ZA - Other SADC', 'OT - Other',
                 ];
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Citizenship Code',
-                  options: codes,
-                  initialValue: _citizenshipCodeCtrl.text,
-                );
-                if (result != null) {
-                  setState(() => _citizenshipCodeCtrl.text = result);
-                }
+                final result = await _showSearchablePicker(context, title: 'Citizenship Code', options: codes, initialValue: _citizenshipCodeCtrl.text);
+                if (result != null) setState(() => _citizenshipCodeCtrl.text = result);
               },
             ),
-
-            const SizedBox(height: 24),
-            const Text(
-              'Personal Information',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _idNumberCtrl,
+              keyboardType: TextInputType.text,
+              decoration: const InputDecoration(
+                labelText: 'ID / Passport Number *',
+                prefixIcon: Icon(Icons.perm_identity_outlined),
               ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
+            const SizedBox(height: 24),
+            const Text('Personal Information', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            const Text(
-              'Please enter your personal information.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-            ),
+            const Text('Please enter your personal information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _gender.isEmpty ? null : _gender,
-              decoration: const InputDecoration(
-                labelText: 'Gender *',
-                prefixIcon: Icon(Icons.wc_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Gender *', prefixIcon: Icon(Icons.wc_outlined)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(
-                  value: 'Prefer not to say',
-                  child: Text('Prefer not to say'),
-                ),
+                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDob ?? DateTime(2006),
-                  firstDate: DateTime(1950),
-                  lastDate: DateTime.now(),
+                  context: context, initialDate: _selectedDob ?? DateTime(2006),
+                  firstDate: DateTime(1950), lastDate: DateTime.now(),
                   builder: (ctx, child) => Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: const ColorScheme.dark(
-                        primary: AppColors.primary,
-                        surface: AppColors.surface,
-                      ),
-                    ),
+                    data: Theme.of(context).copyWith(colorScheme: const ColorScheme.dark(primary: AppColors.primary, surface: AppColors.surface)),
                     child: child!,
                   ),
                 );
@@ -3247,19 +2913,14 @@ class _ProfileOnboardingScreenState
               },
               child: InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Date of birth *',
+                  labelText: 'Date of birth (DD-MON-YYYY) *',
                   prefixIcon: const Icon(Icons.calendar_today_outlined),
                   suffixIcon: _selectedDob != null
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () => setState(() => _selectedDob = null),
-                        )
+                      ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() => _selectedDob = null))
                       : null,
                 ),
                 child: Text(
-                  _selectedDob != null
-                      ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}'
-                      : '',
+                  _selectedDob != null ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}' : '',
                   style: const TextStyle(color: AppColors.textPrimary),
                 ),
               ),
@@ -3267,15 +2928,9 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _title.isEmpty ? null : _title,
-              decoration: const InputDecoration(
-                labelText: 'Title *',
-                prefixIcon: Icon(Icons.badge_outlined, size: 20),
-              ),
+              decoration: const InputDecoration(labelText: 'Title *', prefixIcon: Icon(Icons.badge_outlined, size: 20)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Mr', child: Text('Mr')),
                 DropdownMenuItem(value: 'Ms', child: Text('Ms')),
                 DropdownMenuItem(value: 'Mx', child: Text('Mx')),
@@ -3283,565 +2938,232 @@ class _ProfileOnboardingScreenState
                 DropdownMenuItem(value: 'Prof', child: Text('Prof')),
               ],
               onChanged: (v) => setState(() => _title = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _initialsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Initials *',
-                prefixIcon: Icon(Icons.short_text, size: 20),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _initialsCtrl, decoration: const InputDecoration(labelText: 'Initials *', prefixIcon: Icon(Icons.short_text, size: 20)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _surnameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Surname *',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _surnameCtrl, decoration: const InputDecoration(labelText: 'Surname *', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _firstNamesCtrl,
-              decoration: const InputDecoration(
-                labelText: 'First names *',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _firstNamesCtrl, decoration: const InputDecoration(labelText: 'First names *', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _maidenNameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Maiden name',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-            ),
+            TextFormField(controller: _maidenNameCtrl, decoration: const InputDecoration(labelText: 'Maiden name', prefixIcon: Icon(Icons.person_outline))),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
-              decoration: const InputDecoration(
-                labelText: 'Marital status *',
-                prefixIcon: Icon(Icons.favorite_outline),
-              ),
+              decoration: const InputDecoration(labelText: 'Marital status *', prefixIcon: Icon(Icons.favorite_outline)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Single', child: Text('Single')),
                 DropdownMenuItem(value: 'Married', child: Text('Married')),
                 DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
                 DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
               ],
               onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
-              controller: _homeLanguageCtrl,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Home language *',
-                prefixIcon: Icon(Icons.language_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
+              controller: _homeLanguageCtrl, readOnly: true,
+              decoration: const InputDecoration(labelText: 'Home language *', prefixIcon: Icon(Icons.language_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Language',
-                  options: _languages,
-                  initialValue: _homeLanguageCtrl.text,
-                );
-                if (result != null) {
-                  setState(() => _homeLanguageCtrl.text = result);
-                }
+                final result = await _showSearchablePicker(context, title: 'Language', options: _languages, initialValue: _homeLanguageCtrl.text);
+                if (result != null) setState(() => _homeLanguageCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _ethnicGroup.isEmpty ? null : _ethnicGroup,
-              decoration: const InputDecoration(
-                labelText: 'Ethnic group *',
-                prefixIcon: Icon(Icons.people_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Ethnic group *', prefixIcon: Icon(Icons.people_outlined)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'African', child: Text('African')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
-                DropdownMenuItem(
-                  value: 'Indian/Asian',
-                  child: Text('Indian/Asian'),
-                ),
+                DropdownMenuItem(value: 'Indian/Asian', child: Text('Indian/Asian')),
                 DropdownMenuItem(value: 'White', child: Text('White')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(
-                  value: 'Prefer not to say',
-                  child: Text('Prefer not to say'),
-                ),
+                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
               ],
               onChanged: (v) => setState(() => _ethnicGroup = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _isEmployed.isEmpty ? null : _isEmployed,
-              decoration: const InputDecoration(
-                labelText: 'Are you Employed?',
-                prefixIcon: Icon(Icons.work_outline),
-              ),
+              decoration: const InputDecoration(labelText: 'Are you Employed?', prefixIcon: Icon(Icons.work_outline)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
-                  value: 'Unemployed',
-                  child: Text('Unemployed'),
-                ),
-                DropdownMenuItem(
-                  value: 'Employed (part-time)',
-                  child: Text('Employed (part-time)'),
-                ),
-                DropdownMenuItem(
-                  value: 'Employed (full-time)',
-                  child: Text('Employed (full-time)'),
-                ),
-                DropdownMenuItem(
-                  value: 'Self-employed',
-                  child: Text('Self-employed'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(value: 'Unemployed', child: Text('Unemployed')),
+                DropdownMenuItem(value: 'Employed (part-time)', child: Text('Employed (part-time)')),
+                DropdownMenuItem(value: 'Employed (full-time)', child: Text('Employed (full-time)')),
+                DropdownMenuItem(value: 'Self-employed', child: Text('Self-employed')),
               ],
               onChanged: (v) => setState(() => _isEmployed = v ?? ''),
             ),
             const SizedBox(height: 14),
             TextFormField(
-              controller: _heardAboutUsCtrl,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Where did you hear about us?',
-                prefixIcon: Icon(Icons.info_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
+              controller: _heardAboutUsCtrl, readOnly: true,
+              decoration: const InputDecoration(labelText: 'Where did you hear about us?', prefixIcon: Icon(Icons.info_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
               onTap: () async {
-                const sources = [
-                  '--- Please select ---',
-                  'Radio',
-                  'Television',
-                  'Newspaper',
-                  'Internet',
-                  'Friend/Family',
-                  'School/Teacher',
-                  'Career Fair',
-                  'Social Media',
-                  'Other',
-                ];
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Source',
-                  options: sources,
-                  initialValue: _heardAboutUsCtrl.text,
-                );
-                if (result != null) {
-                  setState(() => _heardAboutUsCtrl.text = result);
-                }
+                const sources = ['--- Please select ---', 'Radio', 'Television', 'Newspaper', 'Internet', 'Friend/Family', 'School/Teacher', 'Career Fair', 'Social Media', 'Other'];
+                final result = await _showSearchablePicker(context, title: 'Source', options: sources, initialValue: _heardAboutUsCtrl.text);
+                if (result != null) setState(() => _heardAboutUsCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
-              decoration: const InputDecoration(
-                labelText: 'Is a bursary required?',
-                prefixIcon: Icon(Icons.monetization_on_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Is a bursary required?', prefixIcon: Icon(Icons.monetization_on_outlined)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
                 DropdownMenuItem(value: 'Unsure', child: Text('Unsure')),
               ],
               onChanged: (v) => setState(() => _bursaryRequired = v ?? ''),
             ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPage3AddressContact() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Form(
-        key: _formKeys[2],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'Address & Contact Information'),
+            const SizedBox(height: 28),
+            Container(width: double.infinity, height: 1, color: AppColors.border),
             const SizedBox(height: 20),
-            const Text(
-              'Street Address',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            const Text('Address Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text('Please enter your address information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const SizedBox(height: 16),
+            const Text('Street Address', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _streetAddr1Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Street Address Line 1 *',
-                prefixIcon: Icon(Icons.home_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _streetAddr1Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 1 (e.g. Street Name) *', prefixIcon: Icon(Icons.home_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _streetAddr2Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Street Address Line 2 *',
-                prefixIcon: Icon(Icons.home_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _streetAddr2Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 2 (e.g. Suburb Name) *', prefixIcon: Icon(Icons.home_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _streetAddr3Ctrl,
-              decoration: const InputDecoration(
-                labelText: 'Street Address Line 3',
-                prefixIcon: Icon(Icons.home_outlined),
-              ),
-            ),
+            TextFormField(controller: _streetAddr3Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 3 (e.g. Town Name)', prefixIcon: Icon(Icons.home_outlined))),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _streetProvince.isEmpty ? null : _streetProvince,
-              decoration: const InputDecoration(
-                labelText: 'Street Address Line 4 (Province) *',
-                prefixIcon: Icon(Icons.map_outlined),
-              ),
-              items: AppConstants.provinces
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                  .toList(),
+              decoration: const InputDecoration(labelText: 'Street Address Line 4 (Province Name) *', prefixIcon: Icon(Icons.map_outlined)),
+              items: AppConstants.provinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
               onChanged: (v) => setState(() => _streetProvince = v ?? ''),
               validator: (v) => v == null ? 'Select your province' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _streetPostalCodeCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textMuted,
-                ),
-              ),
+              decoration: const InputDecoration(labelText: 'Postal Code *', prefixIcon: Icon(Icons.pin_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(
-                  context,
-                  title: 'Postal Code',
-                  options: _postalCodes,
-                  initialValue: _streetPostalCodeCtrl.text,
-                  displayTransformer: (p) => p,
-                );
-                if (result != null) {
-                  setState(
-                    () => _streetPostalCodeCtrl.text = result
-                        .split(' - ')
-                        .first
-                        .trim(),
-                  );
-                }
+                final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _streetPostalCodeCtrl.text, displayTransformer: (p) => p);
+                if (result != null) setState(() => _streetPostalCodeCtrl.text = result.split(' - ').first.trim());
               },
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _streetPostalCodeConfirmCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Confirm Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Confirm Postal Code *', prefixIcon: Icon(Icons.pin_outlined)),
               validator: (v) {
                 if (v?.trim().isEmpty == true) return 'Required';
-                if (v!.trim() != _streetPostalCodeCtrl.text.trim()) {
-                  return 'Postal codes do not match';
-                }
+                if (v!.trim() != _streetPostalCodeCtrl.text.trim()) return 'Postal codes do not match';
                 return null;
               },
             ),
             const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text(
-                'Tick if your Postal Address is different from your Street Address',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
+              title: const Text('Tick if your Postal Address is different from your Street Address', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               value: _postalDifferent,
               onChanged: (v) => setState(() => _postalDifferent = v ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              dense: true,
+              controlAffinity: ListTileControlAffinity.leading, dense: true,
             ),
             if (_postalDifferent) ...[
               const SizedBox(height: 12),
-              const Text(
-                'Postal Address',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              const Text('Postal Address', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _postalAddr1Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Postal Address Line 1 *',
-                  prefixIcon: Icon(Icons.mail_outlined),
-                ),
-                validator: (v) =>
-                    _postalDifferent && v?.trim().isEmpty == true
-                        ? 'Required'
-                        : null,
-              ),
+              TextFormField(controller: _postalAddr1Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 1 *', prefixIcon: Icon(Icons.mail_outlined)), validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null),
               const SizedBox(height: 14),
-              TextFormField(
-                controller: _postalAddr2Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Postal Address Line 2 *',
-                  prefixIcon: Icon(Icons.mail_outlined),
-                ),
-                validator: (v) =>
-                    _postalDifferent && v?.trim().isEmpty == true
-                        ? 'Required'
-                        : null,
-              ),
+              TextFormField(controller: _postalAddr2Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 2 *', prefixIcon: Icon(Icons.mail_outlined)), validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null),
               const SizedBox(height: 14),
-              TextFormField(
-                controller: _postalAddr3Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Postal Address Line 3',
-                  prefixIcon: Icon(Icons.mail_outlined),
-                ),
-              ),
+              TextFormField(controller: _postalAddr3Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 3', prefixIcon: Icon(Icons.mail_outlined))),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 initialValue: _postalProvince.isEmpty ? null : _postalProvince,
-                decoration: const InputDecoration(
-                  labelText: 'Postal Address Line 4 (Province) *',
-                  prefixIcon: Icon(Icons.map_outlined),
-                ),
-                items: AppConstants.provinces
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                    .toList(),
+                decoration: const InputDecoration(labelText: 'Postal Address Line 4 (Province) *', prefixIcon: Icon(Icons.map_outlined)),
+                items: AppConstants.provinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
                 onChanged: (v) => setState(() => _postalProvince = v ?? ''),
-                validator: (v) =>
-                    _postalDifferent && v == null
-                        ? 'Select province'
-                        : null,
+                validator: (v) => _postalDifferent && v == null ? 'Select province' : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _postalPostalCodeCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Postal Code *',
-                  prefixIcon: Icon(Icons.pin_outlined),
-                  suffixIcon: Icon(
-                    Icons.arrow_drop_down,
-                    color: AppColors.textMuted,
-                  ),
-                ),
+                decoration: const InputDecoration(labelText: 'Postal Code *', prefixIcon: Icon(Icons.pin_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
                 readOnly: true,
-                validator: (v) =>
-                    _postalDifferent && v?.trim().isEmpty == true
-                        ? 'Required'
-                        : null,
+                validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null,
                 onTap: () async {
-                  final result = await _showSearchablePicker(
-                    context,
-                    title: 'Postal Code',
-                    options: _postalCodes,
-                    initialValue: _postalPostalCodeCtrl.text,
-                    displayTransformer: (p) => p,
-                  );
-                  if (result != null) {
-                    setState(
-                      () => _postalPostalCodeCtrl.text = result
-                          .split(' - ')
-                          .first
-                          .trim(),
-                    );
-                  }
+                  final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _postalPostalCodeCtrl.text, displayTransformer: (p) => p);
+                  if (result != null) setState(() => _postalPostalCodeCtrl.text = result.split(' - ').first.trim());
                 },
               ),
             ],
-
             const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
+            Container(width: double.infinity, height: 1, color: AppColors.border),
             const SizedBox(height: 20),
-            const Text(
-              'Contact Information',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Contact Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text(
-              'Please enter your contact information.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
+            const Text('Please enter your contact information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
               initialValue: _hasSACellphone.isEmpty ? null : _hasSACellphone,
-              decoration: const InputDecoration(
-                labelText: 'Do you have a South African Cell Phone Number? *',
-                prefixIcon: Icon(Icons.phone_android_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Do you have a South African Cell Phone Number? *', prefixIcon: Icon(Icons.phone_android_outlined)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _hasSACellphone = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _workPhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Work Telephone Number',
-                prefixIcon: Icon(Icons.phone_forwarded_outlined),
-              ),
-            ),
+            TextFormField(controller: _workPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Work Telephone Number', prefixIcon: Icon(Icons.phone_forwarded_outlined))),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _homePhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Home Telephone Number',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-            ),
+            TextFormField(controller: _homePhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Home Telephone Number', prefixIcon: Icon(Icons.phone_outlined))),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
-            ),
+            TextFormField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email *', prefixIcon: Icon(Icons.email_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _verifyEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Verify email *',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (v!.trim() != _emailCtrl.text.trim()) {
-                  return 'Emails do not match';
-                }
-                return null;
-              },
-            ),
-
+            TextFormField(controller: _verifyEmailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Verify email *', prefixIcon: Icon(Icons.email_outlined)), validator: (v) {
+              if (v?.trim().isEmpty == true) return 'Required';
+              if (v!.trim() != _emailCtrl.text.trim()) return 'Emails do not match';
+              return null;
+            }),
             const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
+            Container(width: double.infinity, height: 1, color: AppColors.border),
             const SizedBox(height: 20),
-            const Text(
-              'Residence Information',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Residence Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text('Please select whether you want to apply for residence.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _wantsResidence.isEmpty ? null : _wantsResidence,
-              decoration: const InputDecoration(
-                labelText: 'Do you want to apply for residence? *',
-                prefixIcon: Icon(Icons.bed_outlined),
-              ),
+              decoration: const InputDecoration(labelText: 'Do you want to apply for residence? *', prefixIcon: Icon(Icons.bed_outlined)),
               items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
+                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _wantsResidence = v ?? ''),
-              validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
-
             const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              height: 1,
-              color: AppColors.border,
-            ),
+            Container(width: double.infinity, height: 1, color: AppColors.border),
             const SizedBox(height: 20),
-            const Text(
-              'Disability Information',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Disability Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text('Please indicate whether you have any disabilities.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text(
-                'Do you have a disability or impairment?',
-                style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
-              ),
+              title: const Text('Do you have a disability or impairment?', style: TextStyle(fontSize: 14, color: AppColors.textPrimary)),
               value: _hasDisability,
               onChanged: (v) => setState(() => _hasDisability = v ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              dense: true,
+              controlAffinity: ListTileControlAffinity.leading, dense: true,
             ),
             const SizedBox(height: 32),
           ],
@@ -3854,7 +3176,7 @@ class _ProfileOnboardingScreenState
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
-        key: _formKeys[3],
+        key: _formKeys[1],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -4179,7 +3501,7 @@ class _ProfileOnboardingScreenState
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
-        key: _formKeys[4],
+        key: _formKeys[2],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -4466,6 +3788,7 @@ class _ProfileOnboardingScreenState
           maidenName: _maidenNameCtrl.text.trim(),
           gender: _gender,
           dateOfBirth: _selectedDob,
+          idNumber: _idNumberCtrl.text.trim(),
         ),
         contact: ContactInfo(
           email: _emailCtrl.text.trim(),
@@ -4563,7 +3886,9 @@ class _ProfileOnboardingScreenState
         );
       }
     }
-    setState(() => _saving = false);
+    if (mounted) {
+      setState(() => _saving = false);
+    }
   }
 
   Widget _buildBottomButtons() {
@@ -4613,7 +3938,7 @@ class _ProfileOnboardingScreenState
                         color: Colors.white,
                       ),
                     )
-                  : Text(_currentPage < 4 ? 'Next' : 'Finish'),
+                  : Text(_currentPage < 2 ? 'Next' : 'Finish'),
             ),
           ),
         ],
