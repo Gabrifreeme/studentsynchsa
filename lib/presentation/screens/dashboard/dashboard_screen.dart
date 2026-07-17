@@ -21,9 +21,8 @@ class DashboardScreen extends ConsumerWidget {
         ? profile!.personal.firstName
         : 'Student';
 
-    return GradientBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+    return Scaffold(
+        backgroundColor: AppColors.surface,
         appBar: AppBar(
           title: Row(
             mainAxisSize: MainAxisSize.min,
@@ -108,7 +107,6 @@ class DashboardScreen extends ConsumerWidget {
             ],
           ),
         ),
-      ),
     );
   }
 

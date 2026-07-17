@@ -267,6 +267,8 @@ class _DashboardShellState extends State<DashboardShell>
         ],
       ),
       bottomNavigationBar: BottomAppBar(
+        color: AppColors.surface,
+        elevation: 0,
         child: Row(
           children: [
             IconButton(

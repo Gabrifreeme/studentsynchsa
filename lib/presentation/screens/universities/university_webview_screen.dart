@@ -1,10 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/autofill_script.dart' as star;
 
-class UniversityWebViewScreen extends StatefulWidget {
+class UniversityWebViewScreen extends ConsumerStatefulWidget {
   final String url;
   final String universityName;
 
@@ -15,17 +19,20 @@ class UniversityWebViewScreen extends StatefulWidget {
   });
 
   @override
-  State<UniversityWebViewScreen> createState() => _UniversityWebViewScreenState();
+  ConsumerState<UniversityWebViewScreen> createState() => _UniversityWebViewScreenState();
 }
 
-class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
+class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScreen> {
   late final WebViewController _controller;
   bool _loading = true;
   String _currentUrl = '';
+  String? _profileJson;
 
   @override
   void initState() {
     super.initState();
+
+    _loadProfile();
 
     WebViewCookieManager().clearCookies();
 
@@ -34,7 +41,37 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
       ..enableZoom(true)
       ..setUserAgent(
         'Mozilla/5.0 (Linux; Android 15; HONOR ABR-NX1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
-      );
+      )
+      ..addJavaScriptChannel('AutofillResult', onMessageReceived: (msg) {
+        try {
+          final data = jsonDecode(msg.message);
+          if (data['diag'] != null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('DIAG: ${data['diag']}'),
+                  duration: const Duration(seconds: 12),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            }
+            return;
+          }
+          final filled = data['filled'] as int;
+          final total = data['total'] as int;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '$filled of $total fields filled. Complete the reCAPTCHA, then tap "Open in Chrome" to submit.',
+                ),
+                duration: const Duration(seconds: 5),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } catch (_) {}
+      });
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setTextZoom(150);
@@ -78,55 +115,113 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     }
   }
 
+  void _loadProfile() {
+    final profile = ref.read(profileProvider).valueOrNull;
+    if (profile != null) {
+      _profileJson = jsonEncode(profile.toJson());
+    }
+  }
+
+  Future<void> _injectAutofill(BuildContext dialogContext) async {
+    if (_profileJson == null) {
+      _loadProfile();
+    }
+    if (_profileJson != null) {
+      Navigator.pop(dialogContext);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Attempting to autofill form...'), duration: Duration(seconds: 2)),
+        );
+      }
+      try {
+        await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson!));
+        debugPrint('✅ Autofill script injected');
+      } catch (e) {
+        debugPrint('❌ Autofill injection failed: $e');
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No profile found. Complete your profile first.')),
+        );
+      }
+    }
+  }
+
   ({String title, List<(String, String)> steps}) _guidanceForPage(String url) {
     final u = url.toLowerCase();
 
-    if (u.contains('gw1view') || u.contains('oap')) {
+    if (u.contains('gw1view') || u.contains('oap') || u.contains('biographical') || u.contains('nok')) {
       return (
-        title: '📋 Applications Home',
+        title: '📋 Application Process',
         steps: [
-          ('1', 'Look for the red "APPLY" or "New Application" button'),
-          ('2', 'Click it to start a new application'),
-          ('3', 'Select the program you want to apply for'),
-          ('4', 'Read the instructions on the next page'),
+          ('1', 'Fill Next of Kin name, mobile, home & work phone'),
+          ('2', 'Enter Next of Kin postal address lines 1-4 and code'),
+          ('3', 'Enter Next of Kin email address'),
+          ('4', 'Fill Account Contact name, mobile & home phone'),
+          ('5', 'Enter Account Contact postal address lines 1-4 and code'),
+          ('6', 'Enter Account Contact email address'),
         ],
       );
     }
 
-    if (u.contains('id') || u.contains('persona') || u.contains('idnum')) {
+    if (u.contains('id') || u.contains('persona') || u.contains('idnum') || u.contains('nationality') || u.contains('biographical')) {
       return (
-        title: '🆔 ID & Personal Details',
+        title: '🆔 Biographical Details',
         steps: [
-          ('1', 'Enter your South African ID number (13 digits)'),
-          ('2', 'Enter your full name as on ID document'),
-          ('3', 'Select your date of birth'),
-          ('4', 'Select your gender'),
-          ('5', 'Double-check ID number before proceeding'),
+          ('1', 'Select SA Citizen status'),
+          ('2', 'Enter Citizenship Code'),
+          ('3', 'Select Gender, Date of Birth (DD-MON-YYYY), Title'),
+          ('4', 'Enter Initials, Surname, First Names'),
+          ('5', 'Maiden name (optional)'),
+          ('6', 'Select Marital Status, Home Language, Ethnic Group'),
+          ('7', 'Select Employed? and Bursary required?'),
+          ('8', 'Where did you hear about us?'),
+          ('9', 'Street Address Line 1-4, Postal Code'),
+          ('10', 'Tick if Postal Address differs from Street'),
+          ('11', 'SA Cell Phone Number?'),
+          ('12', 'Work Telephone, Home Telephone'),
+          ('13', 'Email and Verify email'),
+          ('14', 'Apply for residence?'),
+          ('15', 'Disability or impairment?'),
         ],
       );
     }
 
     if (u.contains('contact') || u.contains('addr') || u.contains('phone')) {
       return (
-        title: '📞 Contact Information',
+        title: '📞 Address & Contact',
         steps: [
-          ('1', 'Enter your cellphone number'),
-          ('2', 'Enter your email address'),
-          ('3', 'Enter your postal address'),
-          ('4', 'Enter your residential address'),
-          ('5', 'Add an alternative contact number'),
+          ('1', 'Enter Street Address lines 1-4 and Postal Code'),
+          ('2', 'Tick if Postal Address is different from Street'),
+          ('3', 'Enter Email and Verify email'),
+          ('4', 'Enter Home Telephone and Work Telephone'),
+          ('5', 'Select Residence and Disability preferences'),
         ],
       );
     }
 
-    if (u.contains('academic') || u.contains('subject') || u.contains('grade') || u.contains('qual')) {
+    if (u.contains('academic') || u.contains('subject') || u.contains('grade') || u.contains('qual') || u.contains('matric') || u.contains('result')) {
       return (
-        title: '📚 Academic History',
+        title: '📚 Results Details',
         steps: [
-          ('1', 'Select your matric year'),
-          ('2', 'Enter your subjects and symbols'),
-          ('3', 'Add any tertiary qualifications if applicable'),
-          ('4', 'Verify all marks are correct'),
+          ('1', 'Enter Matric/Grade 12 Year'),
+          ('2', 'Select Undergraduate or Postgraduate'),
+          ('3', 'Select Upgrading and Matric type (SA/International)'),
+          ('4', 'Enter Examination Number and School Leaving Certificate'),
+          ('5', 'Add Subject: select subject, grade, result, symbol'),
+          ('6', 'Click "Add Subject" for each additional subject'),
+        ],
+      );
+    }
+
+    if (u.contains('school') || u.contains('previous') || u.contains('institution') || u.contains('tertiary')) {
+      return (
+        title: '🏫 Previous Studies',
+        steps: [
+          ('1', 'Select which school you attended last'),
+          ('2', 'Select what you are currently doing'),
+          ('3', 'Select if you studied at another institution'),
         ],
       );
     }
@@ -158,16 +253,15 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     }
 
     return (
-      title: '⭐ Application Guide',
+      title: 'Application Guide',
       steps: [
-        ('1', 'Click "Apply Now" or the red APPLY button'),
-        ('2', 'Enter your South African ID number'),
-        ('3', 'Fill in your personal details'),
-        ('4', 'Enter your contact information'),
-        ('5', 'Provide your academic history'),
-        ('6', 'Upload required documents'),
-        ('7', 'Review all information carefully'),
-        ('8', 'Submit & SAVE your student number!'),
+        ('1', 'Fill Next of Kin & Account Contact details'),
+        ('2', 'Enter Biographical details and ID'),
+        ('3', 'Enter Address, Contact, Residence info'),
+        ('4', 'Fill Matric/Results and Subject details'),
+        ('5', 'Enter Previous School/Tertiary information'),
+        ('6', 'Review all information carefully'),
+        ('7', 'Submit & SAVE your student number!'),
       ],
     );
   }
@@ -180,7 +274,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Text('⭐', style: TextStyle(fontSize: 28)),
+            const StarAvatar(size: 28),
             const SizedBox(width: 8),
             Flexible(child: Text(guidance.title, style: const TextStyle(fontSize: 16))),
           ],
@@ -190,27 +284,37 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ...guidance.steps.map((s) => _GuideStep(s.$1, s.$2)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: const Row(
+            if (_profileJson != null) ...[
+              const SizedBox(height: 12),
+              const Text('🤖 Try and auto-fill this page?',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red, size: 16),
-                  SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      '⚠️ SAVE your student number after submission!',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    child: OutlinedButton(
+                      onPressed: () => _injectAutofill(ctx),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.green),
+                        foregroundColor: Colors.green,
+                      ),
+                      child: const Text('Yes'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: null,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.grey),
+                        foregroundColor: Colors.grey,
+                      ),
+                      child: const Text('No'),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ],
         ),
         actions: [
