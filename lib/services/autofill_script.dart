@@ -589,6 +589,21 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       }
     })();
 
+    // Postal code override: directly set oapStreetAddrPCodeRq to postal code value
+    (function() {
+      var v = vs.postalCode;
+      if (!v) return;
+      ['oapStreetAddrPCodeRq', 'oapStreetAddrPCodeRq_desc'].forEach(function(name) {
+        var el = document.querySelector('input[name="' + name + '"]');
+        if (!el) return;
+        try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e) {}
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      });
+    })();
+
     showToast(
       filled > 0
         ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
