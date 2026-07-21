@@ -84,9 +84,19 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             _currentUrl = url;
             setState(() => _loading = true);
           },
-          onPageFinished: (url) {
+          onPageFinished: (url) async {
             _currentUrl = url;
             setState(() => _loading = false);
+            if (_profileJson != null) {
+              try {
+                await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson!));
+                await Future.delayed(const Duration(milliseconds: 30));
+                await _controller.runJavaScript('window.requestFlutterAutofill();');
+                debugPrint('✅ Autofill injected on page load');
+              } catch (e) {
+                debugPrint('❌ Autofill injection error: $e');
+              }
+            }
           },
           onWebResourceError: (err) => debugPrint('❌ WebView: ${err.description}'),
           onSslAuthError: (error) => error.proceed(),
@@ -135,6 +145,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
       }
       try {
         await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson!));
+        await Future.delayed(const Duration(milliseconds: 30));
+        await _controller.runJavaScript('window.requestFlutterAutofill();');
         debugPrint('✅ Autofill script injected');
       } catch (e) {
         debugPrint('❌ Autofill injection failed: $e');
@@ -150,6 +162,17 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
   ({String title, List<(String, String)> steps}) _guidanceForPage(String url) {
     final u = url.toLowerCase();
+
+    if (widget.universityName.toUpperCase() == 'UNIVEN' || widget.universityName.toUpperCase() == 'VENDA') {
+      return (
+        title: 'Venda Application Guide',
+        steps: [
+          ('', 'This steps are very easy, if you are a new student then you do not have a student number, tap on "Please select" and pick NO, if you are returning to complete an application form pick YES but if you new then it is NO'),
+          ('', 'next if you have a Qualification Specific Token pick YES, but when you new, you don\'t have then it will be NO again.'),
+          ('', 'That\'s it just do your consent to Venda university by tapping yes and next, If you like to read the POPI Clause first follow this link: https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view'),
+        ],
+      );
+    }
 
     if (u.contains('gw1view') || u.contains('oap') || u.contains('biographical') || u.contains('nok')) {
       return (
@@ -286,8 +309,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             ...guidance.steps.map((s) => _GuideStep(s.$1, s.$2)),
             if (_profileJson != null) ...[
               const SizedBox(height: 12),
-              const Text('🤖 Try and auto-fill this page?',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              const Text('You like me to try and auto fill this page?',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -304,7 +327,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: null,
+                      onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.grey),
                         foregroundColor: Colors.grey,

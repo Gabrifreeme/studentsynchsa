@@ -124,6 +124,8 @@ class _AppWebViewState extends State<AppWebView> {
 
       if (_profileJson != null) {
         await _controller.runJavaScript(star.buildAutofillScript(_profileJson!));
+        await Future.delayed(const Duration(milliseconds: 30));
+        await _controller.runJavaScript('window.requestFlutterAutofill();');
         debugPrint("✅ Autofill script injected");
       }
 

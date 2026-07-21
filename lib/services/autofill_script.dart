@@ -100,6 +100,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                         })(),
     populationGroup:   gv('demographic.populationGroup'),
     maritalStatus:     gv('demographic.maritalStatus'),
+    maritalYesNo:      (function() {
+                            var m = (gv('demographic.maritalStatus') || '').toLowerCase();
+                            return m.indexOf('married') !== -1 ? 'Yes' : 'No';
+                          })(),
+    disabilityValue:   (function() {
+                            var d = (gv('status.disabilityStatus') || '').toLowerCase();
+                            return d.indexOf('y') !== -1 || d.indexOf('disable') !== -1 ? 'Yes' : 'No';
+                          })(),
+    raceValue:         (function() {
+                            var pg = (gv('demographic.populationGroup') || '').toLowerCase();
+                            if (pg.indexOf('afric') !== -1 || pg.indexOf('black') !== -1) return 'African';
+                            if (pg.indexOf('colour') !== -1 || pg.indexOf('colored') !== -1) return 'Coloured';
+                            if (pg.indexOf('asian') !== -1) return 'Asian';
+                            if (pg.indexOf('indian') !== -1) return 'Indian';
+                            if (pg.indexOf('white') !== -1) return 'White';
+                            return pg || '';
+                          })(),
     schoolName:        gv('school.schoolName'),
     currentGrade:      gv('school.currentGrade'),
     matricYear:        gv('results.matricYear'),
@@ -214,13 +231,16 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     workPhone:         ['work phone','work tel','telephone work'],
     address:           ['address','street','physical address'],
     addressLine2:      ['address 2','suburb','town','city'],
-    province:          ['province','state','region'],
+    province:          ['province','state','region','select province'],
     postalCode:        ['postal code','postalcode','post code','postcode','zip'],
     nationality:       ['nationality','citizenship','citizen'],
     isSACitizen:       ['sa citizen','possession of','valid sa','sa id'],
     homeLanguage:      ['home language','homelanguage','language'],
-    populationGroup:   ['population group','race','ethnicity'],
+    populationGroup:   ['population group','ethnicity'],
+    raceValue:         ['race','population group'],
     maritalStatus:     ['marital status','maritalstatus'],
+    maritalYesNo:      ['married','are you married','marital status'],
+    disabilityValue:   ['disabled','disability','are you disabled'],
     schoolName:        ['school','high school','institution'],
     currentGrade:      ['grade','current grade'],
     matricYear:        ['matric year','exam year','year of matric'],
@@ -260,8 +280,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       || t.indexOf('select ') === 0 || t.indexOf('choose ') === 0;
   }
 
-  function findOption(sel, want) {
-    if (!want) return null;
+  function findOption(sel, want) {    if (!want) return null;
     var wl = want.toLowerCase().trim();
     var wlWords = wl.split(/\s+/);
     var best = null, bestScore = -1;
@@ -309,6 +328,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       if (!opt) return false;
       el.value = opt.value;
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (typeof jQuery !== 'undefined') {
+        try { jQuery(el).trigger('change.select2'); } catch(e) {}
+        try { jQuery(el).trigger('select2:select'); } catch(e) {}
+        try { if (jQuery(el).data('select2')) jQuery(el).val(opt.value).trigger('change'); } catch(e) {}
+      }
       return true;
     }
     if (el.type === 'radio') {
@@ -465,6 +489,104 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       }
     }
 
+    // ── Handle Select2 AJAX dropdowns (Race, Province) ─────────────────────
+    function setSelect2Ajax(selector, valueText) {
+      if (!valueText) return false;
+      var el = document.querySelector(selector);
+      if (!el) return false;
+
+      function triggerEvents(element) {
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof jQuery !== 'undefined') {
+          try { jQuery(element).trigger('change.select2'); } catch(e) {}
+          try { jQuery(element).trigger('select2:select'); } catch(e) {}
+          try { if (jQuery(element).data('select2')) jQuery(element).val(element.value).trigger('change'); } catch(e) {}
+        }
+      }
+
+      if (typeof jQuery !== 'undefined' && jQuery(el).data('select2')) {
+        var jqEl = jQuery(el);
+
+        jqEl.select2('open');
+
+        setTimeout(function() {
+          var results = document.querySelectorAll('.select2-results__option');
+          var matched = false;
+          for (var i = 0; i < results.length; i++) {
+            if (results[i].textContent.trim().toLowerCase() === valueText.toLowerCase()) {
+              results[i].click();
+              matched = true;
+              break;
+            }
+          }
+
+          if (!matched) {
+            var newOption = new Option(valueText, valueText, true, true);
+            jqEl.append(newOption).trigger('change');
+          }
+
+          jqEl.select2('close');
+          el.style.outline = '3px solid #10B981';
+          filled++;
+        }, 500);
+
+        return true;
+      }
+
+      function tryStandard() {
+        if (el.options.length === 0) return false;
+        var opt = findOption(el, valueText);
+        if (!opt) return false;
+        el.value = opt.value;
+        triggerEvents(el);
+        el.style.outline = '3px solid #10B981';
+        filled++;
+        return true;
+      }
+
+      if (tryStandard()) return true;
+
+      var retries = 0;
+      var interval = setInterval(function() {
+        retries++;
+        if (tryStandard() || retries >= 10) {
+          clearInterval(interval);
+        }
+      }, 600);
+
+      return true;
+    }
+
+    setSelect2Ajax('select[name="race"]', vs.raceValue);
+    setSelect2Ajax('select[name="address"]', vs.province);
+
+    // Race fallback: if AJAX gave us nothing, populate manually
+    (function() {
+      var s = document.querySelector('select[name="race"]');
+      if (s && s.options.length === 0) {
+        ['African','Asian','Coloured','Indian','Other','White'].forEach(function(t) {
+          s.add(new Option(t, t));
+        });
+        s.value = vs.raceValue || 'African';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof \$ !== 'undefined' && \$('select[name="race"]').data('select2')) \$('select[name="race"]').trigger('change');
+      }
+    })();
+
+    // Province fallback: if AJAX gave us nothing, populate manually
+    (function() {
+      var s = document.querySelector('select[name="address"]');
+      if (s && s.options.length === 0) {
+        ['Eastern Cape','Free State','Gauteng','Kwazulu/Natal','Limpopo','Mpumalanga','North West','Northern Cape','Western Cape'].forEach(function(t) {
+          s.add(new Option(t, t));
+        });
+        s.value = vs.province || 'Gauteng';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof \$ !== 'undefined' && \$('select[name="address"]').data('select2')) \$('select[name="address"]').trigger('change');
+      }
+    })();
+
     showToast(
       filled > 0
         ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
@@ -479,6 +601,8 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
     try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: visibleTotal })); } catch (e) {}
   }
+
+  window.requestFlutterAutofill = doAutofill;
 
   ${addFloatingStar ? '''
   // Floating star button injected into the page
@@ -502,7 +626,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   })();
   ''' : ''}
 
-  doAutofill();
+
 })();
 ''';
 }
