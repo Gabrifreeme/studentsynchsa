@@ -59,7 +59,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     gender:            gv('personal.gender'),
     genderCode:        (function() {
                           var g = gv('personal.gender').toLowerCase();
-                          return g.indexOf('female') !== -1 || g === 'f' ? 'F' : g.indexOf('male') !== -1 || g === 'm' ? 'M' : g;
+                          if (g.indexOf('female') !== -1 || g === 'f') return 'F';
+                          if (g.indexOf('male') !== -1 || g === 'm') return 'M';
+                          return 'M'; // default: 'Other', 'Prefer not to say' → M
                         })(),
     idNumber:          gv('personal.idNumber'),
     dateOfBirth:       fmtDate(dobIso),
@@ -172,7 +174,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     // Heard about us
     'OAPHEARD':               vs.heardAboutUs,
     'OAPHEARD_DESC':          vs.heardAboutUs,
-    // 'OAPGENDER':           vs.genderCode, // DISABLED — testing APEX native state
+    'OAPGENDER':              vs.genderCode,
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
