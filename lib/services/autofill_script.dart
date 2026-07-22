@@ -682,6 +682,28 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       });
     })();
 
+    // Gender: use APEX API to set value (itsExact fills the DOM, APEX needs its own API)
+    (function() {
+      var v = vs.genderCode || 'M';
+      if (typeof apex === 'undefined' || !apex.item) return;
+      try {
+        var ai = apex.item('OAPGENDER');
+        if (ai) {
+          ai.setValue(v);
+          ai.refresh();
+          console.log('✅ apex.item(OAPGENDER).setValue(' + v + ')');
+          console.log('📊 apex value after set:', ai.getValue());
+          console.log('📊 apex element value:', ai.element ? ai.element.value : 'no element');
+        }
+      } catch (e) {
+        console.log('⚠️ apex.item(OAPGENDER) failed:', e);
+        try {
+          var ai2 = apex.item('oapGender');
+          if (ai2) { ai2.setValue(v); ai2.refresh(); console.log('✅ apex.item(oapGender) fallback'); }
+        } catch (e2) { console.log('⚠️ apex.item(oapGender) also failed:', e2); }
+      }
+    })();
+
     showToast(
       filled > 0
         ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
