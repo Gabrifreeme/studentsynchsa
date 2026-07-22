@@ -57,6 +57,10 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     initials:          gv('personal.initials'),
     title:             gv('personal.title'),
     gender:            gv('personal.gender'),
+    genderCode:        (function() {
+                          var g = gv('personal.gender').toLowerCase();
+                          return g.indexOf('female') !== -1 || g === 'f' ? 'F' : g.indexOf('male') !== -1 || g === 'm' ? 'M' : g;
+                        })(),
     idNumber:          gv('personal.idNumber'),
     dateOfBirth:       fmtDate(dobIso),
     dateOfBirthSlash:  fmtDateSlash(dobIso),
@@ -164,6 +168,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     // Heard about us
     'OAPHEARD':               vs.heardAboutUs,
     'OAPHEARD_DESC':          vs.heardAboutUs,
+    'OAPGENDER':              vs.genderCode,
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
@@ -669,6 +674,31 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new Event('blur', { bubbles: true }));
       });
+    })();
+
+    // Gender override (oapGender = F with Select2 UI fix)
+    (function() {
+      var el = document.getElementById('oapGender') || document.querySelector('select[name="oapGender"]');
+      if (!el) return;
+      var v = vs.genderCode || 'F';
+      el.value = v;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof \$ !== 'undefined' && \$(el).data('select2')) {
+        \$(el).trigger('change');
+        \$(el).trigger('change.select2');
+      }
+      var rendered = document.querySelector('.select2-selection__rendered');
+      if (rendered) {
+        // Find the display text matching the selected option
+        var opt = el.options[el.selectedIndex];
+        var displayText = opt ? opt.text : v;
+        rendered.textContent = displayText;
+        rendered.classList.remove('select2-selection__placeholder');
+        rendered.classList.add('select2-selection-rendered');
+        var placeholder = rendered.querySelector('.select2-selection__placeholder');
+        if (placeholder) placeholder.remove();
+      }
     })();
 
     showToast(
