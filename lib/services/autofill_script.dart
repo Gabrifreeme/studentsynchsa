@@ -82,6 +82,12 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
                             return sa ? 'R.S.A' : (gv('demographic.citizenshipCode') || '');
                           })(),
+    citizenshipShortCode: (function() {
+                            var nat = (gv('demographic.nationality') || '').toLowerCase();
+                            var idn = (gv('personal.idNumber') || '').trim();
+                            var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
+                            return sa ? 'ZA' : (gv('demographic.citizenshipCode') || '');
+                          })(),
     homeLanguage:      gv('demographic.homeLanguage'),
     ethnicValue:       (function() {
                           var pg = (gv('demographic.populationGroup') || '').toLowerCase();
@@ -142,7 +148,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   var itsExact = {
     // UNIVEN / Venda OAP exact-name maps
     'OAPCITIZENTYPE':     vs.isSACitizen,
-    'OAPCITZCODE':        vs.citizenshipCodeValue,
+    'OAPCITZCODE':        vs.citizenshipShortCode,
+    'OAPCITCODE':         vs.citizenshipShortCode,
+    'OAPCITCODE_DESC':    vs.citizenshipCodeValue,
     'OAPHOMELANG':        vs.homeLanguage,
     'OAPETHNIC':          vs.ethnicValue,
     'OAPEMPLOYED':        vs.employedValue,
@@ -647,6 +655,26 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.dispatchEvent(new Event('input', { bubbles: true }));
       if (typeof \$ !== 'undefined' && \$('#' + el.id).data('select2')) \$('#' + el.id).trigger('change');
+    })();
+
+    // Citizenship code override (oapCitCode = ZA, oapCitCode_desc = R.S.A)
+    (function() {
+      var el = document.getElementById('oapCitCode') || document.querySelector('input[name="oapCitCode"]');
+      if (el) {
+        try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e) {}
+        el.value = vs.citizenshipShortCode || 'ZA';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
+      var desc = document.getElementById('oapCitCode_desc') || document.querySelector('input[name="oapCitCode_desc"]');
+      if (desc) {
+        try { desc.removeAttribute('readonly'); desc.removeAttribute('disabled'); } catch(e) {}
+        desc.value = vs.citizenshipCodeValue || 'R.S.A';
+        desc.dispatchEvent(new Event('input', { bubbles: true }));
+        desc.dispatchEvent(new Event('change', { bubbles: true }));
+        desc.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
     })();
 
     showToast(
