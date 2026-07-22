@@ -101,7 +101,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                         })(),
     residenceRequired: (function() {
                           var wr = (gv('status.wantsResidence') || '').toLowerCase();
-                          return wr.indexOf('y') !== -1 ? 'Yes' : 'No';
+                          return wr.indexOf('y') !== -1 ? 'Y' : 'N';
                         })(),
     populationGroup:   gv('demographic.populationGroup'),
     maritalStatus:     gv('demographic.maritalStatus'),
@@ -637,7 +637,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         el = document.getElementById('oapTVETResReq') || document.querySelector('select[name="oapTVETResReq"]');
       }
       if (!el) return;
-      var v = vs.residenceRequired || 'Yes';
+      var v = vs.residenceRequired || 'Y';
       if (el.options.length === 0) {
         ['--- Please select ---', 'Yes', 'No'].forEach(function(t) {
           el.add(new Option(t, t));
