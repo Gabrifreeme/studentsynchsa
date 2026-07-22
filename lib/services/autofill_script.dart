@@ -711,11 +711,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       filled > 0 ? '#10B981' : '#EF4444'
     );
 
-    var totalFields = document.querySelectorAll('input, select, textarea').length;
-    var filledFields = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea')).filter(function(el) { return el.value; }).length;
-    console.log('Total:', totalFields, 'Filled:', filledFields);
+    var visibleFields = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea')).filter(function(el) { return el.offsetParent !== null; });
+    var filledCount = visibleFields.filter(function(el) { return el.value; }).length;
+    console.log('Total visible:', visibleFields.length, 'Filled:', filledCount);
 
-    try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: totalFields })); } catch (e) {}
+    try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: visibleFields.length })); } catch (e) {}
   }
 
   window.requestFlutterAutofill = doAutofill;
