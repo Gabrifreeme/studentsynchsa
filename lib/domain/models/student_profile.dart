@@ -758,6 +758,117 @@ class StudentProfile {
         updatedAt: DateTime.now(),
       );
 
+  /// Merges [other] into this profile. Unlike [copyWith], empty/default fields
+  /// in [other] preserve the existing value from this profile. This prevents
+  /// partial saves from wiping data on pages the user hasn't visited.
+  StudentProfile merge(StudentProfile other) {
+    return StudentProfile(
+      id: id,
+      personal: PersonalDetails(
+        title: other.personal.title.isNotEmpty ? other.personal.title : personal.title,
+        initials: other.personal.initials.isNotEmpty ? other.personal.initials : personal.initials,
+        firstName: other.personal.firstName.isNotEmpty ? other.personal.firstName : personal.firstName,
+        lastName: other.personal.lastName.isNotEmpty ? other.personal.lastName : personal.lastName,
+        maidenName: other.personal.maidenName.isNotEmpty ? other.personal.maidenName : personal.maidenName,
+        gender: other.personal.gender.isNotEmpty ? other.personal.gender : personal.gender,
+        dateOfBirth: other.personal.dateOfBirth ?? personal.dateOfBirth,
+        idNumber: other.personal.idNumber.isNotEmpty ? other.personal.idNumber : personal.idNumber,
+      ),
+      contact: ContactInfo(
+        email: other.contact.email.isNotEmpty ? other.contact.email : contact.email,
+        phone: other.contact.phone.isNotEmpty ? other.contact.phone : contact.phone,
+        workPhone: other.contact.workPhone.isNotEmpty ? other.contact.workPhone : contact.workPhone,
+        hasSACellphone: other.contact.hasSACellphone.isNotEmpty ? other.contact.hasSACellphone : contact.hasSACellphone,
+        verifyEmail: other.contact.verifyEmail.isNotEmpty ? other.contact.verifyEmail : contact.verifyEmail,
+      ),
+      address: AddressInfo(
+        address: other.address.address.isNotEmpty ? other.address.address : address.address,
+        addressLine2: other.address.addressLine2.isNotEmpty ? other.address.addressLine2 : address.addressLine2,
+        addressLine3: other.address.addressLine3.isNotEmpty ? other.address.addressLine3 : address.addressLine3,
+        province: other.address.province.isNotEmpty ? other.address.province : address.province,
+        postalCode: other.address.postalCode.isNotEmpty ? other.address.postalCode : address.postalCode,
+        postalAddress: other.address.postalAddress.isNotEmpty ? other.address.postalAddress : address.postalAddress,
+      ),
+      demographic: DemographicInfo(
+        nationality: other.demographic.nationality.isNotEmpty ? other.demographic.nationality : demographic.nationality,
+        countryOfBirth: other.demographic.countryOfBirth.isNotEmpty ? other.demographic.countryOfBirth : demographic.countryOfBirth,
+        homeLanguage: other.demographic.homeLanguage.isNotEmpty ? other.demographic.homeLanguage : demographic.homeLanguage,
+        populationGroup: other.demographic.populationGroup.isNotEmpty ? other.demographic.populationGroup : demographic.populationGroup,
+        maritalStatus: other.demographic.maritalStatus.isNotEmpty ? other.demographic.maritalStatus : demographic.maritalStatus,
+        citizenshipCode: other.demographic.citizenshipCode.isNotEmpty ? other.demographic.citizenshipCode : demographic.citizenshipCode,
+        heardAboutUs: other.demographic.heardAboutUs.isNotEmpty ? other.demographic.heardAboutUs : demographic.heardAboutUs,
+      ),
+      status: StatusInfo(
+        disabilityStatus: other.status.disabilityStatus.isNotEmpty ? other.status.disabilityStatus : status.disabilityStatus,
+        bursaryRequired: other.status.bursaryRequired.isNotEmpty ? other.status.bursaryRequired : status.bursaryRequired,
+        employmentStatus: other.status.employmentStatus.isNotEmpty ? other.status.employmentStatus : status.employmentStatus,
+        wantsResidence: other.status.wantsResidence.isNotEmpty ? other.status.wantsResidence : status.wantsResidence,
+      ),
+      school: SchoolInfo(
+        schoolName: other.school.schoolName.isNotEmpty ? other.school.schoolName : school.schoolName,
+        currentGrade: other.school.currentGrade.isNotEmpty ? other.school.currentGrade : school.currentGrade,
+        yearOfMatric: other.school.yearOfMatric.isNotEmpty ? other.school.yearOfMatric : school.yearOfMatric,
+        currentlyDoing: other.school.currentlyDoing.isNotEmpty ? other.school.currentlyDoing : school.currentlyDoing,
+        studiedPreviously: other.school.studiedPreviously.isNotEmpty ? other.school.studiedPreviously : school.studiedPreviously,
+      ),
+      nextOfKin: NextOfKin(
+        name: other.nextOfKin.name.isNotEmpty ? other.nextOfKin.name : nextOfKin.name,
+        mobilePhone: other.nextOfKin.mobilePhone.isNotEmpty ? other.nextOfKin.mobilePhone : nextOfKin.mobilePhone,
+        homePhone: other.nextOfKin.homePhone.isNotEmpty ? other.nextOfKin.homePhone : nextOfKin.homePhone,
+        workPhone: other.nextOfKin.workPhone.isNotEmpty ? other.nextOfKin.workPhone : nextOfKin.workPhone,
+        addressLine1: other.nextOfKin.addressLine1.isNotEmpty ? other.nextOfKin.addressLine1 : nextOfKin.addressLine1,
+        addressLine2: other.nextOfKin.addressLine2.isNotEmpty ? other.nextOfKin.addressLine2 : nextOfKin.addressLine2,
+        addressLine3: other.nextOfKin.addressLine3.isNotEmpty ? other.nextOfKin.addressLine3 : nextOfKin.addressLine3,
+        addressLine4: other.nextOfKin.addressLine4.isNotEmpty ? other.nextOfKin.addressLine4 : nextOfKin.addressLine4,
+        postalCode: other.nextOfKin.postalCode.isNotEmpty ? other.nextOfKin.postalCode : nextOfKin.postalCode,
+        email: other.nextOfKin.email.isNotEmpty ? other.nextOfKin.email : nextOfKin.email,
+      ),
+      accountContact: AccountContact(
+        name: other.accountContact.name.isNotEmpty ? other.accountContact.name : accountContact.name,
+        mobilePhone: other.accountContact.mobilePhone.isNotEmpty ? other.accountContact.mobilePhone : accountContact.mobilePhone,
+        homePhone: other.accountContact.homePhone.isNotEmpty ? other.accountContact.homePhone : accountContact.homePhone,
+        addressLine1: other.accountContact.addressLine1.isNotEmpty ? other.accountContact.addressLine1 : accountContact.addressLine1,
+        addressLine2: other.accountContact.addressLine2.isNotEmpty ? other.accountContact.addressLine2 : accountContact.addressLine2,
+        addressLine3: other.accountContact.addressLine3.isNotEmpty ? other.accountContact.addressLine3 : accountContact.addressLine3,
+        addressLine4: other.accountContact.addressLine4.isNotEmpty ? other.accountContact.addressLine4 : accountContact.addressLine4,
+        postalCode: other.accountContact.postalCode.isNotEmpty ? other.accountContact.postalCode : accountContact.postalCode,
+        email: other.accountContact.email.isNotEmpty ? other.accountContact.email : accountContact.email,
+      ),
+      results: ResultsInfo(
+        matricYear: other.results.matricYear != 0 ? other.results.matricYear : results.matricYear,
+        applicationLevel: other.results.applicationLevel.isNotEmpty ? other.results.applicationLevel : results.applicationLevel,
+        upgrading: other.results.upgrading.isNotEmpty ? other.results.upgrading : results.upgrading,
+        matricType: other.results.matricType.isNotEmpty ? other.results.matricType : results.matricType,
+        examinationNumber: other.results.examinationNumber.isNotEmpty ? other.results.examinationNumber : results.examinationNumber,
+        schoolLeavingCertificate: other.results.schoolLeavingCertificate.isNotEmpty ? other.results.schoolLeavingCertificate : results.schoolLeavingCertificate,
+        subjects: other.results.subjects.isNotEmpty ? other.results.subjects : results.subjects,
+      ),
+      qualification: QualificationInfo(
+        academicYear: other.qualification.academicYear != 0 ? other.qualification.academicYear : qualification.academicYear,
+        choices: other.qualification.choices.isNotEmpty ? other.qualification.choices : qualification.choices,
+        applicationPeriod: other.qualification.applicationPeriod.isNotEmpty ? other.qualification.applicationPeriod : qualification.applicationPeriod,
+        studyMode: other.qualification.studyMode.isNotEmpty ? other.qualification.studyMode : qualification.studyMode,
+        studyTiming: other.qualification.studyTiming.isNotEmpty ? other.qualification.studyTiming : qualification.studyTiming,
+        applicationType: other.qualification.applicationType.isNotEmpty ? other.qualification.applicationType : qualification.applicationType,
+        applicationTypeDescription: other.qualification.applicationTypeDescription.isNotEmpty ? other.qualification.applicationTypeDescription : qualification.applicationTypeDescription,
+        numApplicationsAllowed: other.qualification.numApplicationsAllowed != 4 ? other.qualification.numApplicationsAllowed : qualification.numApplicationsAllowed,
+      ),
+      agreement: AgreementInfo(
+        loginPin: other.agreement.loginPin.isNotEmpty ? other.agreement.loginPin : agreement.loginPin,
+        acceptanceStatus: other.agreement.acceptanceStatus.isNotEmpty ? other.agreement.acceptanceStatus : agreement.acceptanceStatus,
+      ),
+      uploadedDocuments: other.uploadedDocuments.isNotEmpty ? other.uploadedDocuments : uploadedDocuments,
+      grade11Subjects: other.grade11Subjects.isNotEmpty ? other.grade11Subjects : grade11Subjects,
+      grade12Subjects: other.grade12Subjects.isNotEmpty ? other.grade12Subjects : grade12Subjects,
+      preferredUniversities: other.preferredUniversities.isNotEmpty ? other.preferredUniversities : preferredUniversities,
+      preferredCourses: other.preferredCourses.isNotEmpty ? other.preferredCourses : preferredCourses,
+      careerInterests: other.careerInterests.isNotEmpty ? other.careerInterests : careerInterests,
+      onboardingComplete: other.onboardingComplete || onboardingComplete,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'personal': personal.toJson(),

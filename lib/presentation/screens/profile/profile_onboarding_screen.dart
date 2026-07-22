@@ -2907,7 +2907,8 @@ class _ProfileOnboardingScreenState
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
-      final profile = base.copyWith(
+      final profile = base.merge(StudentProfile(
+        id: base.id,
         personal: PersonalDetails(
           title: _title,
           initials: _initialsCtrl.text.trim(),
@@ -2935,7 +2936,7 @@ class _ProfileOnboardingScreenState
               ? _postalAddr1Ctrl.text.trim()
               : _streetAddr1Ctrl.text.trim(),
         ),
-        demographic: base.demographic.copyWith(
+        demographic: DemographicInfo(
           nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
           populationGroup: _ethnicGroup,
@@ -2943,7 +2944,7 @@ class _ProfileOnboardingScreenState
           citizenshipCode: _citizenshipCodeCtrl.text.trim(),
           heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
-        status: base.status.copyWith(
+        status: StatusInfo(
           disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
           employmentStatus: _isEmployed,
@@ -2992,7 +2993,7 @@ class _ProfileOnboardingScreenState
           numApplicationsAllowed: _numAppsAllowed,
         ),
         onboardingComplete: true,
-      );
+      ));
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
       if (mounted) {
@@ -4266,7 +4267,8 @@ class _ProfileOnboardingScreenState
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
-      final profile = base.copyWith(
+      final profile = base.merge(StudentProfile(
+        id: base.id,
         personal: PersonalDetails(
           title: _title,
           initials: _initialsCtrl.text.trim(),
@@ -4294,7 +4296,7 @@ class _ProfileOnboardingScreenState
               ? _postalAddr1Ctrl.text.trim()
               : _streetAddr1Ctrl.text.trim(),
         ),
-        demographic: base.demographic.copyWith(
+        demographic: DemographicInfo(
           nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
           populationGroup: _ethnicGroup,
@@ -4302,7 +4304,7 @@ class _ProfileOnboardingScreenState
           citizenshipCode: _citizenshipCodeCtrl.text.trim(),
           heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
-        status: base.status.copyWith(
+        status: StatusInfo(
           disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
           employmentStatus: _isEmployed,
@@ -4350,8 +4352,7 @@ class _ProfileOnboardingScreenState
           schoolLeavingCertificate: _schoolLeavingCertificate,
           subjects: _resultsSubjects,
         ),
-        onboardingComplete: existingProfile?.onboardingComplete ?? false,
-      );
+      ));
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
       if (mounted) {
