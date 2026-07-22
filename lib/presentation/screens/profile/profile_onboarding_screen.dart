@@ -2575,32 +2575,20 @@ class _ProfileOnboardingScreenState
   }
 
   void _loadExistingProfile() async {
-    var profile =
-        ref.read(profileProvider).valueOrNull ??
-        ref.read(authProvider).valueOrNull?.profile;
+    var profile = ref.read(profileProvider).valueOrNull;
     if (profile == null) {
-      // Try reading directly from Hive in case providers haven't loaded yet
-      try {
-        profile = await ProfileRepositoryImpl().getProfile();
-      } catch (_) {}
+      try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
     }
     if (profile == null) {
-      // Retry once after a short delay
       await Future.delayed(const Duration(milliseconds: 500));
-      profile =
-          ref.read(profileProvider).valueOrNull ??
-          ref.read(authProvider).valueOrNull?.profile;
+      profile = ref.read(profileProvider).valueOrNull;
       if (profile == null) {
-        try {
-          profile = await ProfileRepositoryImpl().getProfile();
-        } catch (_) {}
+        try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
       }
     }
     if (profile == null) return;
     final p = profile;
-    setState(() {
-      _applyProfile(p);
-    });
+    setState(() { _applyProfile(p); });
   }
 
   void _applyProfile(StudentProfile p) {
