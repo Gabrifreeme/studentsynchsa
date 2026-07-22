@@ -2987,8 +2987,16 @@ class _ProfileOnboardingScreenState
         onboardingComplete: true,
       ));
 
-      debugPrint('💾 _saveProfile final: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}" id="${profile.id}"');
+      debugPrint('💾 _saveProfile: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"');
       await ref.read(profileProvider.notifier).saveProfile(profile);
+
+      // Verify read-back
+      try {
+        final verify = await ProfileRepositoryImpl().getProfile();
+        debugPrint('🔍 _saveProfile verify Hive: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}');
+      } catch (e) {
+        debugPrint('🔍 _saveProfile verify FAILED: $e');
+      }
       if (mounted) {
         setState(() => _saving = false);
         context.go('/dashboard');
@@ -4260,7 +4268,9 @@ class _ProfileOnboardingScreenState
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
-      final profile = base.merge(StudentProfile(
+      debugPrint('🧬 saveCurrentPage base:   idNumber="${base.personal.idNumber}" gender="${base.personal.gender}"');
+
+      final update = StudentProfile(
         id: base.id,
         personal: PersonalDetails(
           title: _title,
@@ -4345,10 +4355,22 @@ class _ProfileOnboardingScreenState
           schoolLeavingCertificate: _schoolLeavingCertificate,
           subjects: _resultsSubjects,
         ),
-      ));
+      );
 
-      debugPrint('💾 _saveProfile final: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}" id="${profile.id}"');
+      debugPrint('🧬 saveCurrentPage update: idNumber="${update.personal.idNumber}" gender="${update.personal.gender}"');
+
+      final profile = base.merge(update);
+
+      debugPrint('💾 saveCurrentPage merged: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"');
       await ref.read(profileProvider.notifier).saveProfile(profile);
+
+      // Verify read-back
+      try {
+        final verify = await ProfileRepositoryImpl().getProfile();
+        debugPrint('🔍 saveCurrentPage verify Hive: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}');
+      } catch (e) {
+        debugPrint('🔍 saveCurrentPage verify FAILED: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
