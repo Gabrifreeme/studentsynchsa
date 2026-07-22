@@ -174,7 +174,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     // Heard about us
     'OAPHEARD':               vs.heardAboutUs,
     'OAPHEARD_DESC':          vs.heardAboutUs,
-    'OAPGENDER':              vs.genderCode,
+    'oapGender':              vs.genderCode,
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
@@ -682,30 +682,38 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       });
     })();
 
-    // Gender: use APEX API to set value
+    // Gender: direct DOM manipulation (confirmed working in Edge)
     (function() {
-      var v = vs.genderCode || 'M';
-      if (typeof apex === 'undefined' || !apex.item) return;
-      // Find the actual APEX item name from the element's name attribute
-      var el = document.getElementById('OAPGENDER');
-      if (!el) { console.log('⚠️ #OAPGENDER element not found'); return; }
-      var itemName = el.getAttribute('name');
-      console.log('📊 OAPGENDER element name="' + itemName + '" value="' + el.value + '"');
-      // Try the resolved item name (e.g. P1_OAPGENDER) or fall back to OAPGENDER
-      var names = [];
-      if (itemName) names.push(itemName);
-      names.push('OAPGENDER', 'oapGender', 'P1_OAPGENDER', 'P2_OAPGENDER', 'P3_OAPGENDER', 'P4_OAPGENDER', 'P5_OAPGENDER');
-      for (var i = 0; i < names.length; i++) {
-        try {
-          var ai = apex.item(names[i]);
-          if (ai) {
-            ai.setValue(v);
-            ai.refresh();
-            console.log('✅ apex.item(' + names[i] + ').setValue(' + v + ') = ' + ai.getValue());
-            break;
-          }
-        } catch (e) { /* ignore */ }
+      var v = vs.genderCode || 'F';
+      var nativeSelect = document.getElementById('oapGender');
+      if (!nativeSelect) return;
+      nativeSelect.removeAttribute('readonly');
+      nativeSelect.removeAttribute('disabled');
+      nativeSelect.value = v;
+      nativeSelect.setCustomValidity('');
+      nativeSelect.checkValidity();
+      ['input', 'change', 'blur', 'apexchange'].forEach(function(eventType) {
+        nativeSelect.dispatchEvent(new Event(eventType, { bubbles: true }));
+      });
+      nativeSelect.setAttribute('data-apex-changed', 'true');
+      var wrapper = nativeSelect.closest('.t-Form-fieldContainer');
+      if (wrapper) {
+        wrapper.classList.remove('has-error', 'is-error');
+        var err = wrapper.querySelector('[id\$="_error_placeholder"]');
+        if (err) { err.textContent = ''; err.style.display = 'none'; }
       }
+      var nextBtn = document.querySelector('button[data-id="NEXT"]') ||
+                    document.querySelector('#B_NEXT') ||
+                    document.querySelector('input[value="Next"]') ||
+                    document.querySelector('button[type="submit"]') ||
+                    document.querySelector('.t-Button--next');
+      if (nextBtn) {
+        nextBtn.removeAttribute('disabled');
+        nextBtn.classList.remove('is-disabled', 't-Button--disabled');
+        nextBtn.style.pointerEvents = 'auto';
+        nextBtn.style.opacity = '1';
+      }
+      console.log('Gender set to ' + v);
     })();
 
     showToast(
