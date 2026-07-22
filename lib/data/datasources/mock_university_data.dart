@@ -61,7 +61,7 @@ class MockUniversityData {
       province: 'Limpopo',
       website: 'https://www.univen.ac.za',
       applicationUrl:
-          'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
+          'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view?x_processcode=ITS_OAP',
       logoUrl: 'https://usaf.ac.za/wp-content/uploads/2023/08/University_of_Venda-logo.webp',
       hasApplicationFee: true,
       applicationFee: 200,

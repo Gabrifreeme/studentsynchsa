@@ -191,7 +191,7 @@ class _AppWebViewState extends State<AppWebView> {
 
   String _getInitialUrl() {
     if (_isUniven) {
-      return "https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP";
+      return "https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view?x_processcode=ITS_OAP";
     }
     return widget.url;
   }
