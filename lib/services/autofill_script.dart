@@ -67,6 +67,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     addressLine2:      gv('address.addressLine2'),
     province:          gv('address.province'),
     postalCode:        gv('address.postalCode'),
+    heardAboutUs:      gv('demographic.heardAboutUs'),
     nationality:       gv('demographic.nationality'),
     isSACitizen:       (function() {
                          var nat = (gv('demographic.nationality') || '').toLowerCase();
@@ -147,6 +148,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'OAPSTREETADDRPCODEREQ_DESC': vs.postalCode,
     'OAPPOSTALADDRPCODEREQ':      vs.postalCode,
     'OAPPOSTALADDRPCODEREQ_DESC': vs.postalCode,
+    // Heard about us
+    'OAPHEARD':               vs.heardAboutUs,
+    'OAPHEARD_DESC':          vs.heardAboutUs,
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
@@ -253,6 +257,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     academicYear:      ['academic year','year of study'],
     studyMode:         ['study mode','mode of study','attendance'],
     nextOfKinName:     ['next of kin','guardian','parent name','emergency contact name'],
+    heardAboutUs:      ['hear about us','heard about us','how did you hear','how did you find'],
     nextOfKinPhone:    ['guardian phone','parent phone','emergency contact number'],
     nextOfKinEmail:    ['guardian email','parent email'],
   };
@@ -595,6 +600,22 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       if (!v) return;
       ['oapStreetAddrPCodeRq', 'oapStreetAddrPCodeRq_desc'].forEach(function(name) {
         var el = document.querySelector('input[name="' + name + '"]');
+        if (!el) return;
+        try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e) {}
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      });
+    })();
+
+    // Heard about us override
+    (function() {
+      var v = vs.heardAboutUs;
+      if (!v) return;
+      ['oapHeard', 'oapHeard_desc'].forEach(function(name) {
+        var el = document.querySelector('input[name="' + name + '"]');
+        if (!el) el = document.getElementById(name);
         if (!el) return;
         try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e) {}
         el.value = v;
