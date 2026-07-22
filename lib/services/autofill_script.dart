@@ -706,8 +706,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
           apex.item('oapGender').refresh();
         } catch (e) {}
       }
-      // Fallback: click the LOV button to confirm selection
-      var lovBtn = document.querySelector('a[onclick*="oapGender"], img[src*="lov"], button[onclick*="oapGender"]');
+      // Fallback: click the LOV button specific to gender
+      var genderRow = el.closest('tr') || el.closest('div[class*="gender"], div[id*="oapGender"]');
+      var lovBtn = genderRow ? genderRow.querySelector('a[onclick*="oapGender"], button[onclick*="oapGender"], img[src*="lov"]') : null;
       if (lovBtn && typeof lovBtn.click === 'function') lovBtn.click();
     })();
 
