@@ -80,13 +80,13 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                             var nat = (gv('demographic.nationality') || '').toLowerCase();
                             var idn = (gv('personal.idNumber') || '').trim();
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
-                            return sa ? 'R.S.A' : (gv('demographic.citizenshipCode') || '');
+                            return sa ? 'OTHER AFRICAN COUNTRIES' : (gv('demographic.citizenshipCode') || '');
                           })(),
     citizenshipShortCode: (function() {
                             var nat = (gv('demographic.nationality') || '').toLowerCase();
                             var idn = (gv('personal.idNumber') || '').trim();
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
-                            return sa ? 'ZA' : (gv('demographic.citizenshipCode') || '');
+                            return sa ? 'OTHER AFRICAN COUNTRIES' : (gv('demographic.citizenshipCode') || '');
                           })(),
     homeLanguage:      gv('demographic.homeLanguage'),
     ethnicValue:       (function() {
@@ -657,24 +657,18 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       if (typeof \$ !== 'undefined' && \$('#' + el.id).data('select2')) \$('#' + el.id).trigger('change');
     })();
 
-    // Citizenship code override (oapCitCode = ZA, oapCitCode_desc = R.S.A)
+    // Citizenship code override (oapCitCode / oapCitzCode = OTHER AFRICAN COUNTRIES)
     (function() {
-      var el = document.getElementById('oapCitCode') || document.querySelector('input[name="oapCitCode"]');
-      if (el) {
+      var v = vs.citizenshipShortCode || 'OTHER AFRICAN COUNTRIES';
+      ['oapCitCode', 'oapCitCode_desc', 'oapCitzCode', 'oapCitzCode_desc'].forEach(function(name) {
+        var el = document.getElementById(name) || document.querySelector('input[name="' + name + '"]');
+        if (!el) return;
         try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e) {}
-        el.value = vs.citizenshipShortCode || 'ZA';
+        el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new Event('blur', { bubbles: true }));
-      }
-      var desc = document.getElementById('oapCitCode_desc') || document.querySelector('input[name="oapCitCode_desc"]');
-      if (desc) {
-        try { desc.removeAttribute('readonly'); desc.removeAttribute('disabled'); } catch(e) {}
-        desc.value = vs.citizenshipCodeValue || 'R.S.A';
-        desc.dispatchEvent(new Event('input', { bubbles: true }));
-        desc.dispatchEvent(new Event('change', { bubbles: true }));
-        desc.dispatchEvent(new Event('blur', { bubbles: true }));
-      }
+      });
     })();
 
     showToast(
