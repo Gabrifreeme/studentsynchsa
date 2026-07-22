@@ -699,6 +699,16 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         var placeholder = rendered.querySelector('.select2-selection__placeholder');
         if (placeholder) placeholder.remove();
       }
+      // Trigger APEX validation — APEX doesn't recognize raw select changes
+      if (typeof apex !== 'undefined' && apex.item) {
+        try {
+          apex.item('oapGender').setValue(v);
+          apex.item('oapGender').refresh();
+        } catch (e) {}
+      }
+      // Fallback: click the LOV button to confirm selection
+      var lovBtn = document.querySelector('a[onclick*="oapGender"], img[src*="lov"], button[onclick*="oapGender"]');
+      if (lovBtn && typeof lovBtn.click === 'function') lovBtn.click();
     })();
 
     showToast(
