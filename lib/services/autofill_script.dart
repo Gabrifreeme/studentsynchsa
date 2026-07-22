@@ -161,6 +161,10 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'OAPBURSARYREQ':      vs.bursaryValue,
     'OAPRESREQ':          vs.residenceRequired,
     // Address
+    'OAPSTREETADDR1':           vs.address,
+    'OAPSTREETADDR2':           vs.addressLine2,
+    'OAPSTREETADDR3':           vs.addressLine3,
+    'OAPSTREETADDR4':           vs.province,
     'OAPSTREETADDRPCODEREQ':      vs.postalCode,
     'OAPSTREETADDRPCODEREQ_DESC': vs.postalCode,
     'OAPPOSTALADDRPCODEREQ':      vs.postalCode,
