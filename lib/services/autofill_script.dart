@@ -99,6 +99,10 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                           var br = (gv('status.bursaryRequired') || '').toLowerCase();
                           return br.indexOf('y') !== -1 ? 'Y' : 'N';
                         })(),
+    residenceRequired: (function() {
+                          var wr = (gv('status.wantsResidence') || '').toLowerCase();
+                          return wr.indexOf('y') !== -1 ? 'Yes' : 'No';
+                        })(),
     populationGroup:   gv('demographic.populationGroup'),
     maritalStatus:     gv('demographic.maritalStatus'),
     maritalYesNo:      (function() {
@@ -143,6 +147,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'OAPETHNIC':          vs.ethnicValue,
     'OAPEMPLOYED':        vs.employedValue,
     'OAPBURSARYREQ':      vs.bursaryValue,
+    'OAPRESREQ':          vs.residenceRequired,
     // Address
     'OAPSTREETADDRPCODEREQ':      vs.postalCode,
     'OAPSTREETADDRPCODEREQ_DESC': vs.postalCode,
@@ -623,6 +628,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new Event('blur', { bubbles: true }));
       });
+    })();
+
+    // Residence required override
+    (function() {
+      var v = vs.residenceRequired;
+      if (!v) return;
+      var el = document.getElementById('oapResReq') || document.querySelector('select[name="oapResReq"]');
+      if (!el) return;
+      if (el.options.length === 0) {
+        ['--- Please select ---', 'Yes', 'No'].forEach(function(t) {
+          el.add(new Option(t, t));
+        });
+      }
+      el.value = v;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof \$ !== 'undefined' && \$('select[name="oapResReq"]').data('select2')) \$('select[name="oapResReq"]').trigger('change');
     })();
 
     showToast(
