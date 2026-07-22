@@ -632,10 +632,12 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
     // Residence required override
     (function() {
-      var v = vs.residenceRequired;
-      if (!v) return;
       var el = document.getElementById('oapResReq') || document.querySelector('select[name="oapResReq"]');
+      if (!el) {
+        el = document.getElementById('oapTVETResReq') || document.querySelector('select[name="oapTVETResReq"]');
+      }
       if (!el) return;
+      var v = vs.residenceRequired || 'Yes';
       if (el.options.length === 0) {
         ['--- Please select ---', 'Yes', 'No'].forEach(function(t) {
           el.add(new Option(t, t));
@@ -644,7 +646,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       el.value = v;
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.dispatchEvent(new Event('input', { bubbles: true }));
-      if (typeof \$ !== 'undefined' && \$('select[name="oapResReq"]').data('select2')) \$('select[name="oapResReq"]').trigger('change');
+      if (typeof \$ !== 'undefined' && \$('#' + el.id).data('select2')) \$('#' + el.id).trigger('change');
     })();
 
     showToast(
