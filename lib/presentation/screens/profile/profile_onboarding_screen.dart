@@ -2899,8 +2899,11 @@ class _ProfileOnboardingScreenState
   Future<void> _saveProfile() async {
     setState(() => _saving = true);
     try {
-      final authState = ref.read(authProvider);
-      final existingProfile = authState.value?.profile;
+      // Load base from Hive via profileProvider (not authProvider) — auth can be stale
+      StudentProfile? existingProfile = ref.read(profileProvider).valueOrNull;
+      if (existingProfile == null) {
+        try { existingProfile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+      }
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
@@ -4255,8 +4258,11 @@ class _ProfileOnboardingScreenState
   Future<void> _saveCurrentPage() async {
     setState(() => _saving = true);
     try {
-      final authState = ref.read(authProvider);
-      final existingProfile = authState.value?.profile;
+      // Load base from Hive via profileProvider (not authProvider) — auth can be stale
+      StudentProfile? existingProfile = ref.read(profileProvider).valueOrNull;
+      if (existingProfile == null) {
+        try { existingProfile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+      }
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
