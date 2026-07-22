@@ -682,25 +682,29 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       });
     })();
 
-    // Gender: use APEX API to set value (itsExact fills the DOM, APEX needs its own API)
+    // Gender: use APEX API to set value
     (function() {
       var v = vs.genderCode || 'M';
       if (typeof apex === 'undefined' || !apex.item) return;
-      try {
-        var ai = apex.item('OAPGENDER');
-        if (ai) {
-          ai.setValue(v);
-          ai.refresh();
-          console.log('✅ apex.item(OAPGENDER).setValue(' + v + ')');
-          console.log('📊 apex value after set:', ai.getValue());
-          console.log('📊 apex element value:', ai.element ? ai.element.value : 'no element');
-        }
-      } catch (e) {
-        console.log('⚠️ apex.item(OAPGENDER) failed:', e);
+      // Find the actual APEX item name from the element's name attribute
+      var el = document.getElementById('OAPGENDER');
+      if (!el) { console.log('⚠️ #OAPGENDER element not found'); return; }
+      var itemName = el.getAttribute('name');
+      console.log('📊 OAPGENDER element name="' + itemName + '" value="' + el.value + '"');
+      // Try the resolved item name (e.g. P1_OAPGENDER) or fall back to OAPGENDER
+      var names = [];
+      if (itemName) names.push(itemName);
+      names.push('OAPGENDER', 'oapGender', 'P1_OAPGENDER', 'P2_OAPGENDER', 'P3_OAPGENDER', 'P4_OAPGENDER', 'P5_OAPGENDER');
+      for (var i = 0; i < names.length; i++) {
         try {
-          var ai2 = apex.item('oapGender');
-          if (ai2) { ai2.setValue(v); ai2.refresh(); console.log('✅ apex.item(oapGender) fallback'); }
-        } catch (e2) { console.log('⚠️ apex.item(oapGender) also failed:', e2); }
+          var ai = apex.item(names[i]);
+          if (ai) {
+            ai.setValue(v);
+            ai.refresh();
+            console.log('✅ apex.item(' + names[i] + ').setValue(' + v + ') = ' + ai.getValue());
+            break;
+          }
+        } catch (e) { /* ignore */ }
       }
     })();
 
