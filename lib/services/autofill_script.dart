@@ -680,40 +680,103 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       });
     })();
 
-    // Gender override (oapGender = F with Select2 UI fix)
+    // Gender override (oapGender = F with APEX/Select2 fix)
     (function() {
       var el = document.getElementById('oapGender') || document.querySelector('select[name="oapGender"]');
-      if (!el) return;
+      if (!el) { console.log('❌ oapGender element not found'); return; }
       var v = vs.genderCode || 'F';
-      el.value = v;
+      console.log('🔍 oapGender options:', el.options.length);
+      for (var oi = 0; oi < el.options.length; oi++) {
+        console.log('   option[' + oi + '] value="' + el.options[oi].value + '" text="' + el.options[oi].text + '"');
+      }
+      // Use findOption to locate the correct option
+      var opt = findOption(el, v);
+      if (!opt) opt = findOption(el, 'Female');
+      if (!opt) opt = findOption(el, 'F');
+      if (!opt) opt = findOption(el, 'female');
+      var selectedValue = opt ? opt.value : v;
+      if (opt) {
+        console.log('✅ oapGender found option: value="' + opt.value + '" text="' + opt.text + '"');
+        el.value = opt.value;
+      } else {
+        console.log('⚠️ oapGender no option found for "' + v + '", binding value');
+        el.value = v;
+      }
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.dispatchEvent(new Event('input', { bubbles: true }));
-      if (typeof \$ !== 'undefined' && \$(el).data('select2')) {
-        \$(el).trigger('change');
-        \$(el).trigger('change.select2');
+      if (typeof jQuery !== 'undefined' && jQuery(el).data('select2')) {
+        jQuery(el).trigger('change');
+        jQuery(el).trigger('change.select2');
+        jQuery(el).val(selectedValue).trigger('change');
       }
+      // Update Select2 rendered UI
       var rendered = document.querySelector('.select2-selection__rendered');
       if (rendered) {
-        // Find the display text matching the selected option
-        var opt = el.options[el.selectedIndex];
         var displayText = opt ? opt.text : v;
         rendered.textContent = displayText;
         rendered.classList.remove('select2-selection__placeholder');
         rendered.classList.add('select2-selection-rendered');
         var placeholder = rendered.querySelector('.select2-selection__placeholder');
         if (placeholder) placeholder.remove();
+        console.log('✅ oapGender UI updated to:', displayText);
       }
-      // Trigger APEX validation — APEX doesn't recognize raw select changes
-      if (typeof apex !== 'undefined' && apex.item) {
+      // APEX API: try multiple approaches
+      if (typeof apex !== 'undefined') {
+        console.log('🔍 apex available, trying to set oapGender');
+        // Approach 1: apex.item with standard name
         try {
-          apex.item('oapGender').setValue(v);
-          apex.item('oapGender').refresh();
+          var ai = apex.item('oapGender');
+          if (ai) {
+            ai.setValue(selectedValue);
+            ai.refresh();
+            console.log('✅ apex.item(oapGender).setValue(' + selectedValue + ') called');
+          }
+        } catch (e) { console.log('⚠️ apex.item(oapGender) failed:', e); }
+        // Approach 2: apex.item with uppercase name
+        try {
+          var ai2 = apex.item('OAPGENDER');
+          if (ai2) {
+            ai2.setValue(selectedValue);
+            ai2.refresh();
+            console.log('✅ apex.item(OAPGENDER).setValue called');
+          }
+        } catch (e) { console.log('⚠️ apex.item(OAPGENDER) failed:', e); }
+        // Approach 3: apex.widget.apexSelectList
+        try {
+          if (apex.widget && apex.widget.apexSelectList) {
+            apex.widget.apexSelectList('#oapGender', { value: selectedValue });
+            console.log('✅ apex.widget.apexSelectList called');
+          }
+        } catch (e) { console.log('⚠️ apex.widget.apexSelectList failed:', e); }
+        // Approach 5: Try page-prefixed element
+        try {
+          var prefixed = document.getElementById('P1_OAPGENDER') || document.getElementById('P0_OAPGENDER');
+          if (prefixed) {
+            prefixed.value = selectedValue;
+            prefixed.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log('✅ P*_OAPGENDER element value set');
+          }
         } catch (e) {}
+        // Approach 6: Force APEX validation
+        try {
+          if (apex.region && apex.region.validation) {
+            apex.region.validation.validate();
+            console.log('✅ apex.region.validation.validate() called');
+          }
+        } catch (e) {}
+        try {
+          if (apex.page && apex.page.fields && apex.page.fields.oapGender) {
+            apex.page.fields.oapGender.validate();
+            console.log('✅ apex.page.fields.oapGender.validate() called');
+          }
+        } catch (e) {}
+      } else {
+        console.log('⚠️ apex not available on this page');
       }
-      // Fallback: click the LOV button specific to gender
-      var genderRow = el.closest('tr') || el.closest('div[class*="gender"], div[id*="oapGender"]');
-      var lovBtn = genderRow ? genderRow.querySelector('a[onclick*="oapGender"], button[onclick*="oapGender"], img[src*="lov"]') : null;
-      if (lovBtn && typeof lovBtn.click === 'function') lovBtn.click();
+      // Log final state
+      console.log('📊 oapGender final value:', el.value);
+      console.log('📊 oapGender selectedIndex:', el.selectedIndex);
+      console.log('📊 oapGender selectedOption:', el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : 'none');
     })();
 
     showToast(
