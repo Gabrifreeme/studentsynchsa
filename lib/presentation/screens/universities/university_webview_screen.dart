@@ -113,7 +113,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   String _resolveUrl() {
     final name = widget.universityName.toUpperCase();
     if (name == 'UNIVEN' || name == 'VENDA') {
-      return 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view?x_processcode=ITS_OAP';
+      return 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
     }
     return widget.url;
   }
