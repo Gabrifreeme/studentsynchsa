@@ -2902,9 +2902,9 @@ class _ProfileOnboardingScreenState
       final authState = ref.read(authProvider);
       final existingProfile = authState.value?.profile;
       final id = existingProfile?.id ?? const Uuid().v4();
+      final base = existingProfile ?? StudentProfile(id: id);
 
-      final profile = StudentProfile(
-        id: id,
+      final profile = base.copyWith(
         personal: PersonalDetails(
           title: _title,
           initials: _initialsCtrl.text.trim(),
@@ -2932,7 +2932,7 @@ class _ProfileOnboardingScreenState
               ? _postalAddr1Ctrl.text.trim()
               : _streetAddr1Ctrl.text.trim(),
         ),
-        demographic: DemographicInfo(
+        demographic: base.demographic.copyWith(
           nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
           populationGroup: _ethnicGroup,
@@ -2940,7 +2940,7 @@ class _ProfileOnboardingScreenState
           citizenshipCode: _citizenshipCodeCtrl.text.trim(),
           heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
-        status: StatusInfo(
+        status: base.status.copyWith(
           disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
           employmentStatus: _isEmployed,
@@ -4258,9 +4258,9 @@ class _ProfileOnboardingScreenState
       final authState = ref.read(authProvider);
       final existingProfile = authState.value?.profile;
       final id = existingProfile?.id ?? const Uuid().v4();
+      final base = existingProfile ?? StudentProfile(id: id);
 
-      final profile = StudentProfile(
-        id: id,
+      final profile = base.copyWith(
         personal: PersonalDetails(
           title: _title,
           initials: _initialsCtrl.text.trim(),
@@ -4288,7 +4288,7 @@ class _ProfileOnboardingScreenState
               ? _postalAddr1Ctrl.text.trim()
               : _streetAddr1Ctrl.text.trim(),
         ),
-        demographic: DemographicInfo(
+        demographic: base.demographic.copyWith(
           nationality: _isSACitizen,
           homeLanguage: _homeLanguageCtrl.text.trim(),
           populationGroup: _ethnicGroup,
@@ -4296,7 +4296,7 @@ class _ProfileOnboardingScreenState
           citizenshipCode: _citizenshipCodeCtrl.text.trim(),
           heardAboutUs: _heardAboutUsCtrl.text.trim(),
         ),
-        status: StatusInfo(
+        status: base.status.copyWith(
           disabilityStatus: _hasDisability ? 'Yes' : 'No',
           bursaryRequired: _bursaryRequired,
           employmentStatus: _isEmployed,
