@@ -2576,8 +2576,10 @@ class _ProfileOnboardingScreenState
 
   void _loadExistingProfile() async {
     var profile = ref.read(profileProvider).valueOrNull;
+    debugPrint('📂 _loadExistingProfile: profileProvider.valueOrNull = ${profile?.personal.idNumber}');
     if (profile == null) {
       try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+      debugPrint('📂 _loadExistingProfile: Hive direct = ${profile?.personal.idNumber}');
     }
     if (profile == null) {
       await Future.delayed(const Duration(milliseconds: 500));
@@ -2585,6 +2587,7 @@ class _ProfileOnboardingScreenState
       if (profile == null) {
         try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
       }
+      debugPrint('📂 _loadExistingProfile: retry result = ${profile?.personal.idNumber}');
     }
     if (profile == null) return;
     final p = profile;
@@ -2592,6 +2595,7 @@ class _ProfileOnboardingScreenState
   }
 
   void _applyProfile(StudentProfile p) {
+    debugPrint('📋 _applyProfile: idNumber="${p.personal.idNumber}" gender="${p.personal.gender}" id="${p.id}"');
     _isSACitizen = [
       'SA Citizen',
       'Permanent Resident',
@@ -2983,6 +2987,7 @@ class _ProfileOnboardingScreenState
         onboardingComplete: true,
       ));
 
+      debugPrint('💾 _saveProfile final: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}" id="${profile.id}"');
       await ref.read(profileProvider.notifier).saveProfile(profile);
       if (mounted) {
         setState(() => _saving = false);
@@ -4342,6 +4347,7 @@ class _ProfileOnboardingScreenState
         ),
       ));
 
+      debugPrint('💾 _saveProfile final: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}" id="${profile.id}"');
       await ref.read(profileProvider.notifier).saveProfile(profile);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

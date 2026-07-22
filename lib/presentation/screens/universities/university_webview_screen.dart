@@ -120,8 +120,10 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
   void _openInChrome() async {
     final uri = Uri.parse(_resolveUrl());
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('❌ launchUrl failed: $e');
     }
   }
 

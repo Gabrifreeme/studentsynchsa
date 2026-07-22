@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
@@ -142,7 +143,17 @@ class AuthService implements AuthRepository {
   Future<AuthResult> autoLogin() async {
     try {
       var profile = await _profileRepo.getProfile();
-      final existingId = profile?.id ?? const Uuid().v4();
+      // If a real profile exists, return it as-is — don't overwrite with test data
+      if (profile != null) {
+        debugPrint('autoLogin: found existing profile id=${profile.id}');
+        if (HiveDatabase.settings.get('auth_user_id') == null ||
+            (HiveDatabase.settings.get('auth_user_id') ?? '').isEmpty) {
+          await _setAuthData(email: profile.contact.email.isNotEmpty ? profile.contact.email : 'test.user@example.com', id: profile.id);
+        }
+        return AuthResult(success: true, profile: profile);
+      }
+      // No profile — create test fixture for first launch
+      final existingId = const Uuid().v4();
       profile = StudentProfile(
           id: existingId,
           onboardingComplete: true,
