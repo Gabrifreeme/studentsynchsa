@@ -709,6 +709,8 @@ class StudentProfile {
           email: contact?.email,
           phone: contact?.phone,
           workPhone: contact?.workPhone,
+          hasSACellphone: contact?.hasSACellphone,
+          verifyEmail: contact?.verifyEmail,
         ),
         address: this.address.copyWith(
           address: address?.address,
@@ -724,11 +726,14 @@ class StudentProfile {
           homeLanguage: demographic?.homeLanguage,
           populationGroup: demographic?.populationGroup,
           maritalStatus: demographic?.maritalStatus,
+          citizenshipCode: demographic?.citizenshipCode,
+          heardAboutUs: demographic?.heardAboutUs,
         ),
         status: this.status.copyWith(
           disabilityStatus: status?.disabilityStatus,
           bursaryRequired: status?.bursaryRequired,
           employmentStatus: status?.employmentStatus,
+          wantsResidence: status?.wantsResidence,
         ),
         school: this.school.copyWith(
           schoolName: school?.schoolName,
