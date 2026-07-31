@@ -57,3 +57,11 @@ drive_credentials.json
 drive_token.json
 
 ntfy_topic.txt
+
+tasks.json
+
+events.json
+
+alarms.json
+timers.json
+sessions.json

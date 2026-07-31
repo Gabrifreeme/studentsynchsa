@@ -331,6 +331,25 @@
   .search-highlight { background: #fbbf24; color: #1a1200; border-radius: 2px; }
   ::highlight(search-result) { background: #f59e0b; color: #1a1200; }
   ::highlight(search-current) { background: #fbbf24; color: #1a1200; }
+  .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cal-month { flex: 1; text-align: center; font-weight: 700; color: var(--text); font-size: 15px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-dim); padding: 4px 0; }
+  .cal-day { text-align: center; padding: 6px 0; border-radius: 6px; font-size: 12px; color: var(--text); cursor: pointer; border: 1px solid transparent; min-height: 34px; }
+  .cal-day:hover { background: var(--bg-hover); }
+  .cal-day.dim { color: var(--text-mute); opacity: .5; }
+  .cal-day.sel { background: var(--accent); color: #fff; }
+  .cal-day.today { border: 1px solid var(--accent); }
+  .cal-day .cal-dots { display: flex; gap: 2px; justify-content: center; margin-top: 2px; font-size: 6px; color: var(--accent); }
+  .cal-day.sel .cal-dots { color: #fff; }
+  .cal-day .cal-dots span { font-size: 8px; color: var(--text-mute); }
+  .cal-day-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .cal-none { color: var(--text-mute); font-size: 12px; padding: 8px 0; }
+  .cal-ev { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 4px; background: var(--bg-elev); }
+  .cal-ev-time { color: var(--accent); font-weight: 700; font-size: 12px; width: 44px; }
+  .cal-add { display: flex; gap: 8px; margin-top: 10px; }
+  .time-tab { padding: 6px 14px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .time-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -413,6 +432,63 @@
   <span class="st-item" style="margin-left:8px;">
     <button id="stNotifyBtn" class="st-model-btn" title="Send notification to your phone">🔔</button>
   </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stTasksBtn" class="st-model-btn" title="Tasks">📋 <b id="stTasksCount">0</b></button>
+  </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stCalBtn" class="st-model-btn" title="Calendar">📅 <b id="stCalCount">0</b></button>
+  </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stTimeBtn" class="st-model-btn" title="Timers & Alarms">⏰ <b id="stTimeCount">0</b></button>
+  </span>
+</div>
+
+<div id="timeOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:540px;max-width:94vw;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">⏰ Timers & Alarms</h3>
+      <button class="icon-btn" onclick="closeTimeModal()" title="Close">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);">
+      <button class="time-tab" id="tab-timer" onclick="switchTimeTab('timer')">⏲️ Timer</button>
+      <button class="time-tab" id="tab-alarms" onclick="switchTimeTab('alarms')">⏰ Alarms</button>
+      <button class="time-tab" id="tab-sessions" onclick="switchTimeTab('sessions')">💼 Sessions</button>
+    </div>
+    <div id="timeBody" style="padding:16px;max-height:56vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<div id="calOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:680px;max-width:94vw;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">📅 Calendar</h3>
+      <button class="icon-btn" onclick="closeCalModal()" title="Close">✕</button>
+    </div>
+    <div id="calBody" style="padding:16px;max-height:70vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<div id="tasksOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:580px;max-width:92vw;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">📋 Tasks</h3>
+      <button class="icon-btn" onclick="closeTasksModal()" title="Close">✕</button>
+    </div>
+    <div style="padding:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" id="taskTitle" placeholder="New task..." class="settings-input" style="flex:1;box-sizing:border-box;">
+        <select id="taskPriority" class="settings-select">
+          <option value="1">🔴 1 - Urgent</option>
+          <option value="2">🟠 2 - High</option>
+          <option value="3" selected>⚪ 3 - Normal</option>
+          <option value="4">🔵 4 - Low</option>
+          <option value="5">⚫ 5 - Min</option>
+        </select>
+        <button onclick="addTask()" class="settings-save">Add</button>
+      </div>
+      <div id="tasksList" style="max-height:48vh;overflow-y:auto;"></div>
+    </div>
+  </div>
 </div>
 
 <div id="notifyOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
@@ -1709,6 +1785,431 @@
   }
   setInterval(refreshCounts, 10000);
   refreshCounts();
+
+  // ===== TASK MANAGEMENT =====
+  let aceTasks = [];
+
+  function openTasksModal() {
+    document.getElementById('tasksOverlay').style.display = 'flex';
+    loadTasks();
+  }
+  function closeTasksModal() { document.getElementById('tasksOverlay').style.display = 'none'; }
+  document.getElementById('tasksOverlay').addEventListener('click', e => { if (e.target.id === 'tasksOverlay') closeTasksModal(); });
+  document.getElementById('stTasksBtn').addEventListener('click', e => { e.stopPropagation(); openTasksModal(); });
+
+  function updateTasksBadge() {
+    const pending = aceTasks.filter(t => t.status !== 'done').length;
+    const el = document.getElementById('stTasksCount');
+    if (el) el.textContent = pending;
+    if (el) el.title = pending + ' open, ' + aceTasks.length + ' total';
+  }
+
+  function loadTasks() {
+    fetch('http://localhost:5000/tasks')
+      .then(r => r.json())
+      .then(d => { aceTasks = d.tasks || []; renderTasks(); updateTasksBadge(); })
+      .catch(() => {});
+  }
+
+  function renderTasks() {
+    const el = document.getElementById('tasksList');
+    if (!aceTasks.length) {
+      el.innerHTML = '<div style="color:var(--text-mute);padding:14px;text-align:center;">No tasks yet. Add one above.</div>';
+      return;
+    }
+    const priColor = { 1: '#ff5c5c', 2: '#ff9f43', 3: '#888', 4: '#4aa3ff', 5: '#666' };
+    const priLabel = { 1: 'P1', 2: 'P2', 3: 'P3', 4: 'P4', 5: 'P5' };
+    const icons = { done: '✅', in_progress: '🔄', pending: '⬜' };
+    aceTasks.forEach(t => {
+      el.innerHTML += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg-elev);">' +
+        '<button class="icon-btn" onclick="taskToggle(\'' + t.id + '\')" title="Toggle status" style="font-size:15px;">' + (icons[t.status] || icons.pending) + '</button>' +
+        '<div style="flex:1;min-width:0;"><div style="color:var(--text);font-size:13px;' + (t.status === 'done' ? 'text-decoration:line-through;opacity:.6;' : '') + '">' + escapeHtml(t.title) + '</div>' +
+        (t.notes ? '<div style="color:var(--text-mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(t.notes) + '</div>' : '') +
+        '<div style="color:var(--text-mute);font-size:11px;margin-top:2px;">' + escapeHtml(t.created_at) + (t.done_at ? ' · done ' + escapeHtml(t.done_at) : '') + '</div></div>' +
+        '<span style="font-size:11px;font-weight:700;color:' + (priColor[t.priority] || priColor[3]) + ';border:1px solid currentColor;border-radius:4px;padding:2px 6px;">' + (priLabel[t.priority] || 'P3') + '</span>' +
+        '<button class="icon-btn" onclick="taskDelete(\'' + t.id + '\')" title="Delete">🗑</button></div>';
+    });
+  }
+
+  function taskToggle(id) {
+    const t = aceTasks.find(x => x.id === id);
+    if (!t) return;
+    const next = t.status === 'done' ? 'pending' : 'done';
+    fetch('http://localhost:5000/tasks/' + id + '/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next })
+    }).then(r => r.json()).then(() => loadTasks()).catch(err => alert('Error: ' + err));
+  }
+
+  function taskDelete(id) {
+    fetch('http://localhost:5000/tasks/' + id, { method: 'DELETE' })
+      .then(r => r.json()).then(() => loadTasks()).catch(err => alert('Error: ' + err));
+  }
+
+  function addTask() {
+    const title = document.getElementById('taskTitle').value.trim();
+    if (!title) { alert('Enter a task title.'); return; }
+    const priority = document.getElementById('taskPriority').value;
+    fetch('http://localhost:5000/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, priority: priority })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        document.getElementById('taskTitle').value = '';
+        loadTasks();
+      })
+      .catch(err => alert('Error: ' + err));
+  }
+
+  // ===== CALENDAR =====
+  const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  let aceEvents = [];
+  let calYear, calMonth, calSelected;
+
+  function calFmt(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function initCal() {
+    const now = new Date();
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+    calSelected = calFmt(now);
+  }
+
+  function openCalModal() {
+    document.getElementById('calOverlay').style.display = 'flex';
+    if (calYear === undefined) initCal();
+    loadEvents();
+  }
+  function closeCalModal() { document.getElementById('calOverlay').style.display = 'none'; }
+  document.getElementById('calOverlay').addEventListener('click', e => { if (e.target.id === 'calOverlay') closeCalModal(); });
+  document.getElementById('stCalBtn').addEventListener('click', e => { e.stopPropagation(); openCalModal(); });
+
+  function loadEvents() {
+    fetch('http://localhost:5000/events')
+      .then(r => r.json())
+      .then(d => { aceEvents = d.events || []; renderCal(); updateCalBadge(); })
+      .catch(() => {});
+  }
+
+  function updateCalBadge() {
+    const today = calFmt(new Date());
+    const n = aceEvents.filter(e => e.date === today).length;
+    const el = document.getElementById('stCalCount');
+    if (el) { el.textContent = n; el.title = n + ' events today'; }
+  }
+
+  function calDayCell(d, dim, todayStr) {
+    const ds = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const evs = aceEvents.filter(e => e.date === ds);
+    let cell = '<div class="cal-day' + (dim ? ' dim' : '') + (ds === calSelected ? ' sel' : '') + (ds === todayStr ? ' today' : '') + '" onclick="calSelect(' + d + ')">' + d;
+    if (evs.length) {
+      cell += '<div class="cal-dots">' + evs.slice(0, 3).map(() => '●').join('') + (evs.length > 3 ? '<span>+' + (evs.length - 3) + '</span>' : '') + '</div>';
+    }
+    cell += '</div>';
+    return cell;
+  }
+
+  function renderCal() {
+    const todayStr = calFmt(new Date());
+    let html = '<div class="cal-head">' +
+      '<button class="icon-btn" onclick="calNav(-1)" title="Previous month">◀</button>' +
+      '<span class="cal-month">' + CAL_MONTHS[calMonth] + ' ' + calYear + '</span>' +
+      '<button class="icon-btn" onclick="calNav(1)" title="Next month">▶</button>' +
+      '<button class="icon-btn" onclick="calToday()" title="Go to today">●</button>' +
+      '</div>';
+    html += '<div class="cal-grid">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(h => '<div class="cal-dow">' + h + '</div>').join('');
+    const first = new Date(calYear, calMonth, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const dim = new Date(calYear, calMonth + 1, 0).getDate();
+    const prevDim = new Date(calYear, calMonth, 0).getDate();
+    for (let i = offset - 1; i >= 0; i--) html += calDayCell(prevDim - i, true, todayStr);
+    for (let d = 1; d <= dim; d++) html += calDayCell(d, false, todayStr);
+    html += '</div>';
+    const selEvents = aceEvents.filter(e => e.date === calSelected);
+    html += '<div class="cal-day-title">Events — ' + calSelected + '</div>';
+    if (selEvents.length) {
+      selEvents.forEach(e => {
+        html += '<div class="cal-ev"><span class="cal-ev-time">' + (e.time ? escapeHtml(e.time) : '') + '</span>' +
+          '<span style="flex:1;color:var(--text);font-size:13px;">' + escapeHtml(e.title) + '</span>' +
+          '<button class="icon-btn" onclick="calDeleteEvent(\'' + e.id + '\')" title="Delete">🗑</button></div>';
+      });
+    } else {
+      html += '<div class="cal-none">No events this day.</div>';
+    }
+    html += '<div class="cal-add">' +
+      '<input id="calTitle" class="settings-input" placeholder="Event title" style="flex:1;">' +
+      '<input id="calTime" type="time" class="settings-input" style="width:120px;">' +
+      '<button class="settings-save" onclick="calAddEvent()">Add</button></div>';
+    document.getElementById('calBody').innerHTML = html;
+  }
+
+  function calSelect(d) {
+    calSelected = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    renderCal();
+  }
+  function calNav(off) {
+    calMonth += off;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    renderCal();
+  }
+  function calToday() {
+    const now = new Date();
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+    calSelected = calFmt(now);
+    renderCal();
+  }
+  function calAddEvent() {
+    const title = document.getElementById('calTitle').value.trim();
+    if (!title) { alert('Enter an event title.'); return; }
+    const time = document.getElementById('calTime').value || '';
+    fetch('http://localhost:5000/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, date: calSelected, time: time })
+    })
+      .then(r => r.json())
+      .then(d => { if (d.error) { alert('Error: ' + d.error); return; } loadEvents(); })
+      .catch(err => alert('Error: ' + err));
+  }
+  function calDeleteEvent(id) {
+    fetch('http://localhost:5000/events/' + id, { method: 'DELETE' })
+      .then(r => r.json()).then(() => loadEvents()).catch(err => alert('Error: ' + err));
+  }
+
+  // ===== TIMERS / ALARMS / SESSIONS =====
+  let aceTab = 'timer';
+  let aceTimers = [];
+  let aceAlarms = [];
+  let aceSessions = [];
+  let aceTimerFetchTs = 0;
+  let notifyAfter = parseFloat(localStorage.getItem('ace_notify_after') || '0');
+
+  function fmtRemain(s) {
+    s = Math.max(0, s);
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+  }
+
+  function requestNotifyPermission() {
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  }
+
+  function playBeep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880;
+      o.type = 'sine';
+      g.gain.setValueAtTime(0.3, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+      o.start(); o.stop(ctx.currentTime + 1.5);
+    } catch (e) {}
+  }
+
+  function showAlertNotif(type, label) {
+    const title = type === 'alarm' ? '⏰ Alarm: ' + label : '⏲️ Timer: ' + label;
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification(title); } catch (e) {}
+    }
+    playBeep();
+  }
+
+  function pollNotifications() {
+    fetch('http://localhost:5000/notifications/pending?after=' + notifyAfter)
+      .then(r => r.json())
+      .then(d => {
+        if (d.events && d.events.length) {
+          let maxTs = notifyAfter;
+          d.events.forEach(ev => {
+            maxTs = Math.max(maxTs, ev.ts);
+            showAlertNotif(ev.type, ev.label);
+          });
+          notifyAfter = maxTs;
+          localStorage.setItem('ace_notify_after', String(notifyAfter));
+        }
+      })
+      .catch(() => {});
+  }
+  setInterval(pollNotifications, 5000);
+  setTimeout(requestNotifyPermission, 3000);
+
+  function openTimeModal() {
+    document.getElementById('timeOverlay').style.display = 'flex';
+    loadTimeData();
+    requestNotifyPermission();
+  }
+  function closeTimeModal() { document.getElementById('timeOverlay').style.display = 'none'; }
+  document.getElementById('timeOverlay').addEventListener('click', e => { if (e.target.id === 'timeOverlay') closeTimeModal(); });
+  document.getElementById('stTimeBtn').addEventListener('click', e => { e.stopPropagation(); openTimeModal(); });
+
+  function switchTimeTab(tab) {
+    aceTab = tab;
+    renderTimeBody();
+  }
+
+  function loadTimeData() {
+    Promise.all([
+      fetch('http://localhost:5000/timers').then(r => r.json()),
+      fetch('http://localhost:5000/alarms').then(r => r.json()),
+      fetch('http://localhost:5000/sessions').then(r => r.json())
+    ])
+      .then(([t, a, s]) => {
+        aceTimers = t.timers || [];
+        aceAlarms = a.alarms || [];
+        aceSessions = s.sessions || [];
+        aceTimerFetchTs = Date.now();
+        renderTimeBody();
+        updateTimeBadge();
+      })
+      .catch(() => {});
+  }
+
+  function updateTimeBadge() {
+    const running = aceTimers.length + aceAlarms.filter(a => a.enabled).length;
+    const el = document.getElementById('stTimeCount');
+    if (el) { el.textContent = running; el.title = running + ' timers/alarms active'; }
+  }
+
+  function renderTimeBody() {
+    const body = document.getElementById('timeBody');
+    document.getElementById('tab-timer').classList.toggle('active', aceTab === 'timer');
+    document.getElementById('tab-alarms').classList.toggle('active', aceTab === 'alarms');
+    document.getElementById('tab-sessions').classList.toggle('active', aceTab === 'sessions');
+    let html = '';
+    if (aceTab === 'timer') {
+      html += '<div class="cal-add">' +
+        '<input id="tmMinutes" type="number" min="1" value="25" class="settings-input" style="width:90px;">' +
+        '<input id="tmLabel" class="settings-input" placeholder="Label (optional)" style="flex:1;">' +
+        '<button class="settings-save" onclick="startTimer()">Start</button></div>';
+      html += '<div class="cal-day-title" style="margin-top:14px;">Running timers</div>';
+      if (aceTimers.length) {
+        aceTimers.forEach(t => {
+          html += '<div class="cal-ev"><span style="color:var(--accent);font-weight:700;font-size:13px;width:70px;" id="tm-count-' + t.id + '">' + fmtRemain(t.remaining) + '</span>' +
+            '<span style="flex:1;color:var(--text);font-size:13px;">' + escapeHtml(t.label) + '</span>' +
+            '<button class="icon-btn" onclick="stopTimer(\'' + t.id + '\')" title="Stop">⏹</button></div>';
+        });
+      } else {
+        html += '<div class="cal-none">No timers running.</div>';
+      }
+    } else if (aceTab === 'alarms') {
+      html += '<div class="cal-add">' +
+        '<input id="alTime" type="time" class="settings-input" style="width:110px;">' +
+        '<input id="alLabel" class="settings-input" placeholder="Label (e.g. medicine)" style="flex:1;">' +
+        '<label style="color:var(--text-dim);font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;"><input type="checkbox" id="alDaily" checked style="accent-color:var(--accent);"> daily</label>' +
+        '<button class="settings-save" onclick="addAlarm()">Set</button></div>';
+      html += '<div class="cal-day-title" style="margin-top:14px;">Alarms</div>';
+      if (aceAlarms.length) {
+        aceAlarms.forEach(a => {
+          html += '<div class="cal-ev"><button class="icon-btn" onclick="toggleAlarm(\'' + a.id + '\')" title="Toggle on/off">' + (a.enabled ? '🔔' : '🔕') + '</button>' +
+            '<span style="color:var(--accent);font-weight:700;font-size:13px;width:44px;">' + escapeHtml(a.time) + '</span>' +
+            '<span style="flex:1;color:var(--text);font-size:13px;">' + escapeHtml(a.label) + (a.daily ? ' <span style="color:var(--text-mute);font-size:11px;">daily</span>' : '') + '</span>' +
+            '<button class="icon-btn" onclick="deleteAlarm(\'' + a.id + '\')" title="Delete">🗑</button></div>';
+        });
+      } else {
+        html += '<div class="cal-none">No alarms set.</div>';
+      }
+    } else {
+      const open = aceSessions.find(s => !s.ended_at);
+      if (open) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--accent);border-radius:8px;margin-bottom:12px;background:var(--bg-elev);">' +
+          '<span style="font-size:15px;">💼</span>' +
+          '<div style="flex:1;"><div style="color:var(--text);font-size:13px;font-weight:600;">' + escapeHtml(open.label) + '</div>' +
+          '<div style="color:var(--accent);font-size:14px;font-weight:700;" id="sess-elapsed">0:00:00</div></div>' +
+          '<button class="settings-save" onclick="endSession()">End session</button></div>';
+      } else {
+        html += '<div class="cal-add" style="margin-bottom:12px;"><input id="sessLabel" class="settings-input" placeholder="Session name (optional)" style="flex:1;"><button class="settings-save" onclick="startSession()">Start work</button></div>';
+      }
+      html += '<div class="cal-day-title">Recent sessions</div>';
+      if (aceSessions.length) {
+        aceSessions.slice().reverse().slice(0, 8).forEach(s => {
+          html += '<div class="cal-ev"><span style="flex:1;color:var(--text);font-size:13px;">' + escapeHtml(s.label) + '</span>' +
+            '<span style="color:var(--text-mute);font-size:12px;">' + escapeHtml(s.started_at.slice(0, 16)) + (s.ended_at ? ' · ' + escapeHtml(s.duration) : ' · running') + '</span></div>';
+        });
+      } else {
+        html += '<div class="cal-none">No sessions recorded.</div>';
+      }
+    }
+    body.innerHTML = html;
+    if (aceTab === 'sessions') tickSessionElapsed();
+  }
+
+  function tickSessionElapsed() {
+    const open = aceSessions.find(s => !s.ended_at);
+    const el = document.getElementById('sess-elapsed');
+    if (open && el && open.started_epoch) {
+      const secs = Math.max(0, Math.floor(Date.now() / 1000 - open.started_epoch));
+      const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), ss = secs % 60;
+      el.textContent = h + ':' + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+    }
+  }
+
+  setInterval(() => {
+    if (aceTimers.length) {
+      const elapsed = Math.floor((Date.now() - aceTimerFetchTs) / 1000);
+      aceTimers.forEach(t => {
+        const el = document.getElementById('tm-count-' + t.id);
+        if (el) el.textContent = fmtRemain(t.remaining - elapsed);
+      });
+    }
+    tickSessionElapsed();
+  }, 1000);
+
+  function startTimer() {
+    const minutes = parseInt(document.getElementById('tmMinutes').value, 10);
+    const label = document.getElementById('tmLabel').value.trim();
+    if (!minutes || minutes < 1) { alert('Enter minutes.'); return; }
+    fetch('http://localhost:5000/timers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes: minutes, label: label || 'Timer' })
+    }).then(r => r.json()).then(d => { if (d.error) alert('Error: ' + d.error); else loadTimeData(); }).catch(err => alert('Error: ' + err));
+  }
+  function stopTimer(id) {
+    fetch('http://localhost:5000/timers/' + id, { method: 'DELETE' })
+      .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
+  }
+  function addAlarm() {
+    const time = document.getElementById('alTime').value;
+    const label = document.getElementById('alLabel').value.trim();
+    if (!time) { alert('Pick a time.'); return; }
+    fetch('http://localhost:5000/alarms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ time: time, label: label || 'Alarm', daily: document.getElementById('alDaily').checked })
+    }).then(r => r.json()).then(d => { if (d.error) alert('Error: ' + d.error); else loadTimeData(); }).catch(err => alert('Error: ' + err));
+  }
+  function toggleAlarm(id) {
+    fetch('http://localhost:5000/alarms/' + id + '/toggle', { method: 'POST' })
+      .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
+  }
+  function deleteAlarm(id) {
+    fetch('http://localhost:5000/alarms/' + id, { method: 'DELETE' })
+      .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
+  }
+  function startSession() {
+    const label = document.getElementById('sessLabel').value.trim();
+    fetch('http://localhost:5000/sessions/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label || 'Work session' })
+    }).then(r => r.json()).then(d => { if (d.error) alert(d.error); loadTimeData(); }).catch(err => alert('Error: ' + err));
+  }
+  function endSession() {
+    fetch('http://localhost:5000/sessions/end', { method: 'POST' })
+      .then(r => r.json()).then(d => { if (d.error) alert(d.error); loadTimeData(); }).catch(err => alert('Error: ' + err));
+  }
 
   function sendNotification() {
     const title = document.getElementById('ntfyTitle').value.trim() || 'ACE';

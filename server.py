@@ -196,6 +196,305 @@ def fn_send_notification(args):
         return 'ntfy error: ' + str(r.status_code)
     return 'Notification sent to phone (title="' + title + '").'
 
+# ---------- Task management ----------
+TASKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tasks.json')
+
+def load_tasks():
+    try:
+        with open(TASKS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get('tasks'), list):
+            return data['tasks']
+    except Exception:
+        pass
+    return []
+
+def save_tasks(tasks):
+    with open(TASKS_FILE, 'w', encoding='utf-8') as f:
+        json.dump({'tasks': tasks}, f, ensure_ascii=False, indent=2)
+
+def make_task(title, notes='', priority=3, status='pending'):
+    return {
+        'id': os.urandom(6).hex(),
+        'title': title,
+        'notes': notes,
+        'priority': int(priority),
+        'status': status,
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'done_at': None
+    }
+
+def fn_task_add(args):
+    title = (args.get('title') or '').strip()
+    if not title:
+        return 'title is required.'
+    task = make_task(title, (args.get('notes') or ''), args.get('priority', 3))
+    tasks = load_tasks()
+    tasks.insert(0, task)
+    save_tasks(tasks)
+    return 'Task created: "' + title + '" (id=' + task['id'] + ', priority ' + str(task['priority']) + ').'
+
+def fn_task_list(args):
+    tasks = load_tasks()
+    if not tasks:
+        return 'No tasks yet.'
+    icons = {'pending': '[ ]', 'in_progress': '[*]', 'done': '[x]'}
+    lines = []
+    for t in tasks:
+        lines.append(icons.get(t['status'], '[ ]') + ' ' + t['title'] + ' (p' + str(t['priority']) + ', id=' + t['id'] + ')')
+    return 'Tasks:\n' + '\n'.join(lines)
+
+def fn_task_set_status(args):
+    task_id = args.get('id') or args.get('task_id')
+    status = args.get('status')
+    if not task_id or status not in ('pending', 'in_progress', 'done'):
+        return 'id and status (pending|in_progress|done) are required.'
+    tasks = load_tasks()
+    for t in tasks:
+        if t['id'] == task_id:
+            t['status'] = status
+            t['done_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if status == 'done' else None
+            save_tasks(tasks)
+            return 'Task "' + t['title'] + '" set to ' + status + '.'
+    return 'Task not found: ' + task_id
+
+def fn_task_delete(args):
+    task_id = args.get('id') or args.get('task_id')
+    if not task_id:
+        return 'id is required.'
+    tasks = load_tasks()
+    before = len(tasks)
+    tasks = [t for t in tasks if t['id'] != task_id]
+    save_tasks(tasks)
+    return 'Deleted task.' if len(tasks) < before else 'Task not found: ' + task_id
+
+# ---------- Calendar / events ----------
+EVENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'events.json')
+
+def load_events():
+    try:
+        with open(EVENTS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get('events'), list):
+            return data['events']
+    except Exception:
+        pass
+    return []
+
+def save_events(events):
+    with open(EVENTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump({'events': events}, f, ensure_ascii=False, indent=2)
+
+def make_event(title, date, time='', notes=''):
+    return {
+        'id': os.urandom(6).hex(),
+        'title': title,
+        'date': date,
+        'time': time,
+        'notes': notes,
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+def fn_event_add(args):
+    title = (args.get('title') or '').strip()
+    date = (args.get('date') or '').strip()
+    if not title or not date:
+        return 'title and date (YYYY-MM-DD) are required.'
+    event = make_event(title, date, (args.get('time') or ''), (args.get('notes') or ''))
+    events = load_events()
+    events.append(event)
+    events.sort(key=lambda e: (e['date'], e['time']))
+    save_events(events)
+    return 'Event added: "' + title + '" on ' + date + ' (id=' + event['id'] + ').'
+
+def fn_event_list(args):
+    events = load_events()
+    if not events:
+        return 'No events in the calendar.'
+    days = int(args.get('days') or 7)
+    from datetime import date as _date, timedelta
+    today = _date.today().isoformat()
+    limit = (_date.today() + timedelta(days=days)).isoformat()
+    upcoming = [e for e in events if today <= e['date'] <= limit]
+    if not upcoming:
+        return 'No events in the next ' + str(days) + ' days.'
+    lines = []
+    for e in upcoming:
+        lines.append(e['date'] + ((' ' + e['time']) if e.get('time') else '') + ' - ' + e['title'] + ' (id=' + e['id'] + ')')
+    return 'Upcoming events:\n' + '\n'.join(lines)
+
+def fn_event_delete(args):
+    event_id = args.get('id') or args.get('event_id')
+    if not event_id:
+        return 'id is required.'
+    events = load_events()
+    before = len(events)
+    events = [e for e in events if e['id'] != event_id]
+    save_events(events)
+    return 'Deleted event.' if len(events) < before else 'Event not found: ' + event_id
+
+# ---------- Timers / alarms / sessions ----------
+ALARMS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alarms.json')
+TIMERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'timers.json')
+SESSIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions.json')
+
+pending_notifications = []
+
+def push_notification(ntype, label):
+    pending_notifications.append({'ts': time.time(), 'type': ntype, 'label': label})
+    while pending_notifications and pending_notifications[0]['ts'] < time.time() - 600:
+        pending_notifications.pop(0)
+
+def load_json_file(path, key, default):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get(key), list):
+            return data[key]
+    except Exception:
+        pass
+    return default
+
+def save_json_file(path, key, items):
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({key: items}, f, ensure_ascii=False, indent=2)
+
+def load_alarms():
+    return load_json_file(ALARMS_FILE, 'alarms', [])
+
+def save_alarms(alarms):
+    save_json_file(ALARMS_FILE, 'alarms', alarms)
+
+def load_timers():
+    return load_json_file(TIMERS_FILE, 'timers', [])
+
+def save_timers(timers):
+    save_json_file(TIMERS_FILE, 'timers', timers)
+
+def load_sessions():
+    return load_json_file(SESSIONS_FILE, 'sessions', [])
+
+def save_sessions(sessions):
+    save_json_file(SESSIONS_FILE, 'sessions', sessions)
+
+def check_alarms_and_timers():
+    now = datetime.now()
+    today = now.strftime('%Y-%m-%d')
+    hm = now.strftime('%H:%M')
+    alarms = load_alarms()
+    changed = False
+    for a in alarms:
+        if not a.get('enabled', True):
+            continue
+        if a.get('time') != hm:
+            continue
+        if a.get('last_fired') == today:
+            continue
+        a['last_fired'] = today
+        changed = True
+        label = a.get('label') or 'Alarm'
+        try:
+            ntfy_send('⏰ Alarm: ' + label, 'Alarm at ' + hm)
+        except Exception:
+            pass
+        push_notification('alarm', label)
+    if changed:
+        save_alarms(alarms)
+    timers = load_timers()
+    changed2 = False
+    for t in timers:
+        if t.get('fired'):
+            continue
+        if now.timestamp() >= t.get('end_at', 0):
+            t['fired'] = True
+            changed2 = True
+            label = t.get('label') or 'Timer'
+            try:
+                ntfy_send('⏲️ Timer done: ' + label, 'Your timer finished.')
+            except Exception:
+                pass
+            push_notification('timer', label)
+    if changed2:
+        save_timers(timers)
+
+def alarm_loop():
+    while True:
+        time.sleep(10)
+        try:
+            check_alarms_and_timers()
+        except Exception:
+            pass
+
+def fn_alarm_add(args):
+    t = (args.get('time') or '').strip()
+    if not t:
+        return 'time (HH:MM) is required.'
+    alarms = load_alarms()
+    alarm = {
+        'id': os.urandom(6).hex(),
+        'time': t,
+        'label': (args.get('label') or 'Alarm').strip(),
+        'daily': bool(args.get('daily', True)),
+        'enabled': True,
+        'last_fired': None
+    }
+    alarms.append(alarm)
+    save_alarms(alarms)
+    return 'Alarm set for ' + t + (' (daily)' if alarm['daily'] else '') + ' (id=' + alarm['id'] + ').'
+
+def fn_timer_start(args):
+    try:
+        minutes = int(args.get('minutes'))
+    except (TypeError, ValueError):
+        return 'minutes is required.'
+    if minutes < 1:
+        return 'minutes must be positive.'
+    timers = load_timers()
+    timer = {
+        'id': os.urandom(6).hex(),
+        'label': (args.get('label') or 'Timer').strip(),
+        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'end_at': time.time() + minutes * 60,
+        'fired': False
+    }
+    timers.append(timer)
+    save_timers(timers)
+    return 'Timer started for ' + str(minutes) + ' min ("' + timer['label'] + '", id=' + timer['id'] + ').'
+
+def fn_session_start(args):
+    sessions = load_sessions()
+    for s in sessions:
+        if not s.get('ended_at'):
+            return 'A session is already running (id=' + s['id'] + ').'
+    session = {
+        'id': os.urandom(6).hex(),
+        'label': (args.get('label') or 'Work session').strip(),
+        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'ended_at': None
+    }
+    sessions.append(session)
+    save_sessions(sessions)
+    return 'Session started: "' + session['label'] + '" (id=' + session['id'] + ').'
+
+def fn_session_end(args):
+    sessions = load_sessions()
+    for s in sessions:
+        if not s.get('ended_at'):
+            s['ended_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            save_sessions(sessions)
+            return 'Session ended: "' + s['label'] + '" started ' + s['started_at'] + '.'
+    return 'No active session to end.'
+
+def fn_session_list(args):
+    sessions = load_sessions()
+    if not sessions:
+        return 'No work sessions recorded yet.'
+    lines = []
+    for s in sessions[-10:]:
+        status = 'running' if not s.get('ended_at') else 'done'
+        lines.append(s['started_at'] + ' ' + s['label'] + ' (' + status + ', id=' + s['id'] + ')')
+    return 'Recent sessions:\n' + '\n'.join(lines)
+
 FUNCTION_REGISTRY = {
     "read_file": {
         "description": "Read the contents of a file on the local disk.",
@@ -246,6 +545,66 @@ FUNCTION_REGISTRY = {
         "description": "Send a push notification to the user's phone (via ntfy.sh).",
         "parameters": {"type": "object", "properties": {"message": {"type": "string", "description": "Notification text"}, "title": {"type": "string", "description": "Notification title (default 'ACE')"}, "priority": {"type": "integer", "description": "1=min, 2=low, 3=default, 4=high, 5=max"}}, "required": ["message"]},
         "handler": fn_send_notification
+    },
+    "task_add": {
+        "description": "Create a new task in the user's task list.",
+        "parameters": {"type": "object", "properties": {"title": {"type": "string", "description": "Task title"}, "notes": {"type": "string", "description": "Optional notes"}, "priority": {"type": "integer", "description": "1=urgent .. 5=min (default 3)"}}, "required": ["title"]},
+        "handler": fn_task_add
+    },
+    "task_list": {
+        "description": "List all tasks with status and ID.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "handler": fn_task_list
+    },
+    "task_set_status": {
+        "description": "Update a task's status: pending, in_progress, or done.",
+        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Task ID"}, "status": {"type": "string", "description": "pending, in_progress, or done"}}, "required": ["id", "status"]},
+        "handler": fn_task_set_status
+    },
+    "task_delete": {
+        "description": "Delete a task by ID.",
+        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Task ID"}}, "required": ["id"]},
+        "handler": fn_task_delete
+    },
+    "event_add": {
+        "description": "Add an event to the calendar.",
+        "parameters": {"type": "object", "properties": {"title": {"type": "string", "description": "Event title"}, "date": {"type": "string", "description": "Date as YYYY-MM-DD"}, "time": {"type": "string", "description": "Optional time as HH:MM"}, "notes": {"type": "string", "description": "Optional notes"}}, "required": ["title", "date"]},
+        "handler": fn_event_add
+    },
+    "event_list": {
+        "description": "List upcoming events (default next 7 days).",
+        "parameters": {"type": "object", "properties": {"days": {"type": "integer", "description": "Number of days ahead (default 7)"}}, "required": []},
+        "handler": fn_event_list
+    },
+    "event_delete": {
+        "description": "Delete an event by ID.",
+        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Event ID"}}, "required": ["id"]},
+        "handler": fn_event_delete
+    },
+    "alarm_add": {
+        "description": "Set an alarm at a specific time.",
+        "parameters": {"type": "object", "properties": {"time": {"type": "string", "description": "Time as HH:MM (24h)"}, "label": {"type": "string", "description": "Alarm name"}, "daily": {"type": "boolean", "description": "Repeat every day (default true)"}}, "required": ["time"]},
+        "handler": fn_alarm_add
+    },
+    "timer_start": {
+        "description": "Start a countdown timer.",
+        "parameters": {"type": "object", "properties": {"minutes": {"type": "integer", "description": "Duration in minutes"}, "label": {"type": "string", "description": "Timer name"}}, "required": ["minutes"]},
+        "handler": fn_timer_start
+    },
+    "session_start": {
+        "description": "Start a tracked work session.",
+        "parameters": {"type": "object", "properties": {"label": {"type": "string", "description": "Session name"}}, "required": []},
+        "handler": fn_session_start
+    },
+    "session_end": {
+        "description": "End the current tracked work session.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "handler": fn_session_end
+    },
+    "session_list": {
+        "description": "List recent work sessions.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "handler": fn_session_list
     }
 }
 
@@ -774,6 +1133,212 @@ def notify():
         return jsonify({'error': 'ntfy error: ' + str(r.status_code) + ' ' + r.text}), 500
     return jsonify({'ok': True, 'topic': get_ntfy_topic()})
 
+@app.route('/tasks', methods=['GET'])
+def tasks_list():
+    return jsonify({'tasks': load_tasks()})
+
+@app.route('/tasks', methods=['POST'])
+def tasks_add():
+    data = request.json or {}
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'title required.'}), 400
+    task = make_task(title, (data.get('notes') or ''), data.get('priority', 3), data.get('status', 'pending'))
+    tasks = load_tasks()
+    tasks.insert(0, task)
+    save_tasks(tasks)
+    return jsonify({'ok': True, 'task': task})
+
+@app.route('/tasks/<task_id>/status', methods=['POST'])
+def tasks_status(task_id):
+    data = request.json or {}
+    status = data.get('status')
+    if status not in ('pending', 'in_progress', 'done'):
+        return jsonify({'error': 'invalid status.'}), 400
+    tasks = load_tasks()
+    for t in tasks:
+        if t['id'] == task_id:
+            t['status'] = status
+            t['done_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if status == 'done' else None
+            save_tasks(tasks)
+            return jsonify({'ok': True, 'task': t})
+    return jsonify({'error': 'task not found.'}), 404
+
+@app.route('/tasks/<task_id>', methods=['DELETE'])
+def tasks_delete(task_id):
+    tasks = load_tasks()
+    before = len(tasks)
+    tasks = [t for t in tasks if t['id'] != task_id]
+    save_tasks(tasks)
+    if len(tasks) < before:
+        return jsonify({'ok': True})
+    return jsonify({'error': 'task not found.'}), 404
+
+@app.route('/events', methods=['GET'])
+def events_list():
+    return jsonify({'events': load_events()})
+
+@app.route('/events', methods=['POST'])
+def events_add():
+    data = request.json or {}
+    title = (data.get('title') or '').strip()
+    date = (data.get('date') or '').strip()
+    if not title or not date:
+        return jsonify({'error': 'title and date (YYYY-MM-DD) required.'}), 400
+    event = make_event(title, date, (data.get('time') or ''), (data.get('notes') or ''))
+    events = load_events()
+    events.append(event)
+    events.sort(key=lambda e: (e['date'], e['time']))
+    save_events(events)
+    return jsonify({'ok': True, 'event': event})
+
+@app.route('/events/<event_id>', methods=['DELETE'])
+def events_delete(event_id):
+    events = load_events()
+    before = len(events)
+    events = [e for e in events if e['id'] != event_id]
+    save_events(events)
+    if len(events) < before:
+        return jsonify({'ok': True})
+    return jsonify({'error': 'event not found.'}), 404
+
+@app.route('/notifications/pending', methods=['GET'])
+def notifications_pending():
+    after = 0
+    try:
+        after = float(request.args.get('after', '0'))
+    except (TypeError, ValueError):
+        after = 0
+    return jsonify({'events': [n for n in pending_notifications if n['ts'] > after]})
+
+@app.route('/alarms', methods=['GET'])
+def alarms_list():
+    return jsonify({'alarms': load_alarms()})
+
+@app.route('/alarms', methods=['POST'])
+def alarms_add():
+    data = request.json or {}
+    t = (data.get('time') or '').strip()
+    if not t:
+        return jsonify({'error': 'time (HH:MM) required.'}), 400
+    alarm = {
+        'id': os.urandom(6).hex(),
+        'time': t,
+        'label': (data.get('label') or 'Alarm').strip(),
+        'daily': bool(data.get('daily', True)),
+        'enabled': True,
+        'last_fired': None
+    }
+    alarms = load_alarms()
+    alarms.append(alarm)
+    save_alarms(alarms)
+    return jsonify({'ok': True, 'alarm': alarm})
+
+@app.route('/alarms/<alarm_id>/toggle', methods=['POST'])
+def alarms_toggle(alarm_id):
+    alarms = load_alarms()
+    for a in alarms:
+        if a['id'] == alarm_id:
+            a['enabled'] = not a.get('enabled', True)
+            save_alarms(alarms)
+            return jsonify({'ok': True, 'alarm': a})
+    return jsonify({'error': 'alarm not found.'}), 404
+
+@app.route('/alarms/<alarm_id>', methods=['DELETE'])
+def alarms_delete(alarm_id):
+    alarms = load_alarms()
+    before = len(alarms)
+    alarms = [a for a in alarms if a['id'] != alarm_id]
+    save_alarms(alarms)
+    if len(alarms) < before:
+        return jsonify({'ok': True})
+    return jsonify({'error': 'alarm not found.'}), 404
+
+@app.route('/timers', methods=['GET'])
+def timers_list():
+    now = time.time()
+    timers = [t for t in load_timers() if not t.get('fired')]
+    for t in timers:
+        t['remaining'] = max(0, int(t['end_at'] - now))
+    return jsonify({'timers': timers})
+
+@app.route('/timers', methods=['POST'])
+def timers_add():
+    data = request.json or {}
+    try:
+        minutes = int(data.get('minutes'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'minutes required.'}), 400
+    if minutes < 1:
+        return jsonify({'error': 'minutes must be positive.'}), 400
+    timer = {
+        'id': os.urandom(6).hex(),
+        'label': (data.get('label') or 'Timer').strip(),
+        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'end_at': time.time() + minutes * 60,
+        'fired': False
+    }
+    timers = load_timers()
+    timers.append(timer)
+    save_timers(timers)
+    return jsonify({'ok': True, 'timer': timer})
+
+@app.route('/timers/<timer_id>', methods=['DELETE'])
+def timers_delete(timer_id):
+    timers = load_timers()
+    before = len(timers)
+    timers = [t for t in timers if t['id'] != timer_id]
+    save_timers(timers)
+    if len(timers) < before:
+        return jsonify({'ok': True})
+    return jsonify({'error': 'timer not found.'}), 404
+
+@app.route('/sessions', methods=['GET'])
+def sessions_list():
+    sessions = load_sessions()
+    for s in sessions:
+        if s.get('ended_at'):
+            try:
+                st = datetime.strptime(s['started_at'], '%Y-%m-%d %H:%M:%S')
+                en = datetime.strptime(s['ended_at'], '%Y-%m-%d %H:%M:%S')
+                s['duration'] = str(en - st)
+            except Exception:
+                s['duration'] = ''
+        else:
+            s['duration'] = ''
+            try:
+                s['started_epoch'] = int(datetime.strptime(s['started_at'], '%Y-%m-%d %H:%M:%S').timestamp())
+            except Exception:
+                s['started_epoch'] = None
+    return jsonify({'sessions': sessions})
+
+@app.route('/sessions/start', methods=['POST'])
+def sessions_start():
+    data = request.json or {}
+    sessions = load_sessions()
+    for s in sessions:
+        if not s.get('ended_at'):
+            return jsonify({'error': 'A session is already running.', 'session': s}), 400
+    session = {
+        'id': os.urandom(6).hex(),
+        'label': (data.get('label') or 'Work session').strip(),
+        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'ended_at': None
+    }
+    sessions.append(session)
+    save_sessions(sessions)
+    return jsonify({'ok': True, 'session': session})
+
+@app.route('/sessions/end', methods=['POST'])
+def sessions_end():
+    sessions = load_sessions()
+    for s in sessions:
+        if not s.get('ended_at'):
+            s['ended_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            save_sessions(sessions)
+            return jsonify({'ok': True, 'session': s})
+    return jsonify({'error': 'No active session.'}), 400
+
 @app.route('/read', methods=['POST'])
 def read_file():
     data = request.json
@@ -868,6 +1433,7 @@ def lock_verify():
     return jsonify({"ok": False})
 
 if __name__ == '__main__':
+    threading.Thread(target=alarm_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=5000)
 
 
