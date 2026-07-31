@@ -1718,6 +1718,26 @@ def memory_forget():
         return jsonify({"status": "forgotten", "key": key})
     return jsonify({"status": "key not found"})
 
+@app.route('/memory/bulk', methods=['POST'])
+def memory_bulk():
+    data = request.json or {}
+    items = data.get('items')
+    if not isinstance(items, dict) or not items:
+        return jsonify({"error": "Provide items as an object of key: value pairs."}), 400
+    mem = load_memory()
+    now = datetime.now().isoformat()
+    added = 0
+    for key, value in items.items():
+        key = str(key).strip()
+        value = str(value).strip()
+        if not key or not value:
+            continue
+        mem[key] = {"value": value, "updated": now, "source": "bulk"}
+        added += 1
+    if added:
+        save_memory(mem)
+    return jsonify({"status": "memorized", "count": added})
+
 if __name__ == '__main__':
     threading.Thread(target=alarm_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=5000)
