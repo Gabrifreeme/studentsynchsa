@@ -370,6 +370,8 @@
       <div id="attach-preview"></div>
       <div id="input-row">
         <button class="attach-btn" id="attachBtn" title="Attach">＋</button>
+        <button class="attach-btn" id="micBtn" title="Talk to ACE (speech-to-text)">🎤</button>
+        <button class="attach-btn" id="inputTtsBtn" title="ACE speaks replies">🔊</button>
         <textarea id="userInput" rows="1" placeholder="Type a message..."></textarea>
         <button id="sendBtn">Send</button>
       </div>
@@ -446,6 +448,9 @@
   </span>
   <span class="st-item" style="margin-left:8px;">
     <button id="stMemBtn" class="st-model-btn" title="Memory">🧠</button>
+  </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stTtsBtn" class="st-model-btn" title="ACE voice">🔊</button>
   </span>
 </div>
 
@@ -826,6 +831,7 @@
         }, 5000);
       }
       addMessage('Ember. I am here, Chris.', 'ace');
+      speakReply('Ember. I am here, Chris.');
       return;
     }
 
@@ -874,6 +880,7 @@
         });
         const d = await res.json();
         addMessage(d.reply, 'ace');
+        speakReply(d.reply);
         return;
       }
       const isLocal = model.startsWith('dolphin') || model.startsWith('qwen');
@@ -895,6 +902,7 @@
       });
       const d = await res.json();
       addMessage(d.reply, 'ace');
+      speakReply(d.reply);
     } catch { addMessage('Server error.', 'ace'); }
   }
 
@@ -1346,7 +1354,8 @@
     agent: [
       { type: 'checkbox', id: 'agentAutofill', label: 'Enable autofill agent', desc: 'Allow the Star autofill agent for the student portal.' },
       { type: 'checkbox', id: 'agentEmber', label: 'Enable Ember mode', desc: 'Allow Ember persona switching and the background slideshow.' },
-      { type: 'checkbox', id: 'agentTts', label: 'Enable text-to-speech', desc: 'Speak responses aloud.' }
+      { type: 'checkbox', id: 'agentTts', label: 'Enable text-to-speech', desc: 'Speak replies aloud.', def: true },
+      { type: 'select', id: 'ttsVoice', label: 'ACE voice', desc: 'Voice used for speaking replies.', options: [], def: '' }
     ],
     network: [
       { type: 'input', id: 'serverPort', label: 'Server port', def: '5000', desc: 'Port the ACE server listens on.' },
@@ -1613,9 +1622,13 @@
         html += '<input type="checkbox" id="' + item.id + '"' + (val === 'true' || val === 'on' || (val === '' && item.def === true) ? ' checked' : '') + '>';
       } else if (item.type === 'select') {
         html += '<select id="' + item.id + '" class="settings-select">';
-        const opts = item.id === 'modelSelect'
-          ? DEFAULT_MODELS.concat(getLlmModels().map(m => [m.model, m.name]))
-          : item.options;
+        let opts = item.options || [];
+        if (item.id === 'modelSelect') {
+          opts = DEFAULT_MODELS.concat(getLlmModels().map(m => [m.model, m.name]));
+        } else if (item.id === 'ttsVoice') {
+          const voices = aceVoices.length ? aceVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
+          opts = [['', 'Default (system voice)']].concat(voices.map(v => [v.name, v.name + ' (' + v.lang + ')']));
+        }
         opts.forEach(o => {
           html += '<option value="' + o[0] + '"' + (String(val) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>';
         });
@@ -1628,6 +1641,7 @@
       html += '</div>';
     });
     el.innerHTML = html;
+    if (document.getElementById('ttsVoice')) ttsLoadVoices();
     defs.forEach(item => {
       if (item.type === 'range') {
         const r = document.getElementById(item.id);
@@ -2449,6 +2463,101 @@
   }
   document.getElementById('memOverlay').addEventListener('click', e => { if (e.target.id === 'memOverlay') closeMemModal(); });
   document.getElementById('stMemBtn').addEventListener('click', e => { e.stopPropagation(); openMemModal(); });
+
+  // ---- Voice: text-to-speech (ACE speaks) + speech-to-text (ACE listens) ----
+  let aceVoices = [];
+  function ttsEnabled() { return localStorage.getItem('ace_agentTts') !== 'false'; }
+  function ttsAvailable() { return typeof window.speechSynthesis !== 'undefined'; }
+  function ttsLoadVoices() {
+    if (!ttsAvailable()) return;
+    aceVoices = window.speechSynthesis.getVoices();
+    const sel = document.getElementById('ttsVoice');
+    if (!sel) return;
+    const current = localStorage.getItem('ace_ttsVoice') || '';
+    sel.innerHTML = '';
+    const dflt = document.createElement('option');
+    dflt.value = ''; dflt.textContent = 'Default (system voice)';
+    sel.appendChild(dflt);
+    aceVoices.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = v.name + ' (' + v.lang + ')';
+      if (v.name === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+  if (ttsAvailable()) {
+    ttsLoadVoices();
+    window.speechSynthesis.onvoiceschanged = ttsLoadVoices;
+  }
+  function speakReply(text) {
+    if (!ttsEnabled() || !ttsAvailable()) return;
+    const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    const saved = localStorage.getItem('ace_ttsVoice');
+    if (saved) {
+      const v = aceVoices.find(x => x.name === saved);
+      if (v) u.voice = v;
+    }
+    u.rate = parseFloat(localStorage.getItem('ace_ttsRate') || '1');
+    window.speechSynthesis.speak(u);
+  }
+  function toggleTts() {
+    const next = !ttsEnabled();
+    localStorage.setItem('ace_agentTts', next ? 'true' : 'false');
+    if (!next && ttsAvailable()) window.speechSynthesis.cancel();
+    refreshTtsBtn();
+  }
+  function refreshTtsBtn() {
+    const on = ttsEnabled();
+    ['stTtsBtn', 'inputTtsBtn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) { btn.textContent = on ? '🔊' : '🔇'; btn.title = on ? 'ACE speaks replies aloud — click to mute' : 'Muted — click to hear ACE'; }
+    });
+  }
+  document.getElementById('stTtsBtn').addEventListener('click', e => { e.stopPropagation(); toggleTts(); });
+  document.getElementById('inputTtsBtn').addEventListener('click', e => { e.stopPropagation(); toggleTts(); });
+  refreshTtsBtn();
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let aceRec = null;
+  let aceListening = false;
+  function sttAvailable() { return !!SR; }
+  function micPressed() {
+    if (!sttAvailable()) { alert('Speech recognition is not supported in this browser. Use Chrome.'); return; }
+    if (aceListening) { stopListening(); return; }
+    startListening();
+  }
+  function startListening() {
+    aceRec = new SR();
+    aceRec.lang = 'en-US';
+    aceRec.interimResults = false;
+    aceRec.maxAlternatives = 1;
+    aceRec.onresult = function(e) {
+      const transcript = e.results[0][0].transcript;
+      const mi = document.getElementById('userInput');
+      if (mi) { mi.value = transcript; mi.style.height = 'auto'; mi.focus(); }
+      sendMessage();
+    };
+    aceRec.onend = function() { aceListening = false; refreshMicBtn(); };
+    aceRec.onerror = function(e) { aceListening = false; refreshMicBtn(); if (e.error === 'not-allowed') alert('Microphone access denied.'); };
+    aceListening = true;
+    refreshMicBtn();
+    try { aceRec.start(); } catch (err) { aceListening = false; refreshMicBtn(); alert('Could not start listening: ' + err); }
+  }
+  function stopListening() {
+    if (aceRec) { try { aceRec.stop(); } catch (e) {} }
+    aceListening = false;
+    refreshMicBtn();
+  }
+  function refreshMicBtn() {
+    const btn = document.getElementById('micBtn');
+    if (btn) { btn.textContent = aceListening ? '⏹' : '🎤'; btn.title = aceListening ? 'Listening... click to stop' : 'Talk to ACE (speech-to-text)'; }
+  }
+  document.getElementById('micBtn').addEventListener('click', e => { e.stopPropagation(); micPressed(); });
+  refreshMicBtn();
 
   document.addEventListener('DOMContentLoaded', function() {
     const fs = localStorage.getItem('ace_fontSize') || '16';
