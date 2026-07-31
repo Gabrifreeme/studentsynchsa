@@ -52,3 +52,6 @@ app.*.map.json
 # ACE admin key (never commit)
 ace_admin_key.txt
 ace_memory.db
+
+drive_credentials.json
+drive_token.json

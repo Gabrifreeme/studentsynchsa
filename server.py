@@ -1,4 +1,4 @@
-﻿from flask import Flask, request, jsonify, send_from_directory
+﻿from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
 import requests
 import os
@@ -128,6 +128,63 @@ def fn_search(args):
 def fn_get_time(args):
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+def fn_drive_list(args):
+    parent = args.get('parent') or 'root'
+    query = "'" + parent + "' in parents and trashed=false"
+    info, err = drive_api_request('GET', DRIVE_API + '/files?q=' + quote(query) + '&fields=files(id,name,mimeType,size)&pageSize=1000&orderBy=folder,name')
+    if err:
+        return 'Drive error: ' + err
+    files = info.get('files', []) if isinstance(info, dict) else []
+    if not files:
+        return 'No files found in that folder.'
+    lines = []
+    for f in files:
+        if f['mimeType'] == 'application/vnd.google-apps.folder':
+            lines.append('[DIR]  ' + f['name'] + '  (id=' + f['id'] + ')')
+        else:
+            lines.append('       ' + f['name'] + '  (' + f.get('size', '?') + ' bytes, id=' + f['id'] + ')')
+    return '\n'.join(lines)
+
+def fn_drive_read(args):
+    if not args.get('file_id'):
+        return 'file_id is required.'
+    r = requests.get(DRIVE_API + '/files/' + args['file_id'] + '?alt=media', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, timeout=60)
+    if r.status_code >= 400:
+        return 'Drive read error: ' + str(r.status_code)
+    try:
+        return r.content.decode('utf-8')[:50000]
+    except UnicodeDecodeError:
+        return 'Binary file - cannot display as text.'
+
+def fn_drive_upload(args):
+    name = args.get('name')
+    local_path = args.get('path')
+    parent = args.get('parent') or 'root'
+    if local_path:
+        try:
+            with open(local_path, 'rb') as f:
+                content = f.read()
+            name = name or os.path.basename(local_path)
+        except Exception as e:
+            return 'Cannot read local path: ' + str(e)
+    elif args.get('content'):
+        content = args['content'].encode('utf-8')
+        name = name or 'upload.txt'
+    else:
+        return 'Provide either content or a local path.'
+    if len(content) > DRIVE_UPLOAD_LIMIT:
+        return 'File exceeds 5MB limit.'
+    metadata = {'name': name, 'parents': [parent]}
+    files = {
+        'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
+        'media': ('file', content, 'application/octet-stream')
+    }
+    r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, files=files, timeout=120)
+    if r.status_code >= 400:
+        return 'Upload failed: ' + r.text
+    fid = r.json().get('id')
+    return 'Uploaded "' + name + '" to Drive (id=' + fid + ').'
+
 FUNCTION_REGISTRY = {
     "read_file": {
         "description": "Read the contents of a file on the local disk.",
@@ -158,6 +215,21 @@ FUNCTION_REGISTRY = {
         "description": "Get the current date and time.",
         "parameters": {"type": "object", "properties": {}, "required": []},
         "handler": fn_get_time
+    },
+    "drive_list": {
+        "description": "List files and folders in the user's Google Drive.",
+        "parameters": {"type": "object", "properties": {"parent": {"type": "string", "description": "Folder ID (default 'root')"}}, "required": []},
+        "handler": fn_drive_list
+    },
+    "drive_read": {
+        "description": "Read the text content of a Google Drive file by its file ID.",
+        "parameters": {"type": "object", "properties": {"file_id": {"type": "string", "description": "Drive file ID"}}, "required": ["file_id"]},
+        "handler": fn_drive_read
+    },
+    "drive_upload": {
+        "description": "Upload a file to Google Drive. Provide content (text) or a local path.",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "File name in Drive"}, "content": {"type": "string", "description": "Text content to upload"}, "path": {"type": "string", "description": "Local file path to upload"}, "parent": {"type": "string", "description": "Destination folder ID (default 'root')"}}, "required": []},
+        "handler": fn_drive_upload
     }
 }
 
@@ -415,6 +487,205 @@ def opencode_chat():
 @app.route('/opencode/health', methods=['GET'])
 def opencode_health_route():
     return jsonify({"running": opencode_health(), "session": opencode_session_id})
+
+# ---------- Google Drive integration ----------
+from urllib.parse import urlencode, quote
+DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+DRIVE_CRED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drive_credentials.json')
+DRIVE_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drive_token.json')
+DRIVE_REDIRECT_URI = 'http://localhost:5000/drive/callback'
+DRIVE_AUTH_EP = 'https://accounts.google.com/o/oauth2/v2/auth'
+DRIVE_TOKEN_EP = 'https://oauth2.googleapis.com/token'
+DRIVE_API = 'https://www.googleapis.com/drive/v3'
+DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
+DRIVE_UPLOAD_LIMIT = 5 * 1024 * 1024
+
+def drive_credentials():
+    try:
+        with open(DRIVE_CRED_FILE, 'r') as f:
+            data = json.load(f)
+        if data.get('client_id') and data.get('client_secret'):
+            return data
+    except Exception:
+        pass
+    return None
+
+def drive_save_token(token):
+    with open(DRIVE_TOKEN_FILE, 'w') as f:
+        json.dump(token, f)
+
+def drive_load_token():
+    try:
+        with open(DRIVE_TOKEN_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def drive_refresh_token(token):
+    creds = drive_credentials()
+    if not creds or not token.get('refresh_token'):
+        return None
+    r = requests.post(DRIVE_TOKEN_EP, data={
+        'client_id': creds['client_id'],
+        'client_secret': creds['client_secret'],
+        'refresh_token': token['refresh_token'],
+        'grant_type': 'refresh_token'
+    }, timeout=30)
+    if r.status_code != 200:
+        return None
+    new = r.json()
+    token['access_token'] = new.get('access_token')
+    if new.get('expires_in'):
+        token['expires_at'] = time.time() + int(new['expires_in']) - 60
+    drive_save_token(token)
+    return token
+
+def drive_api_request(method, url, **kwargs):
+    token = drive_load_token()
+    if not token:
+        return None, 'Drive not authorized. Run /drive/auth first.'
+    if time.time() >= token.get('expires_at', 0):
+        token = drive_refresh_token(token)
+        if not token:
+            return None, 'Drive token refresh failed. Re-authorize via /drive/auth.'
+    headers = kwargs.pop('headers', {})
+    headers['Authorization'] = 'Bearer ' + token['access_token']
+    r = requests.request(method, url, headers=headers, **kwargs)
+    if r.status_code == 401:
+        token = drive_refresh_token(token)
+        if not token:
+            return None, 'Drive token refresh failed. Re-authorize via /drive/auth.'
+        headers['Authorization'] = 'Bearer ' + token['access_token']
+        r = requests.request(method, url, headers=headers, **kwargs)
+    if r.status_code >= 400:
+        try:
+            msg = r.json().get('error', {}).get('message', r.text)
+        except Exception:
+            msg = r.text
+        return None, 'Drive API ' + str(r.status_code) + ': ' + str(msg)
+    try:
+        return r.json(), None
+    except Exception:
+        return r.text, None
+
+@app.route('/drive/auth', methods=['GET'])
+def drive_auth():
+    creds = drive_credentials()
+    if not creds:
+        return 'Missing drive_credentials.json with {"client_id": "...", "client_secret": "..."}'
+    params = {
+        'client_id': creds['client_id'],
+        'redirect_uri': DRIVE_REDIRECT_URI,
+        'response_type': 'code',
+        'scope': DRIVE_SCOPE,
+        'access_type': 'offline',
+        'prompt': 'consent'
+    }
+    return redirect(DRIVE_AUTH_EP + '?' + urlencode(params))
+
+@app.route('/drive/callback', methods=['GET'])
+def drive_callback():
+    creds = drive_credentials()
+    code = request.args.get('code')
+    error = request.args.get('error')
+    if error:
+        return 'Google auth error: ' + error
+    if not code or not creds:
+        return 'Missing authorization code or credentials.'
+    r = requests.post(DRIVE_TOKEN_EP, data={
+        'client_id': creds['client_id'],
+        'client_secret': creds['client_secret'],
+        'code': code,
+        'redirect_uri': DRIVE_REDIRECT_URI,
+        'grant_type': 'authorization_code'
+    }, timeout=30)
+    if r.status_code != 200:
+        return 'Token exchange failed: ' + r.text
+    token = r.json()
+    token['expires_at'] = time.time() + int(token.get('expires_in', 3600)) - 60
+    drive_save_token(token)
+    return '✅ Google Drive connected! You can close this tab and use Drive in ACE.'
+
+@app.route('/drive/status', methods=['GET'])
+def drive_status():
+    creds = drive_credentials()
+    if not creds:
+        return jsonify({'configured': False, 'authorized': False, 'error': 'No credentials'})
+    token = drive_load_token()
+    if not token:
+        return jsonify({'configured': True, 'authorized': False})
+    info, err = drive_api_request('GET', DRIVE_API + '/about?fields=user(displayName,emailAddress)')
+    if err:
+        return jsonify({'configured': True, 'authorized': False, 'error': err})
+    return jsonify({'configured': True, 'authorized': True, 'user': info.get('user', {})})
+
+@app.route('/drive/list', methods=['GET'])
+def drive_list():
+    parent = request.args.get('parent', 'root')
+    query = "'" + parent + "' in parents and trashed=false"
+    url = DRIVE_API + '/files?q=' + quote(query) + '&fields=files(id,name,mimeType,size,modifiedTime)&pageSize=1000&orderBy=folder,name'
+    info, err = drive_api_request('GET', url)
+    if err:
+        return jsonify({'error': err}), 500
+    files = info.get('files', []) if isinstance(info, dict) else []
+    return jsonify({'files': files})
+
+@app.route('/drive/download', methods=['GET'])
+def drive_download():
+    file_id = request.args.get('id')
+    meta, err = drive_api_request('GET', DRIVE_API + '/files/' + file_id + '?fields=name,mimeType,size')
+    if err:
+        return jsonify({'error': err}), 500
+    if int(meta.get('size', 0)) > DRIVE_UPLOAD_LIMIT:
+        return jsonify({'error': 'File too large to open in ACE (' + meta.get('name', file_id) + ').'}), 413
+    r = requests.get(DRIVE_API + '/files/' + file_id + '?alt=media', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, timeout=60)
+    if r.status_code == 401:
+        token = drive_refresh_token(drive_load_token())
+        if not token:
+            return jsonify({'error': 'Token refresh failed.'}), 401
+        r = requests.get(DRIVE_API + '/files/' + file_id + '?alt=media', headers={'Authorization': 'Bearer ' + token['access_token']}, timeout=60)
+    if r.status_code >= 400:
+        return jsonify({'error': 'Download failed: ' + str(r.status_code)}), 500
+    try:
+        return jsonify({'name': meta.get('name'), 'mimeType': meta.get('mimeType'), 'size': len(r.content), 'content': r.content.decode('utf-8')})
+    except UnicodeDecodeError:
+        return jsonify({'error': 'Binary file (not text) - cannot display in ACE.', 'name': meta.get('name'), 'mimeType': meta.get('mimeType')})
+
+@app.route('/drive/upload', methods=['POST'])
+def drive_upload():
+    data = request.json or {}
+    name = data.get('name')
+    content = data.get('content')
+    local_path = data.get('path')
+    parent = data.get('parent') or 'root'
+    if local_path:
+        try:
+            with open(local_path, 'rb') as f:
+                content = f.read()
+            name = name or os.path.basename(local_path)
+        except Exception as e:
+            return jsonify({'error': 'Cannot read local path: ' + str(e)}), 400
+    if not name or content is None:
+        return jsonify({'error': 'name and content (or path) required.'}), 400
+    if isinstance(content, str):
+        content = content.encode('utf-8')
+    if len(content) > DRIVE_UPLOAD_LIMIT:
+        return jsonify({'error': 'File exceeds 5MB simple-upload limit.'}), 413
+    metadata = {'name': name, 'parents': [parent]}
+    files = {
+        'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
+        'media': ('file', content, 'application/octet-stream')
+    }
+    r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, files=files, timeout=120)
+    if r.status_code == 401:
+        token = drive_refresh_token(drive_load_token())
+        if not token:
+            return jsonify({'error': 'Token refresh failed.'}), 401
+        r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + token['access_token']}, files=files, timeout=120)
+    if r.status_code >= 400:
+        return jsonify({'error': 'Upload failed: ' + r.text}), 500
+    fid = r.json().get('id')
+    return jsonify({'ok': True, 'id': fid, 'name': name})
 
 @app.route('/read', methods=['POST'])
 def read_file():

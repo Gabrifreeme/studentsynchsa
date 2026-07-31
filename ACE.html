@@ -407,6 +407,18 @@
     <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">dolphin-llama3:8b</b> ▾</button>
     <div id="stModelMenu" class="st-model-menu"></div>
   </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stDriveBtn" class="st-model-btn" title="Google Drive">☁️ <b id="stDriveName">Drive</b></button>
+  </span>
+</div>
+
+<div id="driveOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:640px;max-width:92vw;max-height:80vh;height:auto;">    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">☁️ Google Drive</h3>
+      <button class="icon-btn" onclick="closeDriveModal()" title="Close">✕</button>
+    </div>
+    <div id="driveBody" style="flex:1;overflow-y:auto;padding:16px;min-height:200px;"></div>
+  </div>
 </div>
 
 <script>
@@ -1524,6 +1536,121 @@
   document.getElementById('stModelBtn').addEventListener('click', e => { e.stopPropagation(); toggleModelMenu(); });
   document.addEventListener('click', closeModelMenu);
   refreshStatusModel();
+
+  // ===== GOOGLE DRIVE =====
+  let driveParent = 'root';
+  let driveHistory = [];
+
+  function openDriveModal() {
+    document.getElementById('driveOverlay').style.display = 'flex';
+    driveParent = 'root';
+    driveHistory = [];
+    loadDrive();
+  }
+  function closeDriveModal() { document.getElementById('driveOverlay').style.display = 'none'; }
+  document.getElementById('driveOverlay').addEventListener('click', e => { if (e.target.id === 'driveOverlay') closeDriveModal(); });
+  document.getElementById('stDriveBtn').addEventListener('click', e => { e.stopPropagation(); openDriveModal(); });
+
+  function fmtBytes(n) {
+    if (n === null || n === undefined) return '';
+    n = Number(n);
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  function loadDrive() {
+    const body = document.getElementById('driveBody');
+    body.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">Loading Drive...</div>';
+    fetch('http://localhost:5000/drive/status')
+      .then(r => r.json())
+      .then(st => {
+        if (!st.configured) {
+          body.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">Drive not configured.<br>Create <b>drive_credentials.json</b> with your Google OAuth client ID/secret.</div>';
+          return;
+        }
+        if (!st.authorized) {
+          body.innerHTML = '<div style="text-align:center;padding:30px;">' +
+            '<p style="color:var(--text);margin-bottom:16px;">Connect your Google account to let ACE read/upload files.</p>' +
+            '<a href="http://localhost:5000/drive/auth" style="display:inline-block;padding:10px 22px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;text-decoration:none;">Sign in with Google</a></div>';
+          return;
+        }
+        const user = st.user || {};
+        if (user.displayName) document.getElementById('stDriveName').textContent = user.displayName;
+        loadDriveList();
+      })
+      .catch(err => { body.innerHTML = '<div style="color:var(--danger);padding:20px;">Error: ' + escapeHtml(String(err)) + '</div>'; });
+  }
+
+  function loadDriveList() {
+    const body = document.getElementById('driveBody');
+    body.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">Listing files...</div>';
+    fetch('http://localhost:5000/drive/list?parent=' + encodeURIComponent(driveParent))
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { body.innerHTML = '<div style="color:var(--danger);padding:20px;">' + escapeHtml(data.error) + '</div>'; return; }
+        const files = data.files || [];
+        let html = '';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+        html += '<div style="color:var(--text);font-weight:600;">📂 ' + (driveParent === 'root' ? 'My Drive' : files.length + ' items') + '</div>';
+        html += '<div>';
+        if (driveHistory.length) html += '<button class="icon-btn" onclick="driveUp()" title="Up">↑</button> ';
+        html += '<button class="icon-btn" onclick="refreshDrive()" title="Refresh">⟳</button>';
+        html += '</div></div>';
+        if (!files.length) html += '<div style="color:var(--text-mute);padding:10px;">Folder is empty.</div>';
+        files.forEach(f => {
+          const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+          html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg-elev);cursor:pointer;" onclick="' + (isFolder ? 'driveOpenFolder' : 'driveOpenFile') + '(\'' + f.id + '\')" title="' + escapeHtml(f.name) + '">';
+          html += '<span style="font-size:16px;">' + (isFolder ? '📁' : '📄') + '</span>';
+          html += '<span style="flex:1;color:var(--text);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(f.name) + '</span>';
+          html += '<span style="color:var(--text-mute);font-size:12px;">' + (isFolder ? '' : fmtBytes(f.size)) + '</span>';
+          html += '</div>';
+        });
+        html += '<div style="margin-top:12px;padding:10px;border:1px dashed var(--border);border-radius:8px;">';
+        html += '<div style="color:var(--text-dim);font-size:13px;margin-bottom:8px;">Upload file to this folder:</div>';
+        html += '<div style="display:flex;gap:8px;"><input type="file" id="driveFileInput" style="flex:1;font-size:12px;"><button onclick="driveUploadPicker()" class="settings-save">Upload</button></div>';
+        html += '</div>';
+        body.innerHTML = html;
+      })
+      .catch(err => { body.innerHTML = '<div style="color:var(--danger);padding:20px;">Error: ' + escapeHtml(String(err)) + '</div>'; });
+  }
+
+  function driveOpenFolder(id) { driveHistory.push(driveParent); driveParent = id; loadDriveList(); }
+  function driveUp() { if (driveHistory.length) driveParent = driveHistory.pop(); loadDriveList(); }
+  function refreshDrive() { loadDriveList(); }
+
+  function driveOpenFile(id) {
+    fetch('http://localhost:5000/drive/download?id=' + encodeURIComponent(id))
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert('Drive: ' + data.error); return; }
+        const w = window.open('', '_blank');
+        if (w) { w.document.write('<pre style="font-family:monospace;white-space:pre-wrap;padding:16px;">' + escapeHtml(data.content) + '</pre>'); w.document.close(); }
+      })
+      .catch(err => alert('Drive error: ' + err));
+  }
+
+  function driveUploadPicker() {
+    const input = document.getElementById('driveFileInput');
+    if (!input.files || !input.files.length) { alert('Choose a file first.'); return; }
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      fetch('http://localhost:5000/drive/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, content: reader.result, parent: driveParent })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) alert('Upload error: ' + d.error);
+          else { alert('Uploaded "' + d.name + '" to Drive.'); refreshDrive(); }
+        })
+        .catch(err => alert('Upload error: ' + err));
+    };
+    reader.readAsText(file);
+  }
+
 
   document.addEventListener('DOMContentLoaded', function() {
     const fs = localStorage.getItem('ace_fontSize') || '16';
