@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+.aider*
+.env
+.env
+.env
+.env
+
+# ACE admin key (never commit)
+ace_admin_key.txt
+ace_memory.db
