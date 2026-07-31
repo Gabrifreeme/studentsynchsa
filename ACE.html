@@ -410,6 +410,26 @@
   <span class="st-item" style="margin-left:8px;">
     <button id="stDriveBtn" class="st-model-btn" title="Google Drive">☁️ <b id="stDriveName">Drive</b></button>
   </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stNotifyBtn" class="st-model-btn" title="Send notification to your phone">🔔</button>
+  </span>
+</div>
+
+<div id="notifyOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:420px;max-width:92vw;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">🔔 Notify your phone</h3>
+      <button class="icon-btn" onclick="closeNotifyModal()" title="Close">✕</button>
+    </div>
+    <div style="padding:18px;">
+      <div id="ntfyTopic" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Loading topic...</div>
+      <div style="display:flex;gap:10px;flex-direction:column;">
+        <input type="text" id="ntfyTitle" placeholder="Title (default: ACE)" class="settings-input" style="width:100%;box-sizing:border-box;">
+        <textarea id="ntfyMsg" rows="3" placeholder="Message to send to your phone..." class="settings-input" style="width:100%;box-sizing:border-box;resize:vertical;"></textarea>
+        <button onclick="sendNotification()" class="settings-save" style="width:100%;">Send to my phone</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="driveOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
@@ -1649,6 +1669,62 @@
         .catch(err => alert('Upload error: ' + err));
     };
     reader.readAsText(file);
+  }
+
+  // ===== NTFY PUSH NOTIFICATIONS =====
+  let ntfyTopic = '';
+
+  function openNotifyModal() {
+    document.getElementById('notifyOverlay').style.display = 'flex';
+    fetch('http://localhost:5000/notify/topic')
+      .then(r => r.json())
+      .then(d => {
+        ntfyTopic = d.topic;
+        const el = document.getElementById('ntfyTopic');
+        el.textContent = 'Your topic: ' + d.topic;
+        el.title = 'Subscribe to this topic in the ntfy app on your phone.';
+      })
+      .catch(() => { document.getElementById('ntfyTopic').textContent = 'Could not load topic.'; });
+  }
+  function closeNotifyModal() { document.getElementById('notifyOverlay').style.display = 'none'; }
+  document.getElementById('notifyOverlay').addEventListener('click', e => { if (e.target.id === 'notifyOverlay') closeNotifyModal(); });
+  document.getElementById('stNotifyBtn').addEventListener('click', e => { e.stopPropagation(); openNotifyModal(); });
+
+  // ===== LIVE DEVICE + AGENT COUNTS =====
+  function refreshCounts() {
+    fetch('http://localhost:5000/devices')
+      .then(r => r.json())
+      .then(d => {
+        const el = document.getElementById('device-count');
+        if (el && d.count !== undefined) { el.textContent = d.count; el.title = d.devices && d.devices.length ? d.devices.join('\n') : 'No ADB devices'; }
+      })
+      .catch(() => {});
+    fetch('http://localhost:5000/agents')
+      .then(r => r.json())
+      .then(d => {
+        const el = document.getElementById('agent-count');
+        if (el && d.count !== undefined) { el.textContent = d.count; el.title = d.agents && d.agents.length ? d.agents.join('\n') : 'No active agents'; }
+      })
+      .catch(() => {});
+  }
+  setInterval(refreshCounts, 10000);
+  refreshCounts();
+
+  function sendNotification() {
+    const title = document.getElementById('ntfyTitle').value.trim() || 'ACE';
+    const msg = document.getElementById('ntfyMsg').value.trim();
+    if (!msg) { alert('Enter a message first.'); return; }
+    fetch('http://localhost:5000/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, message: msg })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) alert('Error: ' + d.error);
+        else { alert('Sent to your phone!'); closeNotifyModal(); }
+      })
+      .catch(err => alert('Error: ' + err));
   }
 
 

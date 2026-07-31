@@ -185,6 +185,17 @@ def fn_drive_upload(args):
     fid = r.json().get('id')
     return 'Uploaded "' + name + '" to Drive (id=' + fid + ').'
 
+def fn_send_notification(args):
+    message = args.get('message')
+    if not message:
+        return 'message is required.'
+    title = args.get('title') or 'ACE'
+    priority = int(args.get('priority') or 3)
+    r = requests.post('https://ntfy.sh/' + get_ntfy_topic(), data=message.encode('utf-8'), headers={'Title': title, 'Priority': str(priority)}, timeout=15)
+    if r.status_code >= 400:
+        return 'ntfy error: ' + str(r.status_code)
+    return 'Notification sent to phone (title="' + title + '").'
+
 FUNCTION_REGISTRY = {
     "read_file": {
         "description": "Read the contents of a file on the local disk.",
@@ -230,6 +241,11 @@ FUNCTION_REGISTRY = {
         "description": "Upload a file to Google Drive. Provide content (text) or a local path.",
         "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "File name in Drive"}, "content": {"type": "string", "description": "Text content to upload"}, "path": {"type": "string", "description": "Local file path to upload"}, "parent": {"type": "string", "description": "Destination folder ID (default 'root')"}}, "required": []},
         "handler": fn_drive_upload
+    },
+    "send_notification": {
+        "description": "Send a push notification to the user's phone (via ntfy.sh).",
+        "parameters": {"type": "object", "properties": {"message": {"type": "string", "description": "Notification text"}, "title": {"type": "string", "description": "Notification title (default 'ACE')"}, "priority": {"type": "integer", "description": "1=min, 2=low, 3=default, 4=high, 5=max"}}, "required": ["message"]},
+        "handler": fn_send_notification
     }
 }
 
@@ -488,6 +504,37 @@ def opencode_chat():
 def opencode_health_route():
     return jsonify({"running": opencode_health(), "session": opencode_session_id})
 
+@app.route('/devices', methods=['GET'])
+def devices():
+    try:
+        out = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=10).stdout
+    except Exception as e:
+        return jsonify({'count': 0, 'devices': [], 'error': str(e)})
+    found = []
+    for line in out.strip().splitlines()[1:]:
+        parts = line.strip().split()
+        if len(parts) >= 2 and parts[1] == 'device':
+            found.append(parts[0])
+    return jsonify({'count': len(found), 'devices': found})
+
+@app.route('/agents', methods=['GET'])
+def agents():
+    try:
+        r = requests.get(OPENCODE_URL + '/session', auth=opencode_auth(), timeout=5)
+        if r.status_code != 200:
+            return jsonify({'count': 0, 'agents': [], 'error': 'opencode ' + str(r.status_code)})
+        sessions = r.json()
+    except Exception as e:
+        return jsonify({'count': 0, 'agents': [], 'error': str(e)})
+    now = int(time.time() * 1000)
+    window = now - 30 * 60 * 1000
+    active = []
+    if isinstance(sessions, list):
+        for s in sessions:
+            if s.get('time', {}).get('updated', 0) >= window:
+                active.append((s.get('agent') or 'build') + ' · ' + (s.get('title') or 'session'))
+    return jsonify({'count': len(active), 'agents': active})
+
 # ---------- Google Drive integration ----------
 from urllib.parse import urlencode, quote
 DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
@@ -686,6 +733,46 @@ def drive_upload():
         return jsonify({'error': 'Upload failed: ' + r.text}), 500
     fid = r.json().get('id')
     return jsonify({'ok': True, 'id': fid, 'name': name})
+
+# ---------- ntfy.sh push notifications ----------
+NTFY_TOPIC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ntfy_topic.txt')
+
+def get_ntfy_topic():
+    try:
+        with open(NTFY_TOPIC_FILE, 'r') as f:
+            t = f.read().strip()
+        if t:
+            return t
+    except Exception:
+        pass
+    t = 'ace-' + os.urandom(12).hex()
+    with open(NTFY_TOPIC_FILE, 'w') as f:
+        f.write(t)
+    return t
+
+def ntfy_send(title, message, priority=3):
+    r = requests.post('https://ntfy.sh/' + get_ntfy_topic(), data=message.encode('utf-8'), headers={'Title': title, 'Priority': str(priority)}, timeout=15)
+    return r
+
+@app.route('/notify/topic', methods=['GET'])
+def notify_topic():
+    return jsonify({'topic': get_ntfy_topic()})
+
+@app.route('/notify', methods=['POST'])
+def notify():
+    data = request.json or {}
+    message = data.get('message', '')
+    title = data.get('title', 'ACE')
+    priority = int(data.get('priority', 3))
+    if not message:
+        return jsonify({'error': 'message required.'}), 400
+    try:
+        r = ntfy_send(title, message, priority)
+    except Exception as e:
+        return jsonify({'error': 'ntfy error: ' + str(e)}), 500
+    if r.status_code >= 400:
+        return jsonify({'error': 'ntfy error: ' + str(r.status_code) + ' ' + r.text}), 500
+    return jsonify({'ok': True, 'topic': get_ntfy_topic()})
 
 @app.route('/read', methods=['POST'])
 def read_file():
