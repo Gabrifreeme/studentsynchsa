@@ -1033,10 +1033,16 @@ def opencode_chat():
     if memory_ctx:
         message = ('[ACE persistent memory — things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
                    + memory_ctx + '\n\n' + message)
-    model_override = os.environ.get('OPENCODE_MODEL_ID') or 'deepseek-v4-flash-free'
+    raw_model = (data.get('model') or '').strip()
+    if not raw_model or raw_model == 'opencode':
+        raw_model = os.environ.get('OPENCODE_MODEL_ID') or 'deepseek-v4-flash-free'
+    provider_id = os.environ.get('OPENCODE_PROVIDER_ID', 'opencode')
+    model_override = raw_model
+    if '/' in raw_model:
+        provider_id, model_override = raw_model.split('/', 1)
     body = {"parts": [{"type": "text", "text": message}]}
     if model_override:
-        body["model"] = {"providerID": os.environ.get('OPENCODE_PROVIDER_ID', 'opencode'), "modelID": model_override}
+        body["model"] = {"providerID": provider_id, "modelID": model_override}
     try:
         r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=600)
     except Exception as e:

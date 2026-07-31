@@ -838,6 +838,7 @@
       let model = savedModel;
       const knownModels = [
         'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'opencode',
+        ...OPENCODE_MODELS.map(m => m[0]),
         'meta-llama/llama-3.1-8b-instruct', 'mistralai/mistral-7b-instruct', 'deepseek/deepseek-chat'
       ];
       const customModels = getLlmModels();
@@ -846,6 +847,7 @@
         localStorage.removeItem('ace_modelSelect');
         model = 'dolphin-llama3:8b';
       }
+      const OPENCODE_MODEL_IDS = OPENCODE_MODELS.map(m => m[0]);
       const VISION_MODELS = ['llava', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'claude-3-5', 'claude-3-7', 'claude-3', 'gemini', 'qwen2-vl', 'qwen-vl', 'phi-3-vision', 'moondream'];
       const hasImages = attachments.some(a => a.type === 'image');
       const isVision = VISION_MODELS.some(v => model.toLowerCase().includes(v));
@@ -856,11 +858,11 @@
       if (attachments.length) {
         payload.attachments = attachments;
       }
-      if (model === 'opencode') {
+      if (model === 'opencode' || OPENCODE_MODEL_IDS.includes(model)) {
         const res = await fetch('http://localhost:5000/opencode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({ message: text, model: model === 'opencode' ? 'opencode/deepseek-v4-flash-free' : model })
         });
         const d = await res.json();
         addMessage(d.reply, 'ace');
@@ -1356,6 +1358,19 @@
     ['deepseek/deepseek-chat', 'DeepSeek Chat']
   ];
 
+  const OPENCODE_MODELS = [
+    ['opencode/deepseek-v4-flash-free', 'DeepSeek V4 Flash · free'],
+    ['opencode/big-pickle', 'Big Pickle'],
+    ['opencode/north-mini-code-free', 'North Mini Code · free'],
+    ['opencode/ling-3.0-flash-free', 'Ling 3.0 Flash · free'],
+    ['opencode/mimo-v2.5-free', 'MiMo 2.5 · free'],
+    ['opencode/nemotron-3-ultra-free', 'Nemotron 3 Ultra · free'],
+    ['opencode/laguna-s-2.1-free', 'Laguna S 2.1 · free'],
+    ['opencode/gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite'],
+    ['opencode/gpt-5.4-nano', 'GPT-5.4 Nano'],
+    ['opencode/claude-fable-5', 'Claude Fable 5']
+  ];
+
   function getLlmModels() {
     try {
       const raw = localStorage.getItem('ace_llm_models');
@@ -1506,7 +1521,10 @@
       html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">local</span></div>';
     });
     html += '<div class="st-model-group">Opencode</div>';
-    html += '<div class="st-model-opt' + (current === 'opencode' ? ' active' : '') + '" data-model="opencode"><span>Opencode agent</span><span class="opt-provider">local</span></div>';
+    OPENCODE_MODELS.forEach(o => {
+      const active = current === o[0] || (current === 'opencode' && o[0] === 'opencode/deepseek-v4-flash-free');
+      html += '<div class="st-model-opt' + (active ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">opencode</span></div>';
+    });
     html += '<div class="st-model-group">OpenRouter</div>';
     openrouter.forEach(o => {
       html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">cloud</span></div>';
@@ -1532,9 +1550,19 @@
     });
   }
 
+  function modelLabel(id) {
+    if (id === 'opencode') return 'Opencode agent';
+    const all = [
+      ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'],
+      ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']
+    ].concat(DEFAULT_MODELS, OPENCODE_MODELS);
+    const m = all.find(x => x[0] === id);
+    return m ? m[1] : id;
+  }
+
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + (localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b');
+    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b');
   }
 
   function toggleModelMenu() {
