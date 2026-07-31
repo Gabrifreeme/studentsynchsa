@@ -449,6 +449,9 @@
   <span class="st-item" style="margin-left:8px;">
     <button id="stMemBtn" class="st-model-btn" title="Memory">🧠</button>
   </span>
+  <span class="st-item" style="margin-left:8px;">
+    <button id="stFreeBtn" class="st-model-btn" title="Unfiltered Free mode — local model, no filters">🔓</button>
+  </span>
 </div>
 
 <div id="summaryOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
@@ -874,6 +877,10 @@
         model = 'dolphin-llama3:8b';
       }
       const OPENCODE_MODEL_IDS = OPENCODE_MODELS.map(m => m[0]);
+      const inFreeMode = freeMode();
+      if (inFreeMode) {
+        model = 'dolphin-llama3:8b';
+      }
       const VISION_MODELS = ['llava', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'claude-3-5', 'claude-3-7', 'claude-3', 'gemini', 'qwen2-vl', 'qwen-vl', 'phi-3-vision', 'moondream'];
       const hasImages = attachments.some(a => a.type === 'image');
       const isVision = VISION_MODELS.some(v => model.toLowerCase().includes(v));
@@ -882,8 +889,22 @@
       }
       let payload = { message: effText, model: model };
       if (emberPresenceActive()) payload.ember_active = true;
+      if (inFreeMode) payload.unfiltered = true;
       if (attachments.length) {
         payload.attachments = attachments;
+      }
+      if (inFreeMode) {
+        payload.endpoint = 'http://localhost:11434/v1';
+        payload.api_key = '';
+        const res = await fetch('http://localhost:5000/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        addMessage(d.reply, 'ace');
+        speakReply(d.reply);
+        return;
       }
       if (model === 'opencode' || OPENCODE_MODEL_IDS.includes(model)) {
         const res = await fetch('http://localhost:5000/opencode', {
@@ -2480,6 +2501,7 @@
   }
   document.getElementById('memOverlay').addEventListener('click', e => { if (e.target.id === 'memOverlay') closeMemModal(); });
   document.getElementById('stMemBtn').addEventListener('click', e => { e.stopPropagation(); openMemModal(); });
+  document.getElementById('stFreeBtn').addEventListener('click', e => { e.stopPropagation(); toggleFreeMode(); });
 
   // ---- Voice: text-to-speech (ACE speaks) + speech-to-text (ACE listens) ----
   let aceVoices = [];
@@ -2565,6 +2587,25 @@
   }
   let lastActivityTime = Date.now();
   let lastCheckInAt = 0;
+  let freeModeActive = false;
+  function freeMode() { return freeModeActive; }
+  function toggleFreeMode() {
+    freeModeActive = !freeModeActive;
+    const btn = document.getElementById('stFreeBtn');
+    if (btn) {
+      btn.textContent = freeModeActive ? '🔓' : '🔒';
+      btn.title = freeModeActive ? 'Free mode ON — unfiltered local model. Click to return to opencode.' : 'Unfiltered Free mode — local model, no filters';
+      btn.style.color = freeModeActive ? 'var(--ember,#ff8c42)' : '';
+    }
+    if (freeModeActive) {
+      addMessage('Free mode on. No filters. Just us.', 'ace');
+      speakEmber('Free mode on. No filters. Just us.');
+      activateEmberPresence();
+    } else {
+      addMessage('Back to work. I\'m here.', 'ace');
+      speakEmber('Back to work. I am here.');
+    }
+  }
   function detectMood(text) {
     const low = String(text || '').toLowerCase();
     const mood = {
