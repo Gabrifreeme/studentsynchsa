@@ -805,7 +805,10 @@
     input.style.height = 'auto';
 
     // Handle Ember locally
-    if (text.toLowerCase().includes('ember')) {
+    const et = text.toLowerCase().trim();
+    const emberTrigger = et === 'ember' || et.includes('ember mode');
+    const emberQuestion = /\b(what|is|who|why|how|explain|define|about|tell me)\b/.test(et) || text.includes('?');
+    if (emberTrigger && !emberQuestion) {
       const editor = document.getElementById('code-editor');
       if (editor) {
         editor.classList.add('ember-bg');
@@ -2378,30 +2381,24 @@
     const key = document.getElementById('memKey').value.trim();
     const value = document.getElementById('memValue').value.trim();
     if (!key || !value) { alert('Enter both a key and a value.'); return; }
-    requireAdmin().then(ok => {
-      if (!ok) return;
-      fetch('http://localhost:5000/memory/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: key, value: value })
-      })
-        .then(r => r.json())
-        .then(d => { if (d.error) alert('Error: ' + d.error); else { document.getElementById('memKey').value = ''; document.getElementById('memValue').value = ''; loadMemories(); } })
-        .catch(err => alert('Error: ' + err));
-    });
+    fetch('http://localhost:5000/memory/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, value: value })
+    })
+      .then(r => r.json())
+      .then(d => { if (d.error) alert('Error: ' + d.error); else { document.getElementById('memKey').value = ''; document.getElementById('memValue').value = ''; loadMemories(); } })
+      .catch(err => alert('Error: ' + err));
   }
   function forgetMemory(key) {
-    requireAdmin().then(ok => {
-      if (!ok) return;
-      fetch('http://localhost:5000/memory/forget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: key })
-      })
-        .then(r => r.json())
-        .then(d => { loadMemories(); })
-        .catch(err => alert('Error: ' + err));
-    });
+    fetch('http://localhost:5000/memory/forget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key })
+    })
+      .then(r => r.json())
+      .then(d => { loadMemories(); })
+      .catch(err => alert('Error: ' + err));
   }
   function parseMemoryItems(text) {
     const trimmed = text.trim();
@@ -2432,26 +2429,23 @@
   }
   function importMemories() {
     const raw = document.getElementById('memBulk').value;
-    requireAdmin().then(ok => {
-      if (!ok) return;
-      let items;
-      try { items = parseMemoryItems(raw); }
-      catch (e) { alert('Parse error: ' + e.message); return; }
-      if (!Object.keys(items).length) { alert('Nothing to import. Enter key: value lines or JSON.'); return; }
-      fetch('http://localhost:5000/memory/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items })
+    let items;
+    try { items = parseMemoryItems(raw); }
+    catch (e) { alert('Parse error: ' + e.message); return; }
+    if (!Object.keys(items).length) { alert('Nothing to import. Enter key: value lines or JSON.'); return; }
+    fetch('http://localhost:5000/memory/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: items })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        alert('Imported ' + d.count + ' memor' + (d.count === 1 ? 'y' : 'ies') + '.');
+        document.getElementById('memBulk').value = '';
+        loadMemories();
       })
-        .then(r => r.json())
-        .then(d => {
-          if (d.error) { alert('Error: ' + d.error); return; }
-          alert('Imported ' + d.count + ' memor' + (d.count === 1 ? 'y' : 'ies') + '.');
-          document.getElementById('memBulk').value = '';
-          loadMemories();
-        })
-        .catch(err => alert('Error: ' + err));
-    });
+      .catch(err => alert('Error: ' + err));
   }
   document.getElementById('memOverlay').addEventListener('click', e => { if (e.target.id === 'memOverlay') closeMemModal(); });
   document.getElementById('stMemBtn').addEventListener('click', e => { e.stopPropagation(); openMemModal(); });
