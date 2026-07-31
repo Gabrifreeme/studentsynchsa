@@ -866,7 +866,7 @@
         effText = parts.join('\n\n') + '\n\n' + text;
       }
       const knownModels = [
-        'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'opencode',
+        'dolphin-llama3:8b', 'dolphin-phi:2.7b', 'qwen2.5-coder:1.5b', 'opencode',
         ...OPENCODE_MODELS.map(m => m[0]),
         'meta-llama/llama-3.1-8b-instruct', 'mistralai/mistral-7b-instruct', 'deepseek/deepseek-chat'
       ];
@@ -879,7 +879,7 @@
       const OPENCODE_MODEL_IDS = OPENCODE_MODELS.map(m => m[0]);
       const inFreeMode = freeMode();
       if (inFreeMode) {
-        model = 'dolphin-llama3:8b';
+        model = 'dolphin-phi:2.7b';
       }
       const VISION_MODELS = ['llava', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'claude-3-5', 'claude-3-7', 'claude-3', 'gemini', 'qwen2-vl', 'qwen-vl', 'phi-3-vision', 'moondream'];
       const hasImages = attachments.some(a => a.type === 'image');
@@ -1384,7 +1384,7 @@
       { type: 'checkbox', id: 'liveCursor', label: 'Show live cursors', desc: 'Display collaborator cursors.' }
     ],
     ai: [
-      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['dolphin-llama3:8b','Dolphin Llama 3.1 8B (local, free)'],['qwen2.5-coder:1.5b','Qwen Coder 1.5B (local, fast)'],['meta-llama/llama-3.1-8b-instruct','Llama 3.1 8B (OpenRouter)'],['mistralai/mistral-7b-instruct','Mistral 7B (OpenRouter)'],['deepseek/deepseek-chat','DeepSeek Chat (OpenRouter)']], def: 'dolphin-llama3:8b' },
+      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['dolphin-phi:2.7b','Dolphin Phi 2.7B (local, fast, uncensored)'],['dolphin-llama3:8b','Dolphin Llama 3.1 8B (local, free)'],['qwen2.5-coder:1.5b','Qwen Coder 1.5B (local, fast)'],['meta-llama/llama-3.1-8b-instruct','Llama 3.1 8B (OpenRouter)'],['mistralai/mistral-7b-instruct','Mistral 7B (OpenRouter)'],['deepseek/deepseek-chat','DeepSeek Chat (OpenRouter)']], def: 'dolphin-phi:2.7b' },
       { type: 'range', id: 'temperature', label: 'Temperature', desc: 'Randomness of responses (0–2).', min: 0, max: 2, step: 0.1, def: 0.7 },
       { type: 'select', id: 'maxTokens', label: 'Max tokens', desc: 'Maximum response length.', options: [['250','250'],['500','500'],['1000','1000'],['2000','2000']], def: '500' }
     ],
@@ -1567,7 +1567,7 @@
 
   function buildModelPicker() {
     const menu = document.getElementById('stModelMenu');
-    const locals = [['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']];
+    const locals = [['dolphin-phi:2.7b', 'Dolphin Phi 2.7B'], ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']];
     const openrouter = DEFAULT_MODELS;
     const custom = getLlmModels().map(m => [m.model, m.name]);
     const current = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
@@ -1608,6 +1608,7 @@
   function modelLabel(id) {
     if (id === 'opencode') return 'Opencode agent';
     const all = [
+      ['dolphin-phi:2.7b', 'Dolphin Phi 2.7B'],
       ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'],
       ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']
     ].concat(DEFAULT_MODELS, OPENCODE_MODELS);

@@ -878,7 +878,7 @@ def chat():
     global current_mode, last_user_message_time, ember_mode_until
     data = request.json
     user_message = data.get('message', '')
-    model = data.get('model', 'dolphin-llama3:8b')
+    model = data.get('model', 'dolphin-phi:2.7b')
     endpoint = data.get('endpoint', 'http://localhost:11434/v1')
     api_key = data.get('api_key', '')
     functions_enabled = data.get('functions_enabled', False)
@@ -887,13 +887,13 @@ def chat():
     ember_active = data.get('ember_active', False)
     unfiltered = data.get('unfiltered', False)
     if 'localhost' in endpoint or '11434' in endpoint:
-        if model not in ['dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
-            model = 'dolphin-llama3:8b'
+        if model not in ['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
+            model = 'dolphin-phi:2.7b'
     if unfiltered:
         endpoint = 'http://localhost:11434/v1'
         api_key = ''
-        if model not in ['dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
-            model = 'dolphin-llama3:8b'
+        if model not in ['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
+            model = 'dolphin-phi:2.7b'
     last_user_message_time = datetime.now()
 
     # Ember persistence — if the frontend reports Ember presence is active,
