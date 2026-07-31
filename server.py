@@ -847,7 +847,7 @@ def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
-    return requests.post(endpoint.rstrip('/') + "/chat/completions", headers=headers, json=payload, timeout=120)
+    return requests.post(endpoint.rstrip('/') + "/chat/completions", headers=headers, json=payload, timeout=300)
 
 @app.route('/')
 def index():
@@ -1797,7 +1797,7 @@ def memory_bulk():
 
 if __name__ == '__main__':
     threading.Thread(target=alarm_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
 
 
 

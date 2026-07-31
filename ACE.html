@@ -942,9 +942,6 @@
 
   sendBtn.onclick = sendMessage;
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-  document.addEventListener('keydown', markActivity, true);
-  document.addEventListener('pointerdown', markActivity, true);
-  document.addEventListener('input', markActivity, true);
 
   let pendingAttachments = [];
 
@@ -2663,6 +2660,9 @@
     }, 60000);
   }
   function markActivity() { lastActivityTime = Date.now(); }
+  document.addEventListener('keydown', markActivity, true);
+  document.addEventListener('pointerdown', markActivity, true);
+  document.addEventListener('input', markActivity, true);
   startPresenceCheck();
   function speakEmber(text) {
     if (!ttsEnabled() || !ttsAvailable()) return;
