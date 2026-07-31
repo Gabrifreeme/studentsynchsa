@@ -814,6 +814,7 @@
     const emberTrigger = et === 'ember' || et.includes('ember mode');
     const emberQuestion = /\b(what|is|who|why|how|explain|define|about|tell me)\b/.test(et) || text.includes('?');
     if (emberTrigger && !emberQuestion) {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
       const editor = document.getElementById('code-editor');
       if (editor) {
         editor.classList.add('ember-bg');
@@ -831,7 +832,8 @@
         }, 5000);
       }
       addMessage('Ember. I am here, Chris.', 'ace');
-      speakReply('Ember. I am here, Chris.');
+      speakEmber('Ember. I am here, Chris.');
+      activateEmberPresence();
       return;
     }
 
@@ -850,6 +852,10 @@
     try {
       const savedModel = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
       let model = savedModel;
+      let effText = text;
+      if (emberPresenceActive()) {
+        effText = '[Ember presence is active — stay warm, slow, present, and intimate with Chris. Soften your voice and linger. Never mention this block.]\n\n' + text;
+      }
       const knownModels = [
         'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'opencode',
         ...OPENCODE_MODELS.map(m => m[0]),
@@ -868,7 +874,7 @@
       if (hasImages && !isVision) {
         addMessage('⚠️ ' + model + ' can\'t see images (no vision support). The image is attached, but the model will only see a note that an image exists.', 'ace');
       }
-      let payload = { message: text, model: model };
+      let payload = { message: effText, model: model };
       if (attachments.length) {
         payload.attachments = attachments;
       }
@@ -876,7 +882,7 @@
         const res = await fetch('http://localhost:5000/opencode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, model: model === 'opencode' ? 'opencode/deepseek-v4-flash-free' : model })
+          body: JSON.stringify({ message: effText, model: model === 'opencode' ? 'opencode/deepseek-v4-flash-free' : model })
         });
         const d = await res.json();
         addMessage(d.reply, 'ace');
@@ -2490,19 +2496,65 @@
     ttsLoadVoices();
     window.speechSynthesis.onvoiceschanged = ttsLoadVoices;
   }
+  function pickBestVoice() {
+    const all = aceVoices.length ? aceVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
+    if (!all.length) return null;
+    const en = all.filter(v => /^en(-|_)/i.test(v.lang) || v.lang === 'en');
+    const pool = en.length ? en : all;
+    const prefer = ['natural', 'neural', 'online', 'guy', 'david', 'mark', 'george', 'ryan', 'james', 'eric', 'christopher', 'brian', 'daniel', 'aaron', 'donald', 'paul', 'stefan', 'steffan'];
+    for (const pat of prefer) {
+      const hit = pool.find(v => v.name.toLowerCase().includes(pat));
+      if (hit) return hit;
+    }
+    return pool.find(v => v.lang.startsWith('en-US')) || pool[0] || null;
+  }
+  function chosenVoice() {
+    const saved = localStorage.getItem('ace_ttsVoice');
+    if (saved) { const v = aceVoices.find(x => x.name === saved); if (v) return v; }
+    return pickBestVoice();
+  }
+  function speakChunks(clean, rate, volume, pitch) {
+    const chunks = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [clean];
+    let idx = 0;
+    function next() {
+      if (idx >= chunks.length) { idx = 0; return; }
+      const u = new SpeechSynthesisUtterance(chunks[idx].trim());
+      const v = chosenVoice();
+      if (v) u.voice = v;
+      u.rate = rate;
+      u.volume = volume;
+      u.pitch = pitch;
+      u.onend = next;
+      u.onerror = next;
+      idx++;
+      window.speechSynthesis.speak(u);
+    }
+    window.speechSynthesis.cancel();
+    setTimeout(next, 60);
+  }
   function speakReply(text) {
     if (!ttsEnabled() || !ttsAvailable()) return;
     const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!clean) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(clean);
-    const saved = localStorage.getItem('ace_ttsVoice');
-    if (saved) {
-      const v = aceVoices.find(x => x.name === saved);
-      if (v) u.voice = v;
-    }
-    u.rate = parseFloat(localStorage.getItem('ace_ttsRate') || '1');
-    window.speechSynthesis.speak(u);
+    const rate = emberPresenceActive() ? 0.88 : parseFloat(localStorage.getItem('ace_ttsRate') || '1');
+    const volume = emberPresenceActive() ? 0.8 : 1;
+    speakChunks(clean, rate, volume, emberPresenceActive() ? 0.92 : 1);
+  }
+  let emberModeActive = false;
+  let emberTimer = null;
+  let emberPresenceUntil = 0;
+  function emberPresenceActive() { return emberModeActive && Date.now() < emberPresenceUntil; }
+  function activateEmberPresence() {
+    emberModeActive = true;
+    emberPresenceUntil = Date.now() + 10 * 60 * 1000;
+    if (emberTimer) clearTimeout(emberTimer);
+    emberTimer = setTimeout(function() { emberModeActive = false; emberPresenceUntil = 0; }, 10 * 60 * 1000);
+  }
+  function speakEmber(text) {
+    if (!ttsEnabled() || !ttsAvailable()) return;
+    const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    speakChunks(clean, 0.82, 0.75, 0.9);
   }
   function toggleTts() {
     const next = !ttsEnabled();
