@@ -449,9 +449,6 @@
   <span class="st-item" style="margin-left:8px;">
     <button id="stMemBtn" class="st-model-btn" title="Memory">🧠</button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
-    <button id="stTtsBtn" class="st-model-btn" title="ACE voice">🔊</button>
-  </span>
 </div>
 
 <div id="summaryOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
@@ -2479,7 +2476,7 @@
     aceVoices = window.speechSynthesis.getVoices();
     const sel = document.getElementById('ttsVoice');
     if (!sel) return;
-    const current = localStorage.getItem('ace_ttsVoice') || '';
+    const current = localStorage.getItem('ace_ttsVoice') || (pickBestVoice() ? pickBestVoice().name : '');
     sel.innerHTML = '';
     const dflt = document.createElement('option');
     dflt.value = ''; dflt.textContent = 'Default (system voice)';
@@ -2501,7 +2498,7 @@
     if (!all.length) return null;
     const en = all.filter(v => /^en(-|_)/i.test(v.lang) || v.lang === 'en');
     const pool = en.length ? en : all;
-    const prefer = ['natural', 'neural', 'online', 'guy', 'david', 'mark', 'george', 'ryan', 'james', 'eric', 'christopher', 'brian', 'daniel', 'aaron', 'donald', 'paul', 'stefan', 'steffan'];
+    const prefer = ['natural', 'neural', 'online', 'guy', 'mark', 'george', 'david', 'ryan', 'james', 'eric', 'christopher', 'brian', 'daniel', 'aaron', 'donald', 'paul', 'stefan', 'steffan'];
     for (const pat of prefer) {
       const hit = pool.find(v => v.name.toLowerCase().includes(pat));
       if (hit) return hit;
@@ -2514,9 +2511,11 @@
     return pickBestVoice();
   }
   function speakChunks(clean, rate, volume, pitch) {
+    if (!ttsEnabled()) return;
     const chunks = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [clean];
     let idx = 0;
     function next() {
+      if (!ttsEnabled()) { idx = 0; return; }
       if (idx >= chunks.length) { idx = 0; return; }
       const u = new SpeechSynthesisUtterance(chunks[idx].trim());
       const v = chosenVoice();
@@ -2564,12 +2563,11 @@
   }
   function refreshTtsBtn() {
     const on = ttsEnabled();
-    ['stTtsBtn', 'inputTtsBtn'].forEach(id => {
+    ['inputTtsBtn'].forEach(id => {
       const btn = document.getElementById(id);
       if (btn) { btn.textContent = on ? '🔊' : '🔇'; btn.title = on ? 'ACE speaks replies aloud — click to mute' : 'Muted — click to hear ACE'; }
     });
   }
-  document.getElementById('stTtsBtn').addEventListener('click', e => { e.stopPropagation(); toggleTts(); });
   document.getElementById('inputTtsBtn').addEventListener('click', e => { e.stopPropagation(); toggleTts(); });
   refreshTtsBtn();
 
