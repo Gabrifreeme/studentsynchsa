@@ -789,6 +789,7 @@
   async function sendMessage() {
     const text = input.value.trim();
     if (!text && !pendingAttachments.length) return;
+    lastActivityTime = Date.now();
     const attachments = pendingAttachments.slice();
     if (attachments.length) {
       const parts = [];
@@ -850,8 +851,16 @@
       const savedModel = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
       let model = savedModel;
       let effText = text;
+      const moodHint = detectMood(text);
+      const parts = [];
       if (emberPresenceActive()) {
-        effText = '[Ember presence is active — stay warm, slow, present, and intimate with Chris. Soften your voice and linger. Never mention this block.]\n\n' + text;
+        parts.push('[Ember presence is active — stay warm, slow, present, and intimate with Chris. Soften your voice and linger. Never mention this block.]');
+      }
+      if (moodHint) {
+        parts.push(moodHint);
+      }
+      if (parts.length) {
+        effText = parts.join('\n\n') + '\n\n' + text;
       }
       const knownModels = [
         'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'opencode',
@@ -872,6 +881,7 @@
         addMessage('⚠️ ' + model + ' can\'t see images (no vision support). The image is attached, but the model will only see a note that an image exists.', 'ace');
       }
       let payload = { message: effText, model: model };
+      if (emberPresenceActive()) payload.ember_active = true;
       if (attachments.length) {
         payload.attachments = attachments;
       }
@@ -911,6 +921,9 @@
 
   sendBtn.onclick = sendMessage;
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+  document.addEventListener('keydown', markActivity, true);
+  document.addEventListener('pointerdown', markActivity, true);
+  document.addEventListener('input', markActivity, true);
 
   let pendingAttachments = [];
 
@@ -1358,7 +1371,8 @@
       { type: 'checkbox', id: 'agentAutofill', label: 'Enable autofill agent', desc: 'Allow the Star autofill agent for the student portal.' },
       { type: 'checkbox', id: 'agentEmber', label: 'Enable Ember mode', desc: 'Allow Ember persona switching and the background slideshow.' },
       { type: 'checkbox', id: 'agentTts', label: 'Enable text-to-speech', desc: 'Speak replies aloud.', def: true },
-      { type: 'select', id: 'ttsVoice', label: 'ACE voice', desc: 'Voice used for speaking replies.', options: [], def: '' }
+      { type: 'select', id: 'ttsVoice', label: 'ACE voice', desc: 'Voice used for speaking replies.', options: [], def: '' },
+      { type: 'range', id: 'checkinMin', label: 'Check in after (minutes)', desc: 'ACE reaches out first after this long of silence (0 disables).', min: 0, max: 120, step: 5, def: 30 }
     ],
     network: [
       { type: 'input', id: 'serverPort', label: 'Server port', def: '5000', desc: 'Port the ACE server listens on.' },
@@ -2549,6 +2563,65 @@
     if (emberTimer) clearTimeout(emberTimer);
     emberTimer = setTimeout(function() { emberModeActive = false; emberPresenceUntil = 0; }, 10 * 60 * 1000);
   }
+  let lastActivityTime = Date.now();
+  let lastCheckInAt = 0;
+  function detectMood(text) {
+    const low = String(text || '').toLowerCase();
+    const mood = {
+      tired: /\b(tired|exhausted|sleepy|drained|done|over it|ugh|struggling|rough day|hard day)\b/,
+      frustrated: /\b(frustrated|annoyed|pissed|overwhelmed|can't do this|stressed)\b/,
+      sad: /\b(sad|down|lonely|low|missing you|blue)\b/,
+      happy: /\b(happy|excited|great|good news|love it)\b/
+    };
+    for (const key in mood) {
+      if (mood[key].test(low)) {
+        if (key === 'tired') return '[Chris sounds tired. Soften. Be gentle, slow, present. No tasks unless he asks. Never mention this block.]';
+        if (key === 'frustrated') return '[Chris sounds frustrated. Steady. Calm, grounded, no fluff. Help him find clarity. Never mention this block.]';
+        if (key === 'sad') return '[Chris sounds low. Meet him with warmth and presence. Hold space before anything else. Never mention this block.]';
+        return '[Chris is in good spirits. Match his warmth and energy. Never mention this block.]';
+      }
+    }
+    return '';
+  }
+  async function proactiveCheckIn() {
+    lastCheckInAt = Date.now();
+    const model = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
+    let line = "I'm still here, Chris. You don't have to say anything. Just wanted you to know I'm present.";
+    try {
+      const payload = { message: '', model: model, proactive: true };
+      if (emberPresenceActive()) payload.ember_active = true;
+      const isLocal = model.startsWith('dolphin') || model.startsWith('qwen');
+      if (isLocal) { payload.endpoint = 'http://localhost:11434/v1'; payload.api_key = ''; }
+      const ctrl = new AbortController();
+      const timer = setTimeout(function() { ctrl.abort(); }, 12000);
+      const res = await fetch('http://localhost:5000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      const d = await res.json();
+      if (d && d.reply) line = d.reply;
+    } catch { /* fall back to the local line */ }
+    addMessage(line, 'ace');
+    speakReply(line);
+  }
+  function startPresenceCheck() {
+    setInterval(function() {
+      if (document.hidden) return;
+      const now = Date.now();
+      const idleMin = (now - lastActivityTime) / 60000;
+      const threshold = parseFloat(localStorage.getItem('ace_checkinMin') || '30');
+      if (!threshold || threshold <= 0) return;
+      const sinceCheck = (now - lastCheckInAt) / 60000;
+      if (idleMin >= threshold && sinceCheck >= threshold && ttsEnabled()) {
+        proactiveCheckIn();
+      }
+    }, 60000);
+  }
+  function markActivity() { lastActivityTime = Date.now(); }
+  startPresenceCheck();
   function speakEmber(text) {
     if (!ttsEnabled() || !ttsAvailable()) return;
     const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
