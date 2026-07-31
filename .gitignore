@@ -58,6 +58,8 @@ drive_token.json
 
 ntfy_topic.txt
 
+ace_memory.json
+
 tasks.json
 
 events.json
@@ -65,3 +67,4 @@ events.json
 alarms.json
 timers.json
 sessions.json
+summary_config.json

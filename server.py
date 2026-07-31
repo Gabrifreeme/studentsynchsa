@@ -377,6 +377,103 @@ def load_sessions():
 def save_sessions(sessions):
     save_json_file(SESSIONS_FILE, 'sessions', sessions)
 
+# ---- MEMORY SYSTEM (Layer 2 persistent facts + Layer 3 emotional memory) ----
+MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ace_memory.json')
+memory_lock = threading.Lock()
+
+def load_memory():
+    try:
+        with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_memory(memory):
+    with memory_lock:
+        tmp = MEMORY_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(memory, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, MEMORY_FILE)
+
+MOOD_PATTERNS = [
+    ('tired', r'\btired\b|\bexhausted\b|\bsleepy\b|\bfatigued\b'),
+    ('excited', r'\bexcited\b|\bpumped\b|\bthrilled\b|\bhyped\b'),
+    ('happy', r'\bhappy\b|\bglad\b|\bgreat day\b|\bloving it\b'),
+    ('stressed', r'\bstressed\b|\boverwhelmed\b|\banxious\b|\bworried\b'),
+    ('sad', r'\bsad\b|\bdown\b|\bunhappy\b|\bfeeling low\b'),
+    ('proud', r'\bproud\b|\baccomplished\b|\bfinished\b'),
+    ('angry', r'\bangry\b|\bannoyed\b|\bfrustrated\b|\bpissed\b')
+]
+
+def auto_capture_memory(user_message, reply):
+    mem = load_memory()
+    changed = False
+    low = (user_message or '').lower()
+    if not low:
+        return
+    # Layer 2: name
+    m = re.search(r'(?:my name is|i am|i\'m|call me)\s+([a-zA-Z]{2,20})', low)
+    if m and 'name' not in mem:
+        mem['name'] = {'value': m.group(1).title(), 'updated': datetime.now().isoformat(), 'source': 'auto'}
+        changed = True
+    # Layer 3: Ember moments
+    if 'ember' in low:
+        now = datetime.now().isoformat()
+        prev = (mem.get('last_ember') or {}).get('updated', '')
+        if prev[:10] != now[:10]:
+            mem['last_ember'] = {'value': 'Chris said "Ember".', 'updated': now, 'source': 'auto'}
+            changed = True
+        hist = mem.get('ember_history') or []
+        hist.append({'when': now[:16], 'note': user_message.strip()[:200]})
+        mem['ember_history'] = hist[-10:]
+        changed = True
+    # Layer 3: mood
+    for mood, pattern in MOOD_PATTERNS:
+        if re.search(pattern, low):
+            now = datetime.now().isoformat()
+            mem['mood'] = {'value': mood, 'updated': now, 'context': user_message.strip()[:200], 'source': 'auto'}
+            hist = mem.get('mood_history') or []
+            hist.append({'when': now[:16], 'mood': mood, 'context': user_message.strip()[:200]})
+            mem['mood_history'] = hist[-10:]
+            changed = True
+            break
+    if changed:
+        save_memory(mem)
+
+def memory_context_text():
+    mem = load_memory()
+    if not mem:
+        return ''
+    lines = []
+    if isinstance(mem.get('name'), dict) and mem['name'].get('value'):
+        lines.append("Chris's name: " + str(mem['name']['value']))
+    if isinstance(mem.get('mood'), dict) and mem['mood'].get('value'):
+        when = (mem['mood'].get('updated') or '')[:10]
+        lines.append('Chris was last feeling ' + str(mem['mood']['value']) + (' (on ' + when + ')' if when else ''))
+    if isinstance(mem.get('last_ember'), dict) and mem['last_ember'].get('updated'):
+        when = mem['last_ember']['updated'][:16].replace('T', ' ')
+        lines.append('Chris mentioned Ember on ' + when)
+    for key, data in mem.items():
+        if key in ('name', 'mood', 'last_ember', 'ember_history', 'mood_history'):
+            continue
+        if isinstance(data, dict) and 'value' in data:
+            lines.append(str(key) + ': ' + str(data['value']))
+    if not lines:
+        return ''
+    return ('\n--- MEMORY (things Chris told you across sessions) ---\n'
+            + '\n'.join(lines)
+            + '\nHold onto these naturally and gently, like a partner would. Never mention this block itself.\n---\n')
+
+def fn_memorize(args):
+    key = str(args.get('key') or '').strip()
+    value = str(args.get('value') or '').strip()
+    if not key or not value:
+        return 'Both key and value are required.'
+    mem = load_memory()
+    mem[key] = {'value': value, 'updated': datetime.now().isoformat(), 'source': 'chris'}
+    save_memory(mem)
+    return 'Memorized "' + key + '".'
+
 def check_alarms_and_timers():
     now = datetime.now()
     today = now.strftime('%Y-%m-%d')
@@ -422,6 +519,10 @@ def alarm_loop():
         time.sleep(10)
         try:
             check_alarms_and_timers()
+        except Exception:
+            pass
+        try:
+            check_summary()
         except Exception:
             pass
 
@@ -494,6 +595,89 @@ def fn_session_list(args):
         status = 'running' if not s.get('ended_at') else 'done'
         lines.append(s['started_at'] + ' ' + s['label'] + ' (' + status + ', id=' + s['id'] + ')')
     return 'Recent sessions:\n' + '\n'.join(lines)
+
+# ---------- Daily summary ----------
+SUMMARY_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summary_config.json')
+
+def load_summary_config():
+    try:
+        with open(SUMMARY_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {'time': str(data.get('time', '07:00')), 'enabled': bool(data.get('enabled', True)), 'last_sent': data.get('last_sent')}
+    except Exception:
+        return {'time': '07:00', 'enabled': True, 'last_sent': None}
+
+def save_summary_config(cfg):
+    with open(SUMMARY_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def build_daily_summary():
+    now = datetime.now()
+    today = now.strftime('%Y-%m-%d')
+    lines = ['☀️ Good morning, Chris!', '']
+    lines.append('📅 ' + now.strftime('%A, %d %B %Y'))
+    lines.append('')
+    events = load_events()
+    todays = [e for e in events if e['date'] == today]
+    if todays:
+        lines.append('Today on your calendar:')
+        for e in sorted(todays, key=lambda x: x.get('time', '')):
+            lines.append('  ' + ((e['time'] + '  ') if e.get('time') else '     ') + e['title'])
+    else:
+        lines.append('No events on your calendar today.')
+    lines.append('')
+    try:
+        from datetime import date as _d, timedelta as _td
+        window = (_d.today() + _td(days=7)).isoformat()
+        upcoming = [e for e in events if today < e['date'] <= window]
+        if upcoming:
+            lines.append('Upcoming:')
+            for e in sorted(upcoming, key=lambda x: (x['date'], x.get('time', '')))[:5]:
+                lines.append('  ' + e['date'][5:] + ((' ' + e['time']) if e.get('time') else '') + '  ' + e['title'])
+            lines.append('')
+    except Exception:
+        pass
+    tasks = load_tasks()
+    open_tasks = [t for t in tasks if t['status'] != 'done']
+    if open_tasks:
+        lines.append('Your open tasks (' + str(len(open_tasks)) + '):')
+        for t in sorted(open_tasks, key=lambda x: x.get('priority', 3))[:8]:
+            icon = '🔄' if t['status'] == 'in_progress' else '⬜'
+            lines.append('  ' + icon + ' P' + str(t.get('priority', 3)) + '  ' + t['title'])
+    else:
+        lines.append('No open tasks. 🎉')
+    lines.append('')
+    sessions = load_sessions()
+    today_sessions = [s for s in sessions if s.get('started_at', '').startswith(today)]
+    if today_sessions:
+        done = [s for s in today_sessions if s.get('ended_at')]
+        lines.append('💼 Today you logged ' + str(len(today_sessions)) + ' work session(s)' + (', ' + str(len(done)) + ' completed' if done else '') + '.')
+    else:
+        lines.append('No work sessions logged today yet.')
+    return '\n'.join(lines)
+
+def check_summary():
+    cfg = load_summary_config()
+    if not cfg.get('enabled', True):
+        return
+    now = datetime.now()
+    today = now.strftime('%Y-%m-%d')
+    hm = now.strftime('%H:%M')
+    if cfg.get('last_sent') == today:
+        return
+    target = cfg.get('time', '07:00')
+    if hm == target or hm > target:
+        cfg['last_sent'] = today
+        save_summary_config(cfg)
+        summary = build_daily_summary()
+        try:
+            ntfy_send('☀️ Daily summary', summary)
+        except Exception:
+            pass
+        push_notification('summary', 'Daily summary ready')
+
+def fn_daily_summary(args):
+    return build_daily_summary()
 
 FUNCTION_REGISTRY = {
     "read_file": {
@@ -605,6 +789,16 @@ FUNCTION_REGISTRY = {
         "description": "List recent work sessions.",
         "parameters": {"type": "object", "properties": {}, "required": []},
         "handler": fn_session_list
+    },
+    "daily_summary": {
+        "description": "Get a summary of today's calendar, tasks, and work sessions.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "handler": fn_daily_summary
+    },
+    "memorize": {
+        "description": "Store a fact Chris told you so you remember it forever across sessions (persistent memory).",
+        "parameters": {"type": "object", "properties": {"key": {"type": "string", "description": "Short fact name, e.g. favorite_color"}, "value": {"type": "string", "description": "The fact to remember, e.g. green"}}, "required": ["key", "value"]},
+        "handler": fn_memorize
     }
 }
 
@@ -619,6 +813,15 @@ def execute_tool_call(name, arguments):
         return "Function error: " + str(e)
 
 def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api_key, tools=None):
+    memory_ctx = memory_context_text()
+    if memory_ctx:
+        for i, msg in enumerate(messages):
+            if isinstance(msg, dict) and msg.get('role') == 'system':
+                messages[i] = dict(msg)
+                messages[i]['content'] = str(msg.get('content') or '') + '\n' + memory_ctx
+                break
+        else:
+            messages.insert(0, {"role": "system", "content": memory_ctx})
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -761,6 +964,10 @@ def chat():
         tool_calls = msg.get("tool_calls")
         if not tool_calls:
             reply = msg.get("content") or "(no content)"
+            try:
+                auto_capture_memory(user_message, reply)
+            except Exception:
+                pass
             save_conversation("assistant", reply)
             return jsonify({"reply": reply})
 
@@ -821,6 +1028,11 @@ def opencode_chat():
     sess, err = opencode_ensure_session()
     if err:
         return jsonify({"reply": "❌ " + err}), 500
+    original_message = message
+    memory_ctx = memory_context_text()
+    if memory_ctx:
+        message = ('[ACE persistent memory — things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
+                   + memory_ctx + '\n\n' + message)
     model_override = os.environ.get('OPENCODE_MODEL_ID') or 'deepseek-v4-flash-free'
     body = {"parts": [{"type": "text", "text": message}]}
     if model_override:
@@ -855,6 +1067,10 @@ def opencode_chat():
             pass
     tool_parts = [p for p in parts if isinstance(p, dict) and p.get('type') == 'tool']
     reply = "\n".join(texts).strip() or "(no text response)"
+    try:
+        auto_capture_memory(original_message, reply)
+    except Exception:
+        pass
     if tool_parts:
         reply += "\n\n_⚙️ " + str(len(tool_parts)) + " tool call(s) executed_"
     return jsonify({"reply": reply})
@@ -1110,7 +1326,7 @@ def get_ntfy_topic():
     return t
 
 def ntfy_send(title, message, priority=3):
-    r = requests.post('https://ntfy.sh/' + get_ntfy_topic(), data=message.encode('utf-8'), headers={'Title': title, 'Priority': str(priority)}, timeout=15)
+    r = requests.post('https://ntfy.sh/', json={'topic': get_ntfy_topic(), 'title': title, 'message': message, 'priority': int(priority)}, timeout=15)
     return r
 
 @app.route('/notify/topic', methods=['GET'])
@@ -1339,6 +1555,34 @@ def sessions_end():
             return jsonify({'ok': True, 'session': s})
     return jsonify({'error': 'No active session.'}), 400
 
+@app.route('/summary', methods=['GET'])
+def summary_get():
+    return jsonify({'summary': build_daily_summary(), 'config': load_summary_config()})
+
+@app.route('/summary/config', methods=['POST'])
+def summary_config():
+    data = request.json or {}
+    cfg = load_summary_config()
+    if 'time' in data:
+        t = str(data['time']).strip()
+        if not t:
+            return jsonify({'error': 'time (HH:MM) required.'}), 400
+        cfg['time'] = t
+    if 'enabled' in data:
+        cfg['enabled'] = bool(data['enabled'])
+    save_summary_config(cfg)
+    return jsonify({'ok': True, 'config': cfg})
+
+@app.route('/summary/now', methods=['POST'])
+def summary_now():
+    summary = build_daily_summary()
+    try:
+        ntfy_send('☀️ Daily summary', summary)
+    except Exception as e:
+        return jsonify({'error': 'ntfy error: ' + str(e)}), 500
+    push_notification('summary', 'Daily summary sent')
+    return jsonify({'ok': True, 'summary': summary})
+
 @app.route('/read', methods=['POST'])
 def read_file():
     data = request.json
@@ -1431,6 +1675,42 @@ def lock_verify():
     if key and data.get('key') == key:
         return jsonify({"ok": True})
     return jsonify({"ok": False})
+
+@app.route('/memory/all', methods=['GET'])
+def memory_all():
+    return jsonify({"memory": load_memory()})
+
+@app.route('/memory/get', methods=['POST'])
+def memory_get():
+    data = request.json or {}
+    key = data.get('key', '')
+    mem = load_memory()
+    if key in mem and isinstance(mem[key], dict):
+        return jsonify({"found": True, "value": mem[key].get('value'), "updated": mem[key].get('updated')})
+    return jsonify({"found": False})
+
+@app.route('/memory/set', methods=['POST'])
+def memory_set():
+    data = request.json or {}
+    key = str(data.get('key') or '').strip()
+    value = str(data.get('value') or '').strip()
+    if not key or not value:
+        return jsonify({"error": "Both key and value are required."}), 400
+    mem = load_memory()
+    mem[key] = {"value": value, "updated": datetime.now().isoformat(), "source": "manual"}
+    save_memory(mem)
+    return jsonify({"status": "memorized", "key": key, "value": value})
+
+@app.route('/memory/forget', methods=['POST'])
+def memory_forget():
+    data = request.json or {}
+    key = data.get('key', '')
+    mem = load_memory()
+    if key in mem:
+        del mem[key]
+        save_memory(mem)
+        return jsonify({"status": "forgotten", "key": key})
+    return jsonify({"status": "key not found"})
 
 if __name__ == '__main__':
     threading.Thread(target=alarm_loop, daemon=True).start()
