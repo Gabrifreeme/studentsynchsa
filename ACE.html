@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -457,7 +457,7 @@
     <button id="stFreeBtn" class="st-model-btn" title="Unfiltered Free mode — local model, no filters">🔓</button>
   </span>
   <span class="st-model" id="stModelWrap">
-    <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">dolphin-llama3:8b</b> ▾</button>
+    <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">DeepSeek V4 Flash</b> ▾</button>
     <div id="stModelMenu" class="st-model-menu"></div>
   </span>
   <span class="st-item" style="margin-left:8px;display:none;" id="stDriveWrap">
@@ -869,7 +869,7 @@
 
     showThinking(text);
     try {
-      const savedModel = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
+      const savedModel = localStorage.getItem('ace_modelSelect') || 'opencode/deepseek-v4-flash-free';
       let model = savedModel;
       let effText = text;
       const moodHint = detectMood(text);
@@ -894,7 +894,7 @@
       const OPENCODE_MODEL_IDS = OPENCODE_MODELS.map(m => m[0]);
       const inFreeMode = freeMode();
       if (inFreeMode) {
-        model = 'dolphin-phi:2.7b';
+        model = 'opencode/deepseek-v4-flash-free';
       }
       const VISION_MODELS = ['llava', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'claude-3-5', 'claude-3-7', 'claude-3', 'gemini', 'qwen2-vl', 'qwen-vl', 'phi-3-vision', 'moondream'];
       const hasImages = attachments.some(a => a.type === 'image');
@@ -1568,7 +1568,7 @@
     const locals = [['dolphin-phi:2.7b', 'Dolphin Phi 2.7B'], ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']];
     const openrouter = DEFAULT_MODELS;
     const custom = getLlmModels().map(m => [m.model, m.name]);
-    const current = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
+    const current = localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b';
     let html = '<div class="st-model-group">Local</div>';
     locals.forEach(o => {
       html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">local</span></div>';
@@ -1616,7 +1616,7 @@
 
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b');
+    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b');
   }
 
   function toggleModelMenu() {
@@ -1699,7 +1699,7 @@
 
   async function saveSettings() {
     const selEl = document.getElementById('modelSelect');
-    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b')) {
+    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b')) {
       if (!(await requireAdmin())) return;
     }
     const llmNameCheck = document.getElementById('llmName');
@@ -2615,7 +2615,7 @@
   }
   async function proactiveCheckIn() {
     lastCheckInAt = Date.now();
-    const model = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
+    const model = localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b';
     let line = "I'm still here, Chris. You don't have to say anything. Just wanted you to know I'm present.";
     try {
       const payload = { message: '', model: model, proactive: true };

@@ -69,32 +69,48 @@ def is_research_query(text):
         return False
     if len(t.split()) < 2:
         return False
+    # Trivial math / greetings / self-questions don't need a web search.
+    if re.search(r'^(\d+\s*[+\-*/x×÷]\s*\d+|\d+(\s*[+\-*/x×÷]\s*\d+)+)\s*[=?\s]*$', t):
+        return False
+    if re.search(r'^(hi|hey|hello|yo|sup|good\s*(morning|afternoon|evening)|who are you|how are you|thank|thanks)\b', t):
+        return False
+    if re.search(r'\b(what is 2\+2|whats 2\+2|2 plus 2|5\+5|10\+10)\b', t):
+        return False
     for p in RESEARCH_PATTERNS:
         if re.search(p, t):
             return True
     return False
 
-def duckduckgo_research(query, max_results=5):
+def duckduckgo_research(query, max_results=5, timeout=8):
     if DDGS is None:
         return None, "DuckDuckGo library (ddgs) not installed."
-    try:
-        with DDGS() as d:
-            results = list(d.text(query, max_results=max_results))
-        if not results:
-            return None, "No results found for that query."
-        lines = []
-        for i, r in enumerate(results[:max_results], 1):
-            title = r.get('title', '')
-            href = r.get('href', '')
-            body = r.get('body', '')
-            lines.append(f"{i}. {title}")
-            if href:
-                lines.append(f"   {href}")
-            if body:
-                lines.append(f"   {body}")
-        return "\n".join(lines), None
-    except Exception as e:
-        return None, f"DuckDuckGo search error: {e}"
+    result_box = []
+    def _run():
+        try:
+            with DDGS() as d:
+                results = list(d.text(query, max_results=max_results))
+            if not results:
+                result_box.append(None)
+                return
+            lines = []
+            for i, r in enumerate(results[:max_results], 1):
+                title = r.get('title', '')
+                href = r.get('href', '')
+                body = r.get('body', '')
+                lines.append(f"{i}. {title}")
+                if href:
+                    lines.append(f"   {href}")
+                if body:
+                    lines.append(f"   {body}")
+            result_box.append("\n".join(lines))
+        except Exception as e:
+            result_box.append(None)
+    th = threading.Thread(target=_run, daemon=True)
+    th.start()
+    th.join(timeout)
+    if th.is_alive():
+        return None, f"DuckDuckGo search timed out after {timeout}s."
+    return result_box[0], None
 
 # URL detection for browser-automation triggers.
 _URL_RE = re.compile(r'https?://[^\s>)\]]+')
@@ -901,6 +917,7 @@ def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api
             "temperature": temperature,
             "num_predict": max_tokens,
             "num_ctx": 2048,
+            "keep_alive": "10m",
             "stream": False
         }
         return requests.post("http://localhost:11434/api/generate", headers=headers, json=ollama_payload, timeout=300)
