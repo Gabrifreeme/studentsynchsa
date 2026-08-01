@@ -128,6 +128,11 @@
     }
     .btn-run:hover { filter: brightness(1.1); color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
     .btn-icon { width: 30px; padding: 5px 0; text-align: center; }
+    .btn-universal {
+      background: linear-gradient(135deg, var(--accent-soft), var(--bg-elev));
+      color: var(--accent); border-color: var(--accent); font-weight: 600;
+    }
+    .btn-universal:hover { background: var(--accent-soft); color: #fff; border-color: var(--accent); }
     .dropdown-container { position: relative; display: inline-block; }
     .dropdown-menu {
       display: none; position: absolute; top: calc(100% + 6px); left: 0;
@@ -259,6 +264,7 @@
     #status .st-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
     .neon-green { color: var(--success); font-weight: 700; }
     .st-model { position: relative; margin-left: auto; color: var(--text-mute); }
+    .st-spacer { flex: 1 1 auto; min-width: 8px; }
     .st-model b { color: var(--accent); font-weight: 600; }
     .st-model-btn {
       display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
@@ -406,6 +412,17 @@
         <button class="btn" onclick="runCommand('git status')" title="Git status">git</button>
       </div>
       <div class="toolbar-spacer"></div>
+      <div class="toolbar-group" id="universalTab">
+        <button class="btn btn-universal" id="universalTabBtn" title="Universal — project-wide actions" onclick="toggleUniversalMenu()">🌐 universal ▾</button>
+        <div id="universalMenu" class="dropdown-menu" style="display:none;">
+          <div class="cmd-checkbox-label" style="padding:2px 12px;font-size:12px;color:var(--text-dim);">Quick actions:</div>
+          <button class="run-selected" style="width:100%;margin-top:2px;" onclick="runCommand('flutter analyze');closeUniversalMenu();">▶ Analyze</button>
+          <button class="run-selected" style="width:100%;" onclick="runCommand('flutter pub get');closeUniversalMenu();">▶ pub get</button>
+          <button class="run-selected" style="width:100%;" onclick="runCommand('git diff');closeUniversalMenu();">▶ git diff</button>
+          <hr style="margin:4px 0;">
+          <button class="run-selected" style="width:100%;" onclick="openUniversalSearch();closeUniversalMenu();">🔍 Search files</button>
+        </div>
+      </div>
       <div id="code-actions">
         <input id="searchInput" placeholder="Find in file..." title="Search (Ctrl+F)">
         <button class="btn btn-icon" onclick="toggleSearch()" title="Search (Ctrl+F)">⌕</button>
@@ -430,34 +447,34 @@
   <span class="st-item">📱 <span id="device-count" class="neon-green">0</span> devices</span>
   <span class="st-dot"></span>
   <span class="st-item">🤖 <span id="agent-count" class="neon-green">0</span> agents</span>
-  <span class="st-dot"></span>
-  <span class="st-model">
+  <span class="st-spacer"></span>
+  <span class="st-item" style="margin-right:8px;">
+    <button id="stFreeBtn" class="st-model-btn" title="Unfiltered Free mode — local model, no filters">🔓</button>
+  </span>
+  <span class="st-model" id="stModelWrap">
     <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">dolphin-llama3:8b</b> ▾</button>
     <div id="stModelMenu" class="st-model-menu"></div>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stDriveWrap">
     <button id="stDriveBtn" class="st-model-btn" title="Google Drive">☁️ <b id="stDriveName">Drive</b></button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stNotifyWrap">
     <button id="stNotifyBtn" class="st-model-btn" title="Send notification to your phone">🔔</button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stTasksWrap">
     <button id="stTasksBtn" class="st-model-btn" title="Tasks">📋 <b id="stTasksCount">0</b></button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stCalWrap">
     <button id="stCalBtn" class="st-model-btn" title="Calendar">📅 <b id="stCalCount">0</b></button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stTimeWrap">
     <button id="stTimeBtn" class="st-model-btn" title="Timers & Alarms">⏰ <b id="stTimeCount">0</b></button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stSummaryWrap">
     <button id="stSummaryBtn" class="st-model-btn" title="Daily summary">☀️</button>
   </span>
-  <span class="st-item" style="margin-left:8px;">
+  <span class="st-item" style="margin-left:8px;display:none;" id="stMemWrap">
     <button id="stMemBtn" class="st-model-btn" title="Memory">🧠</button>
-  </span>
-  <span class="st-item" style="margin-left:8px;">
-    <button id="stFreeBtn" class="st-model-btn" title="Unfiltered Free mode — local model, no filters">🔓</button>
   </span>
 </div>
 
@@ -740,6 +757,10 @@
     checked.forEach(cb => runCommand(cb.value));
   }
   document.addEventListener('click', e => { if (!e.target.closest('.dropdown-container')) closeDropdown(); });
+  function toggleUniversalMenu() { const m = document.getElementById('universalMenu'); if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block'; }
+  function closeUniversalMenu() { const m = document.getElementById('universalMenu'); if (m) m.style.display = 'none'; }
+  function openUniversalSearch() { const s = document.getElementById('searchInput'); if (s) s.focus(); }
+  document.addEventListener('click', e => { if (!e.target.closest('#universalTab')) closeUniversalMenu(); });
 
   function clearCode() { codeEditor.textContent = ''; applyHighlight(); addOutput('🗑 Cleared'); }
   function copyCode() {
