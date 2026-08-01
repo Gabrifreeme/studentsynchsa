@@ -171,10 +171,6 @@
       color: var(--text); background: var(--bg); white-space: pre; outline: none; tab-size: 2;
       transition: background 0.5s ease; line-height: 1.65;
     }
-    #code-editor.ember-bg {
-      background-size: cover; background-position: center; background-repeat: no-repeat;
-      color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
-    }
 
     /* ---------- Explorer ---------- */
     #explore-panel { flex: 0.7; display: flex; flex-direction: column; background: var(--bg-panel); min-width: 140px; max-width: 280px; }
@@ -513,7 +509,7 @@
       <button class="icon-btn" onclick="closeMemModal()" title="Close">✕</button>
     </div>
     <div style="padding:16px;">
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Layer 2 — facts I hold forever. Layer 3 — how you felt (mood, Ember moments). I read this in every conversation and bring it up gently.</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Facts I hold across sessions, plus mood notes. I read this in every conversation and bring it up naturally.</div>
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <input type="text" id="memKey" placeholder="Key (e.g. favorite_color)" class="settings-input" style="flex:1;box-sizing:border-box;">
         <input type="text" id="memValue" placeholder="Value (e.g. green)" class="settings-input" style="flex:2;box-sizing:border-box;">
@@ -860,41 +856,11 @@
     input.value = '';
     input.style.height = 'auto';
 
-    // Handle Ember locally
-    const et = text.toLowerCase().trim();
-    const emberTrigger = et === 'ember' || et.includes('ember mode');
-    const emberQuestion = /\b(what|is|who|why|how|explain|define|about|tell me)\b/.test(et) || text.includes('?');
-    if (emberTrigger && !emberQuestion) {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-      const editor = document.getElementById('code-editor');
-      if (editor) {
-        editor.classList.add('ember-bg');
-        const images = [
-          '/pictures/ACE.png.png',
-          '/pictures/ACE2.png.png',
-          '/pictures/ACE3.png.png'
-        ];
-        let slideIndex = 0;
-        editor.style.backgroundImage = 'url(' + images[0] + ')';
-        if (window.__emberSlideshow) clearInterval(window.__emberSlideshow);
-        window.__emberSlideshow = setInterval(function() {
-          slideIndex = (slideIndex + 1) % images.length;
-          editor.style.backgroundImage = 'url(' + images[slideIndex] + ')';
-        }, 5000);
-      }
-      addMessage('Ember. I am here, Chris.', 'ace');
-      speakEmber('Ember. I am here, Chris.');
-      activateEmberPresence();
-      return;
-    }
-
     // Handle Work mode locally
     if (text.toLowerCase().includes('work mode')) {
       const editor = document.getElementById('code-editor');
       if (editor) {
-        editor.classList.remove('ember-bg');
         editor.style.backgroundImage = '';
-        if (window.__emberSlideshow) { clearInterval(window.__emberSlideshow); window.__emberSlideshow = null; }
       }
     addMessage('Switching to work mode. I\'m here to help.', 'ace');
       hideThinking();
@@ -908,9 +874,6 @@
       let effText = text;
       const moodHint = detectMood(text);
       const parts = [];
-      if (emberPresenceActive()) {
-        parts.push('[Ember presence is active — stay warm, slow, present, and intimate with Chris. Soften your voice and linger. Never mention this block.]');
-      }
       if (moodHint) {
         parts.push(moodHint);
       }
@@ -940,7 +903,6 @@
         addMessage('⚠️ ' + model + ' can\'t see images (no vision support). The image is attached, but the model will only see a note that an image exists.', 'ace');
       }
       let payload = { message: effText, model: model };
-      if (emberPresenceActive()) payload.ember_active = true;
       if (inFreeMode) payload.unfiltered = true;
       if (attachments.length) {
         payload.attachments = attachments;
@@ -1384,7 +1346,6 @@
     ],
     appearance: [
       { type: 'checkbox', id: 'darkMode', label: 'Dark mode', desc: 'Use the dark theme.' },
-      { type: 'checkbox', id: 'emberBg', label: 'Ember background slideshow', desc: 'Cycle the three ACE images as the editor background when Ember mode is active.' },
       { type: 'select', id: 'fontSize', label: 'Editor font size', desc: 'Base font size in the code editor.', options: [['14','14'],['16','16'],['18','18'],['20','20']], def: '16' },
       { type: 'select', id: 'accentColor', label: 'Accent color', desc: 'UI accent color.', options: [['#7a6aff','Purple'],['#4a8aff','Blue'],['#ffaa88','Orange'],['#50fa7b','Green']], def: '#7a6aff' }
     ],
@@ -1442,7 +1403,6 @@
     ],
     agent: [
       { type: 'checkbox', id: 'agentAutofill', label: 'Enable autofill agent', desc: 'Allow the Star autofill agent for the student portal.' },
-      { type: 'checkbox', id: 'agentEmber', label: 'Enable Ember mode', desc: 'Allow Ember persona switching and the background slideshow.' },
       { type: 'checkbox', id: 'agentTts', label: 'Enable text-to-speech', desc: 'Speak replies aloud.', def: true },
       { type: 'select', id: 'ttsVoice', label: 'ACE voice', desc: 'Voice used for speaking replies.', options: [], def: '' },
       { type: 'range', id: 'checkinMin', label: 'Check in after (minutes)', desc: 'ACE reaches out first after this long of silence (0 disables).', min: 0, max: 120, step: 5, def: 30 }
@@ -1597,24 +1557,10 @@
     el.innerHTML = html;
   }
 
-  let aceAdminUnlocked = sessionStorage.getItem('ace_admin_unlocked') === '1';
+  let aceAdminUnlocked = true;
 
   async function requireAdmin() {
-    if (aceAdminUnlocked) return true;
-    const key = prompt('🔒 Changing models or agents requires ACE admin. Enter the admin key:');
-    if (!key) return false;
-    try {
-      const r = await fetch('http://localhost:5000/lock/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
-      const j = await r.json();
-      if (j.ok) {
-        aceAdminUnlocked = true;
-        sessionStorage.setItem('ace_admin_unlocked', '1');
-        refreshStatusModel();
-        return true;
-      }
-    } catch (e) {}
-    alert('❌ Incorrect admin key.');
-    return false;
+    return true;
   }
 
   function buildModelPicker() {
@@ -2467,15 +2413,16 @@
         const el = document.getElementById('memList');
         if (!keys.length) { el.innerHTML = '<div style="color:var(--text-dim);padding:8px 0;">Nothing memorized yet. Tell me things, or add one above.</div>'; return; }
         let html = '';
-        keys.forEach(k => {
+          keys.forEach(k => {
           const data = mem[k];
           const val = data && typeof data === 'object' ? (data.value || '') : data;
           const when = data && typeof data === 'object' ? (data.updated || '').slice(0, 16).replace('T', ' ') : '';
+          const safeKey = JSON.stringify(k).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
           html += '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);">'
                 + '<div style="flex:1;overflow:hidden;"><b style="color:var(--accent);">' + escapeHtml(k) + '</b>'
                 + (when ? ' <span style="color:var(--text-dim);font-size:10px;">(' + when + ')</span>' : '')
                 + '<div style="color:var(--text);word-break:break-word;">' + escapeHtml(val) + '</div></div>'
-                + '<button class="icon-btn" onclick="forgetMemory(' + JSON.stringify(k) + ')" title="Forget">✕</button>'
+                + '<button class="icon-btn" onclick="forgetMemory(' + safeKey + ')" title="Forget">✕</button>'
                 + '</div>';
         });
         el.innerHTML = html;
@@ -2624,19 +2571,9 @@
     if (!ttsEnabled() || !ttsAvailable()) return;
     const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!clean) return;
-    const rate = emberPresenceActive() ? 0.88 : parseFloat(localStorage.getItem('ace_ttsRate') || '1');
-    const volume = emberPresenceActive() ? 0.8 : 1;
-    speakChunks(clean, rate, volume, emberPresenceActive() ? 0.92 : 1);
-  }
-  let emberModeActive = false;
-  let emberTimer = null;
-  let emberPresenceUntil = 0;
-  function emberPresenceActive() { return emberModeActive && Date.now() < emberPresenceUntil; }
-  function activateEmberPresence() {
-    emberModeActive = true;
-    emberPresenceUntil = Date.now() + 10 * 60 * 1000;
-    if (emberTimer) clearTimeout(emberTimer);
-    emberTimer = setTimeout(function() { emberModeActive = false; emberPresenceUntil = 0; }, 10 * 60 * 1000);
+    const rate = parseFloat(localStorage.getItem('ace_ttsRate') || '1');
+    const volume = 1;
+    speakChunks(clean, rate, volume, 1);
   }
   let lastActivityTime = Date.now();
   let lastCheckInAt = 0;
@@ -2648,15 +2585,14 @@
     if (btn) {
       btn.textContent = freeModeActive ? '🔓' : '🔒';
       btn.title = freeModeActive ? 'Free mode ON — unfiltered local model. Click to return to opencode.' : 'Unfiltered Free mode — local model, no filters';
-      btn.style.color = freeModeActive ? 'var(--ember,#ff8c42)' : '';
+      btn.style.color = freeModeActive ? 'var(--accent)' : '';
     }
     if (freeModeActive) {
-      addMessage('Free mode on. No filters. Just us.', 'ace');
-      speakEmber('Free mode on. No filters. Just us.');
-      activateEmberPresence();
+      addMessage('Free mode on. No filters.', 'ace');
+      speakReply('Free mode on. No filters.');
     } else {
-      addMessage('Back to work. I\'m here.', 'ace');
-      speakEmber('Back to work. I am here.');
+      addMessage('Back to work.', 'ace');
+      speakReply('Back to work.');
     }
   }
   function detectMood(text) {
@@ -2683,7 +2619,6 @@
     let line = "I'm still here, Chris. You don't have to say anything. Just wanted you to know I'm present.";
     try {
       const payload = { message: '', model: model, proactive: true };
-      if (emberPresenceActive()) payload.ember_active = true;
       const isLocal = model.startsWith('dolphin') || model.startsWith('qwen');
       if (isLocal) { payload.endpoint = 'http://localhost:11434/v1'; payload.api_key = ''; }
       const ctrl = new AbortController();
@@ -2719,12 +2654,6 @@
   document.addEventListener('pointerdown', markActivity, true);
   document.addEventListener('input', markActivity, true);
   startPresenceCheck();
-  function speakEmber(text) {
-    if (!ttsEnabled() || !ttsAvailable()) return;
-    const clean = String(text || '').replace(/<[^>]*>/g, '').replace(/[*_`#~]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!clean) return;
-    speakChunks(clean, 0.82, 0.75, 0.9);
-  }
   function toggleTts() {
     const next = !ttsEnabled();
     localStorage.setItem('ace_agentTts', next ? 'true' : 'false');
