@@ -40,6 +40,7 @@ RESEARCH_PATTERNS = [
     r'\bwho is\b', r'\bwho was\b', r'\bwho are\b', r'\bwhen did\b', r'\bwhen was\b',
     r'\bwhere is\b', r'\bwhere are\b', r'\bwhy is\b', r'\bwhy did\b', r'\bwhy does\b',
     r'\bhow does\b', r'\bhow do\b', r'\bhow did\b', r'\bhow much\b', r'\bhow many\b',
+    r'\bhow to\b', r'\bhow do i\b', r'\bhow can i\b', r'\bhow should i\b',
     r'\bdefine\b', r'\bdefinition of\b', r'\bmeaning of\b', r'\bwhat means\b',
     r'\bdifference between\b', r'\bhistory of\b', r'\bcapital of\b', r'\bpopulation of\b',
     r'\bfind\b', r'\blook up\b', r'\blookup\b', r'\bresearch\b', r'\bsearch for\b',
@@ -47,7 +48,9 @@ RESEARCH_PATTERNS = [
     r'\bexplain\b', r'\bfacts about\b', r'\bnews about\b', r'\bwho won\b', r'\bwho scored\b',
     r'\bwhat happened\b', r'\bwhat year\b', r'\bwhat time\b', r'\bsummary of\b',
     r'\bwikipedia\b', r'\bcapital of\b', r'\bcurrency of\b', r'\btimezone of\b',
-    r'\bweather\b', r'\btemperature in\b', r'\bforecast\b'
+    r'\bweather\b', r'\btemperature in\b', r'\bforecast\b',
+    r'\berror\b', r'\b404\b', r'\b403\b', r'\b500\b', r'\berr[0-9]+\b', r'\bbug\b', r'\bexception\b',
+    r'\bnot working\b', r'\bdoes not work\b', r'\btroubleshoot\b', r'\bfix\b', r'\bsolution\b', r'\bwhy does', r'\bwhy won'
 ]
 
 def is_research_query(text):
@@ -1002,15 +1005,20 @@ def chat():
         prompt = ACE_PERSONA
 
     attachments = data.get('attachments', []) or []
-    if not unfiltered and current_mode != "EMBER" and not attachments and is_research_query(user_message):
+    # Auto-research: run a web search first for error/bug/how-to/404 style queries,
+    # then fold the findings into the model reply. Skips only when there are file
+    # attachments (would bloat the prompt). Works in every mode now, including Free.
+    research_summary = ''
+    if not attachments and is_research_query(user_message):
         result, err = duckduckgo_research(user_message)
-        if err is None:
-            reply = "Here's what I found:\n\n" + result
-            save_conversation("assistant", reply)
-            return jsonify({"reply": reply})
-        reply = "DuckDuckGo lookup failed, using OpenRouter instead. " + err
-        save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
+        if err is None and result:
+            research_summary = "Here's what I found while researching:\n\n" + result
+        else:
+            research_summary = ''
+    if research_summary:
+        prompt = (research_summary + "\n\nNow answer Chris's question using the above, in your own voice.\n\n" + prompt)
+    elif not attachments and is_research_query(user_message):
+        prompt = ("No reliable web results; answer from your own knowledge and be transparent.\n\n" + prompt)
 
     if attachments:
         prompt += "\n\n[Attached files]\n"

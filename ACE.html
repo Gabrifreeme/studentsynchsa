@@ -94,7 +94,14 @@
       background: var(--bg-elev); color: var(--text);
       border: 1px solid var(--border); border-bottom-left-radius: 4px;
     }
-    .msg.ace a { color: var(--info); }
+     .msg.ace a { color: var(--info); }
+     .msg.ace-thinking {
+       align-self: flex-start;
+       background: var(--bg-elev); color: var(--text-mute);
+       border: 1px solid var(--border); border-bottom-left-radius: 4px;
+       font-style: italic; font-size: 13px; opacity: 0.8;
+     }
+
 
     /* ---------- Resizers ---------- */
     #resizer1, #resizer2 { width: 1px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; }
@@ -705,6 +712,19 @@
     div.innerHTML = text;
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+  let thinkingEl = null;
+  function showThinking(text) {
+    hideThinking();
+    const keywords = ['error', 'bug', '404', 'not working', 'how do i', 'what is', 'why does', 'why won', 'solution', 'fix', 'documentation', 'how to'];
+    const t = (text || '').toLowerCase();
+    const label = (keywords.some(k => t.includes(k))) ? '\ud83d\udd0d Researching\2026' : '\u2026';
+    thinkingEl = addMessage(label, 'ace-thinking');
+  }
+  function hideThinking() {
+    if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
+    thinkingEl = null;
   }
 
   function addOutput(text) { addMessage(text, 'ace'); }
@@ -846,10 +866,12 @@
         editor.style.backgroundImage = '';
         if (window.__emberSlideshow) { clearInterval(window.__emberSlideshow); window.__emberSlideshow = null; }
       }
-      addMessage('Switching to work mode. I\'m here to help.', 'ace');
+    addMessage('Switching to work mode. I\'m here to help.', 'ace');
+      hideThinking();
       return;
     }
 
+    showThinking(text);
     try {
       const savedModel = localStorage.getItem('ace_modelSelect') || 'dolphin-llama3:8b';
       let model = savedModel;
@@ -902,6 +924,7 @@
           body: JSON.stringify(payload)
         });
         const d = await res.json();
+        hideThinking();
         addMessage(d.reply, 'ace');
         speakReply(d.reply);
         return;
@@ -913,6 +936,7 @@
           body: JSON.stringify({ message: effText, model: model === 'opencode' ? 'opencode/deepseek-v4-flash-free' : model })
         });
         const d = await res.json();
+        hideThinking();
         addMessage(d.reply, 'ace');
         speakReply(d.reply);
         return;
@@ -935,9 +959,10 @@
         body: JSON.stringify(payload)
       });
       const d = await res.json();
+      hideThinking();
       addMessage(d.reply, 'ace');
       speakReply(d.reply);
-    } catch { addMessage('Server error.', 'ace'); }
+    } catch { hideThinking(); addMessage('Server error.', 'ace'); }
   }
 
   sendBtn.onclick = sendMessage;
