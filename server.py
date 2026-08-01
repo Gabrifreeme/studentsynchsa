@@ -16,8 +16,16 @@ try:
 except ImportError:
     DDGS = None
 
+try:
+    import playwright_tools as _pw_tools
+except Exception:
+    _pw_tools = None
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Dev-mode flag for browser automation / playwright tooling.
+ACE_DEV = os.environ.get("ACE_DEV", "0") == "1"
 
 OPENROUTER_API_KEY = "REDACTED_OPENROUTER_KEY"
 
@@ -85,6 +93,24 @@ def duckduckgo_research(query, max_results=5):
         return "\n".join(lines), None
     except Exception as e:
         return None, f"DuckDuckGo search error: {e}"
+
+# URL detection for browser-automation triggers.
+_URL_RE = re.compile(r'https?://[^\s>)\]]+')
+# Error-message triggers that warrant driving a browser instead of (or before) searching.
+_ERROR_TRIGGERS = re.compile(r'\b(error|failed|broken|404|500|not working|crash|exception|white screen)\b', re.I)
+
+def detect_browser_task(user_message):
+    """If the message contains a URL + error vibe, return (url, trigger_text).
+
+    Used to decide whether to kick off a Playwright drive inside chat().
+    """
+    if not ACE_DEV or _pw_tools is None:
+        return None
+    if not _ERROR_TRIGGERS.search(user_message):
+        return None
+    for m in _URL_RE.finditer(user_message):
+        return m.group(0).rstrip('.,;)'), _ERROR_TRIGGERS.search(user_message).group(0)
+    return None
 
 def init_db():
     conn = sqlite3.connect('ace_memory.db')
@@ -925,6 +951,32 @@ def list_files():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/playwright', methods=['POST'])
+def playwright_route():
+    """Dev-gated browser automation endpoint.
+
+    Actions: eval | screenshot | errors
+    Requires ACE_DEV=1, otherwise returns a disabled stub.
+    """
+    if not ACE_DEV:
+        return jsonify({"error": "browser automation disabled (set ACE_DEV=1)"}), 403
+    if _pw_tools is None:
+        return jsonify({"error": "playwright_tools module not loaded"}), 500
+    data = request.json or {}
+    url = data.get('url', '')
+    action = data.get('action', 'eval')
+    script = data.get('script', '')
+    wait_ms = int(data.get('wait_ms', 1500))
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    if action == 'screenshot':
+        result = _pw_tools.browser_screenshot(url, wait_ms=wait_ms)
+    elif action == 'errors':
+        result = _pw_tools.browser_errors(url, wait_ms=wait_ms)
+    else:
+        result = _pw_tools.browser_eval(url, script=script or None, wait_ms=wait_ms)
+    return jsonify(result)
+
 @app.route('/chat', methods=['POST'])
 def chat():
     global current_mode, last_user_message_time, ember_mode_until
@@ -1005,6 +1057,31 @@ def chat():
         prompt = ACE_PERSONA
 
     attachments = data.get('attachments', []) or []
+
+    # Browser automation — dev-gated. When Chris shares a URL + an error
+    # symptom, drive a headless Chromium to inspect the page and feed the
+    # findings back into the reply. Status-bar shows "🌐 Driving browser…".
+    browser_summary = ''
+    if not attachments:
+        task = detect_browser_task(user_message)
+        if task:
+            url, trigger = task
+            err_info = _pw_tools.browser_errors(url) if _pw_tools else {"error": "pw closed"}
+            scr = _pw_tools.browser_screenshot(url) if _pw_tools else {}
+            title = err_info.get("title", "?")
+            errs = err_info.get("console_errors", [])
+            fails = err_info.get("failed_requests", [])
+            parts = [f"Browser drive for {url}"]
+            if title:
+                parts.append(f"Page title: {title}")
+            if errs:
+                parts.append("Console errors:\n" + "\n".join(errs[:8]))
+            if fails:
+                parts.append("Failed requests:\n" + "\n".join(fails[:8]))
+            if "png_base64" in scr:
+                parts.append("(screenshot captured)")
+            browser_summary = "I drove a browser to inspect this. Here's what I saw:\n\n" + "\n".join(parts)
+
     # Auto-research: run a web search first for error/bug/how-to/404 style queries,
     # then fold the findings into the model reply. Skips only when there are file
     # attachments (would bloat the prompt). Works in every mode now, including Free.
@@ -1015,7 +1092,9 @@ def chat():
             research_summary = "Here's what I found while researching:\n\n" + result
         else:
             research_summary = ''
-    if research_summary:
+    if browser_summary:
+        prompt = (browser_summary + "\n\nAbove is live browser intel I gathered. Now answer Chris's question, using it and in your own voice.\n\n" + prompt)
+    elif research_summary:
         prompt = (research_summary + "\n\nNow answer Chris's question using the above, in your own voice.\n\n" + prompt)
     elif not attachments and is_research_query(user_message):
         prompt = ("No reliable web results; answer from your own knowledge and be transparent.\n\n" + prompt)
