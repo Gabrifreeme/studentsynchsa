@@ -464,15 +464,19 @@ def memory_context_text():
     if isinstance(mem.get('last_ember'), dict) and mem['last_ember'].get('updated'):
         when = mem['last_ember']['updated'][:16].replace('T', ' ')
         lines.append('Chris mentioned Ember on ' + when)
-    for key, data in mem.items():
+    # Keep only a few key facts so the prompt/context stays small and fast.
+    for key, data in list(mem.items()):
+        if len(lines) >= 8:
+            break
         if key in ('name', 'mood', 'last_ember', 'ember_history', 'mood_history'):
             continue
         if isinstance(data, dict) and 'value' in data:
             lines.append(str(key) + ': ' + str(data['value']))
+    lines = [l for l in lines if l]
     if not lines:
         return ''
     return ('\n--- MEMORY (things Chris told you across sessions) ---\n'
-            + '\n'.join(lines)
+            + '\n'.join(lines[:8])
             + '\nHold onto these naturally and gently, like a partner would. Never mention this block itself.\n---\n')
 
 def fn_memorize(args):
@@ -823,6 +827,25 @@ def execute_tool_call(name, arguments):
     except Exception as e:
         return "Function error: " + str(e)
 
+def extract_reply(response):
+    """Pull the assistant text out of either an OpenAI-style or Ollama /api/generate response."""
+    try:
+        body = response.json()
+    except Exception:
+        return None
+    if isinstance(body, dict):
+        try:
+            return body["choices"][0]["message"].get("content")
+        except (KeyError, IndexError, TypeError):
+            pass
+        if body.get("response") is not None:
+            return body["response"]
+        try:
+            return body["message"]["content"]
+        except (KeyError, TypeError):
+            pass
+    return None
+
 def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api_key, tools=None):
     memory_ctx = memory_context_text()
     if memory_ctx:
@@ -838,6 +861,32 @@ def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api
         headers["Authorization"] = f"Bearer {api_key}"
     elif "openrouter.ai" in endpoint:
         headers["Authorization"] = f"Bearer {OPENROUTER_API_KEY}"
+
+    # Local Ollama is far faster via its native /api/generate endpoint than the
+    # slow OpenAI-shaped /v1 wrapper (phi-2.7b: ~22s native vs >300s via /v1).
+    is_ollama = ('localhost' in endpoint) or ('127.0.0.1' in endpoint) or ('11434' in endpoint) or (not endpoint and 'ollama' in model)
+    if is_ollama and model in ('dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest'):
+        prompt = ''
+        for msg in messages:
+            role = msg.get('role') if isinstance(msg, dict) else ''
+            content = str(msg.get('content') or '') if isinstance(msg, dict) else str(msg)
+            if role == 'system':
+                prompt += content + '\n\n'
+            elif role == 'user':
+                prompt += '### ' + content + '\n\n'
+            elif role == 'assistant':
+                prompt += content + '\n\n'
+            else:
+                prompt += content + '\n\n'
+        ollama_payload = {
+            "model": model,
+            "prompt": prompt,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False
+        }
+        return requests.post("http://localhost:11434/api/generate", headers=headers, json=ollama_payload, timeout=300)
+
     payload = {
         "model": model,
         "messages": messages,
@@ -917,10 +966,7 @@ def chat():
         messages = [{"role": "system", "content": checkin_prompt}]
         response = call_chat_completion(model, messages, 0.7, 120, endpoint, api_key, None)
         if response.status_code == 200:
-            try:
-                reply = response.json()["choices"][0]["message"].get("content") or "I'm here, Chris."
-            except (KeyError, IndexError):
-                reply = "I'm here, Chris."
+            reply = extract_reply(response) or "I'm here, Chris."
         else:
             reply = "I'm here, Chris. You don't have to say anything."
         save_conversation("assistant", reply)
@@ -1005,15 +1051,27 @@ def chat():
     messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
     max_rounds = 5
     for round_idx in range(max_rounds):
-        response = call_chat_completion(model, messages, 0.7, 500, endpoint, api_key, tools)
+        response = call_chat_completion(model, messages, 0.7, 64, endpoint, api_key, tools)
 
         if response.status_code != 200:
             return jsonify({"reply": f"Error: {response.text}"}), 500
 
         try:
-            msg = response.json()["choices"][0]["message"]
-        except (KeyError, IndexError) as e:
-            return jsonify({"reply": f"Error parsing response: {e}"}), 500
+            body = response.json()
+        except Exception:
+            return jsonify({"reply": "Error: invalid response from model"}), 500
+
+        if isinstance(body, dict) and "choices" in body:
+            try:
+                msg = body["choices"][0]["message"]
+            except (IndexError, KeyError):
+                return jsonify({"reply": "Error parsing response: unexpected format"}), 500
+        else:
+            # Ollama /api/generate style: {response: "..."}
+            reply = body.get("response") if isinstance(body, dict) else None
+            if reply is None:
+                return jsonify({"reply": "Error parsing response: unexpected format"}), 500
+            msg = {"content": reply, "tool_calls": None, "role": "assistant"}
 
         tool_calls = msg.get("tool_calls")
         if not tool_calls:
