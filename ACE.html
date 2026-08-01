@@ -411,7 +411,6 @@
         <button class="btn" onclick="runCommand('dir')" title="List files">dir</button>
         <button class="btn" onclick="runCommand('git status')" title="Git status">git</button>
       </div>
-      <div class="toolbar-spacer"></div>
       <div class="toolbar-group" id="universalTab">
         <button class="btn btn-universal" id="universalTabBtn" title="Universal — project-wide actions" onclick="toggleUniversalMenu()">🌐 universal ▾</button>
         <div id="universalMenu" class="dropdown-menu" style="display:none;">
@@ -423,6 +422,7 @@
           <button class="run-selected" style="width:100%;" onclick="openUniversalSearch();closeUniversalMenu();">🔍 Search files</button>
         </div>
       </div>
+      <div class="toolbar-spacer"></div>
       <div id="code-actions">
         <input id="searchInput" placeholder="Find in file..." title="Search (Ctrl+F)">
         <button class="btn btn-icon" onclick="toggleSearch()" title="Search (Ctrl+F)">⌕</button>
