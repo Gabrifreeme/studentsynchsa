@@ -91,6 +91,16 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             // Allow gw1proc URLs through without modification
             if (url.contains('gw1proc')) return NavigationDecision.navigate;
 
+            // Fix truncated ITS submit URL: gw1pkg.gw1p → gw1pkg.gw1proc
+            if (url.contains('gw1pkg.gw1p') && !url.contains('gw1proc')) {
+              final fixedUrl = url.replaceAll('gw1pkg.gw1p', 'gw1pkg.gw1proc');
+              debugPrint('🔧 Fixing truncated URL: $url → $fixedUrl');
+              if (mounted) {
+                _controller.loadRequest(Uri.parse(fixedUrl));
+              }
+              return NavigationDecision.prevent;
+            }
+
             return NavigationDecision.navigate;
           },
           onPageStarted: (url) {
@@ -101,6 +111,12 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             _currentUrl = url;
             setState(() => _loading = false);
             debugPrint('ℹ️ Autofill deferred — user must tap star to fill');
+            try {
+              await _controller.runJavaScript(star.buildNavigationFixScript());
+              debugPrint('✅ Navigation fix injected');
+            } catch (e) {
+              debugPrint('❌ Navigation fix error: $e');
+            }
             try {
               await _controller.runJavaScript('''
 (function() {
