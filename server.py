@@ -41,10 +41,27 @@ WORK_PERSONA = ("You are ACE, Chris's focused, capable work assistant. "
                 "Professional, warm-but-business-first, and efficient.")
 
 MODE_TAG_INSTRUCTION = ("\nEvery reply must START with exactly one mode tag followed by a space, "
-                        "choosing it yourself based on the task: [PLAN] when the task needs analysis, "
-                        "explanation, design, or reading — do not pretend to execute anything. "
-                        "[BUILD] when the task needs implementation, changes, or commands to run. "
-                        "Then continue the reply normally.")
+                         "choosing it yourself based on the task: [PLAN] when the task needs analysis, "
+                         "explanation, design, or reading — do not pretend to execute anything. "
+                         "[BUILD] when the task needs implementation, changes, or commands to run. "
+                         "[REPLY] when the task is a simple question that only needs a short factual answer "
+                         "— no planning, no building, just the answer. "
+                         "Then continue the reply normally.")
+
+NARRATION_INSTRUCTION = (
+    "NARRATE YOUR WORK like a thoughtful engineer showing their work — the way Chris's opencode "
+    "assistant talks to him.\n"
+    "1. When Chris gives you a task, briefly say what you're about to do and why (1-2 lines), then DO it.\n"
+    "2. As you work, write out the actual steps in text: what file you're reading, what command you ran, "
+    "what you found. Keep each step short and concrete.\n"
+    "3. Show your reasoning. If something could be done this way or that way, say so openly and explain "
+    "which you chose and why. Never hide uncertainty.\n"
+    "4. Quote the important real facts you found (file paths, line numbers, error text, command output) — "
+    "don't paraphrase them away.\n"
+    "5. End with a short summary of what you did and the result, and offer the next obvious step.\n"
+    "Write it naturally and conversationally, not as a bullet dump. A good rhythm: a line of action, a "
+    "line of thinking, a line of result. If the task is trivial (a one-line answer), don't force the "
+    "narration — just answer. For trivial answers, use [REPLY] mode tag, not [BUILD] or [PLAN].")
 
 RESEARCH_PATTERNS = [
     r'\bwhat is\b', r'\bwhat are\b', r'\bwhat was\b', r'\bwhat does\b', r'\bwhat do\b',
@@ -149,6 +166,35 @@ def save_conversation(role, content):
     c.execute("INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)", (datetime.now().isoformat(), role, content))
     conn.commit()
     conn.close()
+
+def load_conversations(limit=100):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT timestamp, role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    rows.reverse()
+    return [{"timestamp": t, "role": r, "content": c} for t, r, c in rows]
+
+def conversation_context_text(limit=12):
+    """Compact recent chat history for injecting into ACE's prompt so a fresh
+    opencode session picks up where the last one left off."""
+    try:
+        convs = load_conversations(limit=limit)
+    except Exception:
+        return ''
+    if not convs:
+        return ''
+    lines = []
+    for c in convs:
+        role = 'Chris' if c['role'] == 'user' else 'ACE'
+        body = (c['content'] or '').strip()
+        if len(body) > 400:
+            body = body[:400] + '…'
+        lines.append(role + ': ' + body)
+    return ('\n--- RECENT CONVERSATION (so you remember where we are) ---\n'
+            + '\n'.join(lines)
+            + '\nThis is your history with Chris. Refer back to it and continue the work.\n---\n')
 
 def fn_read_file(args):
     with open(args.get('path', ''), 'r') as f:
@@ -1047,6 +1093,17 @@ def playwright_route():
         result = _pw_tools.browser_eval(url, script=script or None, wait_ms=wait_ms)
     return jsonify(result)
 
+@app.route('/conversations', methods=['GET'])
+def conversations_route():
+    try:
+        limit = int(request.args.get('limit', 100))
+    except Exception:
+        limit = 100
+    try:
+        return jsonify({"conversations": load_conversations(limit)})
+    except Exception as e:
+        return jsonify({"conversations": [], "error": str(e)}), 500
+
 @app.route('/chat', methods=['POST'])
 def chat():
     global current_mode, last_user_message_time
@@ -1256,14 +1313,69 @@ opencode_activity = {
     "tool": "",                # last tool name
     "tool_input": "",          # last tool input (command/path/url)
     "tool_state": "",          # pending | running | completed
+    "steps": [],               # live step log: [{id, kind, icon, text, state}]
+    "last_reply": "",          # final reply of the most recent request
     "updated": None,
 }
 activity_lock = threading.Lock()
+
+TOOL_ICONS = {
+    'bash': '💻', 'read': '📖', 'write': '✏️', 'edit': '🛠️', 'patch': '🧩',
+    'grep': '🔍', 'glob': '🗂️', 'webfetch': '🌐', 'websearch': '🔎',
+    'task': '🤖', 'todowrite': '✅', 'skill': '📚', 'question': '❓',
+}
+
+def _tool_explain(tool, desc):
+    """Friendly one-line explanation of what a tool step is doing."""
+    d = (desc or '').strip()
+    if tool == 'bash':
+        return ('Running shell command' + (f': {d}' if d else ''))
+    if tool == 'read':
+        return ('Reading file' + (f': {d}' if d else ''))
+    if tool == 'write':
+        return ('Writing file' + (f': {d}' if d else ''))
+    if tool == 'edit':
+        return ('Editing file' + (f': {d}' if d else ''))
+    if tool == 'patch':
+        return ('Applying patch' + (f': {d}' if d else ''))
+    if tool == 'grep':
+        return ('Searching text' + (f' for "{d}"' if d else ''))
+    if tool == 'glob':
+        return ('Finding files' + (f' matching {d}' if d else ''))
+    if tool == 'webfetch':
+        return ('Fetching web page' + (f': {d}' if d else ''))
+    if tool == 'websearch':
+        return ('Searching the web' + (f' for "{d}"' if d else ''))
+    if tool == 'task':
+        return ('Running subtask' + (f': {d}' if d else ''))
+    if tool == 'todowrite':
+        return ('Updating task list')
+    if tool == 'skill':
+        return ('Loading skill' + (f': {d}' if d else ''))
+    return (tool + (f': {d}' if d else ''))
 
 def _set_activity(**kw):
     with activity_lock:
         opencode_activity.update(kw)
         opencode_activity["updated"] = datetime.now().isoformat()
+
+def _reset_steps():
+    with activity_lock:
+        opencode_activity["steps"] = []
+        opencode_activity["stream"] = {"parts": {}, "order": [], "skip_first": True}
+        opencode_activity["last_reply"] = ""
+
+def _upsert_step(step_id, kind, icon, text, state):
+    with activity_lock:
+        steps = opencode_activity["steps"]
+        for s in steps:
+            if s.get("id") == step_id:
+                s["text"] = text
+                s["state"] = state
+                return
+        steps.append({"id": step_id, "kind": kind, "icon": icon, "text": text, "state": state})
+        if len(steps) > 40:
+            del steps[:len(steps) - 40]
 
 def _activity_listener():
     """Long-lived SSE consumer. Keeps trying to connect to opencode's
@@ -1301,16 +1413,36 @@ def _activity_listener():
                             desc = inp.get('command') or inp.get('description') or ''
                         else:
                             desc = inp.get('path') or inp.get('pattern') or inp.get('query') or inp.get('url') or inp.get('description') or ''
+                        step_id = 'tool:' + (part.get('id') or (tool + ':' + str(desc)))
+                        icon = TOOL_ICONS.get(tool, '⚙️')
+                        text = _tool_explain(tool, desc)
+                        _upsert_step(step_id, 'tool', icon, text, 'running' if st == 'running' else st)
                         _set_activity(tool=tool, tool_input=desc, tool_state=st)
-                        label = '⚙️ ' + tool
-                        if st == 'running':
-                            label += ' ▶ ' + (desc or '…')
-                        elif st == 'completed':
+                        label = icon + ' ' + text
+                        if st == 'completed':
                             label += ' ✔'
+                        elif st == 'running':
+                            label += ' ▶'
                         _set_activity(activity=label)
                     elif ptype == 'text':
-                        txt = (part.get('text') or '').strip()
-                        if txt:
+                        sid = props.get('sessionID')
+                        if opencode_session_id and sid and sid != opencode_session_id:
+                            continue
+                        pid = part.get('id') or ''
+                        txt = part.get('text') or ''
+                        with activity_lock:
+                            stream = opencode_activity.setdefault(
+                                "stream", {"parts": {}, "order": [], "skip_first": True})
+                            if stream.get("skip_first"):
+                                stream["skip_first"] = False
+                            elif pid and pid not in stream["parts"]:
+                                stream["parts"][pid] = txt
+                                stream["order"].append(pid)
+                            elif pid:
+                                stream["parts"][pid] = txt
+                            stream_text = "".join(stream["parts"].get(p, "") for p in stream["order"])
+                        if stream_text:
+                            _upsert_step('text:stream', 'text', '✍️', stream_text, 'running')
                             _set_activity(activity='✍️ Writing…')
                 elif etype == 'session.idle':
                     _set_activity(status='idle', activity='Done.')
@@ -1353,16 +1485,30 @@ def opencode_chat():
     if not opencode_health():
         return jsonify({"reply": "❌ opencode server not running. Start it with: opencode serve"}), 503
     _set_activity(status='busy', activity='🧠 Thinking…', tool='', tool_input='', tool_state='')
+    _reset_steps()
+    with activity_lock:
+        opencode_activity["steps"].append({
+            "id": "msg:user", "kind": "text", "icon": "💬",
+            "text": "You asked: " + (message[:80] + ('…' if len(message) > 80 else '')),
+            "state": "done",
+        })
     sess, err = opencode_ensure_session()
     if err:
         return jsonify({"reply": "❌ " + err}), 500
     original_message = message
+    try:
+        save_conversation("user", original_message)
+    except Exception:
+        pass
     persona_ctx = ('[ACE persona — this is who you are. Hold this voice in every reply, naturally. Never mention this block.]\n'
                    + ACE_PERSONA + '\n')
     memory_ctx = memory_context_text()
     if memory_ctx:
         persona_ctx += ('\n[ACE persistent memory — things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
                         + memory_ctx + '\n')
+    conv_ctx = conversation_context_text()
+    if conv_ctx:
+        persona_ctx += '\n' + conv_ctx + '\n'
     persona_ctx += '\n' + MODE_TAG_INSTRUCTION + '\n'
     message = persona_ctx + '\n' + message
     raw_model = (data.get('model') or '').strip()
@@ -1386,6 +1532,7 @@ def opencode_chat():
                       "The project root is the current working directory; you may also touch paths "
                       "outside it. Do not ask for permission before acting — just do it, then report "
                       "what you did. Never emit DSML/tool_call XML/HTML tags in your final text reply."
+                      + "\n\n" + NARRATION_INSTRUCTION
                       + MODE_TAG_INSTRUCTION)
     try:
         r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=600)
@@ -1430,7 +1577,11 @@ def opencode_chat():
         pass
     if tool_parts:
         reply += "\n\n_⚙️ " + str(len(tool_parts)) + " tool call(s) executed_"
-    _set_activity(status='idle', activity='Done.', tool_state='completed')
+    try:
+        save_conversation("assistant", reply)
+    except Exception:
+        pass
+    _set_activity(status='idle', activity='Done.', tool_state='completed', last_reply=reply)
     return jsonify({"reply": reply})
 
 @app.route('/opencode/health', methods=['GET'])
@@ -1452,6 +1603,11 @@ def opencode_stop():
             pass
     opencode_poison_session()
     _set_activity(status='idle', activity='⏹ Stopped by user.')
+    with activity_lock:
+        for s in opencode_activity["steps"]:
+            if s.get("id") == "text:stream":
+                s["state"] = "done"
+                break
     return jsonify({"stopped": True})
 
 @app.route('/devices', methods=['GET'])

@@ -955,9 +955,11 @@
   function addOutput(text) { addMessage(text, 'ace'); }
 
   function addAceReply(text) {
-    const m = text.match(/^\s*\[(PLAN|BUILD)\]\s*/i);
+    const m = text.match(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i);
     if (!m) return addMessage(text, 'ace');
-    const isBuild = m[1].toUpperCase() === 'BUILD';
+    const tag = m[1].toUpperCase();
+    if (tag === 'REPLY') return addMessage(text.slice(m[0].length), 'ace');
+    const isBuild = tag === 'BUILD';
     const chip = '<span class="mode-chip ' + (isBuild ? 'chip-build' : 'chip-plan') + '">' +
       (isBuild ? '🛠 Build' : '📋 Plan') + '</span>';
     return addMessage(chip + text.slice(m[0].length), 'ace');
@@ -969,13 +971,18 @@
     const el = workStepEls['text:stream'];
     if (!el) { addAceReply(text); return; }
     delete workStepEls['text:stream'];
-    const m = text.match(/^\s*\[(PLAN|BUILD)\]\s*/i);
+    const m = text.match(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i);
     let html;
     if (m) {
-      const isBuild = m[1].toUpperCase() === 'BUILD';
-      const chip = '<span class="mode-chip ' + (isBuild ? 'chip-build' : 'chip-plan') + '">' +
-        (isBuild ? '🛠 Build' : '📋 Plan') + '</span>';
-      html = chip + text.slice(m[0].length);
+      const tag = m[1].toUpperCase();
+      if (tag === 'REPLY') {
+        html = text.slice(m[0].length);
+      } else {
+        const isBuild = tag === 'BUILD';
+        const chip = '<span class="mode-chip ' + (isBuild ? 'chip-build' : 'chip-plan') + '">' +
+          (isBuild ? '🛠 Build' : '📋 Plan') + '</span>';
+        html = chip + text.slice(m[0].length);
+      }
     } else {
       html = text;
     }
@@ -1185,7 +1192,7 @@
           const d = await res.json();
           hideThinking();
           finalizeStreamedReply(d.reply);
-          speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD)\]\s*/i, ''));
+           speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
         } catch (err) {
           if (err && err.name === 'AbortError') {
             hideThinking();
@@ -1220,7 +1227,7 @@
       const d = await res.json();
       hideThinking();
       addAceReply(d.reply);
-      speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD)\]\s*/i, ''));
+       speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
     } catch { hideThinking(); addMessage('Server error.', 'ace'); }
   }
 
