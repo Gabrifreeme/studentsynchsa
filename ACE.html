@@ -83,6 +83,10 @@
       white-space: pre-wrap; word-wrap: break-word; max-width: 82%;
       border-radius: 14px;
     }
+    .chat-ts {
+      align-self: center; font-size: 10px; color: var(--text-mute); opacity: 0.7;
+      letter-spacing: 0.5px; text-transform: uppercase; margin: 4px 0 2px;
+    }
     .msg.user {
       align-self: flex-end;
       background: #000000;
@@ -125,6 +129,27 @@
       .ace-stop-btn:hover { background: rgba(239, 68, 68, 0.3); border-color: #f87171; }
       .ace-stop-btn:active { background: rgba(239, 68, 68, 0.45); }
       .ace-stop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      /* Inline work steps — rendered directly in the chat thread like opencode's tool steps */
+      .msg.ace-step {
+        align-self: flex-start; max-width: 82%; padding: 7px 12px;
+        border-radius: 10px; font-size: 13px; line-height: 1.5;
+        display: flex; align-items: flex-start; gap: 8px; border-bottom-left-radius: 4px;
+      }
+      .msg.ace-step .w-icon { flex-shrink: 0; font-size: 14px; }
+      .msg.ace-step .w-text { flex: 1; word-break: break-word; }
+      .msg.ace-step .w-state { flex-shrink: 0; font-size: 12px; }
+      /* grey = what ACE is doing (tools); white = ACE talking to you (reply) */
+      .msg.ace-step.work { background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.1); }
+      .msg.ace-step.work .w-text { color: #9a9a9a; }
+      .msg.ace-step.work .w-icon { opacity: 0.85; }
+      .msg.ace-step.talk { background: #151515; border: 1px solid rgba(255, 255, 255, 0.35); }
+      .msg.ace-step.talk .w-text { color: #ffffff; font-weight: 600; }
+      .msg.ace-step.running { border-color: rgba(56, 189, 248, 0.5); }
+      .msg.ace-step.running .w-state { color: var(--info); }
+      .msg.ace-step.pending .w-state { color: var(--text-mute); }
+      .msg.ace-step.done .w-state { color: var(--success); }
+      .msg.ace-step.error { border-color: rgba(239, 68, 68, 0.5); }
+      .msg.ace-step.error .w-state { color: var(--danger); }
      @keyframes dotBounce {
        0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
        30% { transform: translateY(-4px); opacity: 1; }
@@ -277,10 +302,16 @@
     .attach-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
 
     .chat-attach-img {
-      max-width: 260px; max-height: 220px; border-radius: 10px; border: 1px solid var(--border-strong);
+      max-width: 260px; max-height: 220px; width: auto; height: auto;
+      aspect-ratio: 16 / 9;
+      border-radius: 10px; border: 1px solid var(--border-strong);
       display: block; margin-bottom: 6px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+      /* reserve space so loading images don't shift the chat scroll */
+      object-fit: contain;
     }
     .chat-attach-img:hover { border-color: var(--accent); }
+    /* any image inside a message gets stable sizing to avoid scroll jumps */
+    .msg img { max-width: 100%; height: auto; display: block; }
 
     .ctx-menu {
       position: fixed; z-index: 2000; min-width: 200px;
@@ -766,22 +797,45 @@
     scheduleHighlight();
   });
 
-  function addMessage(text, sender) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + sender;
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    text = text.replace(urlRegex, function(url) {
-      return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
-    });
-    div.innerHTML = text;
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-    return div;
-  }
+   function addMessage(text, sender) {
+     const div = document.createElement('div');
+     div.className = 'msg ' + sender;
+     const urlRegex = /(https?:\/\/[^\s]+)/g;
+     text = text.replace(urlRegex, function(url) {
+       return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
+     });
+     div.innerHTML = text;
+     appendChat(div);
+     return div;
+   }
+   // Centralized insertion + scroll-anchoring so the chat always grows at the
+   // bottom and the view follows new content (mirrors the terminal chat feel).
+   function appendChat(el) {
+     // New content is inserted *above* the "working on it" indicator so the
+     // indicator stays pinned to the bottom and never scrolls out of sight.
+     if (thinkingEl && thinkingEl.parentNode) {
+       thinkingEl.parentNode.insertBefore(el, thinkingEl);
+     } else {
+       chat.appendChild(el);
+     }
+     scrollToBottom();
+   }
+   function scrollToBottom() {
+     // requestAnimationFrame lets the browser flush layout first, so
+     // scrollHeight is measured against the actually-rendered frame (fixes the
+     // "jumps to a random spot" bug where scrollTop was set to a stale height).
+     requestAnimationFrame(function () {
+       chat.scrollTop = chat.scrollHeight;
+       requestAnimationFrame(function () { chat.scrollTop = chat.scrollHeight; });
+     });
+   }
   let thinkingEl = null;
   let activityTimer = null;
   let stopButtonEl = null;
   let currentAbort = null;
+  let uiRequestActive = false;   // true while a request was sent from THIS window
+  let monitorThinkingShown = false; // poller created the thinking bubble (remote run)
+  let lastPollStatus = 'idle';
   function showThinking(text) {
     hideThinking();
     const keywords = ['error', 'bug', '404', 'not working', 'how do i', 'what is', 'why does', 'why won', 'solution', 'fix', 'documentation', 'how to'];
@@ -799,35 +853,103 @@
   async function stopRequest() {
     if (currentAbort) { try { currentAbort.abort(); } catch (e) {} }
     currentAbort = null;
+    uiRequestActive = false;
     try { await fetch('http://localhost:5000/opencode/stop', { method: 'POST' }); } catch (e) {}
     hideThinking();
+    monitorThinkingShown = false;
     addMessage('⏹ Stopped the last request.', 'ace');
   }
-  function startActivityPoll() {
-    stopActivityPoll();
-    activityTimer = setInterval(async () => {
-      try {
-        const r = await fetch('http://localhost:5000/opencode/status');
-        const d = await r.json();
-        if (!d || !d.activity || !thinkingEl || !thinkingEl.parentNode) return;
-        const a = String(d.activity);
-        if (a !== thinkingEl.dataset.activity) {
-          thinkingEl.dataset.activity = a;
-          const dots = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
-          thinkingEl.innerHTML = dots + ' ' + a;
-          if (stopButtonEl) thinkingEl.appendChild(stopButtonEl);
+  function updateThinkingText(a) {
+    if (!thinkingEl || !thinkingEl.parentNode) return;
+    const activity = String(a || '');
+    if (activity === thinkingEl.dataset.activity) return;
+    thinkingEl.dataset.activity = activity;
+    const dots = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    thinkingEl.innerHTML = dots + ' ' + activity;
+    if (stopButtonEl) thinkingEl.appendChild(stopButtonEl);
+  }
+  // Global activity monitor: always follows the server's status, so ACE's
+  // window shows live steps even when a request was fired from outside (e.g.
+  // by the main assistant) rather than through this chat's send button.
+  async function pollActivity() {
+    try {
+      const r = await fetch('http://localhost:5000/opencode/status');
+      const d = await r.json();
+      if (!d) return;
+      const st = String(d.status || 'idle');
+      if (st === 'busy') {
+        if (lastPollStatus !== 'busy' && !uiRequestActive) {
+          for (const k in workStepEls) delete workStepEls[k];
+          lastWorkStepCount = 0;
         }
-      } catch (e) {}
-    }, 900);
+        renderWorkSteps(d);
+        if (!uiRequestActive && !thinkingEl) {
+          showThinking('');
+          monitorThinkingShown = true;
+        }
+        if (thinkingEl) updateThinkingText(d.activity);
+      } else {
+        // idle / error / done
+        if (lastPollStatus === 'busy') {
+          // just transitioned out of a run
+          if (monitorThinkingShown && d.last_reply) {
+            finalizeStreamedReply(d.last_reply);
+          }
+          if (monitorThinkingShown) {
+            hideThinking();
+            monitorThinkingShown = false;
+          }
+        }
+      }
+      lastPollStatus = st;
+    } catch (e) {}
   }
-  function stopActivityPoll() {
-    if (activityTimer) { clearInterval(activityTimer); activityTimer = null; }
-  }
+  setInterval(pollActivity, 1000);
   function hideThinking() {
-    stopActivityPoll();
     if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
     thinkingEl = null;
     stopButtonEl = null;
+  }
+
+  // Inline work-step rendering: shows ACE's tool steps (grey) and reply
+  // writing (white) directly in the chat thread, keyed by step id.
+  const workStepEls = {};
+  let lastWorkStepCount = 0;
+
+  function renderWorkSteps(d) {
+    if (!d || !d.steps || !d.steps.length) return;
+    const steps = d.steps;
+    let changed = false;
+    for (const s of steps) {
+      const cls = s.kind === 'text' ? 'talk' : 'work';
+      const stCls = s.state === 'running' ? 'running' : (s.state === 'error' ? 'error' : (s.state === 'pending' ? 'pending' : 'done'));
+      const stTxt = s.state === 'running' ? '▶' : (s.state === 'error' ? '✖' : (s.state === 'pending' ? '…' : '✔'));
+      const id = s.id || (cls + ':' + s.text);
+      let el = workStepEls[id];
+      if (!el) {
+        el = document.createElement('div');
+         el.className = 'msg ace-step ' + cls + ' ' + stCls;
+         el.innerHTML = '<span class="w-icon">' + (s.icon || '⚙️') + '</span>' +
+           '<span class="w-text">' + escapeHtml(s.text || '') + '</span>' +
+           '<span class="w-state">' + stTxt + '</span>';
+         appendChat(el);
+         workStepEls[id] = el;
+         changed = true;
+       } else {
+         const oldCls = el.className;
+         const wantCls = 'msg ace-step ' + cls + ' ' + stCls;
+         if (oldCls !== wantCls || el.querySelector('.w-text').textContent !== (s.text || '')) {
+           el.className = wantCls;
+           el.querySelector('.w-text').textContent = s.text || '';
+           el.querySelector('.w-state').textContent = stTxt;
+           changed = true;
+         }
+       }
+     }
+     if (changed || steps.length !== lastWorkStepCount) {
+       lastWorkStepCount = steps.length;
+       scrollToBottom();
+     }
   }
 
   function addOutput(text) { addMessage(text, 'ace'); }
@@ -840,6 +962,36 @@
       (isBuild ? '🛠 Build' : '📋 Plan') + '</span>';
     return addMessage(chip + text.slice(m[0].length), 'ace');
   }
+
+  // Turn the live "text:stream" step bubble into the final reply in place,
+  // so the streamed reply stays ONE continuous bubble (no duplicate bubble).
+  function finalizeStreamedReply(text) {
+    const el = workStepEls['text:stream'];
+    if (!el) { addAceReply(text); return; }
+    delete workStepEls['text:stream'];
+    const m = text.match(/^\s*\[(PLAN|BUILD)\]\s*/i);
+    let html;
+    if (m) {
+      const isBuild = m[1].toUpperCase() === 'BUILD';
+      const chip = '<span class="mode-chip ' + (isBuild ? 'chip-build' : 'chip-plan') + '">' +
+        (isBuild ? '🛠 Build' : '📋 Plan') + '</span>';
+      html = chip + text.slice(m[0].length);
+    } else {
+      html = text;
+    }
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    html = html.replace(urlRegex, function(url) {
+      return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
+    });
+    html = html.replace(urlRegex, function(url) {
+      return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
+    });
+    el.className = 'msg ace';
+    el.innerHTML = html;
+    scrollToBottom();
+  }
+
+  function addOutput(text) { addMessage(text, 'ace'); }
 
   function toggleDropdown() {
     const d = document.getElementById('runDropdown');
@@ -938,7 +1090,7 @@
       '<button class="btn-run" style="padding:4px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;" onclick="' +
       'executeCommand(&quot;' + esc + '&quot;);this.parentNode.parentNode.remove();">Run</button>' +
       '<button class="btn" style="padding:4px 14px;cursor:pointer;" onclick="this.parentNode.parentNode.remove();">Cancel</button></span>';
-    chat.scrollTop = chat.scrollHeight;
+    scrollToBottom();
   }
 
   function runCommand(cmd) {
@@ -954,6 +1106,8 @@
     const text = input.value.trim();
     if (!text && !pendingAttachments.length) return;
     lastActivityTime = Date.now();
+    for (const k in workStepEls) delete workStepEls[k];
+    lastWorkStepCount = 0;
     const attachments = pendingAttachments.slice();
     if (attachments.length) {
       const parts = [];
@@ -1018,7 +1172,7 @@
         payload.attachments = attachments;
       }
       if (model === 'opencode' || OPENCODE_MODEL_IDS.includes(model)) {
-        startActivityPoll();
+        uiRequestActive = true;
         currentAbort = new AbortController();
         if (stopButtonEl) stopButtonEl.disabled = false;
         try {
@@ -1030,7 +1184,7 @@
           });
           const d = await res.json();
           hideThinking();
-          addAceReply(d.reply);
+          finalizeStreamedReply(d.reply);
           speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD)\]\s*/i, ''));
         } catch (err) {
           if (err && err.name === 'AbortError') {
@@ -1042,6 +1196,7 @@
           }
         } finally {
           currentAbort = null;
+          uiRequestActive = false;
         }
         return;
       }
@@ -2822,7 +2977,37 @@
     const ac = localStorage.getItem('ace_accentColor') || '#ffffff';
     document.documentElement.style.setProperty('--accent', ac);
     document.documentElement.style.setProperty('--accent-2', ac);
+    loadChatHistory();
   });
+
+  async function loadChatHistory() {
+    try {
+      const res = await fetch('http://localhost:5000/conversations?limit=60');
+      const d = await res.json();
+      const convs = (d && d.conversations) || [];
+      if (!convs.length) return;
+      // Clear the greeting so history sits at the top.
+      const chatEl = document.getElementById('chat');
+      if (chatEl) chatEl.innerHTML = '';
+      let lastTs = null;
+      convs.forEach(c => {
+        const role = c.role === 'user' ? 'user' : 'ace';
+        const text = (c.content || '').trim();
+        if (!text) return;
+        const bubble = addMessage(text, role);
+        if (bubble) {
+          const ts = (c.timestamp || '').slice(0, 16).replace('T', ' ');
+          if (ts && ts !== lastTs) {
+            const tdiv = document.createElement('div');
+            tdiv.className = 'chat-ts';
+            tdiv.textContent = ts;
+            chatEl.insertBefore(tdiv, bubble);
+            lastTs = ts;
+          }
+        }
+      });
+    } catch (e) {}
+  }
 </script>
 </body>
 </html>
