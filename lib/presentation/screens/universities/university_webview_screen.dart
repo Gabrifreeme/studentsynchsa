@@ -88,17 +88,19 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             final url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
 
-            // Allow gw1proc URLs through without modification
+            // Allow gw1proc URLs through without modification.
             if (url.contains('gw1proc')) return NavigationDecision.navigate;
 
-            // Fix truncated ITS submit URL: gw1pkg.gw1p → gw1pkg.gw1proc
+            // A truncated ITS URL (gw1pkg.gw1p) is a truncated report of the
+            // form's own POST. The JS navfix (buildNavigationFixScript) already
+            // rewrites every form action to the full .../gen.gw1pkg.gw1proc
+            // BEFORE the request is built (see the 'Form action' DIAG snackbar),
+            // so the real POST goes to the correct URL. Do NOT cancel it and
+            // reload as a GET loadRequest — that drops the POST body and the
+            // portal 404s. Just let it flow and surface the report for diagnosis.
             if (url.contains('gw1pkg.gw1p') && !url.contains('gw1proc')) {
-              final fixedUrl = url.replaceAll('gw1pkg.gw1p', 'gw1pkg.gw1proc');
-              debugPrint('🔧 Fixing truncated URL: $url → $fixedUrl');
-              if (mounted) {
-                _controller.loadRequest(Uri.parse(fixedUrl));
-              }
-              return NavigationDecision.prevent;
+              debugPrint('🔎 Truncated ITS URL (letting real POST flow): $url');
+              _reportTruncatedUrl(url);
             }
 
             return NavigationDecision.navigate;
@@ -591,6 +593,19 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
   Future<void> _loadPortal() async {
     await _controller.loadRequest(Uri.parse(_resolveUrl()));
+  }
+
+  void _reportTruncatedUrl(String url) {
+    debugPrint('🔎 Truncated ITS URL reported: $url');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('DIAG: truncated ITS URL seen (POST left intact): $url'),
+          duration: const Duration(seconds: 6),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   String _resolveUrl() {

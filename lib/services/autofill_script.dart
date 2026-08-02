@@ -739,102 +739,219 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
 String buildNavigationFixScript() {
   return '''
-(function() {
-  // 1. Resolve relative form action URLs to absolute BEFORE the form submits.
-  //    This is the ONLY thing this script should do.  Do NOT intercept
-  //    apex.navigation.redirect, window.location.replace/assign, or anything
-  //    that goes through the FlutterNavigation JS channel — that converts
-  //    POST to GET and loses the session/body.
-  document.addEventListener('submit', function(e) {
-    var form = e.target;
+var __ssaNavfix = function() {
+  // ── ITS URL helpers ─────────────────────────────────────────────────
+  // ITS portal navigation uses RELATIVE URLs everywhere
+  // (location.replace('gen.gw1pkg.gw1view'), dynamic form action
+  // 'gen.gw1pkg.gw1proc', ...). The Android WebView sometimes truncates
+  // these to '.../gen.gw1pkg.gw1v' / '.../gen.gw1pkg.gw1p' when resolving
+  // or requesting them, which 404s. We expand truncated procedure names
+  // and resolve relative URLs to absolute BEFORE they leave the page.
+
+  // Expand a truncated ITS procedure name: gw1v -> gw1view, gw1p -> gw1proc.
+  function expandProc(u) {
+    if (typeof u !== 'string') return u;
+    var marker = 'gen.gw1pkg.gw1';
+    var i = u.indexOf(marker);
+    if (i === -1) return u;
+    var restStart = i + marker.length;
+    var rest = u.substring(restStart);
+    var q = rest.indexOf('?');
+    var sl = rest.indexOf('/');
+    var cut = -1;
+    if (q === -1 && sl === -1) { cut = rest.length; }
+    else if (q !== -1 && (sl === -1 || q < sl)) { cut = q; }
+    else { cut = sl; }
+    var proc = rest.substring(0, cut);
+    var tail = rest.substring(cut);
+    if (proc === 'v') return u.substring(0, restStart) + 'view' + tail;
+    if (proc === 'p') return u.substring(0, restStart) + 'proc' + tail;
+    return u;
+  }
+
+  // Resolve a possibly-relative URL against the current page URL.
+  function resolveUrl(u) {
+    if (typeof u !== 'string' || !u) return u;
+    if (u.indexOf('http://') === 0 || u.indexOf('https://') === 0 ||
+        u.indexOf('javascript:') === 0 || u.indexOf('data:') === 0 ||
+        u.indexOf('mailto:') === 0 || u.indexOf('#') === 0) return u;
+    var base = window.location.href;
+    var hash = base.indexOf('#'); if (hash !== -1) base = base.substring(0, hash);
+    var query = base.indexOf('?'); if (query !== -1) base = base.substring(0, query);
+    if (u.charAt(0) === '/') {
+      var scheme = base.indexOf('//');
+      var originSlash = base.indexOf('/', scheme + 2);
+      var origin = originSlash === -1 ? base : base.substring(0, originSlash);
+      return origin + u;
+    }
+    var lastSlash = base.lastIndexOf('/');
+    var dir = lastSlash === -1 ? base + '/' : base.substring(0, lastSlash + 1);
+    return dir + u;
+  }
+
+  function fixUrl(u) { return resolveUrl(expandProc(u)); }
+
+  // Report to the Flutter layer for on-device visibility.
+  function diag(msg) {
+    console.log('[navfix] ' + msg);
+    try { AutofillResult.postMessage(JSON.stringify({ diag: msg })); } catch (e) {}
+  }
+
+  // ── Form actions ────────────────────────────────────────────────────
+  function fixAction(form, log) {
     if (!form || form.tagName !== 'FORM') return;
-    var action = form.getAttribute('action');
-    // If action is empty, missing, or relative → force it to current page URL
-    if (!action || action.length === 0 || !action.startsWith('http')) {
-      var resolved = window.location.href;
-      form.setAttribute('action', resolved);
-      console.log('Form action forced to current URL: ' + resolved);
+    var before = form.getAttribute('action') || '';
+    var after = fixUrl(before);
+    if (after !== before) {
+      form.setAttribute('action', after);
+      console.log('[navfix] form action: ' + before + ' -> ' + after);
+      if (log) diag('Form action: ' + before + ' -> ' + after);
     }
-  }, true);
+  }
 
-  // 2. Ensure all existing form actions are absolute (for forms already in the DOM)
+  document.addEventListener('submit', function(e) { fixAction(e.target, true); }, true);
+
+  // Direct form.submit() calls fire NO 'submit' event — patch the prototype
+  // so the action is corrected before the POST actually goes out.
+  var origSubmit = HTMLFormElement.prototype.submit;
+  if (origSubmit && !origSubmit.__ssaPatched) {
+    var submitWrapper = function() { fixAction(this, true); return origSubmit.apply(this, arguments); };
+    submitWrapper.__ssaPatched = true;
+    HTMLFormElement.prototype.submit = submitWrapper;
+  }
+
   var forms = document.querySelectorAll('form');
-  for (var i = 0; i < forms.length; i++) {
-    var f = forms[i];
-    var a = f.getAttribute('action');
-    // If action is empty, missing, or relative → force to current page URL
-    if (!a || a.length === 0 || !a.startsWith('http')) {
-      f.setAttribute('action', window.location.href);
-      console.log('Form action set to current URL: ' + window.location.href);
-    }
-  }
+  for (var i = 0; i < forms.length; i++) fixAction(forms[i]);
 
-  // 3. Force the specific ITS portal submit URL (handles missing/empty action)
-  var targetUrl = 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1proc';
-  for (var i = 0; i < forms.length; i++) {
-    var f = forms[i];
-    f.setAttribute('action', targetUrl);
-    console.log('Form action forced to ITS submit URL: ' + targetUrl);
-  }
-
-  // 4. Watch for dynamically added forms (APEX dynamic actions, AJAX regions)
   var observer = new MutationObserver(function(mutations) {
     for (var m = 0; m < mutations.length; m++) {
-      for (var n = 0; n < mutations[m].addedNodes.length; n++) {
-        var node = mutations[m].addedNodes[n];
+      var nodes = mutations[m].addedNodes;
+      for (var n = 0; n < nodes.length; n++) {
+        var node = nodes[n];
         if (node.tagName === 'FORM') {
-          node.setAttribute('action', targetUrl);
-          console.log('Dynamic form action set: ' + targetUrl);
+          fixAction(node);
         } else if (node.querySelectorAll) {
-          var dynamicForms = node.querySelectorAll('form');
-          for (var d = 0; d < dynamicForms.length; d++) {
-            dynamicForms[d].setAttribute('action', targetUrl);
-            console.log('Dynamic form (in subtree) action set: ' + targetUrl);
-          }
+          var dyn = node.querySelectorAll('form');
+          for (var d = 0; d < dyn.length; d++) fixAction(dyn[d]);
         }
       }
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  if (document.body) observer.observe(document.body, { childList: true, subtree: true });
 
-  // 5. Intercept APEX redirects that truncate the URL (gw1p → gw1proc)
-  //    APEX sometimes uses apex.navigation.redirect or window.location
-  //    after form submit, and the WebView may lose the trailing chars.
+  // ── JS navigations (location.replace / assign) ──────────────────────
   var originalReplace = window.location.replace;
-  window.location.replace = function(url) {
-    if (typeof url === 'string' && url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
-      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
-      console.log('🔧 Fixed truncated redirect URL: ' + url);
-    }
-    return originalReplace.call(this, url);
-  };
-  var originalAssign = window.location.assign;
-  window.location.assign = function(url) {
-    if (typeof url === 'string' && url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
-      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
-      console.log('🔧 Fixed truncated assign URL: ' + url);
-    }
-    return originalAssign.call(this, url);
-  };
-
-  // 6. Intercept fetch/XHR responses that redirect to truncated URL
-  var originalFetch = window.fetch;
-  window.fetch = function(input, init) {
-    var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-    if (url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
-      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
-      console.log('🔧 Fixed truncated fetch URL: ' + url);
-      if (typeof input === 'string') {
-        input = url;
-      } else if (input && input.url) {
-        input.url = url;
+  if (originalReplace && !originalReplace.__ssaPatched) {
+    var rp = function(u) {
+      var fixed = fixUrl(u);
+      if (typeof u === 'string' && fixed !== u) {
+        console.log('[navfix] nav: ' + u + ' -> ' + fixed);
+        diag('Nav: ' + u + ' -> ' + fixed);
       }
-    }
-    return originalFetch.call(this, input, init);
-  };
+      return originalReplace.call(this, fixed);
+    };
+    rp.__ssaPatched = true;
+    window.location.replace = rp;
+  }
+  var originalAssign = window.location.assign;
+  if (originalAssign && !originalAssign.__ssaPatched) {
+    var as = function(u) {
+      var fixed = fixUrl(u);
+      if (typeof u === 'string' && fixed !== u) {
+        console.log('[navfix] nav: ' + u + ' -> ' + fixed);
+        diag('Nav: ' + u + ' -> ' + fixed);
+      }
+      return originalAssign.call(this, fixed);
+    };
+    as.__ssaPatched = true;
+    window.location.assign = as;
+  }
 
-  console.log('Navigation fix injected');
-})();
+  // location.href = '...' / window.location = '...' bypass both replace and
+  // assign. Patch the Location href setter so those get expanded too.
+  try {
+    var loc = window.location;
+    var locProto = Object.getPrototypeOf(loc);
+    var hrefDesc = Object.getOwnPropertyDescriptor(locProto, 'href');
+    if (hrefDesc && hrefDesc.set && !hrefDesc.set.__ssaPatched) {
+      var origHrefGet = hrefDesc.get;
+      var origHrefSet = hrefDesc.set;
+      var hrefSetWrapper = function(v) {
+        var fixed = fixUrl(v);
+        if (typeof v === 'string' && fixed !== v) {
+          console.log('[navfix] location.href: ' + v + ' -> ' + fixed);
+          diag('location.href: ' + v + ' -> ' + fixed);
+        }
+        return origHrefSet.call(this, fixed);
+      };
+      hrefSetWrapper.__ssaPatched = true;
+      Object.defineProperty(locProto, 'href', {
+        configurable: true,
+        enumerable: true,
+        get: function() { return origHrefGet.call(this); },
+        set: hrefSetWrapper
+      });
+    }
+  } catch (e) {}
+
+  // Plain <a href="gen.gw1pkg.gw1..."> links fire no submit event and don't go
+  // through replace/assign. Expand + absolutize their href at click time so a
+  // truncated relative link can't 404. Capture phase so it runs before the
+  // default navigation.
+  document.addEventListener('click', function(e) {
+    var el = e.target;
+    while (el && el.tagName !== 'A') { el = el.parentElement; }
+    if (!el || !el.href) return;
+    var h = el.getAttribute('href');
+    if (!h || h.indexOf('gen.gw1pkg.gw1') === -1) return;
+    var fixed = fixUrl(h);
+    if (fixed !== h) {
+      el.setAttribute('href', fixed);
+      console.log('[navfix] link href: ' + h + ' -> ' + fixed);
+    }
+  }, true);
+
+  // ── fetch/XHR redirects ─────────────────────────────────────────────
+  var originalFetch = window.fetch;
+  if (originalFetch && !originalFetch.__ssaPatched) {
+    var fetcher = function(input, init) {
+      var u = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+      var fixed = fixUrl(u);
+      if (fixed !== u) {
+        if (typeof input === 'string') { input = fixed; }
+        else if (input && input.url) { input.url = fixed; }
+      }
+      return originalFetch.call(this, input, init);
+    };
+    fetcher.__ssaPatched = true;
+    window.fetch = fetcher;
+  }
+
+  diag('Page: ' + window.location.href);
+  diag('NavFix injected');
+};
+__ssaNavfix();
+
+// ITS can render the application form inside a same-origin iframe, which the
+// top-frame script cannot reach directly. Re-apply the fix inside every
+// same-origin iframe so their form actions / navigations are corrected too.
+function __ssaApplyToFrames() {
+  try {
+    var frames = document.querySelectorAll('iframe');
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        var doc = frames[i].contentDocument;
+        if (doc && doc !== document) {
+          var s = doc.createElement('script');
+          s.textContent = '(' + __ssaNavfix.toString() + ')();';
+          doc.documentElement.appendChild(s);
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+__ssaApplyToFrames();
+setTimeout(__ssaApplyToFrames, 1200);
 ''';
 }
 
