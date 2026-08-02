@@ -9,7 +9,6 @@ import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart';
 import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/pdf_generator.dart';
 

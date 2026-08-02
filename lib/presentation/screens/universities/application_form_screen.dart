@@ -41,11 +41,12 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       await Future.delayed(const Duration(seconds: 1));
       p = await repo.getProfile();
     }
-    if (mounted)
+    if (mounted) {
       setState(() {
         _profile = p;
         _loading = false;
       });
+    }
   }
 
   @override

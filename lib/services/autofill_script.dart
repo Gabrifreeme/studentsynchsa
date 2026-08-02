@@ -46,10 +46,147 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     return p[2] + '/' + p[1] + '/' + p[0];
   }
 
+  // date as DD-MM-YYYY for ITS portals (e.g. 16-03-1963)
+  function fmtDateDash(iso) {
+    if (!iso || iso.length < 10) return iso || '';
+    var p = iso.split('T')[0].split('-');
+    return p[2] + '-' + p[1] + '-' + p[0];
+  }
+
+  // Individual date parts for split fields
+  function fmtDateDay(iso) {
+    if (!iso || iso.length < 10) return '';
+    var p = iso.split('T')[0].split('-');
+    return p[2];
+  }
+  function fmtDateMonth(iso) {
+    if (!iso || iso.length < 10) return '';
+    var p = iso.split('T')[0].split('-');
+    return p[1];
+  }
+  function fmtDateYear(iso) {
+    if (!iso || iso.length < 10) return '';
+    var p = iso.split('T')[0].split('-');
+    return p[0];
+  }
+
+  // date as DD-M-YYYY for ITS portals (e.g. 13-4-1964)
+  function fmtDateShort(iso) {
+    if (!iso || iso.length < 10) return iso || '';
+    var p = iso.split('T')[0].split('-');
+    return parseInt(p[2]) + '-' + parseInt(p[1]) + '-' + p[0];
+  }
+
+  // Fill date as separate day/month/year fields (DD-MON-YYYY)
+  function fillDateFields(dobIso) {
+    if (!dobIso || dobIso.length < 10) return;
+    var p = dobIso.split('T')[0].split('-'); // [YYYY, MM, DD]
+    var day = parseInt(p[2]);
+    var monthNum = p[1];
+    var year = p[0];
+
+    var monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var monthMap = {
+      'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+      'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+      'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+    };
+    var monthAbbr = monthNames[parseInt(monthNum) - 1] || monthNum;
+
+    // Remove any existing custom date picker
+    var existing = document.getElementById('ssa-date-picker');
+    if (existing) existing.remove();
+
+    // Find the original date field
+    var target = document.getElementById('oapBirthdate')
+      || document.querySelector('input[name="OAPBIRTHDATE"]')
+      || document.querySelector('input[name="oapBirthdate"]')
+      || document.querySelector('input[id*="birth" i], input[id*="Birth" i]');
+
+    if (!target) {
+      console.log('No target date field found for custom picker');
+      return;
+    }
+
+    target.style.display = 'none';
+
+    var wrapper = document.createElement('div');
+    wrapper.id = 'ssa-date-picker';
+    wrapper.style.cssText = 'display:inline-flex;gap:8px;align-items:flex-end;margin:8px 0;';
+
+    function makeSelect(label, options, selected, widthPx) {
+      var div = document.createElement('div');
+      div.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
+      var lbl = document.createElement('label');
+      lbl.textContent = label;
+      lbl.style.cssText = 'font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;';
+      var sel = document.createElement('select');
+      sel.style.cssText = 'width:' + widthPx + 'px;padding:10px 8px;font-size:18px;border:1px solid #ccc;border-radius:4px;text-align:center;font-family:monospace;background:#fff;';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = label;
+      placeholder.disabled = true;
+      placeholder.selected = !selected;
+      sel.appendChild(placeholder);
+      options.forEach(function(opt) {
+        var o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (opt === selected) o.selected = true;
+        sel.appendChild(o);
+      });
+      div.appendChild(lbl);
+      div.appendChild(sel);
+      return {div: div, select: sel};
+    }
+
+    var days = [];
+    for (var i = 1; i <= 31; i++) days.push(String(i));
+    var years = [];
+    for (var y = 2030; y >= 1900; y--) years.push(String(y));
+
+    var dayPart = makeSelect('DD', days, String(day), 60);
+    var monthPart = makeSelect('MON', monthNames, monthAbbr, 80);
+    var yearPart = makeSelect('YYYY', years, year, 100);
+
+    function updateDob() {
+      var d = dayPart.select.value;
+      var m = monthPart.select.value;
+      var y = yearPart.select.value;
+      if (d && m && y && monthMap[m]) {
+        var formatted = parseInt(d) + '-' + m + '-' + y;
+        target.value = formatted;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log('Date set to:', formatted);
+      }
+    }
+
+    dayPart.select.addEventListener('change', updateDob);
+    monthPart.select.addEventListener('change', updateDob);
+    yearPart.select.addEventListener('change', updateDob);
+
+    wrapper.appendChild(dayPart.div);
+    wrapper.appendChild(monthPart.div);
+    wrapper.appendChild(yearPart.div);
+
+    var insertAfter = target;
+    var customWrapper = document.getElementById('custom-date-wrapper');
+    if (customWrapper) insertAfter = customWrapper;
+    insertAfter.parentNode.insertBefore(wrapper, insertAfter.nextSibling);
+
+    target.value = parseInt(day) + '-' + monthAbbr + '-' + year;
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+
+    console.log('Date picker injected: ' + parseInt(day) + '-' + monthAbbr + '-' + year);
+  }
+
   var firstName   = gv('personal.firstName');
   var lastName    = gv('personal.lastName');
   var email       = gv('contact.email');
   var dobIso      = gv('personal.dateOfBirth');
+  console.log('🔍 DEBUG dobIso:', dobIso, '→ dash:', fmtDateDash(dobIso));
 
   var vs = {
     firstName:         firstName,
@@ -57,16 +194,28 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     initials:          gv('personal.initials'),
     title:             gv('personal.title'),
     gender:            gv('personal.gender'),
+    genderCode:        (function() {
+                          var g = gv('personal.gender').toLowerCase();
+                          if (g.indexOf('female') !== -1 || g === 'f') return 'F';
+                          if (g.indexOf('male') !== -1 || g === 'm') return 'M';
+                          return 'M'; // default: 'Other', 'Prefer not to say' → M
+                        })(),
     idNumber:          gv('personal.idNumber'),
     dateOfBirth:       fmtDate(dobIso),
     dateOfBirthSlash:  fmtDateSlash(dobIso),
+    dateOfBirthDash:   fmtDateDash(dobIso),
+    dateOfBirthDay:    fmtDateDay(dobIso),
+    dateOfBirthMonth:  fmtDateMonth(dobIso),
+    dateOfBirthYear:   fmtDateYear(dobIso),
     email:             email,
     phone:             gv('contact.phone'),
     workPhone:         gv('contact.workPhone'),
     address:           gv('address.address'),
     addressLine2:      gv('address.addressLine2'),
+    addressLine3:      gv('address.addressLine3'),
     province:          gv('address.province'),
     postalCode:        gv('address.postalCode'),
+    heardAboutUs:      gv('demographic.heardAboutUs'),
     nationality:       gv('demographic.nationality'),
     isSACitizen:       (function() {
                          var nat = (gv('demographic.nationality') || '').toLowerCase();
@@ -75,11 +224,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                          if (idn.length >= 13) return 'Yes';
                          return 'No';
                        })(),
+    // FIX #5: citizenshipCodeValue → the LOV *description* (long label) for SA citizens.
+    //    citizenshipShortCode → the 2-letter LOV *code* (short code) when known,
+    //      falling back to the description when no short code is mapped.
     citizenshipCodeValue: (function() {
                             var nat = (gv('demographic.nationality') || '').toLowerCase();
                             var idn = (gv('personal.idNumber') || '').trim();
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
-                            return sa ? 'R.S.A' : (gv('demographic.citizenshipCode') || '');
+                            // Long LOV description
+                            return sa ? 'OTHER AFRICAN COUNTRIES' : (gv('demographic.citizenshipDescription') || gv('demographic.nationality') || '');
+                          })(),
+    citizenshipShortCode: (function() {
+                            var nat = (gv('demographic.nationality') || '').toLowerCase();
+                            var idn = (gv('personal.idNumber') || '').trim();
+                            var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
+                            // Short 2-letter code for SA; fall back to whichever is set
+                            if (sa) return 'OA';
+                            return gv('demographic.citizenshipCode') || gv('demographic.citizenshipShortCode') || '';
                           })(),
     homeLanguage:      gv('demographic.homeLanguage'),
     ethnicValue:       (function() {
@@ -98,8 +259,29 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                           var br = (gv('status.bursaryRequired') || '').toLowerCase();
                           return br.indexOf('y') !== -1 ? 'Y' : 'N';
                         })(),
+    residenceRequired: (function() {
+                          var wr = (gv('status.wantsResidence') || '').toLowerCase();
+                          return wr.indexOf('y') !== -1 ? 'Y' : 'N';
+                        })(),
     populationGroup:   gv('demographic.populationGroup'),
     maritalStatus:     gv('demographic.maritalStatus'),
+    maritalYesNo:      (function() {
+                            var m = (gv('demographic.maritalStatus') || '').toLowerCase();
+                            return m.indexOf('married') !== -1 ? 'Yes' : 'No';
+                          })(),
+    disabilityValue:   (function() {
+                            var d = (gv('status.disabilityStatus') || '').toLowerCase();
+                            return d.indexOf('y') !== -1 || d.indexOf('disable') !== -1 ? 'Yes' : 'No';
+                          })(),
+    raceValue:         (function() {
+                            var pg = (gv('demographic.populationGroup') || '').toLowerCase();
+                            if (pg.indexOf('afric') !== -1 || pg.indexOf('black') !== -1) return 'African';
+                            if (pg.indexOf('colour') !== -1 || pg.indexOf('colored') !== -1) return 'Coloured';
+                            if (pg.indexOf('asian') !== -1) return 'Asian';
+                            if (pg.indexOf('indian') !== -1) return 'Indian';
+                            if (pg.indexOf('white') !== -1) return 'White';
+                            return pg || '';
+                          })(),
     schoolName:        gv('school.schoolName'),
     currentGrade:      gv('school.currentGrade'),
     matricYear:        gv('results.matricYear'),
@@ -120,14 +302,32 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   var itsExact = {
     // UNIVEN / Venda OAP exact-name maps
     'OAPCITIZENTYPE':     vs.isSACitizen,
-    'OAPCITZCODE':        vs.citizenshipCodeValue,
+    'OAPCITZCODE':        vs.citizenshipShortCode,
+    'OAPCITCODE':         vs.citizenshipShortCode,
+    'OAPCITCODE_DESC':    vs.citizenshipCodeValue,
     'OAPHOMELANG':        vs.homeLanguage,
     'OAPETHNIC':          vs.ethnicValue,
     'OAPEMPLOYED':        vs.employedValue,
     'OAPBURSARYREQ':      vs.bursaryValue,
+    'OAPRESREQ':          vs.residenceRequired,
     // Address
+    'OAPSTREETADDR1':           vs.address,
+    'OAPSTREETADDR2':           vs.addressLine2,
+    'OAPSTREETADDR3':           vs.addressLine3,
+    'OAPSTREETADDR4':           vs.province,
+    'OAPSTREETADDRPCODEREQ':      vs.postalCode,
+    'OAPSTREETADDRPCODEREQ_DESC': vs.postalCode,
     'OAPPOSTALADDRPCODEREQ':      vs.postalCode,
     'OAPPOSTALADDRPCODEREQ_DESC': vs.postalCode,
+    // Date of birth
+    'OAPBIRTHDATE':           vs.dateOfBirth,
+    'OAPBIRTHDAY':            vs.dateOfBirthDay,
+    'OAPBIRTHMONTH':          vs.dateOfBirthMonth,
+    'OAPBIRTHYEAR':           vs.dateOfBirthYear,
+    // Heard about us
+    'OAPHEARD':               vs.heardAboutUs,
+    'OAPHEARD_DESC':          vs.heardAboutUs,
+    'oapGender':              vs.genderCode,
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
@@ -136,9 +336,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'P_GENDER':            vs.gender,
     'P_ID_NO':             vs.idNumber,
     'P_PASSPORT_NO':       vs.idNumber,
-    'P_DATE_OF_BIRTH':     vs.dateOfBirth,
-    'P_DOB':               vs.dateOfBirth,
-    'P_BIRTH_DATE':        vs.dateOfBirth,
+    'P_DATE_OF_BIRTH':     vs.dateOfBirthDash,
+    'P_DOB':               vs.dateOfBirthDash,
+    'P_BIRTH_DATE':        vs.dateOfBirthDash,
     // Contact
     'P_EMAIL':             vs.email,
     'P_EMAIL_ADDRESS':     vs.email,
@@ -214,13 +414,16 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     workPhone:         ['work phone','work tel','telephone work'],
     address:           ['address','street','physical address'],
     addressLine2:      ['address 2','suburb','town','city'],
-    province:          ['province','state','region'],
+    province:          ['province','state','region','select province'],
     postalCode:        ['postal code','postalcode','post code','postcode','zip'],
     nationality:       ['nationality','citizenship','citizen'],
     isSACitizen:       ['sa citizen','possession of','valid sa','sa id'],
     homeLanguage:      ['home language','homelanguage','language'],
-    populationGroup:   ['population group','race','ethnicity'],
+    populationGroup:   ['population group','ethnicity'],
+    raceValue:         ['race'],
     maritalStatus:     ['marital status','maritalstatus'],
+    maritalYesNo:      ['married','are you married'],
+    disabilityValue:   ['disabled','disability','are you disabled'],
     schoolName:        ['school','high school','institution'],
     currentGrade:      ['grade','current grade'],
     matricYear:        ['matric year','exam year','year of matric'],
@@ -231,6 +434,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     academicYear:      ['academic year','year of study'],
     studyMode:         ['study mode','mode of study','attendance'],
     nextOfKinName:     ['next of kin','guardian','parent name','emergency contact name'],
+    heardAboutUs:      ['hear about us','heard about us','how did you hear','how did you find'],
     nextOfKinPhone:    ['guardian phone','parent phone','emergency contact number'],
     nextOfKinEmail:    ['guardian email','parent email'],
   };
@@ -260,18 +464,17 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       || t.indexOf('select ') === 0 || t.indexOf('choose ') === 0;
   }
 
-  function findOption(sel, want) {
-    if (!want) return null;
+  function findOption(sel, want) {    if (!want) return null;
     var wl = want.toLowerCase().trim();
-    var wlWords = wl.split(/\s+/);
+    var wlWords = wl.split(/\\s+/);
     var best = null, bestScore = -1;
     for (var i = 0; i < sel.options.length; i++) {
       var opt = sel.options[i];
       if (isPlaceholder(opt.text)) continue;
       var tl = opt.text.toLowerCase().trim();
       var vl = opt.value.toLowerCase().trim();
-      var tlWords = tl.split(/\s+/);
-      var vlWords = vl.split(/\s+/);
+      var tlWords = tl.split(/\\s+/);
+      var vlWords = vl.split(/\\s+/);
       var score = -1;
       // 100: exact text/value equals want
       if (tl === wl || vl === wl) score = 100;
@@ -309,6 +512,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       if (!opt) return false;
       el.value = opt.value;
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      if (typeof jQuery !== 'undefined') {
+        try { jQuery(el).trigger('change.select2'); } catch(e) {}
+        try { jQuery(el).trigger('select2:select'); } catch(e) {}
+        try { if (jQuery(el).data('select2')) jQuery(el).val(opt.value).trigger('change'); } catch(e) {}
+      }
       return true;
     }
     if (el.type === 'radio') {
@@ -399,71 +607,48 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   // ── 5. Main autofill ───────────────────────────────────────────────────
   function doAutofill() {
-    if (!firstName && !lastName && !email) {
-      showToast('No profile data. Please complete your profile first.', '#EF4444');
-      return;
-    }
-
-    var inputs = document.querySelectorAll(
-      'input:not([type=submit]):not([type=button])'
-      + ':not([type=reset]):not([type=image]),'
-      + 'select, textarea'
-    );
+    console.log('🔍 Autofill started');
+    var fields = {
+      oapFirstNames: profile.personal.firstName,
+      oapSurname: profile.personal.lastName,
+      oapBirthdate: profile.personal.dateOfBirth,
+      itsEmail: profile.contact.email,
+      verifyEmail: profile.contact.email,
+      oapWorkPhone: profile.contact.workPhone,
+      oapHomePhone: profile.contact.phone,
+      oapIntCell: profile.contact.phone,
+      oapStreetAddr1: profile.address.address,
+      oapStreetAddr4: profile.address.province,
+      oapStreetAddrPCodeRq: profile.address.postalCode,
+      oapPostalAddrPCodeRq: profile.address.postalCode,
+    };
 
     var filled = 0;
-    var alreadyHandled = {};
-
-    for (var i = 0; i < inputs.length; i++) {
-      var el = inputs[i];
-      if (el.disabled) continue;
-      var isHidden = (el.type === 'hidden');
-
-      var elName = (el.name || '').toUpperCase().trim();
-
-      // Pass 1: ITS exact name match (highest confidence)
-      if (elName && itsExact[elName] !== undefined) {
-        if (itsExact[elName] && fill(el, itsExact[elName])) {
-          el.style.outline = '3px solid #10B981';
-          filled++;
-          alreadyHandled[i] = true;
-          continue;
-        }
-      }
-
-      // Skip LOV description/display helper fields (e.g. oapCitzCode_desc).
-      // The portal auto-populates these from the real value field; filling both
-      // creates a duplicate visible row.  Exact itsExact entries above can
-      // still target _desc fields that need explicit filling.
-      if (elName.indexOf('_DESC') !== -1 || elName.indexOf('_DISPLAY') !== -1 || elName.indexOf('_LOV') !== -1) continue;
-
-      // Hidden fields: only fill via exact itsExact match above — never fuzzy,
-      // to avoid clobbering CSRF/token/state inputs.
-      if (isHidden) continue;
-
-      // Pass 2: ITS partial/case-insensitive name match
-      if (elName) {
-        for (var itk in itsExact) {
-          if (elName.indexOf(itk) !== -1 || itk.indexOf(elName) !== -1) {
-            if (itsExact[itk] && fill(el, itsExact[itk])) {
-              el.style.outline = '3px solid #10B981';
-              filled++;
-              alreadyHandled[i] = true;
-              break;
-            }
-          }
-        }
-        if (alreadyHandled[i]) continue;
-      }
-
-      // Pass 3: Generic fuzzy match on label/placeholder text
-      var key = fuzzyMatch(el);
-      if (key && vs[key]) {
-        if (fill(el, vs[key])) {
-          el.style.outline = '3px solid #10B981';
-          filled++;
-        }
+    for (var name in fields) {
+      var value = fields[name];
+      var el = document.getElementById(name);
+      if (el && value) {
+        el.value = value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        filled++;
+        console.log('✅ Filled ' + name + ': ' + value);
       }
     }
+
+    // Trigger blur on ID number field so APEX eventRun() fires
+    // and populates citizenship + other dependent fields
+    var idEl = document.getElementById('oapIdNumber')
+      || document.querySelector('input[name="OAPIDNUMBER"]')
+      || document.querySelector('input[name="oapIdNumber"]')
+      || document.querySelector('input[id*="id" i]');
+    if (idEl && idEl.value) {
+      idEl.dispatchEvent(new Event('blur', { bubbles: true }));
+      console.log('✅ Blur fired on ID number field');
+    }
+
+    var msg = filled > 0 ? '✅ Filled ' + filled + ' fields' : 'No fields found';
+    console.log(msg);
 
     showToast(
       filled > 0
@@ -472,37 +657,708 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       filled > 0 ? '#10B981' : '#EF4444'
     );
 
-    var visibleTotal = 0;
-    for (var ti = 0; ti < inputs.length; ti++) {
-      if (inputs[ti].offsetParent !== null) visibleTotal++;
-    }
-
-    try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: visibleTotal })); } catch (e) {}
+    try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: filled })); } catch (e) {}
   }
 
+  window.requestFlutterAutofill = doAutofill;
+
+  // Auto-inject date picker after APEX initializes
+  (function() {
+    var profile = $profileJson;
+    var dobIso = (profile.personal && profile.personal.dateOfBirth) || '';
+    if (!dobIso || dobIso.length < 10) return;
+
+    function tryInject() {
+      // Check if APEX is ready (apex object exists and page is initialized)
+      if (window.apex && window.apex.page && window.apex.page.isInitialized) {
+        fillDateFields(dobIso);
+        return;
+      }
+      // Or wait for apexafterrefresh event
+      if (window.apex && window.apex.event) {
+        window.apex.event.trigger(document, 'apexafterrefresh');
+        setTimeout(tryInject, 500);
+        return;
+      }
+      // Fallback: retry after delay
+      setTimeout(tryInject, 500);
+    }
+
+    // Start after a short delay to let APEX initialize
+    setTimeout(tryInject, 1000);
+  })();
+
   ${addFloatingStar ? '''
-  // Floating star button injected into the page
+  // Floating Star button
   (function() {
     if (document.getElementById('ssa-star')) return;
-    var star = document.createElement('div');
+    const star = document.createElement('div');
     star.id = 'ssa-star';
-    star.innerHTML = '⭐';
-    star.title = 'Star Auto-Fill';
-    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
-      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
-      + 'color:#FFD700;font-size:32px;user-select:none;';
-    star.onclick = doAutofill;
-    function tryAppend() {
-      if (document.body) document.body.appendChild(star);
-      else setTimeout(tryAppend, 300);
-    }
-    tryAppend();
+    star.textContent = '⭐';
+    star.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #0F1624;
+      color: #FFD700;
+      font-size: 32px;
+      border: 2px solid #7C3AED;
+      box-shadow: 0 4px 20px rgba(124,58,237,0.5);
+      z-index: 2147483646;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    `
+    star.onclick = function() {
+      console.log('⭐ Star clicked — running doAutofill');
+      if (typeof doAutofill === 'function') {
+        doAutofill();
+      } else {
+        console.log('❌ doAutofill not found');
+      }
+    };
+    document.body.appendChild(star);
+    console.log('✅ Star injected and connected to doAutofill');
   })();
   ''' : ''}
 
-  doAutofill();
+
 })();
 ''';
 }
+
+// ── Portal patches ──────────────────────────────────────────────────────────
+// Stub implementations for build*Patch functions referenced by webview_impl.dart
+// and university_portal_screen.dart. These fix APEX portal rendering and
+// navigation inside a Flutter WebView.
+
+String buildNavigationFixScript() {
+  return '''
+(function() {
+  // 1. Resolve relative form action URLs to absolute BEFORE the form submits.
+  //    This is the ONLY thing this script should do.  Do NOT intercept
+  //    apex.navigation.redirect, window.location.replace/assign, or anything
+  //    that goes through the FlutterNavigation JS channel — that converts
+  //    POST to GET and loses the session/body.
+  document.addEventListener('submit', function(e) {
+    var form = e.target;
+    if (!form || form.tagName !== 'FORM') return;
+    var action = form.getAttribute('action');
+    // If action is empty, missing, or relative → force it to current page URL
+    if (!action || action.length === 0 || !action.startsWith('http')) {
+      var resolved = window.location.href;
+      form.setAttribute('action', resolved);
+      console.log('Form action forced to current URL: ' + resolved);
+    }
+  }, true);
+
+  // 2. Ensure all existing form actions are absolute (for forms already in the DOM)
+  var forms = document.querySelectorAll('form');
+  for (var i = 0; i < forms.length; i++) {
+    var f = forms[i];
+    var a = f.getAttribute('action');
+    // If action is empty, missing, or relative → force to current page URL
+    if (!a || a.length === 0 || !a.startsWith('http')) {
+      f.setAttribute('action', window.location.href);
+      console.log('Form action set to current URL: ' + window.location.href);
+    }
+  }
+
+  // 3. Force the specific ITS portal submit URL (handles missing/empty action)
+  var targetUrl = 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1proc';
+  for (var i = 0; i < forms.length; i++) {
+    var f = forms[i];
+    f.setAttribute('action', targetUrl);
+    console.log('Form action forced to ITS submit URL: ' + targetUrl);
+  }
+
+  // 4. Watch for dynamically added forms (APEX dynamic actions, AJAX regions)
+  var observer = new MutationObserver(function(mutations) {
+    for (var m = 0; m < mutations.length; m++) {
+      for (var n = 0; n < mutations[m].addedNodes.length; n++) {
+        var node = mutations[m].addedNodes[n];
+        if (node.tagName === 'FORM') {
+          node.setAttribute('action', targetUrl);
+          console.log('Dynamic form action set: ' + targetUrl);
+        } else if (node.querySelectorAll) {
+          var dynamicForms = node.querySelectorAll('form');
+          for (var d = 0; d < dynamicForms.length; d++) {
+            dynamicForms[d].setAttribute('action', targetUrl);
+            console.log('Dynamic form (in subtree) action set: ' + targetUrl);
+          }
+        }
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // 5. Intercept APEX redirects that truncate the URL (gw1p → gw1proc)
+  //    APEX sometimes uses apex.navigation.redirect or window.location
+  //    after form submit, and the WebView may lose the trailing chars.
+  var originalReplace = window.location.replace;
+  window.location.replace = function(url) {
+    if (typeof url === 'string' && url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
+      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
+      console.log('🔧 Fixed truncated redirect URL: ' + url);
+    }
+    return originalReplace.call(this, url);
+  };
+  var originalAssign = window.location.assign;
+  window.location.assign = function(url) {
+    if (typeof url === 'string' && url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
+      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
+      console.log('🔧 Fixed truncated assign URL: ' + url);
+    }
+    return originalAssign.call(this, url);
+  };
+
+  // 6. Intercept fetch/XHR responses that redirect to truncated URL
+  var originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+    if (url.indexOf('gw1pkg.gw1p') !== -1 && url.indexOf('gw1proc') === -1) {
+      url = url.replace('gw1pkg.gw1p', 'gw1pkg.gw1proc');
+      console.log('🔧 Fixed truncated fetch URL: ' + url);
+      if (typeof input === 'string') {
+        input = url;
+      } else if (input && input.url) {
+        input.url = url;
+      }
+    }
+    return originalFetch.call(this, input, init);
+  };
+
+  console.log('Navigation fix injected');
+})();
+''';
+}
+
+String buildViewportPatch() {
+  return '''
+(function() {
+  var vp = document.querySelector('meta[name="viewport"]');
+  if (!vp) {
+    vp = document.createElement('meta');
+    vp.name = 'viewport';
+    document.head.appendChild(vp);
+  }
+  vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
+  console.log('Viewport patch applied');
+})();
+''';
+}
+
+String buildBlanketAutofillSuppressScript() {
+  return '''
+(function() {
+  var inputs = document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image])');
+  for (var i = 0; i < inputs.length; i++) {
+    inputs[i].setAttribute('autocomplete', 'off');
+    inputs[i].setAttribute('autocorrect', 'off');
+    inputs[i].setAttribute('autocapitalize', 'off');
+    inputs[i].setAttribute('spellcheck', 'false');
+  }
+  console.log('Autofill suppressed on ' + inputs.length + ' fields');
+})();
+''';
+}
+
+String buildSecurityPatch() {
+  return '''
+(function() {
+  // APEX security: ensure hidden CSRF/token fields are preserved
+  // and not accidentally removed or modified by our other patches.
+  var forms = document.querySelectorAll('form');
+  for (var i = 0; i < forms.length; i++) {
+    var f = forms[i];
+    var hiddens = f.querySelectorAll('input[type="hidden"]');
+    for (var j = 0; j < hiddens.length; j++) {
+      // Ensure hidden fields stay hidden but are NOT disabled
+      hiddens[j].style.display = 'none';
+      hiddens[j].removeAttribute('disabled');
+    }
+  }
+
+  // Do NOT override apex.page.submit — doing so silently swallows errors
+  // and prevents the form from submitting if the original throws.
+
+  console.log('Security patch applied');
+})();
+''';
+}
+
+String buildLabelPatch() {
+  return '''
+(function() {
+  // Fix label-for associations for APEX form fields
+  var labels = document.querySelectorAll('label');
+  for (var i = 0; i < labels.length; i++) {
+    var lbl = labels[i];
+    var forId = lbl.getAttribute('for');
+    if (forId) {
+      var target = document.getElementById(forId);
+      if (!target) {
+        // Try matching by name
+        var name = forId.replace(/_display\$/, '').replace(/_value\$/, '');
+        var field = document.querySelector('[name="' + name + '"]');
+        if (field) {
+          lbl.setAttribute('for', field.id || field.name);
+        }
+      }
+    }
+  }
+  console.log('Label patch applied');
+})();
+''';
+}
+
+String buildAutocompletePatch() {
+  return '''
+(function() {
+  // Disable autocomplete on APEX LOV fields and text inputs
+  var fields = document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]');
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    f.setAttribute('autocomplete', 'off');
+    // Remove APEX-generated readonly from LOV fields if they block typing
+    if (f.readOnly && f.name && f.name.indexOf('lov') === -1) {
+      // keep readonly for non-LOV fields
+    }
+  }
+  console.log('Autocomplete patch applied');
+})();
+''';
+}
+
+String buildSelectAutocompletePatch() {
+  return '''
+(function() {
+  // Fix Select2/APEX LOV dropdowns — make them usable in WebView
+  var selects = document.querySelectorAll('select');
+  for (var i = 0; i < selects.length; i++) {
+    var s = selects[i];
+    s.removeAttribute('disabled');
+    s.removeAttribute('readonly');
+    s.setAttribute('autocomplete', 'off');
+  }
+
+  // Ensure LOV popups open in-page (not popup windows)
+  if (window.open) {
+    var origOpen = window.open;
+    window.open = function(url, name, features) {
+      if (url && url.indexOf('lov') !== -1) {
+        // Try to load LOV in current page instead of popup
+        console.log('LOV popup blocked, URL: ' + url);
+        return null;
+      }
+      return origOpen.call(window, url, name, features);
+    };
+  }
+
+  console.log('Select autocomplete patch applied');
+})();
+''';
+}
+
+String buildProvinceDisambiguationPatch() {
+  return '''
+(function() {
+  // ITS portals have two province fields — street address vs postal address
+  // Ensure the correct one gets filled by auto-fill
+  var streetProv = document.querySelector('select[name="OAPSTREETADDR4"]');
+  var postalProv = document.querySelector('select[name="OAPPOSTALADDR4"]');
+  // Remove ambiguity — mark them clearly
+  if (streetProv) streetProv.setAttribute('data-province-type', 'street');
+  if (postalProv) postalProv.setAttribute('data-province-type', 'postal');
+  console.log('Province disambiguation patch applied');
+})();
+''';
+}
+
+String buildFocusPatch() {
+  return '''
+(function() {
+  // Fix focus issues on Android WebView — ensure keyboard appears on tap
+  var inputs = document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image])');
+  for (var i = 0; i < inputs.length; i++) {
+    var f = inputs[i];
+    f.removeAttribute('readonly');
+    // Add touch handler to force focus
+    f.addEventListener('touchstart', function() {
+      this.focus();
+    }, { passive: true });
+  }
+
+  // Also fix select elements — ensure they respond to touch
+  var selects = document.querySelectorAll('select');
+  for (var i = 0; i < selects.length; i++) {
+    selects[i].removeAttribute('disabled');
+  }
+
+  console.log('Focus patch applied to ' + inputs.length + ' fields');
+})();
+''';
+}
+
+String buildInputmodePatch() {
+  return '''
+(function() {
+  // Set correct inputmode for mobile keyboards
+  var inputs = document.querySelectorAll('input');
+  for (var i = 0; i < inputs.length; i++) {
+    var f = inputs[i];
+    var name = (f.name || '').toLowerCase();
+    // Phone fields
+    if (name.indexOf('phone') !== -1 || name.indexOf('tel') !== -1 || name.indexOf('cell') !== -1) {
+      f.setAttribute('inputmode', 'tel');
+    }
+    // Numeric fields (ID number, postal code)
+    if (name.indexOf('id') !== -1 || name.indexOf('pcode') !== -1 || name.indexOf('code') !== -1) {
+      f.setAttribute('inputmode', 'numeric');
+    }
+    // Email fields
+    if (name.indexOf('email') !== -1) {
+      f.setAttribute('inputmode', 'email');
+    }
+  }
+  console.log('Inputmode patch applied');
+})();
+''';
+}
+
+String buildFormLabelPatch() {
+  return '''
+(function() {
+  // Additional form label fixes — ensure labels are visible and correctly positioned
+  var containers = document.querySelectorAll('.t-Form-fieldContainer, .t-Form-inputContainer');
+  for (var i = 0; i < containers.length; i++) {
+    var c = containers[i];
+    var lbl = c.querySelector('label');
+    var input = c.querySelector('input, select, textarea');
+    if (lbl && input && !lbl.getAttribute('for')) {
+      lbl.setAttribute('for', input.id || input.name);
+    }
+  }
+
+  // Ensure required-field markers are visible
+  var requireds = document.querySelectorAll('.u-TF-item--required, [required]');
+  for (var i = 0; i < requireds.length; i++) {
+    requireds[i].style.display = '';
+  }
+
+  console.log('Form label patch applied');
+})();
+''';
+}
+
+String buildPostalCodePickerScript(String profileJson) {
+  return '''
+(function() {
+  var profile = $profileJson;
+  var profilePostal = (profile.address && profile.address.postalCode) || '';
+
+  // South African postal codes → location (extend as needed)
+  var db = {
+    // ── Pretoria / Tshwane ──
+    '0001': 'Arcadia, Pretoria', '0002': 'Arcadia, Pretoria',
+    '0006': 'Groenkloof, Pretoria', '0007': 'Arcadia, Pretoria',
+    '0008': 'Hatfield, Pretoria', '0011': 'Hatfield, Pretoria',
+    '0014': 'Menlyn, Pretoria', '0017': 'Centurion',
+    '0018': 'Wierda Park, Centurion', '0028': 'Lynnwood, Pretoria',
+    '0030': 'Menlyn, Pretoria', '0035': 'Lynnwood Manor, Pretoria',
+    '0037': 'Waterkloof, Pretoria', '0044': 'Brooklyn, Pretoria',
+    '0066': 'Atteridgeville', '0072': 'Mamelodi, Pretoria',
+    '0081': 'Hatfield, Pretoria', '0084': 'Hatfield, Pretoria',
+    '0086': 'Menlo Park, Pretoria', '0157': 'Wierda Park, Centurion',
+    '0169': 'Clubview, Centurion', '0170': 'Lyttelton, Centurion',
+    '0181': 'Wierda Park, Centurion', '0200': 'Pretoria',
+    '0204': 'Pretoria West', '0229': 'Silverton, Pretoria',
+    '0232': 'Silverton, Pretoria', '0257': 'Akasia, Pretoria',
+    '0258': 'Akasia, Pretoria', '0294': 'Sunnyside, Pretoria',
+    // ── Johannesburg / Gauteng ──
+    '2000': 'Johannesburg', '2001': 'Johannesburg',
+    '2007': 'Auckland Park, JHB', '2016': 'Crosby, JHB',
+    '2017': 'Marshalltown, JHB', '2021': 'Bez Valley, JHB',
+    '2024': 'Observatory, JHB', '2031': 'Illovo, JHB',
+    '2036': 'Bryanston, JHB', '2041': 'Constantia, JHB',
+    '2049': 'Alexandra, JHB', '2060': 'Craighall Park, JHB',
+    '2061': 'Linden, JHB', '2062': 'Emmarentia, JHB',
+    '2065': 'Westdene, JHB', '2067': 'Greymont, JHB',
+    '2068': 'Blairgowrie, JHB', '2069': 'Ferndale, JHB',
+    '2070': 'Ferndale, Randburg', '2072': 'Cresta, JHB',
+    '2074': 'Blackheath, JHB', '2076': 'Northcliff, JHB',
+    '2077': 'Constantia Kloof, JHB', '2078': 'Weltevredenpark',
+    '2090': 'Norwood, JHB', '2094': 'Parktown, JHB',
+    '2121': 'Auckland Park, JHB', '2148': 'Booysens, JHB',
+    '2191': 'Linden, JHB', '2196': 'Linden, JHB',
+    // ── Cape Town / Western Cape ──
+    '7000': 'Cape Town', '7005': 'Maitland, Cape Town',
+    '7100': 'Eerste River', '7130': 'Somerset West',
+    '7140': 'Strand', '7200': 'Goodwood, Cape Town',
+    '7400': 'Epping, Cape Town', '7441': 'Milnerton, Cape Town',
+    '7449': 'Sunningdale, Cape Town', '7450': 'Pinelands',
+    '7460': 'Elsies River', '7500': 'Parow, Cape Town',
+    '7505': 'Bellville', '7535': 'Bellville',
+    '7540': 'Bellville', '7545': 'Durbanville',
+    '7560': 'Brackenfell', '7570': 'Kraaifontein',
+    '7600': 'Stellenbosch', '7646': 'Paarl',
+    '7655': 'Worcester', '7700': 'Claremont, Cape Town',
+    '7725': 'Claremont, Cape Town', '7735': 'Constantia, Cape Town',
+    '7764': 'Khayelitsha', '7779': 'Philippi',
+    '7785': 'Mitchells Plain', '7790': 'Mitchells Plain',
+    '7800': 'Constantia, Cape Town', '7806': 'Bergvliet',
+    '7809': 'Plumstead', '7813': 'Tokai',
+    '7925': 'Cape Town', '7945': 'Tokai, Cape Town',
+    '7975': 'Fish Hoek', '7980': 'Simons Town',
+    // ── Durban / KZN ──
+    '3000': 'Durban', '3001': 'Durban',
+    '3010': 'Berea, Durban', '3025': 'Overport, Durban',
+    '3039': 'Durban North', '3040': 'Durban North',
+    '3070': 'Queensburgh', '3079': 'Westville',
+    '3100': 'Pietermaritzburg', '3201': 'Pietermaritzburg',
+    '3245': 'Howick', '3300': 'Ladysmith',
+    '3400': 'Newcastle', '3500': 'Empangeni',
+    '3610': 'Mtubatuba', '3650': 'Richards Bay',
+    '3800': 'Greytown', '3860': 'Eshowe',
+    '3920': 'Richards Bay', '3940': 'Richards Bay',
+    // ── Eastern Cape ──
+    '5200': 'East London', '5201': 'East London',
+    '5500': 'Umtata', '6001': 'Port Elizabeth',
+    '6045': 'Newton Park, PE', '6055': 'Newton Park, PE',
+    '6059': 'Walmer, PE', '6139': 'Jeffreys Bay',
+    '6170': 'Uitenhage', '6229': 'Despatch',
+    '6300': 'Humansdorp', '6335': 'Jeffreys Bay',
+    '6470': 'Oudtshoorn', '6500': 'George',
+    '6529': 'George', '6570': 'Knysna', '6600': 'Plettenberg Bay',
+    // ── Free State ──
+    '9300': 'Bloemfontein', '9301': 'Bloemfontein',
+    '9310': 'Bloemfontein', '9350': 'Bloemfontein',
+    '9700': 'Bethlehem', '9800': 'Welkom',
+    '9900': 'Kroonstad',
+    // ── Limpopo (UNIVEN) ──
+    '0699': 'Polokwane', '0700': 'Polokwane',
+    '0710': 'Polokwane', '0727': 'Sovenga',
+    '0880': 'Phalaborwa', '0900': 'Musina',
+    '0950': 'Thohoyandou', '0951': 'Thohoyandou',
+    '0952': 'Thohoyandou', '0953': 'Thohoyandou',
+    '0954': 'Thohoyandou', '0955': 'Thohoyandou',
+    '0956': 'Thohoyandou', '0957': 'Thohoyandou',
+    '0958': 'Thohoyandou', '0959': 'Thohoyandou',
+    '0960': 'Sibasa', '0961': 'Sibasa',
+    '0962': 'Sibasa', '0963': 'Sibasa',
+    '0970': 'Mutale', '0971': 'Mutale',
+    // ── Mpumalanga ──
+    '1200': 'Nelspruit', '1201': 'Nelspruit',
+    '1240': 'White River', '1245': 'Hazyview',
+    '1270': 'Ermelo', '1300': 'Standerton',
+    '1350': 'Secunda', '1370': 'Middelburg',
+    '1400': 'Witbank', '1500': 'KwaMhlanga',
+    // ── North West ──
+    '2500': 'Rustenburg', '2520': 'Rustenburg',
+    '2531': 'Potchefstroom', '2550': 'Stilfontein',
+    '2560': 'Klerksdorp', '2600': 'Vereeniging',
+    '2614': 'Vanderbijlpark', '2700': 'Brits',
+    '2800': 'Mafikeng', '2900': 'Vryburg',
+    // ── Northern Cape ──
+    '8300': 'Kimberley', '8500': 'Upington',
+    '8600': 'Springbok', '8700': 'Calvinia',
+    '8800': 'Kuruman'
+  };
+
+  // Sorted list for fast lookup
+  var list = [];
+  for (var k in db) list.push({ c: k, l: db[k] });
+  list.sort(function(a, b) { return a.c.localeCompare(b.c); });
+
+  function inject(targetId) {
+    var v = document.getElementById(targetId);
+    if (!v) return false;
+    if (document.getElementById('ssa-pc-' + targetId)) return true; // already injected
+
+    // Hide original (and APEX _display sibling if present)
+    v.style.display = 'none';
+    v.removeAttribute('readonly'); v.removeAttribute('disabled');
+    var d = document.getElementById(targetId + '_display');
+    if (d) { d.style.display = 'none'; d.removeAttribute('readonly'); d.removeAttribute('disabled'); }
+
+    // Wrapper
+    var w = document.createElement('div');
+    w.id = 'ssa-pc-' + targetId;
+    w.style.cssText = 'position:relative;display:block;margin:8px 0;font-family:Arial,sans-serif;';
+
+    // Search input
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = '🔍 Type code or area (e.g. 0001 or Arcadia)...';
+    input.autocomplete = 'off';
+    input.inputMode = 'numeric';
+    input.style.cssText = 'width:100%;padding:12px 16px;font-size:16px;'
+      + 'border:2px solid #7C3AED;border-radius:8px;box-sizing:border-box;'
+      + 'outline:none;background:#fff;color:#0F1624;';
+    w.appendChild(input);
+
+    // Dropdown
+    var drop = document.createElement('div');
+    drop.style.cssText = 'position:absolute;top:100%;left:0;right:0;'
+      + 'max-height:280px;overflow-y:auto;background:#fff;'
+      + 'border:2px solid #7C3AED;border-top:none;'
+      + 'border-radius:0 0 8px 8px;box-shadow:0 4px 14px rgba(0,0,0,0.15);'
+      + 'z-index:9999;display:none;';
+    w.appendChild(drop);
+
+    function show(q) {
+      q = (q || '').toLowerCase().trim();
+      drop.innerHTML = '';
+      var matches = [];
+      for (var i = 0; i < list.length && matches.length < 50; i++) {
+        var item = list[i];
+        if (!q || item.c.indexOf(q) === 0 || item.l.toLowerCase().indexOf(q) !== -1) {
+          matches.push(item);
+        }
+      }
+      if (matches.length === 0) {
+        var e = document.createElement('div');
+        e.textContent = q ? 'No postal codes match "' + q + '"' : 'Start typing to search...';
+        e.style.cssText = 'padding:14px 16px;color:#888;font-style:italic;';
+        drop.appendChild(e);
+      } else {
+        matches.forEach(function(item) {
+          var row = document.createElement('div');
+          row.style.cssText = 'padding:10px 14px;cursor:pointer;'
+            + 'border-bottom:1px solid #f0f0f0;'
+            + 'display:flex;align-items:center;gap:12px;';
+          row.onmouseenter = function() { this.style.background = '#F3F0FF'; };
+          row.onmouseleave = function() { this.style.background = '#fff'; };
+
+          var badge = document.createElement('span');
+          badge.textContent = item.c;
+          badge.style.cssText = 'font-family:monospace;font-size:14px;'
+            + 'font-weight:bold;color:#0F1624;background:#F3F0FF;'
+            + 'padding:4px 10px;border-radius:4px;min-width:64px;text-align:center;';
+          row.appendChild(badge);
+
+          var loc = document.createElement('span');
+          loc.textContent = item.l;
+          loc.style.cssText = 'font-size:14px;color:#555;flex:1;';
+          row.appendChild(loc);
+
+          row.onclick = function() { pick(item.c, item.l); };
+          drop.appendChild(row);
+        });
+      }
+      drop.style.display = 'block';
+    }
+
+    function pick(code, loc) {
+      input.value = code + ' — ' + loc;
+      v.value = code;
+      v.removeAttribute('readonly'); v.removeAttribute('disabled');
+
+      if (d) {
+        d.value = code + ' — ' + loc;
+        d.removeAttribute('readonly'); d.removeAttribute('disabled');
+      }
+
+      // ITS / APEX expects all of these events to fire validation
+      ['input','change','blur','focus'].forEach(function(evt) {
+        v.dispatchEvent(new Event(evt, { bubbles: true }));
+        if (d) d.dispatchEvent(new Event(evt, { bubbles: true }));
+      });
+
+      // jQuery / Select2 glue
+      if (typeof jQuery !== 'undefined') {
+        try {
+          jQuery(v).trigger('change');
+          if (d) jQuery(d).trigger('change');
+          jQuery(v).trigger('select2:select');
+          if (d) jQuery(d).trigger('select2:select');
+        } catch (e) {}
+      }
+
+      drop.style.display = 'none';
+      console.log('✅ Postal code selected:', code, '→', loc);
+
+      // Trigger APEX event chain if available
+      if (window.apex && window.apex.event) {
+        try { window.apex.event.trigger(v, 'change'); } catch (e) {}
+      }
+
+      // Visual feedback
+      input.style.borderColor = '#10B981';
+      setTimeout(function() { input.style.borderColor = '#7C3AED'; }, 1200);
+    }
+
+    input.addEventListener('focus', function() { show(input.value); });
+    input.addEventListener('input',  function() { show(input.value); });
+    input.addEventListener('blur',   function() { setTimeout(function() { drop.style.display = 'none'; }, 200); });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var first = drop.querySelector('div[style*="cursor:pointer"]');
+        if (first) first.click();
+      } else if (e.key === 'Escape') {
+        drop.style.display = 'none';
+      }
+    });
+
+    v.parentNode.insertBefore(w, v.nextSibling);
+
+    // Pre-fill from profile
+    if (profilePostal) {
+      input.value = profilePostal;
+      var hit = null;
+      for (var i = 0; i < list.length; i++) if (list[i].c === profilePostal) { hit = list[i]; break; }
+      if (hit) pick(hit.c, hit.l);
+    }
+    return true;
+  }
+
+  function tryAll() {
+    var ids = [
+      'oapStreetAddrPCodeRq', 'oapPostalAddrPCodeRq',
+      'OAPSTREETADDRPCODEREQ', 'OAPPOSTALADDRPCODEREQ',
+      'OAPSTREETADDRPCODEREQ_DESC', 'OAPPOSTALADDRPCODEREQ_DESC'
+    ];
+    var n = 0;
+    for (var i = 0; i < ids.length; i++) if (inject(ids[i])) n++;
+    if (n === 0) setTimeout(tryAll, 600);
+    else console.log('✅ Postal code picker injected on ' + n + ' field(s)');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(tryAll, 600); });
+  } else {
+    setTimeout(tryAll, 600);
+  }
+})();
+''';
+}
+
+String buildRemoveOldPostalPickerScript() {
+  return r'''
+(function() {
+  ['oapStreetAddrPCodeRqFld', 'oapPostalAddrPCodeRqFld'].forEach(function(fldId) {
+    var fld = document.getElementById(fldId);
+    if (!fld || !fld.parentNode) return;
+    var parent = fld.parentNode;
+
+    var codeId = fldId.replace('Fld', '');
+    var input = document.getElementById(codeId);
+    if (input) {
+      // Move the hidden value input outside the container so the
+      // postal picker script can still find it.
+      parent.insertBefore(input, fld.nextSibling);
+    }
+
+    parent.removeChild(fld);
+    console.log('Removed old picker:', fldId);
+  });
+})();
+''';
+}
+

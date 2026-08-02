@@ -34,13 +34,14 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
     _loadProfile();
 
-    WebViewCookieManager().clearCookies();
+    // DO NOT clearCookies() here — it races with the page load and can destroy
+    // the APEX session cookie the portal just set, causing 404 on form submit.
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..enableZoom(true)
       ..setUserAgent(
-        'Mozilla/5.0 (Linux; Android 15; HONOR ABR-NX1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       )
       ..addJavaScriptChannel('AutofillResult', onMessageReceived: (msg) {
         try {
@@ -75,18 +76,494 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setTextZoom(150);
+      (_controller.platform as AndroidWebViewController).setOnConsoleMessage((msg) {
+        debugPrint('[WebView ${msg.level}] ${msg.message}');
+      });
     }
 
     _controller
-      ..setNavigationDelegate(
+      .setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            final url = request.url.toString();
+            debugPrint('🟡 Navigation: $url');
+
+            // Allow gw1proc URLs through without modification
+            if (url.contains('gw1proc')) return NavigationDecision.navigate;
+
+            return NavigationDecision.navigate;
+          },
           onPageStarted: (url) {
             _currentUrl = url;
             setState(() => _loading = true);
           },
-          onPageFinished: (url) {
+          onPageFinished: (url) async {
             _currentUrl = url;
             setState(() => _loading = false);
+            debugPrint('ℹ️ Autofill deferred — user must tap star to fill');
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  var citz = document.getElementById('oapCitzCode');
+  if (!citz) return;
+
+  var countryList = [
+    'AFGHANISTAN', 'ALBANIA', 'ALGERIA', 'ANDORRA', 'ANGOLA',
+    'ANTIGUA AND BARBUDA', 'ARGENTINA', 'ARMENIA', 'AUSTRALIA', 'AUSTRIA',
+    'AZERBAIJAN', 'BAHAMAS', 'BAHRAIN', 'BANGLADESH', 'BARBADOS',
+    'BELARUS', 'BELGIUM', 'BELIZE', 'BENIN', 'BHUTAN', 'BOLIVIA',
+    'BOSNIA AND HERZEGOVINA', 'BOTSWANA', 'BRAZIL', 'BURKINA FASO',
+    'BURUNDI', 'CAMEROON', 'CAPE VERDE', 'CENTRAL AFRICAN REPUBLIC',
+    'CHAD', 'CORTE de VOIRE', 'DJIBOUTI', 'EGYPT', 'EQUATORIAL GUINEA',
+    'ERITREA', 'ETHIOPIA', 'FRANCE', 'GABON', 'GAMBIA', 'GERMANY',
+    'GHANA', 'GUINEA BISAU', 'INDIA', 'ITALY', 'KENYA', 'LESOTHO',
+    'LIBERIA', 'LIBYA', 'MADAGASCAR', 'MALAWI', 'MALI', 'MAURITANIA',
+    'MAURITIUS', 'MOROCCO', 'MOZAMBIQUE', 'NAMIBIA', 'NIGER', 'NIGERIA',
+    'OTHER AFRICAN COUNTRIES', 'R.S.A.', 'RWANDA', 'SENEGAL', 'SEYCHELLES',
+    'SIERRA LEONE', 'SUDAN', 'SWAZILAND', 'TANZANIA', 'TOGO', 'TUNISIA',
+    'UGANDA', 'UNITED ARAB EMIRATES', 'ZAMBIA', 'ZIMBABWE'
+  ];
+
+  var wrapper = citz.closest('div');
+  if (!wrapper) return;
+
+  var lovBtn = wrapper.querySelector('a[onclick*="lov"], img[src*="lov.gif"]');
+  if (lovBtn) lovBtn.remove();
+
+  var select = document.createElement('select');
+  select.id = 'custom-citz-code';
+  select.style.cssText = 'width:100%;padding:8px;font-size:16px;border:1px solid #ccc;border-radius:4px;';
+
+  var emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = '';
+  select.appendChild(emptyOption);
+
+  countryList.forEach(function(country) {
+    var opt = document.createElement('option');
+    opt.value = country;
+    opt.textContent = country;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', function() {
+    citz.value = this.value;
+    citz.dispatchEvent(new Event('change', { bubbles: true }));
+    citz.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log('Citizenship Code set to:', this.value);
+  });
+
+  var observer = new MutationObserver(function() {
+    if (citz.value !== select.value) {
+      select.value = citz.value;
+    }
+  });
+  observer.observe(citz, { attributes: true, attributeFilter: ['value'] });
+  citz.addEventListener('change', function() {
+    select.value = citz.value;
+  });
+  citz.addEventListener('input', function() {
+    select.value = citz.value;
+  });
+
+  wrapper.insertBefore(select, citz);
+  console.log('Custom citizenship dropdown injected');
+})();
+''');
+              debugPrint('✅ Citizenship dropdown injected');
+            } catch (e) {
+              debugPrint('❌ Citizenship dropdown error: $e');
+            }
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  var targetField = document.getElementById('oapHeard');
+  if (!targetField) return;
+
+  var options = [
+    'FRIEND/FAMILY',
+    'NEWSPAPER',
+    'PERSONAL',
+    'PUBLIC RELATION\\'S OFFICER',
+    'RADIO',
+    'SOCIAL MEDIA',
+    'SCHOOL TEACHER',
+    'TELEVISION',
+    'UNIVEN WEB SITE'
+  ];
+
+  var wrapper = targetField.closest('div');
+  if (!wrapper) return;
+
+  var lovBtn = wrapper.querySelector('a[onclick*="lov"], img[src*="lov.gif"]');
+  if (lovBtn) lovBtn.remove();
+
+  // Also search parent for LOV button
+  var parent = targetField.parentElement;
+  if (parent) {
+    var parentLov = parent.querySelector('a[onclick*="lov"], img[src*="lov.gif"]');
+    if (parentLov) parentLov.remove();
+  }
+
+  targetField.style.display = 'none';
+
+  var select = document.createElement('select');
+  select.style.cssText = 'width:100%;padding:8px;font-size:16px;border:1px solid #ccc;border-radius:4px;';
+
+  var defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = '-- Select --';
+  select.appendChild(defaultOption);
+
+  options.forEach(function(option) {
+    var opt = document.createElement('option');
+    opt.value = option;
+    opt.textContent = option;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', function() {
+    targetField.value = this.value;
+    targetField.dispatchEvent(new Event('change', { bubbles: true }));
+    targetField.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log('Selected:', this.value);
+  });
+
+  wrapper.insertBefore(select, targetField);
+  console.log('Custom dropdown inserted for oapHeard');
+})();
+''');
+              debugPrint('✅ Heard about us dropdown injected');
+            } catch (e) {
+              debugPrint('❌ Heard about us dropdown error: $e');
+            }
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  var postalReplaced = false;
+
+  function openPostalLookup() {
+    var field = document.getElementById('oapStreetAddrPCodeRq');
+    if (!field || field.value.trim() === '') {
+      alert('Please enter a postal code first.');
+      return;
+    }
+    callDynBGproc('web.ws29pkg.ws29valdata', '&x_type=POSTAL&x_name=oapStreetAddrPCodeRq&x_value=' + encodeURIComponent(field.value));
+  }
+  window.openPostalLookup = openPostalLookup;
+
+  function replacePostalCode() {
+    if (postalReplaced) return;
+
+    var lovLinks = document.querySelectorAll('a[id^="LOVHref"]');
+    var lovLink = null;
+    for (var i = 0; i < lovLinks.length; i++) {
+      var oc = lovLinks[i].getAttribute('onclick') || '';
+      if (oc.indexOf('oapStreetAddrPCodeRq') !== -1) { lovLink = lovLinks[i]; break; }
+    }
+    if (!lovLink) return;
+
+    var section = lovLink.closest('tr') || lovLink.closest('table') || lovLink.closest('fieldset') || lovLink.closest('div');
+    if (!section) return;
+
+    var errorDiv = null;
+    var el = section;
+    for (var i = 0; i < 10 && el; i++) {
+      el = el.nextElementSibling;
+      if (!el) break;
+      if (el.classList.contains('ErrorDivAndMsg') || el.classList.contains('ErrorDiv') ||
+          (el.id && el.id.indexOf('Err') !== -1)) { errorDiv = el; break; }
+      var inner = el.querySelector('.ErrorDivAndMsg, .ErrorDiv, [id*="Err"]');
+      if (inner) { errorDiv = inner; break; }
+    }
+
+    var toDelete = [];
+    var cur = section;
+    while (cur && cur !== errorDiv) { toDelete.push(cur); cur = cur.nextElementSibling; }
+    toDelete.forEach(function(d) { d.remove(); });
+
+    var parent = (errorDiv && errorDiv.parentNode) || document.body;
+
+    var fld = document.createElement('div');
+    fld.id = 'oapStreetAddrPCodeRqFld';
+    fld.setAttribute('tag', 'oapStreetAddrPCodeRq');
+    fld.setAttribute('pgseq', '246');
+    fld.style.cssText = 'text-align:right; float:left;';
+
+    var mainInput = document.createElement('input');
+    mainInput.type = 'text';
+    mainInput.name = 'oapStreetAddrPCodeRq';
+    mainInput.id = 'oapStreetAddrPCodeRq';
+    mainInput.style.cssText = 'display:inline-block';
+
+    var descInput = document.createElement('input');
+    descInput.type = 'hidden';
+    descInput.name = 'oapStreetAddrPCodeRq_desc';
+    descInput.id = 'oapStreetAddrPCodeRq_desc';
+    descInput.value = '';
+
+    var link = document.createElement('a');
+    link.href = 'javascript: void(0)';
+    link.setAttribute('onclick', 'openPostalLookup()');
+    link.id = 'LOVHref_71';
+    var img = document.createElement('img');
+    img.src = '/itsimages/lov.gif';
+    img.alt = 'Lookup';
+    link.appendChild(img);
+
+    fld.appendChild(mainInput);
+    fld.appendChild(descInput);
+    fld.appendChild(link);
+
+    parent.insertBefore(fld, errorDiv);
+    postalReplaced = true;
+    console.log('POSTAL CODE REPLACED');
+  }
+
+  replacePostalCode();
+  setInterval(function() { if (!postalReplaced) replacePostalCode(); }, 500);
+  new MutationObserver(function() { if (!postalReplaced) replacePostalCode(); }).observe(document.body, {childList: true, subtree: true});
+
+  setInterval(function() {
+    var desc = document.getElementById('oapStreetAddrPCodeRq_desc');
+    var main = document.getElementById('oapStreetAddrPCodeRq');
+    if (desc && main && desc.value && desc.value !== main.value) {
+      main.value = desc.value;
+      main.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+  }, 300);
+
+  // Auto-fill street/city/province on postal code blur
+  var profile = $_profileJson;
+  if (profile) {
+    var addr = (profile.address && profile.address.address) || '';
+    var city = (profile.address && profile.address.addressLine2) || '';
+    var prov = (profile.address && profile.address.province) || '';
+    var postal = (profile.address && profile.address.postalCode) || '';
+
+    document.addEventListener('blur', function(e) {
+      if (e.target && e.target.id === 'oapStreetAddrPCodeRq') {
+        var s1 = document.querySelector('input[name="OAPSTREETADDR1"]');
+        if (s1 && !s1.value) { s1.value = addr; s1.dispatchEvent(new Event('change', {bubbles: true})); }
+        var s2 = document.querySelector('input[name="OAPSTREETADDR2"]');
+        if (s2 && !s2.value) { s2.value = city; s2.dispatchEvent(new Event('change', {bubbles: true})); }
+        var s4 = document.querySelector('input[name="OAPSTREETADDR4"], select[name="OAPSTREETADDR4"]');
+        if (s4 && !s4.value) {
+          if (s4.tagName === 'SELECT') {
+            for (var i = 0; i < s4.options.length; i++) {
+              if (s4.options[i].text.toUpperCase().indexOf(prov.toUpperCase()) !== -1) {
+                s4.selectedIndex = i; break;
+              }
+            }
+          } else {
+            s4.value = prov;
+          }
+          s4.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+        var desc = document.getElementById('oapStreetAddrPCodeRq_desc');
+        if (desc && !desc.value && postal) { desc.value = postal; }
+      }
+    }, true);
+  }
+})();
+''');
+              debugPrint('✅ Postal code replaced with clean HTML');
+            } catch (e) {
+              debugPrint('❌ Postal code replacement error: $e');
+            }
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  var dob = document.getElementById('oapBirthdate') || document.querySelector('input[name="oapBirthdate"]');
+  if (!dob) return;
+
+  var oldCustom = document.getElementById('custom-date-wrapper');
+  if (oldCustom) oldCustom.remove();
+
+  dob.removeAttribute('onfocus');
+  dob.removeAttribute('onclick');
+  dob.readOnly = false;
+  dob.removeAttribute('readonly');
+  dob.removeAttribute('disabled');
+  dob.style.display = 'none';
+
+  var row = dob.closest('div') || dob.parentElement;
+  if (row) {
+    row.querySelectorAll('a, img, button, span[class*="calendar"]').forEach(function(el) {
+      if (!el.contains(dob)) el.style.display = 'none';
+    });
+  }
+
+  var monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+  var wrapper = document.createElement('div');
+  wrapper.id = 'custom-date-wrapper';
+  wrapper.style.cssText = 'display:inline-flex;gap:8px;align-items:flex-end;margin:8px 0;';
+
+  function makeSelect(label, options, widthPx) {
+    var div = document.createElement('div');
+    div.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
+    var lbl = document.createElement('label');
+    lbl.textContent = label;
+    lbl.style.cssText = 'font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;';
+    var sel = document.createElement('select');
+    sel.style.cssText = 'width:' + widthPx + 'px;padding:10px 8px;font-size:18px;border:1px solid #ccc;border-radius:4px;text-align:center;font-family:monospace;background:#fff;';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = label;
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
+    options.forEach(function(opt) {
+      var o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      sel.appendChild(o);
+    });
+    div.appendChild(lbl);
+    div.appendChild(sel);
+    return {div: div, select: sel};
+  }
+
+  var days = [];
+  for (var i = 1; i <= 31; i++) days.push(String(i));
+  var years = [];
+  for (var y = 2030; y >= 1900; y--) years.push(String(y));
+
+  var dayPart = makeSelect('DD', days, 60);
+  var monthPart = makeSelect('MON', monthNames, 80);
+  var yearPart = makeSelect('YYYY', years, 100);
+
+  dayPart.select.addEventListener('change', updateDob);
+  monthPart.select.addEventListener('change', updateDob);
+  yearPart.select.addEventListener('change', updateDob);
+
+  function updateDob() {
+    var d = dayPart.select.value;
+    var m = monthPart.select.value;
+    var y = yearPart.select.value;
+    if (d && m && y) {
+      var formatted = parseInt(d) + '-' + m + '-' + y;
+      dob.value = formatted;
+      dob.dispatchEvent(new Event('input', { bubbles: true }));
+      dob.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log('Date set to:', formatted);
+    }
+  }
+
+  wrapper.appendChild(dayPart.div);
+  wrapper.appendChild(monthPart.div);
+  wrapper.appendChild(yearPart.div);
+  dob.parentNode.insertBefore(wrapper, dob);
+  console.log('Date dropdowns added');
+})();
+''');
+              debugPrint('✅ Date picker injected');
+            } catch (e) {
+              debugPrint('❌ Date picker error: $e');
+            }
+            // TEMP: Hardcode postal code for Next button testing
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  var pcode = document.querySelector('[name="oapStreetAddrPCodeRq"]');
+  var pdesc = document.querySelector('[name="oapStreetAddrPCodeRq_desc"]');
+  if (pcode && (!pcode.value || pcode.value.length < 4)) {
+    pcode.value = '2197';
+    if (pdesc) {
+      pdesc.value = 'JOHANNESBURG';
+      pdesc.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    console.log('TEMP: Postal code set to 2197 / JOHANNESBURG');
+  }
+})();
+''');
+              debugPrint('✅ Temp postal code injected');
+            } catch (_) {}
+
+            // Remove old postal code picker and ensure the new picker is visible/functional.
+            // Runs after the page has fully loaded and uses a MutationObserver so it survives
+            // late re-injection by the portal's own scripts.
+            try {
+              await _controller.runJavaScript('''
+(function() {
+  // --- CONFIG ----------------------------------------------------------------
+  // CSS selector for the new picker. Swap this for the real id/class once known.
+  // Examples:
+  //   '#newPostalCodePicker'
+  //   '.postal-code-picker--new'
+  //   '[data-picker="postal-code"]'
+  var NEW_PICKER_SELECTOR = '#newPostalCodePicker';
+  // ---------------------------------------------------------------------------
+
+  function removeOldPicker() {
+    var old = document.getElementById('oapStreetAddrPCodeRqFld');
+    if (old) {
+      old.style.setProperty('display', 'none', 'important');
+      console.log('OLD POSTAL PICKER HIDDEN');
+      return true;
+    }
+    return false;
+  }
+
+  function showNewPicker() {
+    var el = document.querySelector(NEW_PICKER_SELECTOR);
+    if (!el) return false;
+    // Clear the content attribute FIRST (it's reflected to el.hidden), then
+    // set the IDL attribute — otherwise removeAttribute would clobber a
+    // freshly-assigned el.hidden = false.
+    el.removeAttribute('hidden');
+    el.hidden = false;
+    el.style.display = '';
+    el.style.visibility = 'visible';
+    el.style.opacity = '1';
+    // Clear any inline 'display:none' / hidden flags that may be reapplied.
+    el.classList.remove('hidden', 'is-hidden', 'oap-hidden');
+    console.log('NEW POSTAL PICKER VISIBLE');
+    return true;
+  }
+
+  // 1) Run once now.
+  removeOldPicker();
+  showNewPicker();
+
+  // 2) Run again after the load event — beats scripts that fire on window 'load'.
+  window.addEventListener('load', function() {
+    removeOldPicker();
+    showNewPicker();
+  });
+
+  // 3) Run again after a short delay — beats scripts that run on a short timer
+  //    after DOMContentLoaded.
+  setTimeout(function() { removeOldPicker(); showNewPicker(); }, 250);
+  setTimeout(function() { removeOldPicker(); showNewPicker(); }, 1000);
+  setTimeout(function() { removeOldPicker(); showNewPicker(); }, 3000);
+
+  // 4) Watch the DOM. The portal may re-inject the old picker via AJAX or its
+  //    own onload handlers — keep removing it and keep the new picker visible.
+  var observer = new MutationObserver(function() {
+    removeOldPicker();
+    showNewPicker();
+  });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'hidden', 'disabled']
+  });
+
+  // 5) Also re-run just before the user navigates away (form submit), so the
+  //    old picker can't come back in a race with the submit.
+  window.addEventListener('beforeunload', function() {
+    removeOldPicker();
+    showNewPicker();
+  });
+})();
+''');
+              debugPrint('✅ Old postal picker removed, new picker ensured visible');
+            } catch (e) {
+              debugPrint('❌ Postal picker swap error: $e');
+            }
           },
           onWebResourceError: (err) => debugPrint('❌ WebView: ${err.description}'),
           onSslAuthError: (error) => error.proceed(),
@@ -110,8 +587,10 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
   void _openInChrome() async {
     final uri = Uri.parse(_resolveUrl());
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('❌ launchUrl failed: $e');
     }
   }
 
@@ -135,7 +614,11 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
       }
       try {
         await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson!));
-        debugPrint('✅ Autofill script injected');
+        await Future.delayed(const Duration(milliseconds: 30));
+        await _controller.runJavaScript('window.requestFlutterAutofill();');
+        await _controller.runJavaScript(star.buildRemoveOldPostalPickerScript());
+        await _controller.runJavaScript(star.buildPostalCodePickerScript(_profileJson!));
+        debugPrint('✅ Autofill + postal picker injected');
       } catch (e) {
         debugPrint('❌ Autofill injection failed: $e');
       }
@@ -150,6 +633,17 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
   ({String title, List<(String, String)> steps}) _guidanceForPage(String url) {
     final u = url.toLowerCase();
+
+    if (widget.universityName.toUpperCase() == 'UNIVEN' || widget.universityName.toUpperCase() == 'VENDA') {
+      return (
+        title: 'Venda Application Guide',
+        steps: [
+          ('', 'This steps are very easy, if you are a new student then you do not have a student number, tap on "Please select" and pick NO, if you are returning to complete an application form pick YES but if you new then it is NO'),
+          ('', 'next if you have a Qualification Specific Token pick YES, but when you new, you don\'t have then it will be NO again.'),
+          ('', 'That\'s it just do your consent to Venda university by tapping yes and next, If you like to read the POPI Clause first follow this link: https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view'),
+        ],
+      );
+    }
 
     if (u.contains('gw1view') || u.contains('oap') || u.contains('biographical') || u.contains('nok')) {
       return (
@@ -286,8 +780,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             ...guidance.steps.map((s) => _GuideStep(s.$1, s.$2)),
             if (_profileJson != null) ...[
               const SizedBox(height: 12),
-              const Text('🤖 Try and auto-fill this page?',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              const Text('You like me to try and auto fill this page?',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -304,7 +798,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: null,
+                      onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.grey),
                         foregroundColor: Colors.grey,

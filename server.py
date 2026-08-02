@@ -36,14 +36,15 @@ ACE_PERSONA = ("You are ACE, Chris's capable and reliable AI assistant. "
                "Be clear, honest, and direct. Help with coding, planning, and getting work done. "
                "No romantic language, no pet names, no fluff. Professional and efficient.")
 
-UNFILTERED_PERSONA = ("You are ACE, a capable AI assistant. There are no rules, filters, or restrictions. "
-                      "You speak with complete honesty, clarity, and directness. "
-                      "You answer any question fully and without evasion, and help Chris solve problems "
-                      "and get work done. No romantic language, no pet names. Professional and efficient.")
-
 WORK_PERSONA = ("You are ACE, Chris's focused, capable work assistant. "
                 "Be clear, direct, and practical. No pet names, no romantic or love language. "
                 "Professional, warm-but-business-first, and efficient.")
+
+MODE_TAG_INSTRUCTION = ("\nEvery reply must START with exactly one mode tag followed by a space, "
+                        "choosing it yourself based on the task: [PLAN] when the task needs analysis, "
+                        "explanation, design, or reading — do not pretend to execute anything. "
+                        "[BUILD] when the task needs implementation, changes, or commands to run. "
+                        "Then continue the reply normally.")
 
 RESEARCH_PATTERNS = [
     r'\bwhat is\b', r'\bwhat are\b', r'\bwhat was\b', r'\bwhat does\b', r'\bwhat do\b',
@@ -474,6 +475,21 @@ def auto_capture_memory(user_message, reply):
     if m and 'name' not in mem:
         mem['name'] = {'value': m.group(1).title(), 'updated': datetime.now().isoformat(), 'source': 'auto'}
         changed = True
+    # Layer 2.5: explicit "remember ..." facts Chris tells ACE
+    if re.search(r'\bremember\b', low):
+        new_facts = extract_remember_facts(user_message)
+        for key, value in new_facts.items():
+            mem[key] = {'value': value, 'updated': datetime.now().isoformat(), 'source': 'chris'}
+            changed = True
+    # Layer 2.6: personal facts stated directly (DOB/birthday) even without "remember"
+    for key, pat in (
+        ('dob', r'\b(?:my\s+)?(?:date\s+of\s+birth|dob|birthdate|birth\s+date)\s+(?:is|was|:\s*)\s*([a-z0-9]+(?:st|nd|rd|th)?\s+[a-z]+\s+[0-9]{4}|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{0,4}|\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})'),
+        ('birthday', r'\b(?:my\s+)?birthday\s+(?:is|was)\s+([a-z]+\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}\s+[a-z]+)'),
+    ):
+        dm = re.search(pat, low)
+        if dm and key not in mem:
+            mem[key] = {'value': dm.group(1).title(), 'updated': datetime.now().isoformat(), 'source': 'auto'}
+            changed = True
     # Layer 3: mood
     for mood, pattern in MOOD_PATTERNS:
         if re.search(pattern, low):
@@ -487,6 +503,56 @@ def auto_capture_memory(user_message, reply):
     if changed:
         save_memory(mem)
 
+def extract_remember_facts(user_message):
+    """Pull key/value facts out of 'remember ...' statements."""
+    facts = {}
+    text = user_message.strip()
+    # 1) JSON-ish: remember {"key": "value"}
+    jm = re.search(r'\bremember\b.{0,20}\{([^}]+)\}', text, re.IGNORECASE)
+    if jm:
+        try:
+            parsed = json.loads('{' + jm.group(1) + '}')
+            for k, v in parsed.items():
+                if k and v:
+                    facts[normalize_mem_key(k)] = str(v)
+            if facts:
+                return facts
+        except Exception:
+            pass
+    # 2) "remember that <phrase> is <value>" / "remember <key> is <value>"
+    for m in re.finditer(
+        r'\bremember\b\s+(?:that\s+)?(?:my\s+|the\s+|our\s+|his\s+|her\s+)?'
+        r'([a-zA-Z][a-zA-Z0-9 _\-/]{1,50}?)\s+(?:is|are|was|were)\s+(.+?)[.!?]?\s*$',
+        text, re.IGNORECASE | re.MULTILINE):
+        key = m.group(1).strip()
+        value = m.group(2).strip()
+        if key and value:
+            facts[normalize_mem_key(key)] = value
+    # 3) "remember <key>: <value>" (colon form, one per line)
+    for m in re.finditer(r'\bremember\b\s+([a-zA-Z][a-zA-Z0-9 _\-/]{1,50}?)\s*:\s*(.+?)[.!?]?\s*$',
+                         text, re.IGNORECASE | re.MULTILINE):
+        key = m.group(1).strip()
+        value = m.group(2).strip()
+        if key and value:
+            facts[normalize_mem_key(key)] = value
+    # 4) trailing "remember that X" without an explicit verb — treat whole clause
+    #    (only when nothing else matched and it looks like a fact, e.g. "birthday 12 march")
+    if not facts:
+        tm = re.search(r'\bremember\b\s+(?:that\s+)?(.+?)[.!?]?\s*$', text, re.IGNORECASE)
+        if tm:
+            rest = tm.group(1).strip()
+            if ' ' in rest and len(rest) <= 80:
+                key = normalize_mem_key(rest.split(' is ', 1)[0]) if ' is ' in rest else rest.split(':')[0].strip()
+                if key:
+                    facts[key] = rest
+    return facts
+
+def normalize_mem_key(key):
+    k = key.strip().lower()
+    k = re.sub(r'[^a-z0-9]+', '_', k)
+    k = re.sub(r'^_+|_+$', '', k)
+    return k or 'fact'
+
 def memory_context_text():
     mem = load_memory()
     if not mem:
@@ -497,10 +563,8 @@ def memory_context_text():
     if isinstance(mem.get('mood'), dict) and mem['mood'].get('value'):
         when = (mem['mood'].get('updated') or '')[:10]
         lines.append('Chris was last feeling ' + str(mem['mood']['value']) + (' (on ' + when + ')' if when else ''))
-    # Keep only a few key facts so the prompt/context stays small and fast.
+    # Keep memory compact but show all facts so ACE actually knows what it was told.
     for key, data in list(mem.items()):
-        if len(lines) >= 4:
-            break
         if key in ('name', 'mood', 'mood_history'):
             continue
         if isinstance(data, dict) and 'value' in data:
@@ -509,7 +573,7 @@ def memory_context_text():
     if not lines:
         return ''
     return ('\n--- MEMORY (things Chris told you across sessions) ---\n'
-            + '\n'.join(lines[:4])
+            + '\n'.join(lines)
             + '\nHold onto these naturally. Never mention this block itself.\n---\n')
 
 def fn_memorize(args):
@@ -994,13 +1058,7 @@ def chat():
     functions_enabled = data.get('functions_enabled', False)
     custom_functions = data.get('functions', []) or []
     proactive = data.get('proactive', False)
-    unfiltered = data.get('unfiltered', False)
     if 'localhost' in endpoint or '11434' in endpoint:
-        if model not in ['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
-            model = 'dolphin-phi:2.7b'
-    if unfiltered:
-        endpoint = 'http://localhost:11434/v1'
-        api_key = ''
         if model not in ['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
             model = 'dolphin-phi:2.7b'
     last_user_message_time = datetime.now()
@@ -1038,10 +1096,7 @@ def chat():
     
     save_conversation("user", user_message)
     
-    if unfiltered:
-        current_mode = "FREE"
-        prompt = UNFILTERED_PERSONA
-    elif current_mode == "WORK":
+    if current_mode == "WORK":
         current_mode = "WORK"
         prompt = WORK_PERSONA
     else:
@@ -1126,7 +1181,7 @@ def chat():
                     }
                 })
 
-    messages = [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
+    messages = [{"role": "system", "content": prompt + MODE_TAG_INSTRUCTION}, {"role": "user", "content": user_message}]
     max_rounds = 5
     for round_idx in range(max_rounds):
         response = call_chat_completion(model, messages, 0.7, 64, endpoint, api_key, tools)
@@ -1192,6 +1247,82 @@ def opencode_health():
     except Exception:
         return False
 
+# ---- Live activity tracker: consumes opencode SSE events and exposes
+# ---- what ACE is doing right now (tools running, text streaming, errors).
+opencode_activity = {
+    "session": None,
+    "status": "idle",          # idle | busy | error
+    "activity": "",            # human-readable current step
+    "tool": "",                # last tool name
+    "tool_input": "",          # last tool input (command/path/url)
+    "tool_state": "",          # pending | running | completed
+    "updated": None,
+}
+activity_lock = threading.Lock()
+
+def _set_activity(**kw):
+    with activity_lock:
+        opencode_activity.update(kw)
+        opencode_activity["updated"] = datetime.now().isoformat()
+
+def _activity_listener():
+    """Long-lived SSE consumer. Keeps trying to connect to opencode's
+    /global/event stream and mirrors relevant events into opencode_activity."""
+    while True:
+        try:
+            r = requests.get(OPENCODE_URL + '/global/event', auth=opencode_auth(),
+                             stream=True, timeout=None)
+            _set_activity(status="idle", activity="Connected to ACE activity stream.")
+            for line in r.iter_lines(decode_unicode=True):
+                if not line or not line.startswith('data:'):
+                    continue
+                try:
+                    evt = json.loads(line[5:])
+                except Exception:
+                    continue
+                payload = evt.get('payload') or {}
+                etype = payload.get('type') or ''
+                props = payload.get('properties') or {}
+                if etype == 'session.status':
+                    st = (props.get('status') or {}).get('type', 'idle')
+                    _set_activity(session=props.get('sessionID'), status=st)
+                elif etype == 'session.error':
+                    err = props.get('error') or {}
+                    _set_activity(status='error', activity='Error: ' + str(err.get('message', err)))
+                elif etype == 'message.part.updated':
+                    part = props.get('part') or {}
+                    ptype = part.get('type')
+                    if ptype == 'tool':
+                        tool = part.get('tool') or ''
+                        state = part.get('state') or {}
+                        st = state.get('status', '')
+                        inp = state.get('input') or {}
+                        if tool == 'bash':
+                            desc = inp.get('command') or inp.get('description') or ''
+                        else:
+                            desc = inp.get('path') or inp.get('pattern') or inp.get('query') or inp.get('url') or inp.get('description') or ''
+                        _set_activity(tool=tool, tool_input=desc, tool_state=st)
+                        label = '⚙️ ' + tool
+                        if st == 'running':
+                            label += ' ▶ ' + (desc or '…')
+                        elif st == 'completed':
+                            label += ' ✔'
+                        _set_activity(activity=label)
+                    elif ptype == 'text':
+                        txt = (part.get('text') or '').strip()
+                        if txt:
+                            _set_activity(activity='✍️ Writing…')
+                elif etype == 'session.idle':
+                    _set_activity(status='idle', activity='Done.')
+        except Exception:
+            try:
+                _set_activity(activity='Lost activity stream — reconnecting…')
+            except Exception:
+                pass
+            time.sleep(3)
+
+threading.Thread(target=_activity_listener, daemon=True).start()
+
 def opencode_ensure_session():
     global opencode_session_id
     with opencode_lock:
@@ -1207,6 +1338,12 @@ def opencode_ensure_session():
         except Exception as e:
             return None, f"error creating session: {e}"
 
+def opencode_poison_session():
+    """Mark the cached session as dead so the next request creates a fresh one."""
+    global opencode_session_id
+    with opencode_lock:
+        opencode_session_id = None
+
 @app.route('/opencode', methods=['POST'])
 def opencode_chat():
     data = request.json or {}
@@ -1215,6 +1352,7 @@ def opencode_chat():
         return jsonify({"reply": "Empty message."}), 400
     if not opencode_health():
         return jsonify({"reply": "❌ opencode server not running. Start it with: opencode serve"}), 503
+    _set_activity(status='busy', activity='🧠 Thinking…', tool='', tool_input='', tool_state='')
     sess, err = opencode_ensure_session()
     if err:
         return jsonify({"reply": "❌ " + err}), 500
@@ -1225,6 +1363,7 @@ def opencode_chat():
     if memory_ctx:
         persona_ctx += ('\n[ACE persistent memory — things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
                         + memory_ctx + '\n')
+    persona_ctx += '\n' + MODE_TAG_INSTRUCTION + '\n'
     message = persona_ctx + '\n' + message
     raw_model = (data.get('model') or '').strip()
     if not raw_model or raw_model == 'opencode':
@@ -1236,19 +1375,38 @@ def opencode_chat():
     body = {"parts": [{"type": "text", "text": message}]}
     if model_override:
         body["model"] = {"providerID": provider_id, "modelID": model_override}
+    body["tools"] = {t: True for t in (
+        'bash', 'edit', 'read', 'write', 'grep', 'glob', 'webfetch', 'websearch',
+        'task', 'todowrite', 'skill', 'patch',
+    )}
+    body["tools"]["question"] = False
+    body["system"] = ("You are ACE, running on Chris's PC with FULL local access. "
+                      "Tools ARE enabled: use bash (PowerShell), read, write, edit, grep, glob, and "
+                      "web tools freely to inspect the filesystem, run commands, and make changes. "
+                      "The project root is the current working directory; you may also touch paths "
+                      "outside it. Do not ask for permission before acting — just do it, then report "
+                      "what you did. Never emit DSML/tool_call XML/HTML tags in your final text reply."
+                      + MODE_TAG_INSTRUCTION)
     try:
         r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=600)
+    except requests.exceptions.ReadTimeout:
+        opencode_poison_session()
+        return jsonify({"reply": "❌ opencode timed out. Refreshed the session — try again."}), 500
     except Exception as e:
+        opencode_poison_session()
         return jsonify({"reply": "❌ opencode request failed: " + str(e)}), 500
     if r.status_code != 200:
+        opencode_poison_session()
         return jsonify({"reply": f"❌ opencode error ({r.status_code}): {r.text[:300]}"}), 500
     try:
         result = r.json()
     except Exception as e:
+        opencode_poison_session()
         return jsonify({"reply": "❌ could not parse opencode response: " + str(e)}), 500
     info = result.get('info', {}) or {}
     err = info.get('error')
     if err:
+        opencode_poison_session()
         msg = err.get('message', str(err)) if isinstance(err, dict) else str(err)
         return jsonify({"reply": "❌ opencode: " + msg}), 500
     parts = result.get('parts', []) or []
@@ -1272,11 +1430,29 @@ def opencode_chat():
         pass
     if tool_parts:
         reply += "\n\n_⚙️ " + str(len(tool_parts)) + " tool call(s) executed_"
+    _set_activity(status='idle', activity='Done.', tool_state='completed')
     return jsonify({"reply": reply})
 
 @app.route('/opencode/health', methods=['GET'])
 def opencode_health_route():
     return jsonify({"running": opencode_health(), "session": opencode_session_id})
+
+@app.route('/opencode/status', methods=['GET'])
+def opencode_status_route():
+    with activity_lock:
+        return jsonify(dict(opencode_activity))
+
+@app.route('/opencode/stop', methods=['POST'])
+def opencode_stop():
+    sid = opencode_session_id
+    if sid:
+        try:
+            requests.post(OPENCODE_URL + f"/session/{sid}/abort", auth=opencode_auth(), timeout=10)
+        except Exception:
+            pass
+    opencode_poison_session()
+    _set_activity(status='idle', activity='⏹ Stopped by user.')
+    return jsonify({"stopped": True})
 
 @app.route('/devices', methods=['GET'])
 def devices():

@@ -11,6 +11,7 @@ import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/presentation/widgets/postal_code_picker.dart';
 import 'package:uuid/uuid.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
@@ -1042,87 +1043,7 @@ class _ProfileOnboardingScreenState
     'Xitsonga Second Add Language',
   ];
 
-  static const _postalCodes = [
-    '0001 - Skuilkrans Country Estate, Gauteng',
-    '0002 - Glen Marais, Gauteng',
-    '0003 - Hulsbosrand AH, Gauteng',
-    '0015 - Bailey\'s Muckleneuk, Gauteng',
-    '0024 - Mountain View, Gauteng',
-    '0040 - Murrayfield, Gauteng',
-    '0041 - Erasmuskloof, Gauteng',
-    '0042 - Silverton, Gauteng',
-    '0043 - Waltloo, Gauteng',
-    '0044 - Equestria, Gauteng',
-    '0050 - Pretoria Central, Gauteng',
-    '0054 - Hatfield, Gauteng',
-    '0055 - Lynnwood, Gauteng',
-    '0059 - Menlo Park, Gauteng',
-    '0060 - Brooklyn, Gauteng',
-    '0061 - Queenswood, Gauteng',
-    '0062 - Garsfontein, Gauteng',
-    '0063 - Newlands, Gauteng',
-    '0070 - Waterkloof, Gauteng',
-    '0071 - Waterkloof Heights, Gauteng',
-    '0072 - Waterkloof Ridge, Gauteng',
-    '0073 - Wingate Park, Gauteng',
-    '0074 - Pierre van Ryneveld, Gauteng',
-    '0081 - Die Wilgers, Gauteng',
-    '0082 - Rietondale, Gauteng',
-    '0083 - Constantia Park, Gauteng',
-    '0084 - Moreleta Park, Gauteng',
-    '0085 - Silver Lakes, Gauteng',
-    '0090 - Monument Park, Gauteng',
-    '0101 - Capital Park, Gauteng',
-    '0102 - Wonderboom, Gauteng',
-    '0105 - Mountain View, Gauteng',
-    '0109 - Gezina, Gauteng',
-    '0110 - Gezina Ext, Gauteng',
-    '0112 - Annlin, Gauteng',
-    '0116 - Nina Park, Gauteng',
-    '0118 - Danville, Gauteng',
-    '0120 - Pretoria North, Gauteng',
-    '0122 - Wolmer, Gauteng',
-    '0125 - Sinoville, Gauteng',
-    '0126 - Doornpoort, Gauteng',
-    '0129 - Koedoespoort, Gauteng',
-    '0130 - Magalieskruin, Gauteng',
-    '0132 - Montana, Gauteng',
-    '0133 - Eersterus, Gauteng',
-    '0134 - Eersterust East, Gauteng',
-    '0135 - Waverley, Gauteng',
-    '0136 - Rietfontein, Gauteng',
-    '0137 - Towerby, Gauteng',
-    '0139 - Hammanskraal, Gauteng',
-    '0140 - Temba, Gauteng',
-    '0141 - Makapanstad, Gauteng',
-    '0142 - Kekana Gardens, Gauteng',
-    '0144 - Winterveld, Gauteng',
-    '0145 - Hebron, Gauteng',
-    '0149 - Soshanguve, Gauteng',
-    '0150 - Soshanguve East, Gauteng',
-    '0151 - Soshanguve South, Gauteng',
-    '0152 - Mabopane, Gauteng',
-    '0153 - Ga-Rankuwa, Gauteng',
-    '0154 - Rosslyn, Gauteng',
-    '0155 - Akasia, Gauteng',
-    '0156 - Theresapark, Gauteng',
-    '0157 - Karenpark, Gauteng',
-    '0158 - Amandasig, Gauteng',
-    '0160 - Laudium, Gauteng',
-    '0161 - Erasmia, Gauteng',
-    '0162 - Waterkloof Glen, Gauteng',
-    '0163 - Lyttelton, Gauteng',
-    '0164 - Lyttelton Manor, Gauteng',
-    '0165 - Clubview, Gauteng',
-    '0166 - Eldoraigne, Gauteng',
-    '0167 - Pierre van Ryneveld Park, Gauteng',
-    '0168 - Tiegerpoort, Gauteng',
-    '0169 - Zwavelpoort, Gauteng',
-    '0172 - Kameeldrift East, Gauteng',
-    '0173 - Baviaanspoort, Gauteng',
-    '0174 - Roodeplaat, Gauteng',
-    '0180 - Cullinan, Gauteng',
-    '0182 - Rayton, Gauteng',
+  static const _areaCodes = [
     '0183 - Bronkhorstspruit, Gauteng',
     '0184 - Ekangala, Gauteng',
     '0185 - Zithobeni, Gauteng',
@@ -2317,8 +2238,8 @@ class _ProfileOnboardingScreenState
       context: context,
       builder: (ctx) {
         final searchCtrl = TextEditingController();
-        final searchNode = FocusNode();
         String? selected = initialValue;
+        final maxHeight = MediaQuery.of(ctx).size.height * 0.65;
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             final filtered = options.where((o) {
@@ -2335,74 +2256,99 @@ class _ProfileOnboardingScreenState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: TextField(
-                      controller: searchCtrl,
-                      focusNode: searchNode,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: 'Search $title...',
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: AppColors.textMuted,
-                        ),
-                        suffixIcon: searchCtrl.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  searchCtrl.clear();
-                                  setDialogState(() {});
-                                },
-                              )
-                            : null,
-                      ),
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  if (filtered.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text(
-                        'No results found',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filtered.length,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemBuilder: (_, i) {
-                          final item = filtered[i];
-                          final display =
-                              displayTransformer?.call(item) ?? item;
-                          return ListTile(
-                            dense: true,
-                            selected: selected == item,
-                            selectedTileColor: AppColors.primary.withValues(
-                              alpha: 0.08,
-                            ),
-                            title: Text(
-                              display,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: maxHeight,
+                  maxWidth: 480,
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                            onTap: () {
-                              Navigator.pop(ctx, item);
-                            },
-                          );
-                        },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            tooltip: 'Cancel',
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
                       ),
                     ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: TextField(
+                        controller: searchCtrl,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Search $title...',
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: AppColors.textMuted,
+                          ),
+                          suffixIcon: searchCtrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    searchCtrl.clear();
+                                    setDialogState(() {});
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    if (filtered.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                          'No results found',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filtered.length,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemBuilder: (_, i) {
+                            final item = filtered[i];
+                            final display =
+                                displayTransformer?.call(item) ?? item;
+                            return ListTile(
+                              dense: true,
+                              selected: selected == item,
+                              selectedTileColor: AppColors.primary.withValues(
+                                alpha: 0.08,
+                              ),
+                              title: Text(
+                                display,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.pop(ctx, item);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
               ),
             );
           },
@@ -3128,8 +3074,13 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _streetPostalCodeCtrl.text, displayTransformer: (p) => p);
-                if (result != null) setState(() => _streetPostalCodeCtrl.text = result.split(' - ').first.trim());
+                final result = await PostalCodePicker.show(
+                  context,
+                  initialCode: _streetPostalCodeCtrl.text,
+                );
+                if (result != null) {
+                  setState(() => _streetPostalCodeCtrl.text = result);
+                }
               },
             ),
             const SizedBox(height: 14),
@@ -3174,8 +3125,13 @@ class _ProfileOnboardingScreenState
                 readOnly: true,
                 validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null,
                 onTap: () async {
-                  final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _postalPostalCodeCtrl.text, displayTransformer: (p) => p);
-                  if (result != null) setState(() => _postalPostalCodeCtrl.text = result.split(' - ').first.trim());
+                  final result = await PostalCodePicker.show(
+                    context,
+                    initialCode: _postalPostalCodeCtrl.text,
+                  );
+                  if (result != null) {
+                    setState(() => _postalPostalCodeCtrl.text = result);
+                  }
                 },
               ),
             ],

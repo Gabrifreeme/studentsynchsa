@@ -27,21 +27,27 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
   late final WebViewController _controller;
   bool _loading = true;
   StudentProfile? _profile;
+  String? _profileJson;
   bool _isUniven = false;
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
+    if (_profile != null) {
+      _profileJson = jsonEncode(_profile!.toJson());
+    }
     _isUniven = widget.universityName.toUpperCase() == 'UNIVEN';
     _loadProfileIfMissing();
 
-    WebViewCookieManager().clearCookies();
+    // DO NOT clearCookies() here — it races with the page load and can destroy
+    // the APEX session cookie the portal just set, causing 404 on form submit.
 
     // Determine initial URL
     String initialUrl = widget.url;
     if (_isUniven) {
-      initialUrl = 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
+      initialUrl =
+          'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
     }
 
     _controller = WebViewController()
@@ -68,7 +74,8 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
       );
 
     if (_controller.platform is AndroidWebViewController) {
-      final androidController = _controller.platform as AndroidWebViewController;
+      final androidController =
+          _controller.platform as AndroidWebViewController;
       androidController.setTextZoom(150);
     }
 
@@ -78,6 +85,10 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
           onNavigationRequest: (request) {
             final url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
+
+            // Allow gw1proc URLs through without modification
+            if (url.contains('gw1proc')) return NavigationDecision.navigate;
+
             return NavigationDecision.navigate;
           },
           onPageStarted: (url) {
@@ -119,6 +130,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
     if (p != null && mounted) {
       setState(() {
         _profile = p;
+        _profileJson = jsonEncode(p?.toJson());
       });
     }
   }
@@ -131,14 +143,86 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
 
     try {
       if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(
-          Uri.parse(url),
-          mode: LaunchMode.externalApplication,
-        );
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         debugPrint('✅ Opened in Chrome: $url');
       }
     } catch (e) {
       debugPrint('❌ Error opening Chrome: $e');
+    }
+  }
+
+  void _showAutofillConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Text('⭐', style: TextStyle(fontSize: 28)),
+            SizedBox(width: 8),
+            Text('Auto-fill Form'),
+          ],
+        ),
+        content: const Text(
+          "You like me to try and auto fill this page?",
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _runAutofill();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+            ),
+            child: const Text('Yes', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runAutofill() async {
+    try {
+      // Load autofill script on demand
+      if (_profileJson != null) {
+        await _controller.runJavaScript(
+          star.buildAutofillScript(_profileJson!),
+        );
+        await _controller.runJavaScript(
+          star.buildRemoveOldPostalPickerScript(),
+        );
+        await _controller.runJavaScript(
+          star.buildPostalCodePickerScript(_profileJson!),
+        );
+      }
+      await _controller.runJavaScript(
+        'if (typeof requestFlutterAutofill === "function") requestFlutterAutofill();',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Auto-fill triggered!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Autofill error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Auto-fill failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -170,20 +254,22 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ...steps.map((step) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${steps.indexOf(step) + 1}.',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(step)),
-                      ],
-                    ),
-                  )),
+              ...steps.map(
+                (step) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${steps.indexOf(step) + 1}.',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(step)),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(10),
@@ -257,8 +343,8 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.star, color: Colors.amber, size: 30),
-            onPressed: _showGuidanceDialog,
-            tooltip: 'Application Guide',
+            onPressed: _showAutofillConfirmDialog,
+            tooltip: 'Auto-fill form',
           ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),
@@ -275,10 +361,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_loading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
+          if (_loading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
