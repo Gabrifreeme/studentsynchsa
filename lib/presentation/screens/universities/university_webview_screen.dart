@@ -124,6 +124,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 (function() {
   var citz = document.getElementById('oapCitzCode');
   if (!citz) return;
+  if (document.getElementById('custom-citz-code')) return;
 
   var countryList = [
     'AFGHANISTAN', 'ALBANIA', 'ALGERIA', 'ANDORRA', 'ANGOLA',
@@ -197,6 +198,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 (function() {
   var targetField = document.getElementById('oapHeard');
   if (!targetField) return;
+  if (document.getElementById('ssa-heard-select')) return;
 
   var options = [
     'FRIEND/FAMILY',
@@ -226,6 +228,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   targetField.style.display = 'none';
 
   var select = document.createElement('select');
+  select.id = 'ssa-heard-select';
   select.style.cssText = 'width:100%;padding:8px;font-size:16px;border:1px solid #ccc;border-radius:4px;';
 
   var defaultOption = document.createElement('option');
@@ -394,6 +397,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 (function() {
   var dob = document.getElementById('oapBirthdate') || document.querySelector('input[name="oapBirthdate"]');
   if (!dob) return;
+  if (document.getElementById('ssa-date-picker')) return;
 
   var oldCustom = document.getElementById('custom-date-wrapper');
   if (oldCustom) oldCustom.remove();

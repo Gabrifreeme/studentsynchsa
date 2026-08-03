@@ -95,7 +95,19 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
     // Remove any existing custom date picker
     var existing = document.getElementById('ssa-date-picker');
-    if (existing) existing.remove();
+    if (existing) {
+      // navfix calendar picker is already injected — fill the hidden field and
+      // let it keep control of the UI.
+      var t = document.getElementById('oapBirthdate')
+        || document.querySelector('input[name="OAPBIRTHDATE"]')
+        || document.querySelector('input[name="oapBirthdate"]');
+      if (t) {
+        t.value = parseInt(day) + '-' + monthAbbr + '-' + year;
+        t.dispatchEvent(new Event('input', { bubbles: true }));
+        t.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      return;
+    }
 
     // Find the original date field
     var target = document.getElementById('oapBirthdate')
@@ -789,7 +801,7 @@ var __ssaNavfix = function() {
     return dir + u;
   }
 
-  function fixUrl(u) { return resolveUrl(expandProc(u)); }
+  function fixUrl(u) { return resolveUrl(expandProc(u)).replace('unlven', 'univen'); }
 
   // Report to the Flutter layer for on-device visibility.
   function diag(msg) {
@@ -809,13 +821,77 @@ var __ssaNavfix = function() {
     }
   }
 
-  document.addEventListener('submit', function(e) { fixAction(e.target, true); }, true);
+  // A form is an ITS wizard POST target when its action resolves to
+  // .../gen.gw1pkg.gw1proc (or its truncated .../gw1p form).
+  function isItsPostForm(f) {
+    if (!f || f.tagName !== 'FORM') return false;
+    var a = (f.getAttribute('action') || f.action || '').toString();
+    return a.indexOf('gen.gw1pkg.gw1') !== -1 && /gw1(proc|p)([^a-z]|\$)/.test(a);
+  }
+
+  // ROOT CAUSE: wizard.js always builds a fresh form whose action is the
+  // correct relative 'gen.gw1pkg.gw1proc' and calls xForm.submit(). But the
+  // Android WebView mangles the native form POST, truncating 'gw1proc' to
+  // 'gw1p' / 'gw1view' to 'gw1v' when the request goes out, so the server 404s.
+  // JS cannot see that mangling (it happens below the page), so we never let
+  // the native POST run: we POST the same body via fetch to the full absolute
+  // URL and write the returned page back into the document.
+  function submitViaFetch(f) {
+    var target = (f.getAttribute('action') || f.action || '').toString();
+    if (target.indexOf('gen.gw1pkg.gw1') === -1) return false;
+    try {
+      var body = new URLSearchParams(new FormData(f)).toString();
+      console.log('[navfix] fetch POST -> ' + target);
+      diag('POST via fetch -> ' + target);
+      fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: body,
+        redirect: 'follow',
+        credentials: 'same-origin'
+      }).then(function(res) {
+        return res.text().then(function(html) {
+          console.log('[navfix] fetch POST done: HTTP ' + res.status + ' len ' + html.length);
+          diag('POST back HTTP ' + res.status + ' (' + html.length + ' chars)');
+          document.open();
+          document.write(html);
+          document.close();
+          // The new document has no listeners (they were attached to the old
+          // one) — re-run navfix so the next page's form submits are hijacked.
+          setTimeout(function() {
+            try { __ssaNavfix(); } catch (e) {}
+          }, 30);
+        });
+      }).catch(function(err) {
+        console.log('[navfix] fetch POST failed, falling back to native submit: ' + err);
+        try { origSubmit.call(f); } catch (e2) {}
+      });
+      return true;
+    } catch (e) {
+      console.log('[navfix] fetch POST exception, falling back: ' + e);
+      return false;
+    }
+  }
+
+  document.addEventListener('submit', function(e) {
+    var f = e.target;
+    fixAction(f, true);
+    if (isItsPostForm(f)) {
+      e.preventDefault();
+      if (!submitViaFetch(f)) { try { origSubmit.call(f); } catch (err) {} }
+    }
+  }, true);
 
   // Direct form.submit() calls fire NO 'submit' event — patch the prototype
-  // so the action is corrected before the POST actually goes out.
+  // so the POST is hijacked (and the action corrected) before it goes out.
   var origSubmit = HTMLFormElement.prototype.submit;
   if (origSubmit && !origSubmit.__ssaPatched) {
-    var submitWrapper = function() { fixAction(this, true); return origSubmit.apply(this, arguments); };
+    var submitWrapper = function() {
+      var f = this;
+      fixAction(f, true);
+      if (isItsPostForm(f) && submitViaFetch(f)) return;
+      return origSubmit.apply(this, arguments);
+    };
     submitWrapper.__ssaPatched = true;
     HTMLFormElement.prototype.submit = submitWrapper;
   }
@@ -838,6 +914,292 @@ var __ssaNavfix = function() {
     }
   });
   if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+
+  // ── Page enhancements (run on every page, incl. fetch-written ones) ──
+
+  // Replace the ITS citizenship LOV with a plain dropdown.
+  function ssaCitizenship() {
+    if (document.getElementById('custom-citz-code')) return;
+    var citz = document.getElementById('oapCitzCode');
+    if (!citz) return;
+    var countryList = [
+      'AFGHANISTAN','ALBANIA','ALGERIA','ANDORRA','ANGOLA','ANTIGUA AND BARBUDA',
+      'ARGENTINA','ARMENIA','AUSTRALIA','AUSTRIA','AZERBAIJAN','BAHAMAS','BAHRAIN',
+      'BANGLADESH','BARBADOS','BELARUS','BELGIUM','BELIZE','BENIN','BHUTAN','BOLIVIA',
+      'BOSNIA AND HERZEGOVINA','BOTSWANA','BRAZIL','BURKINA FASO','BURUNDI','CAMEROON',
+      'CAPE VERDE','CENTRAL AFRICAN REPUBLIC','CHAD','CORTE de VOIRE','DJIBOUTI','EGYPT',
+      'EQUATORIAL GUINEA','ERITREA','ETHIOPIA','FRANCE','GABON','GAMBIA','GERMANY','GHANA',
+      'GUINEA BISAU','INDIA','ITALY','KENYA','LESOTHO','LIBERIA','LIBYA','MADAGASCAR','MALAWI',
+      'MALI','MAURITANIA','MAURITIUS','MOROCCO','MOZAMBIQUE','NAMIBIA','NIGER','NIGERIA',
+      'OTHER AFRICAN COUNTRIES','R.S.A.','RWANDA','SENEGAL','SEYCHELLES','SIERRA LEONE',
+      'SUDAN','SWAZILAND','TANZANIA','TOGO','TUNISIA','UGANDA','UNITED ARAB EMIRATES',
+      'ZAMBIA','ZIMBABWE'
+    ];
+    var wrapper = citz.closest('div');
+    if (!wrapper) return;
+    var lovBtn = wrapper.querySelector('a[onclick*="lov"], img[src*="lov.gif"]');
+    if (lovBtn) lovBtn.remove();
+    var select = document.createElement('select');
+    select.id = 'custom-citz-code';
+    select.style.cssText = 'width:100%;padding:8px;font-size:16px;border:1px solid #ccc;border-radius:4px;';
+    var emptyOption = document.createElement('option');
+    emptyOption.value = ''; emptyOption.textContent = '';
+    select.appendChild(emptyOption);
+    countryList.forEach(function(country) {
+      var opt = document.createElement('option');
+      opt.value = country; opt.textContent = country;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', function() {
+      citz.value = this.value;
+      citz.dispatchEvent(new Event('change', { bubbles: true }));
+      citz.dispatchEvent(new Event('input', { bubbles: true }));
+      console.log('Citizenship Code set to: ' + this.value);
+    });
+    var observer = new MutationObserver(function() {
+      if (citz.value !== select.value) select.value = citz.value;
+    });
+    observer.observe(citz, { attributes: true, attributeFilter: ['value'] });
+    citz.addEventListener('change', function() { select.value = citz.value; });
+    citz.addEventListener('input', function() { select.value = citz.value; });
+    wrapper.insertBefore(select, citz);
+    console.log('Custom citizenship dropdown injected');
+  }
+
+  // Full calendar date picker replacing the ITS calendar-button field.
+  function ssaDatePicker() {
+    if (document.getElementById('ssa-date-picker') || document.getElementById('custom-date-wrapper')) return;
+    var dob = document.getElementById('oapBirthdate')
+      || document.querySelector('input[name="oapBirthdate"]')
+      || document.querySelector('input[name="OAPBIRTHDATE"]')
+      || document.querySelector('input[name="P_DATE_OF_BIRTH"]')
+      || document.querySelector('input[id*="birth" i], input[id*="Birth" i]');
+    if (!dob) return;
+
+    var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+    function parseDob(v) {
+      var t = (v || '').trim();
+      if (!t) return { d: null, mo: null, y: null };
+      var m = /^(\\d{1,2})\\s*[-/]\\s*([A-Za-z]{3,9})\\s*[-/]\\s*(\\d{4})\$/.exec(t);
+      if (m) {
+        var mo = MONTHS.indexOf(m[2].toUpperCase());
+        return { d: parseInt(m[1]), mo: mo >= 0 ? mo : 0, y: parseInt(m[3]) };
+      }
+      var n = /^(\\d{1,2})\\s*[-/]\\s*(\\d{1,2})\\s*[-/]\\s*(\\d{4})\$/.exec(t);
+      if (n) return { d: parseInt(n[1]), mo: parseInt(n[2]) - 1, y: parseInt(n[3]) };
+      var s = /^(\\d{4})\\s*[-/]\\s*(\\d{1,2})\\s*[-/]\\s*(\\d{1,2})\$/.exec(t);
+      if (s) return { d: parseInt(s[3]), mo: parseInt(s[2]) - 1, y: parseInt(s[1]) };
+      return { d: null, mo: null, y: null };
+    }
+
+    var cur = parseDob(dob.value);
+    var view = { y: cur.y || 1990, mo: cur.mo || 0 };
+
+    dob.style.display = 'none';
+    var row = dob.closest('div') || dob.parentElement;
+    if (row) {
+      var calBtns = row.querySelectorAll('a[onclick*="cal"], img[src*="cal"], button, input[type="image"]');
+      for (var i = 0; i < calBtns.length; i++) {
+        var el = calBtns[i];
+        if (!el.contains(dob) && el !== dob) el.style.display = 'none';
+      }
+    }
+
+    var wrap = document.createElement('div');
+    wrap.id = 'ssa-date-picker';
+    wrap.style.cssText = 'display:inline-flex;gap:6px;align-items:center;font-family:Arial,sans-serif;';
+
+    var show = document.createElement('input');
+    show.type = 'text';
+    show.readOnly = true;
+    show.placeholder = 'DD-MON-YYYY';
+    show.style.cssText = 'width:150px;padding:10px;font-size:17px;border:1px solid #7C3AED;border-radius:6px;text-align:center;font-family:monospace;background:#fff;color:#0F1624;';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '📅';
+    btn.style.cssText = 'padding:8px 12px;font-size:17px;border:1px solid #7C3AED;border-radius:6px;background:#fff;cursor:pointer;';
+
+    wrap.appendChild(show);
+    wrap.appendChild(btn);
+
+    var cal = document.createElement('div');
+    cal.style.cssText = 'position:fixed;z-index:2147483647;background:#fff;border:1px solid #bbb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.28);padding:12px;width:286px;font-family:Arial,sans-serif;display:none;';
+
+    var head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+    var prev = document.createElement('button');
+    prev.type = 'button'; prev.textContent = '‹'; prev.style.cssText = 'padding:4px 10px;font-size:16px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
+    var title = document.createElement('div');
+    title.style.cssText = 'font-weight:bold;font-size:15px;';
+    var next = document.createElement('button');
+    next.type = 'button'; next.textContent = '›'; next.style.cssText = 'padding:4px 10px;font-size:16px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
+    head.appendChild(prev); head.appendChild(title); head.appendChild(next);
+    cal.appendChild(head);
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:13px;';
+    cal.appendChild(grid);
+
+    var foot = document.createElement('div');
+    foot.style.cssText = 'display:flex;justify-content:space-between;margin-top:8px;';
+    var todayBtn = document.createElement('button');
+    todayBtn.type = 'button'; todayBtn.textContent = 'Today';
+    todayBtn.style.cssText = 'padding:6px 12px;font-size:13px;border:1px solid #7C3AED;border-radius:4px;background:#7C3AED;color:#fff;cursor:pointer;';
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button'; closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = 'padding:6px 12px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
+    foot.appendChild(todayBtn); foot.appendChild(closeBtn);
+    cal.appendChild(foot);
+
+    document.body.appendChild(cal);
+
+    function fmt() {
+      return cur.d ? cur.d + '-' + MONTHS[cur.mo] + '-' + cur.y : '';
+    }
+
+    function apply() {
+      var val = fmt();
+      dob.value = val;
+      dob.removeAttribute('readonly');
+      dob.removeAttribute('disabled');
+      ['input','change','blur'].forEach(function(ev) {
+        dob.dispatchEvent(new Event(ev, { bubbles: true }));
+      });
+      show.value = val;
+      console.log('Date set to: ' + val);
+    }
+
+    function render() {
+      var first = new Date(view.y, view.mo, 1).getDay();
+      var daysIn = new Date(view.y, view.mo + 1, 0).getDate();
+      title.textContent = MONTHS[view.mo] + ' ' + view.y;
+      grid.innerHTML = '';
+      ['S','M','T','W','T','F','S'].forEach(function(d) {
+        var h = document.createElement('div');
+        h.textContent = d;
+        h.style.cssText = 'font-weight:bold;color:#7C3AED;padding:4px 0;font-size:12px;';
+        grid.appendChild(h);
+      });
+      for (var i = 0; i < first; i++) grid.appendChild(document.createElement('div'));
+      for (var d = 1; d <= daysIn; d++) {
+        var cell = document.createElement('div');
+        cell.textContent = d;
+        cell.style.cssText = 'padding:7px 0;border-radius:6px;cursor:pointer;color:#0F1624;';
+        if (d === cur.d && view.mo === cur.mo && view.y === cur.y) {
+          cell.style.background = '#7C3AED'; cell.style.color = '#fff';
+        }
+        cell.onclick = (function(dd) {
+          return function() {
+            cur = { d: dd, mo: view.mo, y: view.y };
+            apply();
+            cal.style.display = 'none';
+          };
+        })(d);
+        grid.appendChild(cell);
+      }
+    }
+
+    function open() {
+      view = { y: cur.y || 1990, mo: cur.mo || 0 };
+      render();
+      var r = btn.getBoundingClientRect();
+      var left = Math.max(8, Math.min(window.innerWidth - 300, r.left));
+      var top = r.bottom + 8;
+      if (top + 340 > window.innerHeight) top = Math.max(8, r.top - 340);
+      cal.style.left = left + 'px';
+      cal.style.top = top + 'px';
+      cal.style.display = 'block';
+    }
+
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      if (cal.style.display === 'none') open(); else cal.style.display = 'none';
+    };
+    prev.onclick = function() { view.mo--; if (view.mo < 0) { view.mo = 11; view.y--; } render(); };
+    next.onclick = function() { view.mo++; if (view.mo > 11) { view.mo = 0; view.y++; } render(); };
+    todayBtn.onclick = function() {
+      var n = new Date();
+      cur = { d: n.getDate(), mo: n.getMonth(), y: n.getFullYear() };
+      apply();
+      cal.style.display = 'none';
+    };
+    closeBtn.onclick = function() { cal.style.display = 'none'; };
+    document.addEventListener('click', function(e) {
+      if (cal.style.display !== 'none' && e.target !== btn && !cal.contains(e.target)) {
+        cal.style.display = 'none';
+      }
+    });
+
+    // Keep the picker display in sync if the field value changes elsewhere
+    // (e.g. the star autofill writing the hidden field).
+    dob.addEventListener('change', function() {
+      var p = parseDob(dob.value);
+      if (p) { cur = p; show.value = fmt(); }
+    });
+
+    show.value = fmt();
+    dob.parentNode.insertBefore(wrap, dob.nextSibling);
+    console.log('Custom date picker injected');
+  }
+
+  // Replace the ITS "Where did you hear about us" LOV with a plain select.
+  function ssaHeardDropdown() {
+    if (document.getElementById('ssa-heard-select')) return;
+    var field = document.getElementById('oapHeard')
+      || document.querySelector('input[name="oapHeard"]')
+      || document.querySelector('input[name="OAPHEARD"]');
+    if (!field) return;
+
+    var OPTIONS = ["FRIEND/FAMILY", "NEWSPAPER", "PERSONAL", "PUBLIC RELATION'S OFFICER",
+      "RADIO", "SOCIAL MEDIA", "SCHOOL TEACHER", "TELEVISION", "UNIVEN WEB SITE"];
+
+    var cell = field.closest('td, div, fieldset');
+    if (cell) {
+      var lovs = cell.querySelectorAll('a[onclick*="lov"], img[src*="lov"], button, input[type="image"]');
+      for (var i = 0; i < lovs.length; i++) lovs[i].style.display = 'none';
+    }
+
+    var desc = document.getElementById('oapHeard_desc')
+      || document.querySelector('input[name="oapHeard_desc"]')
+      || document.querySelector('input[name="OAPHEARD_DESC"]');
+    if (desc) desc.style.display = 'none';
+    field.style.display = 'none';
+
+    var sel = document.createElement('select');
+    sel.id = 'ssa-heard-select';
+    sel.style.cssText = 'width:100%;min-width:220px;padding:11px 10px;font-size:16px;border:1px solid #7C3AED;border-radius:6px;background:#fff;color:#0F1624;position:relative;z-index:10000;';
+
+    var ph = document.createElement('option');
+    ph.value = ''; ph.textContent = '-- Select --'; ph.disabled = true; ph.selected = true;
+    sel.appendChild(ph);
+
+    OPTIONS.forEach(function(o) {
+      var op = document.createElement('option');
+      op.value = o; op.textContent = o;
+      if (o === field.value) op.selected = true;
+      sel.appendChild(op);
+    });
+
+    sel.addEventListener('change', function() {
+      field.value = this.value;
+      if (desc) { desc.value = this.value; desc.dispatchEvent(new Event('change', { bubbles: true })); }
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('blur', { bubbles: true }));
+      console.log('Heard about us set to: ' + this.value);
+    });
+
+    field.parentNode.insertBefore(sel, field.nextSibling);
+    console.log('Heard-about-us dropdown injected');
+  }
+
+  function ssaEnhance() {
+    ssaCitizenship();
+    ssaDatePicker();
+    ssaHeardDropdown();
+  }
 
   // ── JS navigations (location.replace / assign) ──────────────────────
   var originalReplace = window.location.replace;
@@ -929,6 +1291,10 @@ var __ssaNavfix = function() {
 
   diag('Page: ' + window.location.href);
   diag('NavFix injected');
+
+  ssaEnhance();
+  setTimeout(ssaEnhance, 800);
+  setTimeout(ssaEnhance, 2500);
 };
 __ssaNavfix();
 
@@ -952,6 +1318,9 @@ function __ssaApplyToFrames() {
 }
 __ssaApplyToFrames();
 setTimeout(__ssaApplyToFrames, 1200);
+setTimeout(__ssaApplyToFrames, 3000);
+setTimeout(__ssaApplyToFrames, 6000);
+setTimeout(__ssaApplyToFrames, 12000);
 ''';
 }
 
