@@ -11,6 +11,7 @@ import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart
 import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/pdf_generator.dart';
+import 'package:studentsyncsa/services/its_url_fixer.dart';
 
 
 class UniversityDetailScreen extends ConsumerWidget {
@@ -256,7 +257,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            final url = Uri.encodeComponent(uni.applicationUrl);
+                            final url = Uri.encodeComponent(ItsUrl.normalize(uni.applicationUrl));
                             final name = Uri.encodeComponent(uni.shortName);
                             context.push('/universities/${uni.id}/webview?url=$url&name=$name');
                           },
@@ -436,7 +437,8 @@ class UniversityDetailScreen extends ConsumerWidget {
 
   bool _isItsPortal(String url) {
     return url.contains('pls/prodi41') ||
-        url.contains('univenerp01') ||
+        url.contains('univenierp01') ||
+        url.contains('unlven') ||
         url.contains('gw1startup');
   }
 
@@ -461,7 +463,7 @@ class UniversityDetailScreen extends ConsumerWidget {
   }
 
   void _openPortalInChrome(String url) async {
-    final uri = Uri.parse(url);
+    final uri = Uri.parse(ItsUrl.normalize(url));
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}

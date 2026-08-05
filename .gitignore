@@ -49,6 +49,21 @@ app.*.map.json
 .env
 .env
 
+# Node / Python runtime
+node_modules/
+__pycache__/
+.venv/
+*.egg-info/
+
+# Scratch / experimental files
+ACE.html.overwritten_backup
+postal_picker.dart
+venda_postal_picker.dart
+custom_list.dart
+test_widget.dart
+profile.txt
+reminders.json
+
 # ACE admin key (never commit)
 ace_admin_key.txt
 ace_memory.db
@@ -68,3 +83,4 @@ alarms.json
 timers.json
 sessions.json
 summary_config.json
+*.ace_bak

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>ACE · Phone</title>
+<style>
+  :root {
+    --bg: #000000; --panel: #0a0a0a; --bubble: #151515; --bubble-user: #1a1a1a;
+    --border: #222; --text: #e8e8e8; --mute: #8a8a8a; --accent: #ffaa33;
+    --green: #39ff14; --cyan: #00ffcc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    height: 100%; height: 100dvh;
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+  }
+  #aceOrb { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 3; pointer-events: none; }
+  #app { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; width: 100%; }
+
+  header {
+    flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  .logo { width: 34px; height: 34px; border-radius: 50%; background: #cc5500; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #fff; flex-shrink: 0; }
+  .title { flex: 1; min-width: 0; }
+  .title b { display: block; font-size: 16px; letter-spacing: 1px; }
+  .title .status { font-size: 11px; color: var(--mute); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .dot.busy { background: var(--green); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+  .icon-btn {
+    border: 1px solid var(--border); background: var(--bubble); color: var(--text);
+    width: 38px; height: 38px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0;
+  }
+  .icon-btn:active { filter: brightness(1.3); }
+
+  .model-row { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .model-row label { font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; }
+  .model-row select {
+    flex: 1; background: var(--bubble); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 14px;
+  }
+
+  #chat { flex: 1; min-height: 0; overflow-y: auto; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--bubble-user); border: 1px solid var(--border); border-bottom-right-radius: 4px; }
+  .msg.ace { align-self: flex-start; background: var(--bubble); border: 1px solid #2a2a2a; border-bottom-left-radius: 4px; }
+  .msg.thinking { align-self: flex-start; color: var(--mute); font-style: italic; }
+  .msg .ts { display: block; font-size: 9px; color: var(--mute); margin-top: 6px; opacity: 0.7; letter-spacing: 0.5px; }
+
+  .input-bar {
+    flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border); background: var(--panel);
+  }
+  .input-bar textarea {
+    flex: 1; background: var(--bubble); color: var(--text); border: 1px solid var(--border);
+    border-radius: 12px; padding: 11px 12px; font-size: 16px; resize: none; max-height: 140px;
+    outline: none; font-family: inherit; line-height: 1.4;
+  }
+  .input-bar textarea:focus { border-color: var(--accent); }
+  #sendBtn {
+    width: 46px; height: 46px; border-radius: 14px; border: none; cursor: pointer;
+    background: var(--accent); color: #1a1a1a; font-size: 20px; flex-shrink: 0;
+  }
+  #sendBtn:disabled { opacity: 0.5; }
+
+  .sheet {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .sheet.open { display: flex; }
+  .sheet-card {
+    width: 100%; max-width: 640px; background: var(--panel); border-radius: 18px 18px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 10px; max-height: 75dvh; overflow-y: auto;
+  }
+  .sheet-card h3 { font-size: 16px; }
+  .sheet-card input, .sheet-card textarea {
+    background: var(--bubble); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; font-size: 14px; width: 100%; font-family: inherit; outline: none;
+  }
+  .note-item { background: var(--bubble); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
+  .note-item .k { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .note-item .v { flex: 1; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+  .note-item button { background: none; border: none; color: #f66; font-size: 16px; cursor: pointer; }
+  .btn {
+    background: var(--accent); color: #1a1a1a; border: none; border-radius: 10px;
+    padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
+  }
+  .btn:disabled { opacity: 0.5; }
+  .btn-secondary { background: var(--bubble); color: var(--text); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<canvas id="aceOrb"></canvas>
+<div id="app">
+  <header>
+    <div class="logo">A</div>
+    <div class="title">
+      <b>ACE</b>
+      <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">ready</span></span>
+    </div>
+    <button class="icon-btn" id="notesBtn" title="Instructions / notes">📝</button>
+  </header>
+
+  <div class="model-row">
+    <label>Model</label>
+    <select id="modelSelect">
+      <option value="openai/gpt-oss-20b:free">GPT-OSS 20B · cloud free</option>
+      <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 26B · cloud free</option>
+      <option value="inclusionai/ling-3.0-flash:free">Ling 3.0 Flash · cloud free</option>
+      <option value="cohere/north-mini-code:free">North Mini · cloud free</option>
+      <option value="tinyllama:latest">TinyLlama · local</option>
+      <option value="qwen2.5-coder:1.5b">Qwen Coder 1.5B · local</option>
+      <option value="deepseek-coder:1.3b">DeepSeek Coder 1.3B · local</option>
+      <option value="qwen2.5:3b">Qwen 3B · local</option>
+    </select>
+  </div>
+
+  <div id="chat"></div>
+
+  <div class="input-bar">
+    <textarea id="input" rows="1" placeholder="Message ACE..."></textarea>
+    <button id="sendBtn" title="Send">➤</button>
+  </div>
+</div>
+
+<div class="sheet" id="notesSheet">
+  <div class="sheet-card">
+    <h3>📝 Instructions &amp; notes for ACE</h3>
+    <input id="noteTitle" placeholder="Title (optional)">
+    <textarea id="noteText" rows="3" placeholder="What should ACE remember or follow?"></textarea>
+    <button class="btn" id="saveNote">Save to memory</button>
+    <div id="notesList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <button class="btn btn-secondary" id="closeNotes">Close</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const modelSel = document.getElementById('modelSelect');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const notesBtn = document.getElementById('notesBtn');
+  const notesSheet = document.getElementById('notesSheet');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  const savedModel = localStorage.getItem('ace_phone_model');
+  if (savedModel) modelSel.value = savedModel;
+  modelSel.addEventListener('change', () => localStorage.setItem('ace_phone_model', modelSel.value));
+
+  function setBusy(on, label) {
+    statusDot.className = 'dot' + (on ? ' busy' : '');
+    statusText.textContent = label;
+    sendBtn.disabled = on;
+  }
+
+  function addMsg(text, who) {
+    const el = document.createElement('div');
+    el.className = 'msg ' + who;
+    el.textContent = text;
+    if (who !== 'thinking') {
+      const ts = document.createElement('span');
+      ts.className = 'ts';
+      ts.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      el.appendChild(ts);
+    }
+    chatEl.appendChild(el);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return el;
+  }
+
+  function autoGrow() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+  }
+  inputEl.addEventListener('input', autoGrow);
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || sendBtn.disabled) return;
+    inputEl.value = '';
+    autoGrow();
+    addMsg(text, 'user');
+
+    // Straight-to-model: the server auto-routes cloud vs local.
+    const model = modelSel.value;
+    setBusy(true, 'thinking');
+    const thinkEl = addMsg('thinking…', 'thinking');
+    const t0 = Date.now();
+    const tick = setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      thinkEl.textContent = 'thinking… ' + s + 's' + (s % 3 < 1 ? '' : (s % 3 === 1 ? '.' : '..'));
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }, 1000);
+    const ac = new AbortController();
+    const failTimer = setTimeout(() => ac.abort('timeout'), 180000);
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, model: model }),
+        signal: ac.signal
+      });
+      const d = await res.json();
+      clearTimeout(failTimer);
+      clearInterval(tick);
+      thinkEl.remove();
+      if (d.type === 'stream' && d.url) {
+        addMsg('This request starts an auto-fix task — open the desktop ACE to watch it.', 'ace');
+      } else if (d.rate_limited) {
+        addMsg('⚠️ Cloud quota used up — switching to a local model.\n\n' + (d.reply || ''), 'ace');
+        if (d.model && [...modelSel.options].some(o => o.value === d.model)) modelSel.value = d.model;
+      } else {
+        addMsg(d.reply || '(empty reply)', 'ace');
+      }
+    } catch (e) {
+      clearTimeout(failTimer);
+      clearInterval(tick);
+      thinkEl.remove();
+      const aborted = ac.signal.aborted;
+      if (aborted) {
+        addMsg('⚠️ This model took too long (3 min). Pick a cloud-free model (fast) or a smaller local one, then try again.', 'ace');
+      } else {
+        addMsg('Server error: ' + e.message, 'ace');
+      }
+    } finally {
+      setBusy(false, 'ready');
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  async function loadHistory() {
+    try {
+      const r = await fetch('/conversations?limit=30');
+      const d = await r.json();
+      (d.conversations || []).forEach(c => {
+        if (c.content && String(c.content).trim()) addMsg(c.content, c.role === 'user' ? 'user' : 'ace');
+      });
+      chatEl.scrollTop = chatEl.scrollHeight;
+    } catch (e) {}
+  }
+
+  // ---- Notes / instructions ----
+  function openNotes() { notesSheet.classList.add('open'); loadNotes(); }
+  function closeNotes() { notesSheet.classList.remove('open'); }
+  notesBtn.addEventListener('click', openNotes);
+  document.getElementById('closeNotes').addEventListener('click', closeNotes);
+  notesSheet.addEventListener('click', e => { if (e.target === notesSheet) closeNotes(); });
+
+  async function loadNotes() {
+    const list = document.getElementById('notesList');
+    list.innerHTML = 'Loading...';
+    try {
+      const r = await fetch('/memory/all');
+      const d = await r.json();
+      const mem = d.memory || {};
+      list.innerHTML = '';
+      const keys = Object.keys(mem).filter(k => k !== 'memory_config' && !k.startsWith('memory_config.'));
+      if (!keys.length) { list.innerHTML = '<div style="color:var(--mute);font-size:13px;">No notes yet.</div>'; return; }
+      keys.forEach(k => {
+        const v = mem[k];
+        if (!v || typeof v !== 'object' || v.value === undefined) return;
+        const item = document.createElement('div');
+        item.className = 'note-item';
+        item.innerHTML = '<span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(String(v.value)) + '</span>';
+        const del = document.createElement('button');
+        del.textContent = '🗑';
+        del.onclick = () => forgetNote(k);
+        item.appendChild(del);
+        list.appendChild(item);
+      });
+    } catch (e) { list.innerHTML = 'Could not load notes.'; }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  document.getElementById('saveNote').addEventListener('click', async () => {
+    const title = document.getElementById('noteTitle').value.trim();
+    const text = document.getElementById('noteText').value.trim();
+    if (!text) return;
+    const key = title || 'note_' + Date.now();
+    const btn = document.getElementById('saveNote');
+    btn.disabled = true;
+    try {
+      await fetch('/memory/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, value: text })
+      });
+      document.getElementById('noteTitle').value = '';
+      document.getElementById('noteText').value = '';
+      loadNotes();
+      addMsg('📝 Saved to memory: "' + (title || 'note') + '"', 'ace');
+    } catch (e) {
+      addMsg('Could not save note.', 'ace');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function forgetNote(key) {
+    try {
+      await fetch('/memory/forget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key })
+      });
+      loadNotes();
+    } catch (e) {}
+  }
+
+  loadHistory();
+})();
+</script>
+<script>
+(function() {
+  const cv = document.getElementById('aceOrb');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  let aceTalking = false;
+  let angle = 0;
+  const COLORS = {
+    idle:          { core: '#cc5500', glow: '#ffaa33' },
+    speaking:      { core: '#39ff14', glow: '#ffffff' },
+    user_speaking: { core: '#39ff14', glow: '#ffffff' }
+  };
+  function state() {
+    const input = document.getElementById('input');
+    if (input && input.value.trim().length > 0) return 'user_speaking';
+    if (aceTalking) return 'speaking';
+    if (document.querySelector('.msg.thinking')) return 'speaking';
+    if (window.speechSynthesis && window.speechSynthesis.speaking) return 'speaking';
+    return 'idle';
+  }
+  window.aceOrbAceActive = function(v) { aceTalking = !!v; };
+  function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
+  window.addEventListener('resize', resize);
+  resize();
+  function frame() {
+    const panel = document.getElementById('chat');
+    const r = panel ? panel.getBoundingClientRect() : { left: 0, top: 0, width: cv.width, height: cv.height };
+    const cx = r.left + r.width * 0.5;
+    const cy = r.top + r.height * 0.40;
+    const colors = COLORS[state()];
+    const base = Math.max(24, Math.min(r.width, r.height) * 0.12);
+    const speaking = state() !== 'idle';
+    const amp = base * (speaking ? 0.25 : 0.16);
+    const speed = 0.05;
+    angle += speed;
+    const radius = base + Math.sin(angle) * amp;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const g = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 2.2);
+    g.addColorStop(0, colors.core);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, radius * 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = colors.glow;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = colors.core;
+    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

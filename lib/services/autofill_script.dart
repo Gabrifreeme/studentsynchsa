@@ -7,6 +7,475 @@
 // Falls back to generic matching for other university sites.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Self-contained DOM date picker used by both the webview screen and the
+/// autofill script. Pure in-flow calendar (no native `<input type="date">`,
+/// no `<select>` year list, no fixed popup) so it fits the phone WebView.
+///
+/// Design goals (v2, "reconsidered UI"):
+///   * Always-visible day grid — no empty state, no toggle, no popup.
+///   * Iframe-aware: the Venda/ITS form can live in a same-origin iframe, so
+///     the picker scans the top document AND every accessible frame and builds
+///     against whichever one hosts the DOB field. Retries until APEX renders it.
+///   * Suppresses the portal's own (broken in WebView) calendar: the real field
+///     is hidden + made read-only, inline onfocus/onclick handlers removed, and
+///     focus/click capture-listeners stop the ITS calendar from opening.
+///   * Re-attached on every page/frame by buildNavigationFixScript so a form
+///     POST (fetch + document.write) can't leave the portal calendar behind.
+///   * Autofill-safe: `ssaDatePickerSet` on the top window forwards to whatever
+///     frame hosts the picker, so fillDateFields() always lands in the real field.
+const String ssaDatePickerJs = r'''
+(function() {
+  if (window.__ssaDatePickerLoaded) return;
+  window.__ssaDatePickerLoaded = true;
+
+  var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var WD = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function findDobIn(doc) {
+    try {
+      return doc.getElementById('oapBirthdate')
+        || doc.querySelector('input[name="oapBirthdate"]')
+        || doc.querySelector('input[name="OAPBIRTHDATE"]')
+        || doc.querySelector('input[name="P_DATE_OF_BIRTH"]')
+        || doc.querySelector('input[id*="birth" i], input[id*="Birth" i], input[name*="birth" i], input[name*="Birth" i]');
+    } catch (e) {
+      try {
+        return doc.getElementById('oapBirthdate')
+          || doc.querySelector('input[name="oapBirthdate"]')
+          || doc.querySelector('input[name="OAPBIRTHDATE"]')
+          || doc.querySelector('input[name="P_DATE_OF_BIRTH"]')
+          || doc.querySelector('input[id*="birth"], input[name*="birth"]');
+      } catch (e2) { return null; }
+    }
+  }
+
+  // Top document + every same-origin frame (recursively). The Venda/ITS form
+  // can be rendered inside an iframe; the top document alone often has no field.
+  function allWindows() {
+    var out = [];
+    (function walk(win) {
+      try { out.push(win); } catch (e) { return; }
+      try {
+        for (var i = 0; i < win.frames.length; i++) {
+          var f = win.frames[i];
+          try { if (f.document) walk(f); } catch (e) {}
+        }
+      } catch (e) {}
+    })(window);
+    return out;
+  }
+
+  // Stop the portal's own (broken in WebView) calendar from ever opening.
+  function suppressPortalCalendar(doc, dob) {
+    try {
+      dob.removeAttribute('onfocus');
+      dob.removeAttribute('onclick');
+      dob.removeAttribute('onchange');
+    } catch (e) {}
+    if (dob.__ssaSuppressed) return;
+    dob.__ssaSuppressed = true;
+    var stop = function(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+    };
+    dob.addEventListener('focus', stop, true);
+    dob.addEventListener('click', stop, true);
+    dob.addEventListener('mousedown', stop, true);
+    dob.addEventListener('keydown', function(e) {
+      if (e.key && e.key !== 'Tab') { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  }
+
+  // Wherever a picker actually got built: { win, set } — the set() writes the
+  // real field in the right frame and fires the events APEX listens for.
+  var built = null;
+
+  function buildIn(win, doc) {
+    var dob = findDobIn(doc);
+    if (!dob) return false;
+
+    var existing = doc.getElementById('ssa-date-picker-wrap');
+    if (existing && existing.__ssaDob === dob) return true; // already built here
+
+    suppressPortalCalendar(doc, dob);
+
+    var oldWrap = doc.getElementById('ssa-date-picker-wrap');
+    if (oldWrap) oldWrap.remove();
+    var oldNative = doc.getElementById('custom-date-wrapper');
+    if (oldNative) oldNative.remove();
+
+    dob.removeAttribute('onfocus');
+    dob.removeAttribute('onclick');
+    dob.readOnly = true;
+    dob.setAttribute('readonly', '');
+    dob.style.display = 'none';
+    dob.style.visibility = 'hidden';
+
+    var row = dob.closest ? (dob.closest('div') || dob.parentElement) : dob.parentElement;
+    if (row) {
+      var trigs = row.querySelectorAll ? row.querySelectorAll('a, img, button, input[type="image"], span[class*="cal" i]') : [];
+      for (var i = 0; i < trigs.length; i++) {
+        var t = trigs[i];
+        if (!t.contains(dob) && t !== dob) t.style.display = 'none';
+      }
+    }
+
+    var E = function(tag) { return doc.createElement(tag); };
+
+    var wrap = E('div');
+    wrap.id = 'ssa-date-picker-wrap';
+    wrap.__ssaDob = dob;
+    wrap.style.cssText = 'width:100%;max-width:360px;box-sizing:border-box;margin:10px 0;font-family:Arial,Helvetica,sans-serif;';
+
+    var lbl = E('div');
+    lbl.textContent = 'Date of Birth';
+    lbl.style.cssText = 'font-size:11px;color:#6B7280;font-weight:bold;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.6px;';
+
+    var displayEl = E('input');
+    displayEl.type = 'text';
+    displayEl.id = 'ssa-date-display';
+    displayEl.readOnly = true;
+    displayEl.placeholder = 'DD-MON-YYYY';
+    displayEl.style.cssText = 'width:100%;box-sizing:border-box;padding:14px;font-size:18px;font-weight:bold;border:2px solid #7C3AED;border-radius:10px;background:#fff;color:#0F1624;text-align:center;';
+
+    // Calendar card — always visible, no toggle, no popup, no empty state.
+    var card = E('div');
+    card.style.cssText = 'box-sizing:border-box;width:100%;margin-top:8px;border:1px solid #E5E7EB;border-radius:12px;background:#fff;padding:10px;';
+
+    var head = E('div');
+    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;';
+
+    var prev = E('button');
+    prev.type = 'button';
+    prev.setAttribute('aria-label', 'Previous month');
+    prev.textContent = '◀';
+    prev.style.cssText = 'min-width:44px;min-height:44px;font-size:16px;border:1px solid #D1D5DB;border-radius:10px;background:#F9FAFB;cursor:pointer;color:#0F1624;';
+
+    var title = E('div');
+    title.textContent = '';
+    title.style.cssText = 'flex:1;text-align:center;font-weight:bold;font-size:16px;color:#0F1624;padding:0 4px;cursor:pointer;';
+
+    var next = E('button');
+    next.type = 'button';
+    next.setAttribute('aria-label', 'Next month');
+    next.textContent = '▶';
+    next.style.cssText = 'min-width:44px;min-height:44px;font-size:16px;border:1px solid #D1D5DB;border-radius:10px;background:#F9FAFB;cursor:pointer;color:#0F1624;';
+
+    head.appendChild(prev);
+    head.appendChild(title);
+    head.appendChild(next);
+    card.appendChild(head);
+
+    var week = E('div');
+    week.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;';
+    for (var w = 0; w < WD.length; w++) {
+      var h = E('div');
+      h.textContent = WD[w];
+      h.style.cssText = 'text-align:center;font-size:12px;color:#6B7280;font-weight:bold;padding:4px 0;';
+      week.appendChild(h);
+    }
+    card.appendChild(week);
+
+    var grid = E('div');
+    grid.id = 'ssa-date-grid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:3px;';
+    card.appendChild(grid);
+
+    var foot = E('div');
+    foot.style.cssText = 'display:flex;gap:6px;margin-top:8px;';
+
+    var todayBtn = E('button');
+    todayBtn.type = 'button';
+    todayBtn.textContent = 'Today';
+    todayBtn.style.cssText = 'flex:1;min-height:44px;font-size:15px;font-weight:bold;border:1px solid #7C3AED;border-radius:10px;background:#fff;color:#7C3AED;cursor:pointer;';
+
+    var yearBtn = E('button');
+    yearBtn.type = 'button';
+    yearBtn.textContent = 'Year';
+    yearBtn.style.cssText = 'flex:1;min-height:44px;font-size:15px;font-weight:bold;border:1px solid #7C3AED;border-radius:10px;background:#fff;color:#7C3AED;cursor:pointer;';
+
+    var clearBtn = E('button');
+    clearBtn.type = 'button';
+    clearBtn.textContent = 'Clear';
+    clearBtn.style.cssText = 'flex:1;min-height:44px;font-size:15px;font-weight:bold;border:1px solid #D1D5DB;border-radius:10px;background:#F9FAFB;color:#4B5563;cursor:pointer;';
+
+    foot.appendChild(todayBtn);
+    foot.appendChild(yearBtn);
+    foot.appendChild(clearBtn);
+    card.appendChild(foot);
+
+    wrap.appendChild(lbl);
+    wrap.appendChild(displayEl);
+    wrap.appendChild(card);
+    dob.parentNode.insertBefore(wrap, dob);
+
+    var selected = null;
+    var view = { y: 2000, mo: 0 };
+    var touched = false;
+    var yearMode = false;
+    var viewYearWindow = null;
+
+    function parseDob(v) {
+      var t = (v || '').trim();
+      if (!t) return null;
+      var m = /^(\d{1,2})\s*[-/]\s*([A-Za-z]{3,9})\s*[-/]\s*(\d{4})$/.exec(t);
+      if (m) {
+        var mo = MONTHS.indexOf(m[2].toUpperCase());
+        if (mo >= 0) return { d: parseInt(m[1],10), mo: mo, y: parseInt(m[3],10) };
+      }
+      var n = /^(\d{1,2})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{4})$/.exec(t);
+      if (n) return { d: parseInt(n[1],10), mo: parseInt(n[2],10) - 1, y: parseInt(n[3],10) };
+      var s = /^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/.exec(t);
+      if (s) return { d: parseInt(s[3],10), mo: parseInt(s[2],10) - 1, y: parseInt(s[1],10) };
+      return null;
+    }
+
+    function fmt(dt) {
+      if (!dt) return '';
+      return pad2(dt.d) + '-' + MONTHS[dt.mo] + '-' + dt.y;
+    }
+
+    function fire(evName) {
+      var ev;
+      try { ev = new (win.Event || Event)(evName, { bubbles: true }); } catch (e) { ev = null; }
+      if (ev) { try { dob.dispatchEvent(ev); } catch (e) {} }
+      if (win.jQuery) {
+        try { win.jQuery(dob).trigger(evName); } catch (e) {}
+      }
+    }
+
+    function renderYears() {
+      yearMode = true;
+      if (viewYearWindow === null) {
+        var start = selected ? selected.y : view.y;
+        viewYearWindow = start - (start % 20);
+      }
+      var startYear = viewYearWindow;
+      title.textContent = startYear + ' - ' + (startYear + 19);
+      grid.innerHTML = '';
+      for (var y = startYear; y < startYear + 20; y++) {
+        var cell = E('button');
+        cell.type = 'button';
+        cell.textContent = y;
+        cell.style.cssText = 'min-height:40px;font-size:15px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;color:#0F1624;cursor:pointer;';
+        if (selected && selected.y === y) {
+          cell.style.background = '#7C3AED';
+          cell.style.color = '#fff';
+          cell.style.fontWeight = 'bold';
+        }
+        cell.onclick = (function(yy) {
+          return function() {
+            view.y = yy;
+            viewYearWindow = null;
+            touched = true;
+            renderGrid();
+          };
+        })(y);
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderGrid() {
+      yearMode = false;
+      title.textContent = MONTHS_FULL[view.mo] + ' ' + view.y;
+      grid.innerHTML = '';
+      var first = new Date(view.y, view.mo, 1).getDay();
+      var daysIn = new Date(view.y, view.mo + 1, 0).getDate();
+      var now = new Date();
+      var tod = { d: now.getDate(), mo: now.getMonth(), y: now.getFullYear() };
+      for (var i = 0; i < first; i++) grid.appendChild(E('div'));
+      for (var d = 1; d <= daysIn; d++) {
+        var cell = E('button');
+        cell.type = 'button';
+        cell.textContent = d;
+        var isSel = selected && selected.d === d && selected.mo === view.mo && selected.y === view.y;
+        var isTod = tod.d === d && tod.mo === view.mo && tod.y === view.y;
+        var st = 'min-height:44px;font-size:17px;font-weight:600;border-radius:10px;background:#fff;color:#0F1624;cursor:pointer;border:1px solid #E5E7EB;';
+        if (isSel) st += 'background:#7C3AED;color:#fff;border-color:#7C3AED;font-weight:bold;';
+        else if (isTod) st += 'border:2px solid #7C3AED;background:#F3F0FF;color:#7C3AED;';
+        cell.style.cssText = st;
+        cell.onclick = (function(day) {
+          return function() { commit({ d: day, mo: view.mo, y: view.y }); };
+        })(d);
+        grid.appendChild(cell);
+      }
+    }
+
+    function render() {
+      if (yearMode) renderYears(); else renderGrid();
+    }
+
+    function syncDisplay() {
+      var cur = parseDob(dob.value);
+      if (cur) {
+        displayEl.value = fmt(cur);
+        selected = cur;
+        if (!touched) view = { y: cur.y, mo: cur.mo };
+      } else {
+        if (!touched && displayEl.value !== '') displayEl.value = '';
+        if (!touched) selected = null;
+      }
+    }
+
+    function commit(dt) {
+      var val = fmt(dt);
+      dob.removeAttribute('readonly');
+      dob.removeAttribute('disabled');
+      dob.value = val;
+      displayEl.value = val;
+      selected = dt;
+      touched = true;
+      view = { y: dt.y, mo: dt.mo };
+      ['input','change','blur'].forEach(fire);
+      if (win.apex && win.apex.event && win.apex.event.trigger) {
+        try { win.apex.event.trigger(dob, 'change'); } catch (e) {}
+      }
+      render();
+    }
+
+    function clearVal() {
+      dob.removeAttribute('readonly');
+      dob.removeAttribute('disabled');
+      dob.value = '';
+      displayEl.value = '';
+      selected = null;
+      touched = false;
+      ['input','change','blur'].forEach(fire);
+      render();
+    }
+
+    prev.onclick = function() {
+      touched = true;
+      if (yearMode) {
+        viewYearWindow = (viewYearWindow || (view.y - (view.y % 20))) - 20;
+        renderYears();
+      } else {
+        view.mo--;
+        if (view.mo < 0) { view.mo = 11; view.y--; }
+        renderGrid();
+      }
+    };
+    next.onclick = function() {
+      touched = true;
+      if (yearMode) {
+        viewYearWindow = (viewYearWindow || (view.y - (view.y % 20))) + 20;
+        renderYears();
+      } else {
+        view.mo++;
+        if (view.mo > 11) { view.mo = 0; view.y++; }
+        renderGrid();
+      }
+    };
+    title.onclick = function() {
+      touched = true;
+      if (yearMode) { renderGrid(); } else { viewYearWindow = null; renderYears(); }
+    };
+    todayBtn.onclick = function() {
+      var n = new Date();
+      commit({ d: n.getDate(), mo: n.getMonth(), y: n.getFullYear() });
+    };
+    yearBtn.onclick = function() { touched = true; viewYearWindow = null; renderYears(); };
+    clearBtn.onclick = clearVal;
+
+    var localSet = function(value) {
+      dob.removeAttribute('readonly');
+      dob.removeAttribute('disabled');
+      dob.value = value;
+      var p = parseDob(value);
+      if (p) {
+        selected = p;
+        view = { y: p.y, mo: p.mo };
+        displayEl.value = fmt(p);
+      } else {
+        displayEl.value = value || '';
+      }
+      touched = true;
+      ['input','change','blur'].forEach(fire);
+      render();
+    };
+    localSet.__ssaLocal = true;
+    win.ssaDatePickerSet = localSet;
+
+    syncDisplay();
+    if (selected) view = { y: selected.y, mo: selected.mo };
+    render();
+
+    try { win.setInterval(function() { syncDisplay(); }, 500); } catch (e) {}
+    try {
+      var MO = win.MutationObserver || win.__ssaMutationObserver;
+      if (typeof MO !== 'undefined' && MO) {
+        var obs = new MO(function() { syncDisplay(); });
+        obs.observe(dob, { attributes: true, attributeFilter: ['value'] });
+      }
+    } catch (e) {}
+
+    if (!built) built = { win: win, set: localSet, dob: dob };
+
+    console.log('SSA date picker built (' + (win === window.top ? 'top' : 'iframe') + ')');
+    return true;
+  }
+
+  function tryBuildAll() {
+    var ws = allWindows();
+    for (var i = 0; i < ws.length; i++) {
+      try { if (buildIn(ws[i], ws[i].document)) return true; } catch (e) {}
+    }
+    return false;
+  }
+
+  // Continuously re-check: APEX renders the form (and any iframe it lives in)
+  // asynchronously, and form POSTs (fetch + document.write) replace the DOM, so
+  // we keep watching and rebuild the moment a birthdate field exists.
+  function builtAlive() {
+    if (!built) return false;
+    try { return !(built.dob && built.dob.isConnected === false); } catch (e) { return false; }
+  }
+  (function poll() {
+    if (!builtAlive()) built = null;
+    tryBuildAll();
+    setTimeout(poll, 700);
+  })();
+
+  // Top-window dispatcher: the autofill script runs in the top frame but the
+  // real field may live in an iframe. Forward to whichever frame has the picker.
+  if (window.top === window) {
+    window.ssaDatePickerInit = function() { tryBuildAll(); };
+    window.ssaDatePickerSet = function(value) {
+      if (builtAlive()) { built.set(value); return; }
+      built = null;
+      tryBuildAll();
+      if (builtAlive()) { built.set(value); return; }
+      var ws = allWindows();
+      for (var i = 0; i < ws.length; i++) {
+        try {
+          var s = ws[i].ssaDatePickerSet;
+          if (s && s.__ssaLocal) { s(value); return; }
+        } catch (e) {}
+      }
+      for (var j = 0; j < ws.length; j++) {
+        try {
+          var el = findDobIn(ws[j].document);
+          if (el) {
+            el.value = value;
+            el.removeAttribute('readonly');
+            el.removeAttribute('disabled');
+            ['input','change','blur'].forEach(function(ev) {
+              try { el.dispatchEvent(new Event(ev, { bubbles: true })); } catch (e) {}
+            });
+            return;
+          }
+        } catch (e) {}
+      }
+    };
+  }
+})();
+''';
+
+String buildDatePickerScript() => ssaDatePickerJs;
+
 String buildAutofillScript(String profileJson) {
   return _script(profileJson, addFloatingStar: true);
 }
@@ -20,6 +489,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 (function() {
   // ── 1. Profile data ────────────────────────────────────────────────────
   var profile = $profileJson;
+
+  // ── 1b. Shared custom date picker (also injected separately by the
+  //      university webview). Idempotent — `__ssaDatePickerLoaded` guard
+  //      makes a second injection a no-op.
+  $ssaDatePickerJs
 
   function gv(path) {
     var parts = path.split('.');
@@ -86,112 +560,47 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     var year = p[0];
 
     var monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    var monthMap = {
-      'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
-      'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
-      'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
-    };
     var monthAbbr = monthNames[parseInt(monthNum) - 1] || monthNum;
+    var portalVal = parseInt(day) + '-' + monthAbbr + '-' + year;
 
-    // Remove any existing custom date picker
-    var existing = document.getElementById('ssa-date-picker');
-    if (existing) {
-      // navfix calendar picker is already injected — fill the hidden field and
-      // let it keep control of the UI.
-      var t = document.getElementById('oapBirthdate')
-        || document.querySelector('input[name="OAPBIRTHDATE"]')
-        || document.querySelector('input[name="oapBirthdate"]');
-      if (t) {
-        t.value = parseInt(day) + '-' + monthAbbr + '-' + year;
-        t.dispatchEvent(new Event('input', { bubbles: true }));
-        t.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+    // Prefer the shared custom picker (idempotent; builds on demand). Its
+    // commit() writes the DD-MON-YYYY value into the real portal field and
+    // fires input/change/blur, then its sync loop keeps the display in step.
+    if (typeof window.ssaDatePickerSet === 'function') {
+      window.ssaDatePickerSet(portalVal);
       return;
     }
 
-    // Find the original date field
-    var target = document.getElementById('oapBirthdate')
-      || document.querySelector('input[name="OAPBIRTHDATE"]')
-      || document.querySelector('input[name="oapBirthdate"]')
-      || document.querySelector('input[id*="birth" i], input[id*="Birth" i]');
+    // Fallback: write the real field directly — across the top document AND
+    // every same-origin iframe (the ITS form can live inside one).
+    var wins = [];
+    (function walk(w2) {
+      try { wins.push(w2); } catch (e) { return; }
+      try {
+        for (var fi = 0; fi < w2.frames.length; fi++) {
+          try { if (w2.frames[fi].document) walk(w2.frames[fi]); } catch (e) {}
+        }
+      } catch (e) {}
+    })(window);
+
+    var target = null;
+    for (var wi = 0; wi < wins.length && !target; wi++) {
+      try {
+        target = wins[wi].document.getElementById('oapBirthdate')
+          || wins[wi].document.querySelector('input[name="OAPBIRTHDATE"]')
+          || wins[wi].document.querySelector('input[name="oapBirthdate"]')
+          || wins[wi].document.querySelector('input[id*="birth" i], input[id*="Birth" i]');
+      } catch (e) {}
+    }
 
     if (!target) {
-      console.log('No target date field found for custom picker');
+      console.log('No target date field found');
       return;
     }
-
-    target.style.display = 'none';
-
-    var wrapper = document.createElement('div');
-    wrapper.id = 'ssa-date-picker';
-    wrapper.style.cssText = 'display:inline-flex;gap:8px;align-items:flex-end;margin:8px 0;';
-
-    function makeSelect(label, options, selected, widthPx) {
-      var div = document.createElement('div');
-      div.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
-      var lbl = document.createElement('label');
-      lbl.textContent = label;
-      lbl.style.cssText = 'font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;';
-      var sel = document.createElement('select');
-      sel.style.cssText = 'width:' + widthPx + 'px;padding:10px 8px;font-size:18px;border:1px solid #ccc;border-radius:4px;text-align:center;font-family:monospace;background:#fff;';
-      var placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = label;
-      placeholder.disabled = true;
-      placeholder.selected = !selected;
-      sel.appendChild(placeholder);
-      options.forEach(function(opt) {
-        var o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        if (opt === selected) o.selected = true;
-        sel.appendChild(o);
-      });
-      div.appendChild(lbl);
-      div.appendChild(sel);
-      return {div: div, select: sel};
-    }
-
-    var days = [];
-    for (var i = 1; i <= 31; i++) days.push(String(i));
-    var years = [];
-    for (var y = 2030; y >= 1900; y--) years.push(String(y));
-
-    var dayPart = makeSelect('DD', days, String(day), 60);
-    var monthPart = makeSelect('MON', monthNames, monthAbbr, 80);
-    var yearPart = makeSelect('YYYY', years, year, 100);
-
-    function updateDob() {
-      var d = dayPart.select.value;
-      var m = monthPart.select.value;
-      var y = yearPart.select.value;
-      if (d && m && y && monthMap[m]) {
-        var formatted = parseInt(d) + '-' + m + '-' + y;
-        target.value = formatted;
-        target.dispatchEvent(new Event('input', { bubbles: true }));
-        target.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('Date set to:', formatted);
-      }
-    }
-
-    dayPart.select.addEventListener('change', updateDob);
-    monthPart.select.addEventListener('change', updateDob);
-    yearPart.select.addEventListener('change', updateDob);
-
-    wrapper.appendChild(dayPart.div);
-    wrapper.appendChild(monthPart.div);
-    wrapper.appendChild(yearPart.div);
-
-    var insertAfter = target;
-    var customWrapper = document.getElementById('custom-date-wrapper');
-    if (customWrapper) insertAfter = customWrapper;
-    insertAfter.parentNode.insertBefore(wrapper, insertAfter.nextSibling);
-
-    target.value = parseInt(day) + '-' + monthAbbr + '-' + year;
+    target.value = portalVal;
     target.dispatchEvent(new Event('input', { bubbles: true }));
     target.dispatchEvent(new Event('change', { bubbles: true }));
-
-    console.log('Date picker injected: ' + parseInt(day) + '-' + monthAbbr + '-' + year);
+    console.log('Date filled (fallback): ' + portalVal);
   }
 
   var firstName   = gv('personal.firstName');
@@ -237,21 +646,22 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                          return 'No';
                        })(),
     // FIX #5: citizenshipCodeValue → the LOV *description* (long label) for SA citizens.
-    //    citizenshipShortCode → the 2-letter LOV *code* (short code) when known,
+    //    citizenshipShortCode → the LOV *code* (short code) when known,
     //      falling back to the description when no short code is mapped.
     citizenshipCodeValue: (function() {
                             var nat = (gv('demographic.nationality') || '').toLowerCase();
                             var idn = (gv('personal.idNumber') || '').trim();
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
                             // Long LOV description
-                            return sa ? 'OTHER AFRICAN COUNTRIES' : (gv('demographic.citizenshipDescription') || gv('demographic.nationality') || '');
+                            return sa ? 'R.S.A' : (gv('demographic.citizenshipDescription') || gv('demographic.nationality') || '');
                           })(),
     citizenshipShortCode: (function() {
                             var nat = (gv('demographic.nationality') || '').toLowerCase();
                             var idn = (gv('personal.idNumber') || '').trim();
                             var sa = (nat.indexOf('south') !== -1 && nat.indexOf('african') !== -1) || idn.length >= 13;
-                            // Short 2-letter code for SA; fall back to whichever is set
-                            if (sa) return 'OA';
+                            // ITS citizenship code for SA (used by the oapCitzCode / oapCitCode LOV fields);
+                            // fall back to whichever profile value is set for non-SA applicants.
+                            if (sa) return 'R.S.A';
                             return gv('demographic.citizenshipCode') || gv('demographic.citizenshipShortCode') || '';
                           })(),
     homeLanguage:      gv('demographic.homeLanguage'),
@@ -617,6 +1027,106 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     return bestKey;
   }
 
+  // ── 4b. Citizenship auto-fill ──────────────────────────────────────────
+  // When a 13-digit SA ID is present (typed into the portal or from the
+  // profile), auto-set the citizenship code field(s) to R.S.A. The portal's
+  // own APEX eventRun sometimes fails to fire in the WebView, so we do it
+  // ourselves — matching how this worked before the autofill refactor.
+  function isSaidNumber(v) {
+    return /^\\d{13}\$/.test((v || '').trim());
+  }
+
+  // Search all same-origin frames (recursively) — the ITS form often lives in an iframe.
+  function allWindowsForCitizenship() {
+    var out = [];
+    (function walk(win) {
+      try { out.push(win); } catch (e) { return; }
+      try {
+        for (var i = 0; i < win.frames.length; i++) {
+          var f = win.frames[i];
+          try { if (f.document) walk(f); } catch (e) {}
+        }
+      } catch (e) {}
+    })(window);
+    return out;
+  }
+
+  function findIdFieldIn(doc) {
+    return doc.getElementById('oapIdNumber')
+      || doc.querySelector('input[name="OAPIDNUMBER"]')
+      || doc.querySelector('input[name="oapIdNumber"]')
+      || doc.querySelector('input[id*="idNumber" i]')
+      || doc.querySelector('input[name*="IDNUMBER" i]');
+  }
+
+  function ssaAutoCitizenship() {
+    var idn = '';
+    var wins = allWindowsForCitizenship();
+    for (var w = 0; w < wins.length; w++) {
+      var idEl = findIdFieldIn(wins[w].document);
+      if (idEl && (idEl.value || '').trim()) {
+        idn = (idEl.value || '').trim();
+        break;
+      }
+    }
+    // If the user typed something in the ID field, trust it — a passport
+    // number must NOT be overridden. Only fall back to the profile ID when
+    // the field is empty (e.g. the star autofill ran first).
+    if (!idn) idn = (profile.personal && profile.personal.idNumber || '').trim();
+    if (!isSaidNumber(idn)) return;
+
+    // Portal field names for citizenship (from ITS exact-name map)
+    var citizenshipFields = [
+      'OAPCITZCODE',      // Primary citizenship code field
+      'OAPCITCODE',       // Alternative citizenship code field
+      'OAPCITCODE_DESC',  // Citizenship code description (LOV display)
+      'OAPCITIZENTYPE',   // Citizen type (Yes/No)
+      'OAPCITZCODE_DESC', // Alternative description field
+    ];
+
+    var wrote = 0;
+    for (var w = 0; w < wins.length; w++) {
+      var doc = wins[w].document;
+      for (var n = 0; n < citizenshipFields.length; n++) {
+        var fieldName = citizenshipFields[n];
+        var el = doc.getElementById(fieldName)
+          || doc.querySelector('input[name="' + fieldName + '"]')
+          || doc.querySelector('select[name="' + fieldName + '"]');
+        if (!el) continue;
+        try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch (e) {}
+        var value = (fieldName === 'OAPCITIZENTYPE') ? 'Yes' : 'R.S.A';
+        el.value = value;
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur',   { bubbles: true }));
+        wrote++;
+        console.log('✅ Citizenship field auto-set: ' + fieldName + ' = ' + value + ' (frame: ' + (w === 0 ? 'top' : 'iframe') + ')');
+      }
+    }
+    // Also check for custom dropdown
+    for (var w = 0; w < wins.length; w++) {
+      var sel = wins[w].document.getElementById('custom-citz-code');
+      if (sel && sel.value !== 'R.S.A') {
+        sel.value = 'R.S.A';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    if (wrote > 0) showToast('Citizenship Code → R.S.A', '#10B981');
+  }
+
+  function isIdField(el) {
+    if (!el || !el.tagName) return false;
+    var n = (el.name || '').toUpperCase().replace(/[_-\\s]/g, '');
+    var i = (el.id || '').toUpperCase().replace(/[_-\\s]/g, '');
+    return n.indexOf('IDNUMBER') !== -1 || n.indexOf('IDNO') !== -1
+      || n.indexOf('PASSPORT') !== -1 || n.indexOf('OAPIDNUMBER') !== -1
+      || i.indexOf('OAPIDNUMBER') !== -1;
+  }
+
+  document.addEventListener('input',  function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
+  document.addEventListener('change', function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
+  document.addEventListener('blur',   function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
+
   // ── 5. Main autofill ───────────────────────────────────────────────────
   function doAutofill() {
     console.log('🔍 Autofill started');
@@ -650,14 +1160,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
     // Trigger blur on ID number field so APEX eventRun() fires
     // and populates citizenship + other dependent fields
-    var idEl = document.getElementById('oapIdNumber')
-      || document.querySelector('input[name="OAPIDNUMBER"]')
-      || document.querySelector('input[name="oapIdNumber"]')
-      || document.querySelector('input[id*="id" i]');
+    var wins = allWindowsForCitizenship();
+    var idEl = null;
+    for (var w = 0; w < wins.length; w++) {
+      var doc = wins[w].document;
+      idEl = doc.getElementById('oapIdNumber')
+        || doc.querySelector('input[name="OAPIDNUMBER"]')
+        || doc.querySelector('input[name="oapIdNumber"]')
+        || doc.querySelector('input[id*="id" i]');
+      if (idEl) break;
+    }
     if (idEl && idEl.value) {
       idEl.dispatchEvent(new Event('blur', { bubbles: true }));
       console.log('✅ Blur fired on ID number field');
     }
+
+    // Auto-set citizenship code to R.S.A when a valid SA ID is present.
+    ssaAutoCitizenship();
 
     var msg = filled > 0 ? '✅ Filled ' + filled + ' fields' : 'No fields found';
     console.log(msg);
@@ -931,7 +1450,7 @@ var __ssaNavfix = function() {
       'EQUATORIAL GUINEA','ERITREA','ETHIOPIA','FRANCE','GABON','GAMBIA','GERMANY','GHANA',
       'GUINEA BISAU','INDIA','ITALY','KENYA','LESOTHO','LIBERIA','LIBYA','MADAGASCAR','MALAWI',
       'MALI','MAURITANIA','MAURITIUS','MOROCCO','MOZAMBIQUE','NAMIBIA','NIGER','NIGERIA',
-      'OTHER AFRICAN COUNTRIES','R.S.A.','RWANDA','SENEGAL','SEYCHELLES','SIERRA LEONE',
+      'OTHER AFRICAN COUNTRIES','R.S.A','RWANDA','SENEGAL','SEYCHELLES','SIERRA LEONE',
       'SUDAN','SWAZILAND','TANZANIA','TOGO','TUNISIA','UGANDA','UNITED ARAB EMIRATES',
       'ZAMBIA','ZIMBABWE'
     ];
@@ -966,183 +1485,9 @@ var __ssaNavfix = function() {
     console.log('Custom citizenship dropdown injected');
   }
 
-  // Full calendar date picker replacing the ITS calendar-button field.
-  function ssaDatePicker() {
-    if (document.getElementById('ssa-date-picker') || document.getElementById('custom-date-wrapper')) return;
-    var dob = document.getElementById('oapBirthdate')
-      || document.querySelector('input[name="oapBirthdate"]')
-      || document.querySelector('input[name="OAPBIRTHDATE"]')
-      || document.querySelector('input[name="P_DATE_OF_BIRTH"]')
-      || document.querySelector('input[id*="birth" i], input[id*="Birth" i]');
-    if (!dob) return;
-
-    var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-
-    function parseDob(v) {
-      var t = (v || '').trim();
-      if (!t) return { d: null, mo: null, y: null };
-      var m = /^(\\d{1,2})\\s*[-/]\\s*([A-Za-z]{3,9})\\s*[-/]\\s*(\\d{4})\$/.exec(t);
-      if (m) {
-        var mo = MONTHS.indexOf(m[2].toUpperCase());
-        return { d: parseInt(m[1]), mo: mo >= 0 ? mo : 0, y: parseInt(m[3]) };
-      }
-      var n = /^(\\d{1,2})\\s*[-/]\\s*(\\d{1,2})\\s*[-/]\\s*(\\d{4})\$/.exec(t);
-      if (n) return { d: parseInt(n[1]), mo: parseInt(n[2]) - 1, y: parseInt(n[3]) };
-      var s = /^(\\d{4})\\s*[-/]\\s*(\\d{1,2})\\s*[-/]\\s*(\\d{1,2})\$/.exec(t);
-      if (s) return { d: parseInt(s[3]), mo: parseInt(s[2]) - 1, y: parseInt(s[1]) };
-      return { d: null, mo: null, y: null };
-    }
-
-    var cur = parseDob(dob.value);
-    var view = { y: cur.y || 1990, mo: cur.mo || 0 };
-
-    dob.style.display = 'none';
-    var row = dob.closest('div') || dob.parentElement;
-    if (row) {
-      var calBtns = row.querySelectorAll('a[onclick*="cal"], img[src*="cal"], button, input[type="image"]');
-      for (var i = 0; i < calBtns.length; i++) {
-        var el = calBtns[i];
-        if (!el.contains(dob) && el !== dob) el.style.display = 'none';
-      }
-    }
-
-    var wrap = document.createElement('div');
-    wrap.id = 'ssa-date-picker';
-    wrap.style.cssText = 'display:inline-flex;gap:6px;align-items:center;font-family:Arial,sans-serif;';
-
-    var show = document.createElement('input');
-    show.type = 'text';
-    show.readOnly = true;
-    show.placeholder = 'DD-MON-YYYY';
-    show.style.cssText = 'width:150px;padding:10px;font-size:17px;border:1px solid #7C3AED;border-radius:6px;text-align:center;font-family:monospace;background:#fff;color:#0F1624;';
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = '📅';
-    btn.style.cssText = 'padding:8px 12px;font-size:17px;border:1px solid #7C3AED;border-radius:6px;background:#fff;cursor:pointer;';
-
-    wrap.appendChild(show);
-    wrap.appendChild(btn);
-
-    var cal = document.createElement('div');
-    cal.style.cssText = 'position:fixed;z-index:2147483647;background:#fff;border:1px solid #bbb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.28);padding:12px;width:286px;font-family:Arial,sans-serif;display:none;';
-
-    var head = document.createElement('div');
-    head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
-    var prev = document.createElement('button');
-    prev.type = 'button'; prev.textContent = '‹'; prev.style.cssText = 'padding:4px 10px;font-size:16px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
-    var title = document.createElement('div');
-    title.style.cssText = 'font-weight:bold;font-size:15px;';
-    var next = document.createElement('button');
-    next.type = 'button'; next.textContent = '›'; next.style.cssText = 'padding:4px 10px;font-size:16px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
-    head.appendChild(prev); head.appendChild(title); head.appendChild(next);
-    cal.appendChild(head);
-
-    var grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:13px;';
-    cal.appendChild(grid);
-
-    var foot = document.createElement('div');
-    foot.style.cssText = 'display:flex;justify-content:space-between;margin-top:8px;';
-    var todayBtn = document.createElement('button');
-    todayBtn.type = 'button'; todayBtn.textContent = 'Today';
-    todayBtn.style.cssText = 'padding:6px 12px;font-size:13px;border:1px solid #7C3AED;border-radius:4px;background:#7C3AED;color:#fff;cursor:pointer;';
-    var closeBtn = document.createElement('button');
-    closeBtn.type = 'button'; closeBtn.textContent = 'Close';
-    closeBtn.style.cssText = 'padding:6px 12px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;';
-    foot.appendChild(todayBtn); foot.appendChild(closeBtn);
-    cal.appendChild(foot);
-
-    document.body.appendChild(cal);
-
-    function fmt() {
-      return cur.d ? cur.d + '-' + MONTHS[cur.mo] + '-' + cur.y : '';
-    }
-
-    function apply() {
-      var val = fmt();
-      dob.value = val;
-      dob.removeAttribute('readonly');
-      dob.removeAttribute('disabled');
-      ['input','change','blur'].forEach(function(ev) {
-        dob.dispatchEvent(new Event(ev, { bubbles: true }));
-      });
-      show.value = val;
-      console.log('Date set to: ' + val);
-    }
-
-    function render() {
-      var first = new Date(view.y, view.mo, 1).getDay();
-      var daysIn = new Date(view.y, view.mo + 1, 0).getDate();
-      title.textContent = MONTHS[view.mo] + ' ' + view.y;
-      grid.innerHTML = '';
-      ['S','M','T','W','T','F','S'].forEach(function(d) {
-        var h = document.createElement('div');
-        h.textContent = d;
-        h.style.cssText = 'font-weight:bold;color:#7C3AED;padding:4px 0;font-size:12px;';
-        grid.appendChild(h);
-      });
-      for (var i = 0; i < first; i++) grid.appendChild(document.createElement('div'));
-      for (var d = 1; d <= daysIn; d++) {
-        var cell = document.createElement('div');
-        cell.textContent = d;
-        cell.style.cssText = 'padding:7px 0;border-radius:6px;cursor:pointer;color:#0F1624;';
-        if (d === cur.d && view.mo === cur.mo && view.y === cur.y) {
-          cell.style.background = '#7C3AED'; cell.style.color = '#fff';
-        }
-        cell.onclick = (function(dd) {
-          return function() {
-            cur = { d: dd, mo: view.mo, y: view.y };
-            apply();
-            cal.style.display = 'none';
-          };
-        })(d);
-        grid.appendChild(cell);
-      }
-    }
-
-    function open() {
-      view = { y: cur.y || 1990, mo: cur.mo || 0 };
-      render();
-      var r = btn.getBoundingClientRect();
-      var left = Math.max(8, Math.min(window.innerWidth - 300, r.left));
-      var top = r.bottom + 8;
-      if (top + 340 > window.innerHeight) top = Math.max(8, r.top - 340);
-      cal.style.left = left + 'px';
-      cal.style.top = top + 'px';
-      cal.style.display = 'block';
-    }
-
-    btn.onclick = function(e) {
-      e.stopPropagation();
-      if (cal.style.display === 'none') open(); else cal.style.display = 'none';
-    };
-    prev.onclick = function() { view.mo--; if (view.mo < 0) { view.mo = 11; view.y--; } render(); };
-    next.onclick = function() { view.mo++; if (view.mo > 11) { view.mo = 0; view.y++; } render(); };
-    todayBtn.onclick = function() {
-      var n = new Date();
-      cur = { d: n.getDate(), mo: n.getMonth(), y: n.getFullYear() };
-      apply();
-      cal.style.display = 'none';
-    };
-    closeBtn.onclick = function() { cal.style.display = 'none'; };
-    document.addEventListener('click', function(e) {
-      if (cal.style.display !== 'none' && e.target !== btn && !cal.contains(e.target)) {
-        cal.style.display = 'none';
-      }
-    });
-
-    // Keep the picker display in sync if the field value changes elsewhere
-    // (e.g. the star autofill writing the hidden field).
-    dob.addEventListener('change', function() {
-      var p = parseDob(dob.value);
-      if (p) { cur = p; show.value = fmt(); }
-    });
-
-    show.value = fmt();
-    dob.parentNode.insertBefore(wrap, dob.nextSibling);
-    console.log('Custom date picker injected');
-  }
+  // The shared DOM date picker (ssaDatePickerJs) is embedded at the end of this
+  // script so it re-attaches on every page/frame — the old inline calendar that
+  // collided with it ('ssa-date-picker' id) was removed entirely.
 
   // Replace the ITS "Where did you hear about us" LOV with a plain select.
   function ssaHeardDropdown() {
@@ -1197,7 +1542,6 @@ var __ssaNavfix = function() {
 
   function ssaEnhance() {
     ssaCitizenship();
-    ssaDatePicker();
     ssaHeardDropdown();
   }
 
@@ -1289,12 +1633,83 @@ var __ssaNavfix = function() {
     window.fetch = fetcher;
   }
 
+  // ── Dynamic relative resources (JSONP / script srcs) ────────────────
+  // its_scripts.js callDynBGproc() injects JSONP <script> tags with a RELATIVE
+  // src ('web.w01pkg.w01_setHeader?x_stmp=...&x_call=...'). Like form actions,
+  // a relative ITS URL can be mangled by the WebView and 404. Replace it with
+  // an equivalent that uses the resolved absolute src so the request can't be
+  // mangled. (This mirrors how the page's other relative navigations are fixed.)
+  if (typeof window.callDynBGproc === 'function' && !window.callDynBGproc.__ssaPatched) {
+    window.callDynBGproc = function(DBProcedure, DBParameters, DBTagName) {
+      var dynamicScriptAreaTagName = 'dynScriptArea';
+      var d = new Date();
+      var v_param = DBParameters;
+      if (v_param === undefined) { v_param = '&'; }
+      var v_new_param = v_param.replace(/&/gi, '*').replace(/\\+/g, '~');
+      if (DBTagName && DBTagName !== '') { dynamicScriptAreaTagName = DBTagName; }
+      var xx = document.getElementById(dynamicScriptAreaTagName);
+      if (xx != null && xx.parentNode) { xx.parentNode.removeChild(xx); }
+      var xscript = document.createElement('script');
+      xscript.setAttribute('language', 'Javascript');
+      xscript.setAttribute('type', 'text/javascript');
+      xscript.setAttribute('id', dynamicScriptAreaTagName);
+      var src = 'web.w01pkg.w01_setHeader?x_stmp=' + escape(d.getTime()) +
+                '&x_call=' + DBProcedure + '&x_parms=' + escape(v_new_param);
+      xscript.setAttribute('src', fixUrl(src));
+      document.getElementsByTagName('head').item(0).appendChild(xscript);
+      window.status = 'Done';
+      return true;
+    };
+    window.callDynBGproc.__ssaPatched = true;
+  }
+
+  // Absolutize any other relative ITS resource URL (script/iframe/img/link)
+  // that the page adds after load (document.write pages, AJAX, LOV popups).
+  function absolutizeResourceEl(el) {
+    if (!el || !el.getAttribute) return;
+    var attr = null;
+    if (el.tagName === 'SCRIPT' || el.tagName === 'IFRAME' || el.tagName === 'IMG') attr = 'src';
+    else if (el.tagName === 'LINK' || el.tagName === 'A') attr = 'href';
+    if (!attr) return;
+    var v = el.getAttribute(attr);
+    if (!v || typeof v !== 'string') return;
+    if (v.indexOf('http://') === 0 || v.indexOf('https://') === 0 || v.indexOf('data:') === 0 ||
+        v.indexOf('javascript:') === 0 || v.indexOf('mailto:') === 0 || v.indexOf('//') === 0 ||
+        v.charAt(0) === '/' || v.charAt(0) === '#') return;
+    var fixed = fixUrl(v);
+    if (fixed !== v) {
+      el.setAttribute(attr, fixed);
+      console.log('[navfix] resource src: ' + v + ' -> ' + fixed);
+    }
+  }
+
+  var resObserver = new MutationObserver(function(muts) {
+    for (var m = 0; m < muts.length; m++) {
+      var nodes = muts[m].addedNodes;
+      for (var n = 0; n < nodes.length; n++) {
+        var node = nodes[n];
+        if (node.nodeType !== 1) continue;
+        absolutizeResourceEl(node);
+        if (node.querySelectorAll) {
+          var subs = node.querySelectorAll('script[src], iframe[src], img[src], link[href]');
+          for (var s = 0; s < subs.length; s++) absolutizeResourceEl(subs[s]);
+        }
+      }
+    }
+  });
+  resObserver.observe(document.documentElement, { childList: true, subtree: true });
+
   diag('Page: ' + window.location.href);
   diag('NavFix injected');
 
   ssaEnhance();
   setTimeout(ssaEnhance, 800);
   setTimeout(ssaEnhance, 2500);
+
+  // Shared DOM date picker — idempotent and frame-aware. Re-attached here on
+  // every page/frame (incl. fetch + document.write POST navigations) so the
+  // portal's own broken calendar never gets a chance to surface.
+  $ssaDatePickerJs
 };
 __ssaNavfix();
 

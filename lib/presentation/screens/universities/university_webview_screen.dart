@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/autofill_script.dart' as star;
+import 'package:studentsyncsa/services/its_url_fixer.dart';
 
 class UniversityWebViewScreen extends ConsumerStatefulWidget {
   final String url;
@@ -27,6 +28,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   bool _loading = true;
   String _currentUrl = '';
   String? _profileJson;
+  String? _lastRecovered;
+  DateTime? _lastRecoveredAt;
 
   @override
   void initState() {
@@ -76,6 +79,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setTextZoom(150);
+      // Keep popups (target=_blank) inside this webview so every navigation
+      // funnels through onNavigationRequest where ITS URLs get normalized.
       (_controller.platform as AndroidWebViewController).setOnConsoleMessage((msg) {
         debugPrint('[WebView ${msg.level}] ${msg.message}');
       });
@@ -85,22 +90,32 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
       .setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) {
-            final url = request.url.toString();
+            var url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
 
-            // Allow gw1proc URLs through without modification.
-            if (url.contains('gw1proc')) return NavigationDecision.navigate;
-
-            // A truncated ITS URL (gw1pkg.gw1p) is a truncated report of the
-            // form's own POST. The JS navfix (buildNavigationFixScript) already
-            // rewrites every form action to the full .../gen.gw1pkg.gw1proc
-            // BEFORE the request is built (see the 'Form action' DIAG snackbar),
-            // so the real POST goes to the correct URL. Do NOT cancel it and
-            // reload as a GET loadRequest — that drops the POST body and the
-            // portal 404s. Just let it flow and surface the report for diagnosis.
-            if (url.contains('gw1pkg.gw1p') && !url.contains('gw1proc')) {
-              debugPrint('🔎 Truncated ITS URL (letting real POST flow): $url');
-              _reportTruncatedUrl(url);
+            // Normalize any malformed ITS URL before it reaches the portal:
+            //  - truncated procedure name: gen.gw1pkg.gw1v -> gen.gw1pkg.gw1view
+            //    (the truncated GET target 404s if it flows through)
+            //  - host typo: unlven -> univen, univenerp01 -> univenierp01
+            //  - plain http -> https
+            // The gw1proc/gw1p POST path is handled by the JS fetch hijack in
+            // buildNavigationFixScript — do NOT GET-reload it (that drops the
+            // POST body and the portal 404s). Just let it flow and surface the
+            // truncated form for diagnosis.
+            if (ItsUrl.isItsHost(url)) {
+              final fixed = ItsUrl.normalize(url);
+              final isPostHandler =
+                  url.contains('gw1proc') || url.contains('gen.gw1pkg.gw1p');
+              if (fixed != url && !isPostHandler) {
+                debugPrint('🔧 Expanding ITS URL: $url -> $fixed');
+                _reportTruncatedUrl('EXPANDED $fixed');
+                _controller.loadRequest(Uri.parse(fixed));
+                return NavigationDecision.prevent;
+              }
+              if (url.contains('gw1pkg.gw1p') && !url.contains('gw1proc')) {
+                debugPrint('🔎 Truncated ITS URL (letting real POST flow): $url');
+                _reportTruncatedUrl(url);
+              }
             }
 
             return NavigationDecision.navigate;
@@ -112,6 +127,16 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
           onPageFinished: (url) async {
             _currentUrl = url;
             setState(() => _loading = false);
+
+            // Last-line recovery: if the committed URL is still a truncated
+            // gw1v, the truncation happened below the navigation-intercept
+            // layer and the portal has rendered its 404 page. Reload the
+            // expanded URL once (guarded so a persistent below-layer
+            // truncation can't spin into a loop).
+            if (_recoverTruncatedPage(url)) {
+              return;
+            }
+
             debugPrint('ℹ️ Autofill deferred — user must tap star to fill');
             try {
               await _controller.runJavaScript(star.buildNavigationFixScript());
@@ -186,6 +211,34 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   });
 
   wrapper.insertBefore(select, citz);
+
+  // Auto-select citizenship from the profile, normalizing SA variants (RSA,
+  // SOUTH AFRICA, R.S.A) to the portal's 'R.S.A.' option, with change+input
+  // dispatch so the portal's own APEX listeners actually fire.
+  try {
+    var prof = $_profileJson || {};
+    var demo = (prof && prof.demographic) || {};
+    var civ = String(demo.citizenshipCode || demo.citizenshipShortCode || demo.citizenshipDescription || '').trim().toUpperCase();
+    if (civ.indexOf('SOUTH AFRICA') !== -1 || civ === 'RSA' || civ === 'R.S.A' || civ === 'R.S.A.') civ = 'R.S.A';
+    var norm = function(s) { return String(s).toUpperCase().replace(/[.]/g, ''); };
+    if (civ) {
+      for (var oi = 0; oi < select.options.length; oi++) {
+        var ov = norm(select.options[oi].value);
+        var ot = norm(select.options[oi].textContent);
+        if (ov === norm(civ) || ot === norm(civ)) {
+          select.value = select.options[oi].value;
+          citz.value = select.options[oi].value;
+          citz.dispatchEvent(new Event('change', { bubbles: true }));
+          citz.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('Citizenship auto-selected:', select.value);
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Citizenship profile auto-select error:', e);
+  }
+
   console.log('Custom citizenship dropdown injected');
 })();
 ''');
@@ -355,7 +408,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   }, 300);
 
   // Auto-fill street/city/province on postal code blur
-  var profile = $_profileJson;
+  var profile = $_profileJson || {};
   if (profile) {
     var addr = (profile.address && profile.address.address) || '';
     var city = (profile.address && profile.address.addressLine2) || '';
@@ -596,7 +649,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   }
 
   Future<void> _loadPortal() async {
-    await _controller.loadRequest(Uri.parse(_resolveUrl()));
+    await _controller.loadRequest(Uri.parse(ItsUrl.normalize(_resolveUrl())));
   }
 
   void _reportTruncatedUrl(String url) {
@@ -612,6 +665,27 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
     }
   }
 
+  /// Recover from a truncated ITS GET target that committed anyway (the
+  /// truncation happened below onNavigationRequest). Returns true when a
+  /// reload of the corrected URL was issued.
+  bool _recoverTruncatedPage(String url) {
+    if (!ItsUrl.isItsHost(url)) return false;
+    if (!url.contains('gen.gw1pkg.gw1v') || url.contains('gw1view')) return false;
+    final fixed = ItsUrl.normalize(url);
+    if (fixed == url) return false;
+    final now = DateTime.now();
+    if (_lastRecovered == fixed &&
+        _lastRecoveredAt != null &&
+        now.difference(_lastRecoveredAt!) < const Duration(seconds: 5)) {
+      return false;
+    }
+    _lastRecovered = fixed;
+    _lastRecoveredAt = now;
+    debugPrint('🔧 Recovering truncated ITS page: $url -> $fixed');
+    _controller.loadRequest(Uri.parse(fixed));
+    return true;
+  }
+
   String _resolveUrl() {
     final name = widget.universityName.toUpperCase();
     if (name == 'UNIVEN' || name == 'VENDA') {
@@ -621,7 +695,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   }
 
   void _openInChrome() async {
-    final uri = Uri.parse(_resolveUrl());
+    final uri = Uri.parse(ItsUrl.normalize(_resolveUrl()));
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {

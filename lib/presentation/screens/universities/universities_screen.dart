@@ -5,6 +5,7 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/its_url_fixer.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -304,7 +305,7 @@ class _UniversityCardState extends State<_UniversityCard>
       await _spinCtrl.forward(from: 0.0);
     }
     if (!context.mounted) return;
-    final url = Uri.encodeComponent(uni.applicationUrl);
+    final url = Uri.encodeComponent(ItsUrl.normalize(uni.applicationUrl));
     final name = Uri.encodeComponent(uni.shortName);
     context.push('/universities/${uni.id}/webview?url=$url&name=$name');
   }

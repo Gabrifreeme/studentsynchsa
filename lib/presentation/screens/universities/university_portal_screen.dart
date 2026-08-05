@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/services/autofill_script.dart' as star;
+import 'package:studentsyncsa/services/its_url_fixer.dart';
 
 class UniversityPortalScreen extends StatefulWidget {
   final String universityName;
@@ -44,7 +45,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
     // the APEX session cookie the portal just set, causing 404 on form submit.
 
     // Determine initial URL
-    String initialUrl = widget.url;
+    String initialUrl = ItsUrl.normalize(widget.url);
     if (_isUniven) {
       initialUrl =
           'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
@@ -62,7 +63,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
           final targetUrl = message.message;
           debugPrint('🔴 JavaScript navigation: $targetUrl');
           if (targetUrl.startsWith('http') && mounted) {
-            _controller.loadRequest(Uri.parse(targetUrl));
+            _controller.loadRequest(Uri.parse(ItsUrl.normalize(targetUrl)));
           }
         },
       )
@@ -77,6 +78,9 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
       final androidController =
           _controller.platform as AndroidWebViewController;
       androidController.setTextZoom(150);
+      // Keep popups (target=_blank) inside this webview so every navigation
+      // funnels through onNavigationRequest where ITS URLs get normalized.
+      androidController.setSupportMultipleWindows(false);
     }
 
     _controller
@@ -86,8 +90,21 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
             final url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
 
-            // Allow gw1proc URLs through without modification
-            if (url.contains('gw1proc')) return NavigationDecision.navigate;
+            // Normalize any malformed ITS URL before it reaches the portal:
+            // truncated procedure name (gw1v -> gw1view), host typo
+            // (unlven/univenerp01), and plain http -> https. The gw1proc/gw1p
+            // POST path is handled by the JS fetch hijack in
+            // buildNavigationFixScript — do NOT GET-reload it.
+            if (ItsUrl.isItsHost(url)) {
+              final fixed = ItsUrl.normalize(url);
+              final isPostHandler =
+                  url.contains('gw1proc') || url.contains('gen.gw1pkg.gw1p');
+              if (fixed != url && !isPostHandler) {
+                debugPrint('🔧 Expanding truncated ITS URL: $url -> $fixed');
+                _controller.loadRequest(Uri.parse(fixed));
+                return NavigationDecision.prevent;
+              }
+            }
 
             return NavigationDecision.navigate;
           },
@@ -98,6 +115,10 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
           onPageFinished: (url) async {
             debugPrint('✅ Page finished: $url');
             setState(() => _loading = false);
+
+            // Last-line recovery: if the committed URL is still a truncated
+            // gw1v, reload the expanded URL once (guarded against loops).
+            if (_recoverTruncatedPage(url)) return;
 
             // Inject navigation fix
             try {
@@ -135,11 +156,36 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
     }
   }
 
+  String? _lastRecovered;
+  DateTime? _lastRecoveredAt;
+
+  /// Recover from a truncated ITS GET target that committed anyway (the
+  /// truncation happened below onNavigationRequest). Returns true when a
+  /// reload of the corrected URL was issued.
+  bool _recoverTruncatedPage(String url) {
+    if (!ItsUrl.isItsHost(url)) return false;
+    if (!url.contains('gen.gw1pkg.gw1v') || url.contains('gw1view')) return false;
+    final fixed = ItsUrl.normalize(url);
+    if (fixed == url) return false;
+    final now = DateTime.now();
+    if (_lastRecovered == fixed &&
+        _lastRecoveredAt != null &&
+        now.difference(_lastRecoveredAt!) < const Duration(seconds: 5)) {
+      return false;
+    }
+    _lastRecovered = fixed;
+    _lastRecoveredAt = now;
+    debugPrint('🔧 Recovering truncated ITS page: $url -> $fixed');
+    _controller.loadRequest(Uri.parse(fixed));
+    return true;
+  }
+
   void _openInChrome() async {
     String url = widget.url;
     if (_isUniven) {
       url = 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
     }
+    url = ItsUrl.normalize(url);
 
     try {
       if (await canLaunchUrl(Uri.parse(url))) {

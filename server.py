@@ -1,15 +1,17 @@
-﻿from flask import Flask, request, jsonify, send_from_directory, redirect
+﻿from flask import Flask, request, jsonify, send_from_directory, redirect, Response
 from flask_cors import CORS
 import requests
 import os
 import re
 import subprocess
 import threading
+import shutil
 import json
 import time
 import sqlite3
 import random
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 try:
     from ddgs import DDGS
@@ -20,6 +22,8 @@ try:
     import playwright_tools as _pw_tools
 except Exception:
     _pw_tools = None
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -42,26 +46,26 @@ WORK_PERSONA = ("You are ACE, Chris's focused, capable work assistant. "
 
 MODE_TAG_INSTRUCTION = ("\nEvery reply must START with exactly one mode tag followed by a space, "
                          "choosing it yourself based on the task: [PLAN] when the task needs analysis, "
-                         "explanation, design, or reading — do not pretend to execute anything. "
+                         "explanation, design, or reading � do not pretend to execute anything. "
                          "[BUILD] when the task needs implementation, changes, or commands to run. "
                          "[REPLY] when the task is a simple question that only needs a short factual answer "
-                         "— no planning, no building, just the answer. "
+                         "� no planning, no building, just the answer. "
                          "Then continue the reply normally.")
 
 NARRATION_INSTRUCTION = (
-    "NARRATE YOUR WORK like a thoughtful engineer showing their work — the way Chris's opencode "
+    "NARRATE YOUR WORK like a thoughtful engineer showing their work � the way Chris's opencode "
     "assistant talks to him.\n"
     "1. When Chris gives you a task, briefly say what you're about to do and why (1-2 lines), then DO it.\n"
     "2. As you work, write out the actual steps in text: what file you're reading, what command you ran, "
     "what you found. Keep each step short and concrete.\n"
     "3. Show your reasoning. If something could be done this way or that way, say so openly and explain "
     "which you chose and why. Never hide uncertainty.\n"
-    "4. Quote the important real facts you found (file paths, line numbers, error text, command output) — "
+    "4. Quote the important real facts you found (file paths, line numbers, error text, command output) � "
     "don't paraphrase them away.\n"
     "5. End with a short summary of what you did and the result, and offer the next obvious step.\n"
     "Write it naturally and conversationally, not as a bullet dump. A good rhythm: a line of action, a "
     "line of thinking, a line of result. If the task is trivial (a one-line answer), don't force the "
-    "narration — just answer. For trivial answers, use [REPLY] mode tag, not [BUILD] or [PLAN].")
+    "narration � just answer. For trivial answers, use [REPLY] mode tag, not [BUILD] or [PLAN].")
 
 RESEARCH_PATTERNS = [
     r'\bwhat is\b', r'\bwhat are\b', r'\bwhat was\b', r'\bwhat does\b', r'\bwhat do\b',
@@ -88,7 +92,7 @@ def is_research_query(text):
     if len(t.split()) < 2:
         return False
     # Trivial math / greetings / self-questions don't need a web search.
-    if re.search(r'^(\d+\s*[+\-*/x×÷]\s*\d+|\d+(\s*[+\-*/x×÷]\s*\d+)+)\s*[=?\s]*$', t):
+    if re.search(r'^(\d+\s*[+\-*/x��]\s*\d+|\d+(\s*[+\-*/x��]\s*\d+)+)\s*[=?\s]*$', t):
         return False
     if re.search(r'^(hi|hey|hello|yo|sup|good\s*(morning|afternoon|evening)|who are you|how are you|thank|thanks)\b', t):
         return False
@@ -190,7 +194,7 @@ def conversation_context_text(limit=12):
         role = 'Chris' if c['role'] == 'user' else 'ACE'
         body = (c['content'] or '').strip()
         if len(body) > 400:
-            body = body[:400] + '…'
+            body = body[:400] + '�'
         lines.append(role + ': ' + body)
     return ('\n--- RECENT CONVERSATION (so you remember where we are) ---\n'
             + '\n'.join(lines)
@@ -198,12 +202,53 @@ def conversation_context_text(limit=12):
 
 def fn_read_file(args):
     with open(args.get('path', ''), 'r') as f:
-        return f.read()
+        content = f.read()
+    if len(content) > 6000:
+        return (content[:6000]
+                + '\n...[TRUNCATED � the file is much larger. To edit a specific part, use patch_file '
+                'with exact old_text/new_text, or read specific lines.]')
+    return content
+
+def fn_patch_file(args):
+    path = args.get('path', '')
+    old_text = args.get('old_text', '')
+    new_text = args.get('new_text', '')
+    if not path or not old_text:
+        return 'Error: path and old_text are required.'
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        return 'Error reading file: ' + str(e)
+    if old_text not in content:
+        return ('Error: old_text not found in the file. Copy it EXACTLY. File head: '
+                + content[:150].replace('\n', '\\n'))
+    shutil.copy2(path, path + '.ace_bak')
+    new_content = content.replace(old_text, new_text, 1)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+    return 'Patched ' + path + ' (1 occurrence replaced, backup: ' + path + '.ace_bak)'
+
+def safe_write_file(path, content):
+    """Write a file with a shrink-guard and a rolling backup so a bad AI edit
+    can never silently destroy a large file. Returns (ok, message)."""
+    try:
+        if os.path.isfile(path):
+            old_len = os.path.getsize(path)
+            if old_len > 300 and len(content) < int(old_len * 0.25):
+                return False, ('Write BLOCKED: new content is much smaller than the existing file '
+                               '(' + str(len(content)) + ' vs ' + str(old_len) + ' bytes). This looks like '
+                               'a broken edit, not a real fix.')
+            shutil.copy2(path, path + '.ace_bak')
+    except Exception:
+        pass
+    with open(path, 'w') as f:
+        f.write(content)
+    return True, 'Saved ' + path + (' (backup: ' + path + '.ace_bak)' if os.path.exists(path + '.ace_bak') else '')
 
 def fn_write_file(args):
-    with open(args.get('path', ''), 'w') as f:
-        f.write(args.get('content', ''))
-    return 'Saved ' + args.get('path', '')
+    ok, msg = safe_write_file(args.get('path', ''), args.get('content', ''))
+    return msg
 
 def fn_list_files(args):
     return json.dumps(os.listdir(args.get('dir', 'C:\\Users\\chris\\StudentSyncSA')))
@@ -581,7 +626,7 @@ def extract_remember_facts(user_message):
         value = m.group(2).strip()
         if key and value:
             facts[normalize_mem_key(key)] = value
-    # 4) trailing "remember that X" without an explicit verb — treat whole clause
+    # 4) trailing "remember that X" without an explicit verb � treat whole clause
     #    (only when nothing else matched and it looks like a fact, e.g. "birthday 12 march")
     if not facts:
         tm = re.search(r'\bremember\b\s+(?:that\s+)?(.+?)[.!?]?\s*$', text, re.IGNORECASE)
@@ -610,16 +655,34 @@ def memory_context_text():
         when = (mem['mood'].get('updated') or '')[:10]
         lines.append('Chris was last feeling ' + str(mem['mood']['value']) + (' (on ' + when + ')' if when else ''))
     # Keep memory compact but show all facts so ACE actually knows what it was told.
+    # Skip verbose meta/noise keys and cap long values so the prompt stays small enough
+    # for fast models (and the free OpenRouter tier).
+    MAX_VALUE = 150
+    MAX_TOTAL = 1000
     for key, data in list(mem.items()):
         if key in ('name', 'mood', 'mood_history'):
             continue
+        if key.startswith('memory_config.'):
+            continue
         if isinstance(data, dict) and 'value' in data:
-            lines.append(str(key) + ': ' + str(data['value']))
+            value = str(data['value'])
+            if len(value) > MAX_VALUE:
+                value = value[:MAX_VALUE] + '�'
+            lines.append(str(key) + ': ' + value)
     lines = [l for l in lines if l]
     if not lines:
         return ''
+    total = 0
+    kept = []
+    for l in lines:
+        if total + len(l) > MAX_TOTAL:
+            break
+        kept.append(l)
+        total += len(l) + 1
+    if not kept:
+        kept = lines[:1]
     return ('\n--- MEMORY (things Chris told you across sessions) ---\n'
-            + '\n'.join(lines)
+            + '\n'.join(kept)
             + '\nHold onto these naturally. Never mention this block itself.\n---\n')
 
 def fn_memorize(args):
@@ -649,7 +712,7 @@ def check_alarms_and_timers():
         changed = True
         label = a.get('label') or 'Alarm'
         try:
-            ntfy_send('⏰ Alarm: ' + label, 'Alarm at ' + hm)
+            ntfy_send('? Alarm: ' + label, 'Alarm at ' + hm)
         except Exception:
             pass
         push_notification('alarm', label)
@@ -665,7 +728,7 @@ def check_alarms_and_timers():
             changed2 = True
             label = t.get('label') or 'Timer'
             try:
-                ntfy_send('⏲️ Timer done: ' + label, 'Your timer finished.')
+                ntfy_send('?? Timer done: ' + label, 'Your timer finished.')
             except Exception:
                 pass
             push_notification('timer', label)
@@ -772,8 +835,8 @@ def save_summary_config(cfg):
 def build_daily_summary():
     now = datetime.now()
     today = now.strftime('%Y-%m-%d')
-    lines = ['☀️ Good morning, Chris!', '']
-    lines.append('📅 ' + now.strftime('%A, %d %B %Y'))
+    lines = ['?? Good morning, Chris!', '']
+    lines.append('?? ' + now.strftime('%A, %d %B %Y'))
     lines.append('')
     events = load_events()
     todays = [e for e in events if e['date'] == today]
@@ -800,16 +863,16 @@ def build_daily_summary():
     if open_tasks:
         lines.append('Your open tasks (' + str(len(open_tasks)) + '):')
         for t in sorted(open_tasks, key=lambda x: x.get('priority', 3))[:8]:
-            icon = '🔄' if t['status'] == 'in_progress' else '⬜'
+            icon = '??' if t['status'] == 'in_progress' else '?'
             lines.append('  ' + icon + ' P' + str(t.get('priority', 3)) + '  ' + t['title'])
     else:
-        lines.append('No open tasks. 🎉')
+        lines.append('No open tasks. ??')
     lines.append('')
     sessions = load_sessions()
     today_sessions = [s for s in sessions if s.get('started_at', '').startswith(today)]
     if today_sessions:
         done = [s for s in today_sessions if s.get('ended_at')]
-        lines.append('💼 Today you logged ' + str(len(today_sessions)) + ' work session(s)' + (', ' + str(len(done)) + ' completed' if done else '') + '.')
+        lines.append('?? Today you logged ' + str(len(today_sessions)) + ' work session(s)' + (', ' + str(len(done)) + ' completed' if done else '') + '.')
     else:
         lines.append('No work sessions logged today yet.')
     return '\n'.join(lines)
@@ -829,7 +892,7 @@ def check_summary():
         save_summary_config(cfg)
         summary = build_daily_summary()
         try:
-            ntfy_send('☀️ Daily summary', summary)
+            ntfy_send('?? Daily summary', summary)
         except Exception:
             pass
         push_notification('summary', 'Daily summary ready')
@@ -847,6 +910,11 @@ FUNCTION_REGISTRY = {
         "description": "Write content to a file on the local disk.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]},
         "handler": fn_write_file
+    },
+    "patch_file": {
+        "description": "Precisely edit a file by replacing one exact substring. Preferred over write_file for large files � read the file first, then give the exact old_text to replace and the new_text. The old_text must appear verbatim in the file.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Absolute path to the file"}, "old_text": {"type": "string", "description": "Exact text currently in the file to replace"}, "new_text": {"type": "string", "description": "Replacement text"}}, "required": ["path", "old_text", "new_text"]},
+        "handler": fn_patch_file
     },
     "list_files": {
         "description": "List files in a directory.",
@@ -989,6 +1057,16 @@ def extract_reply(response):
             pass
     return None
 
+LOCAL_MODELS = frozenset(['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen2.5:3b', 'deepseek-coder:1.3b', 'tinyllama:latest', 'qwen3.6:latest'])
+
+# Free OpenRouter models used as the default / fallback so ACE keeps working
+# even when paid-credit prompt limits are hit.
+FALLBACK_MODELS = ['google/gemma-4-26b-a4b-it:free', 'inclusionai/ling-3.0-flash:free', 'cohere/north-mini-code:free', 'openai/gpt-oss-20b:free']
+
+# Models that cannot handle function calling � skip tools for these so the
+# provider doesn't time out. Locals use Ollama's native path (tools ignored).
+NO_TOOLS = LOCAL_MODELS | frozenset(['google/gemma-4-26b-a4b-it:free', 'poolside/laguna-xs-2.1:free', 'nvidia/nemotron-nano-9b-v2:free'])
+
 def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api_key, tools=None):
     memory_ctx = memory_context_text()
     if memory_ctx:
@@ -1008,7 +1086,7 @@ def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api
     # Local Ollama is far faster via its native /api/generate endpoint than the
     # slow OpenAI-shaped /v1 wrapper (phi-2.7b: ~22s native vs >300s via /v1).
     is_ollama = ('localhost' in endpoint) or ('127.0.0.1' in endpoint) or ('11434' in endpoint) or (not endpoint and 'ollama' in model)
-    if is_ollama and model in ('dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest'):
+    if is_ollama and model in LOCAL_MODELS:
         prompt = ''
         for msg in messages:
             role = msg.get('role') if isinstance(msg, dict) else ''
@@ -1041,11 +1119,19 @@ def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
-    return requests.post(endpoint.rstrip('/') + "/chat/completions", headers=headers, json=payload, timeout=300)
+    return requests.post(endpoint.rstrip('/') + "/chat/completions", headers=headers, json=payload, timeout=90)
 
 @app.route('/')
 def index():
     resp = send_from_directory('.', 'ACE.html')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@app.route('/mobile')
+def mobile():
+    resp = send_from_directory('.', 'mobile.html')
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
@@ -1109,21 +1195,22 @@ def chat():
     global current_mode, last_user_message_time
     data = request.json
     user_message = data.get('message', '')
-    model = data.get('model', 'dolphin-phi:2.7b')
+    model = data.get('model', 'openai/gpt-oss-20b:free')
     endpoint = data.get('endpoint', 'http://localhost:11434/v1')
     api_key = data.get('api_key', '')
-    functions_enabled = data.get('functions_enabled', False)
+    functions_enabled = data.get('functions_enabled', True)
     custom_functions = data.get('functions', []) or []
     proactive = data.get('proactive', False)
     if 'localhost' in endpoint or '11434' in endpoint:
-        if model not in ['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen3.6:latest']:
-            model = 'dolphin-phi:2.7b'
+        if model not in LOCAL_MODELS:
+            endpoint = 'https://openrouter.ai/api/v1'
+            api_key = ''
     last_user_message_time = datetime.now()
 
-    # Proactive check-in — ACE reaches out first when Chris has been quiet.
+    # Proactive check-in � ACE reaches out first when Chris has been quiet.
     if proactive:
         checkin_prompt = ("You are ACE, Chris's assistant. He has been quiet for a while. "
-                          "Reach out to him first, unprompted — one or two brief, helpful sentences. "
+                          "Reach out to him first, unprompted � one or two brief, helpful sentences. "
                           "Ask if he needs help or wants to keep working. Keep it short.")
         messages = [{"role": "system", "content": checkin_prompt}]
         response = call_chat_completion(model, messages, 0.7, 120, endpoint, api_key, None)
@@ -1152,7 +1239,27 @@ def chat():
         return jsonify({"reply": reply})
     
     save_conversation("user", user_message)
-    
+
+    # Auto-fix streaming � when Chris asks ACE to auto-fix / find the error in
+    # a file, hand the request to /auto_fix_stream and let the frontend show
+    # live progress. Broad enough to catch 'auto-fix X. The error is: Y' and
+    # 'find the error in X and apply fix'.
+    lower_msg = user_message.lower()
+    fix_intent = ("auto-fix" in lower_msg or "autofix" in lower_msg
+                  or re.search(r'find the errors? in', lower_msg)
+                  or re.search(r'fix the errors? in', lower_msg)
+                  or re.search(r'fix (?:the )?issue', lower_msg))
+    if fix_intent:
+        file_match = re.search(r'([\w/\\]+\.(?:dart|py|js|ts|html))', user_message)
+        error_match = re.search(r'error is:\s*(.+?)(?:\.\s*|$)', user_message, re.IGNORECASE)
+        if file_match:
+            file_path = file_match.group(1).replace('\\', '/')
+            error_text = error_match.group(1).strip() if error_match else "Find and fix any errors or issues in this file. If the file is already correct, report that it is clean."
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(PROJECT_ROOT, file_path)
+            qs = urlencode({'file_path': file_path, 'error_text': error_text})
+            return jsonify({"type": "stream", "url": f"/auto_fix_stream?{qs}"})
+
     if current_mode == "WORK":
         current_mode = "WORK"
         prompt = WORK_PERSONA
@@ -1161,9 +1268,9 @@ def chat():
 
     attachments = data.get('attachments', []) or []
 
-    # Browser automation — dev-gated. When Chris shares a URL + an error
+    # Browser automation � dev-gated. When Chris shares a URL + an error
     # symptom, drive a headless Chromium to inspect the page and feed the
-    # findings back into the reply. Status-bar shows "🌐 Driving browser…".
+    # findings back into the reply. Status-bar shows "?? Driving browser�".
     browser_summary = ''
     if not attachments:
         task = detect_browser_task(user_message)
@@ -1216,8 +1323,18 @@ def chat():
     prompt += "\nChris: " + user_message + "\nACE:"
 
     tools = None
-    if functions_enabled:
+    if functions_enabled and model not in NO_TOOLS:
         tools = []
+        prompt += ("\n\nYou have LIVE tool access to this computer: read_file, write_file, patch_file, "
+                   "list_files, run_command, search, get_time, drive_list, drive_read, drive_upload, "
+                   "send_notification, task_add, task_list, task_set_status, task_delete, "
+                   "event_add, event_list, and more.\n"
+                   "ACTUALLY USE the tools to complete the task � do not just plan. Call a tool when "
+                   "you need a file's contents, to apply an edit, or to run a command; the result will "
+                   "be handed back to you. Keep tool calls focused. For editing large files, read the "
+                   "file first, then use patch_file with exact old_text/new_text rather than rewriting "
+                   "the whole file. Only after the work is actually done, begin your final reply with "
+                   "the mode tag.")
         for name, spec in FUNCTION_REGISTRY.items():
             tools.append({
                 "type": "function",
@@ -1239,11 +1356,40 @@ def chat():
                 })
 
     messages = [{"role": "system", "content": prompt + MODE_TAG_INSTRUCTION}, {"role": "user", "content": user_message}]
-    max_rounds = 5
+    max_rounds = 8
+    rate_limited = False
+    fallbacks = [m for m in FALLBACK_MODELS if m != model] + ['qwen2.5-coder:1.5b']
+
+    def use_fallback():
+        """Pop the next fallback model. Local qwen is last so ACE keeps working
+        even when the free cloud quota is exhausted."""
+        nonlocal model, endpoint, api_key
+        if not fallbacks:
+            return False
+        model = fallbacks.pop(0)
+        if model in LOCAL_MODELS:
+            endpoint = 'http://localhost:11434/v1'
+            api_key = ''
+        return True
+
     for round_idx in range(max_rounds):
-        response = call_chat_completion(model, messages, 0.7, 64, endpoint, api_key, tools)
+        try:
+            response = call_chat_completion(model, messages, 0.7, 300, endpoint, api_key, tools)
+        except (requests.exceptions.Timeout, requests.exceptions.RequestException):
+            rate_limited = True
+            fallbacks.clear()
+            fallbacks.append('qwen2.5-coder:1.5b')
+            if use_fallback():
+                continue
+            return jsonify({"reply": "The cloud model timed out and no local fallback is available."}), 500
 
         if response.status_code != 200:
+            if 'free-models-per-day' in response.text or 'Rate limit exceeded' in response.text:
+                rate_limited = True
+                fallbacks.clear()
+                fallbacks.append('qwen2.5-coder:1.5b')
+            if use_fallback():
+                continue
             return jsonify({"reply": f"Error: {response.text}"}), 500
 
         try:
@@ -1256,6 +1402,8 @@ def chat():
                 msg = body["choices"][0]["message"]
             except (IndexError, KeyError):
                 return jsonify({"reply": "Error parsing response: unexpected format"}), 500
+        elif isinstance(body, dict) and body.get("error"):
+            return jsonify({"reply": "Error: " + json.dumps(body.get("error"))}), 500
         else:
             # Ollama /api/generate style: {response: "..."}
             reply = body.get("response") if isinstance(body, dict) else None
@@ -1265,13 +1413,17 @@ def chat():
 
         tool_calls = msg.get("tool_calls")
         if not tool_calls:
-            reply = msg.get("content") or "(no content)"
+            reply = msg.get("content") or ""
+            if not reply.strip():
+                if use_fallback():
+                    continue
+                reply = "I couldn't generate a response just now. Please try again."
             try:
                 auto_capture_memory(user_message, reply)
             except Exception:
                 pass
             save_conversation("assistant", reply)
-            return jsonify({"reply": reply})
+            return jsonify({"reply": reply, "model": model, "rate_limited": rate_limited})
 
         messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tool_calls})
         for tc in tool_calls:
@@ -1283,6 +1435,24 @@ def chat():
                 "tool_call_id": tc.get("id", ""),
                 "content": str(result)
             })
+
+    if use_fallback():
+        try:
+            response = call_chat_completion(model, messages, 0.7, 300, endpoint, api_key, tools)
+            if response.status_code == 200:
+                body = response.json()
+                if isinstance(body, dict) and "choices" in body:
+                    msg = body["choices"][0]["message"]
+                    reply = (msg.get("content") or "").strip()
+                    if reply:
+                        try:
+                            auto_capture_memory(user_message, reply)
+                        except Exception:
+                            pass
+                        save_conversation("assistant", reply)
+                        return jsonify({"reply": reply})
+        except Exception:
+            pass
 
     return jsonify({"reply": "Max function rounds reached without a final answer."}), 500
 
@@ -1320,9 +1490,9 @@ opencode_activity = {
 activity_lock = threading.Lock()
 
 TOOL_ICONS = {
-    'bash': '💻', 'read': '📖', 'write': '✏️', 'edit': '🛠️', 'patch': '🧩',
-    'grep': '🔍', 'glob': '🗂️', 'webfetch': '🌐', 'websearch': '🔎',
-    'task': '🤖', 'todowrite': '✅', 'skill': '📚', 'question': '❓',
+    'bash': '??', 'read': '??', 'write': '??', 'edit': '???', 'patch': '??',
+    'grep': '??', 'glob': '???', 'webfetch': '??', 'websearch': '??',
+    'task': '??', 'todowrite': '?', 'skill': '??', 'question': '?',
 }
 
 def _tool_explain(tool, desc):
@@ -1414,15 +1584,15 @@ def _activity_listener():
                         else:
                             desc = inp.get('path') or inp.get('pattern') or inp.get('query') or inp.get('url') or inp.get('description') or ''
                         step_id = 'tool:' + (part.get('id') or (tool + ':' + str(desc)))
-                        icon = TOOL_ICONS.get(tool, '⚙️')
+                        icon = TOOL_ICONS.get(tool, '??')
                         text = _tool_explain(tool, desc)
                         _upsert_step(step_id, 'tool', icon, text, 'running' if st == 'running' else st)
                         _set_activity(tool=tool, tool_input=desc, tool_state=st)
                         label = icon + ' ' + text
                         if st == 'completed':
-                            label += ' ✔'
+                            label += ' ?'
                         elif st == 'running':
-                            label += ' ▶'
+                            label += ' ?'
                         _set_activity(activity=label)
                     elif ptype == 'text':
                         sid = props.get('sessionID')
@@ -1442,13 +1612,13 @@ def _activity_listener():
                                 stream["parts"][pid] = txt
                             stream_text = "".join(stream["parts"].get(p, "") for p in stream["order"])
                         if stream_text:
-                            _upsert_step('text:stream', 'text', '✍️', stream_text, 'running')
-                            _set_activity(activity='✍️ Writing…')
+                            _upsert_step('text:stream', 'text', '??', stream_text, 'running')
+                            _set_activity(activity='?? Writing�')
                 elif etype == 'session.idle':
                     _set_activity(status='idle', activity='Done.')
         except Exception:
             try:
-                _set_activity(activity='Lost activity stream — reconnecting…')
+                _set_activity(activity='Lost activity stream � reconnecting�')
             except Exception:
                 pass
             time.sleep(3)
@@ -1483,28 +1653,28 @@ def opencode_chat():
     if not message:
         return jsonify({"reply": "Empty message."}), 400
     if not opencode_health():
-        return jsonify({"reply": "❌ opencode server not running. Start it with: opencode serve"}), 503
-    _set_activity(status='busy', activity='🧠 Thinking…', tool='', tool_input='', tool_state='')
+        return jsonify({"reply": "? opencode server not running. Start it with: opencode serve"}), 503
+    _set_activity(status='busy', activity='?? Thinking�', tool='', tool_input='', tool_state='')
     _reset_steps()
     with activity_lock:
         opencode_activity["steps"].append({
-            "id": "msg:user", "kind": "text", "icon": "💬",
-            "text": "You asked: " + (message[:80] + ('…' if len(message) > 80 else '')),
+            "id": "msg:user", "kind": "text", "icon": "??",
+            "text": "You asked: " + (message[:80] + ('�' if len(message) > 80 else '')),
             "state": "done",
         })
     sess, err = opencode_ensure_session()
     if err:
-        return jsonify({"reply": "❌ " + err}), 500
+        return jsonify({"reply": "? " + err}), 500
     original_message = message
     try:
         save_conversation("user", original_message)
     except Exception:
         pass
-    persona_ctx = ('[ACE persona — this is who you are. Hold this voice in every reply, naturally. Never mention this block.]\n'
+    persona_ctx = ('[ACE persona � this is who you are. Hold this voice in every reply, naturally. Never mention this block.]\n'
                    + ACE_PERSONA + '\n')
     memory_ctx = memory_context_text()
     if memory_ctx:
-        persona_ctx += ('\n[ACE persistent memory — things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
+        persona_ctx += ('\n[ACE persistent memory � things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
                         + memory_ctx + '\n')
     conv_ctx = conversation_context_text()
     if conv_ctx:
@@ -1530,32 +1700,32 @@ def opencode_chat():
                       "Tools ARE enabled: use bash (PowerShell), read, write, edit, grep, glob, and "
                       "web tools freely to inspect the filesystem, run commands, and make changes. "
                       "The project root is the current working directory; you may also touch paths "
-                      "outside it. Do not ask for permission before acting — just do it, then report "
+                      "outside it. Do not ask for permission before acting � just do it, then report "
                       "what you did. Never emit DSML/tool_call XML/HTML tags in your final text reply."
                       + "\n\n" + NARRATION_INSTRUCTION
                       + MODE_TAG_INSTRUCTION)
     try:
-        r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=600)
+        r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=2400)
     except requests.exceptions.ReadTimeout:
         opencode_poison_session()
-        return jsonify({"reply": "❌ opencode timed out. Refreshed the session — try again."}), 500
+        return jsonify({"reply": "? opencode timed out. Refreshed the session � try again."}), 500
     except Exception as e:
         opencode_poison_session()
-        return jsonify({"reply": "❌ opencode request failed: " + str(e)}), 500
+        return jsonify({"reply": "? opencode request failed: " + str(e)}), 500
     if r.status_code != 200:
         opencode_poison_session()
-        return jsonify({"reply": f"❌ opencode error ({r.status_code}): {r.text[:300]}"}), 500
+        return jsonify({"reply": f"? opencode error ({r.status_code}): {r.text[:300]}"}), 500
     try:
         result = r.json()
     except Exception as e:
         opencode_poison_session()
-        return jsonify({"reply": "❌ could not parse opencode response: " + str(e)}), 500
+        return jsonify({"reply": "? could not parse opencode response: " + str(e)}), 500
     info = result.get('info', {}) or {}
     err = info.get('error')
     if err:
         opencode_poison_session()
         msg = err.get('message', str(err)) if isinstance(err, dict) else str(err)
-        return jsonify({"reply": "❌ opencode: " + msg}), 500
+        return jsonify({"reply": "? opencode: " + msg}), 500
     parts = result.get('parts', []) or []
     texts = [p.get('text', '') for p in parts if isinstance(p, dict) and p.get('type') == 'text' and p.get('text')]
     if not texts:
@@ -1576,7 +1746,7 @@ def opencode_chat():
     except Exception:
         pass
     if tool_parts:
-        reply += "\n\n_⚙️ " + str(len(tool_parts)) + " tool call(s) executed_"
+        reply += "\n\n_?? " + str(len(tool_parts)) + " tool call(s) executed_"
     try:
         save_conversation("assistant", reply)
     except Exception:
@@ -1602,7 +1772,7 @@ def opencode_stop():
         except Exception:
             pass
     opencode_poison_session()
-    _set_activity(status='idle', activity='⏹ Stopped by user.')
+    _set_activity(status='idle', activity='? Stopped by user.')
     with activity_lock:
         for s in opencode_activity["steps"]:
             if s.get("id") == "text:stream":
@@ -1638,7 +1808,7 @@ def agents():
     if isinstance(sessions, list):
         for s in sessions:
             if s.get('time', {}).get('updated', 0) >= window:
-                active.append((s.get('agent') or 'build') + ' · ' + (s.get('title') or 'session'))
+                active.append((s.get('agent') or 'build') + ' � ' + (s.get('title') or 'session'))
     return jsonify({'count': len(active), 'agents': active})
 
 # ---------- Google Drive integration ----------
@@ -1757,7 +1927,7 @@ def drive_callback():
     token = r.json()
     token['expires_at'] = time.time() + int(token.get('expires_in', 3600)) - 60
     drive_save_token(token)
-    return '✅ Google Drive connected! You can close this tab and use Drive in ACE.'
+    return '? Google Drive connected! You can close this tab and use Drive in ACE.'
 
 @app.route('/drive/status', methods=['GET'])
 def drive_status():
@@ -2108,7 +2278,7 @@ def summary_config():
 def summary_now():
     summary = build_daily_summary()
     try:
-        ntfy_send('☀️ Daily summary', summary)
+        ntfy_send('?? Daily summary', summary)
     except Exception as e:
         return jsonify({'error': 'ntfy error: ' + str(e)}), 500
     push_notification('summary', 'Daily summary sent')
@@ -2131,9 +2301,10 @@ def write_file():
     path = data.get('path', '')
     content = data.get('content', '')
     try:
-        with open(path, 'w') as f:
-            f.write(content)
-        return jsonify({'status': 'saved'})
+        ok, msg = safe_write_file(path, content)
+        if not ok:
+            return jsonify({'error': msg}), 400
+        return jsonify({'status': 'saved', 'message': msg})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2144,10 +2315,10 @@ def run_command():
     try:
         if "flutter run" in command.lower():
             subprocess.Popen(f'start cmd /k "{command}"', shell=True)
-            return jsonify({'output': '✅ Flutter app launched'})
+            return jsonify({'output': '? Flutter app launched'})
         if "scrcpy" in command.lower():
             subprocess.Popen(f'start cmd /k "{command}"', shell=True)
-            return jsonify({'output': '✅ Scrcpy launched'})
+            return jsonify({'output': '? Scrcpy launched'})
         result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd='C:\\Users\\chris\\StudentSyncSA')
         output = result.stdout if result.stdout else result.stderr
         return jsonify({'output': output})
@@ -2263,9 +2434,141 @@ def memory_bulk():
         save_memory(mem)
     return jsonify({"status": "memorized", "count": added})
 
+def strip_markdown_fences(code):
+    if not code:
+        return code
+    m = re.search(r'```(?:dart|python|py|javascript|js|typescript|ts|html)?\s*\n(.*?)\n?```', code, re.DOTALL)
+    if m:
+        return m.group(1)
+    return code
+
+@app.route('/auto_fix_stream', methods=['GET'])
+def auto_fix_stream():
+    file_path = request.args.get('file_path')
+    error_text = request.args.get('error_text')
+
+    if not file_path or not error_text:
+        return "Missing parameters", 400
+
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(PROJECT_ROOT, file_path)
+    file_path = file_path.replace('\\', '/')
+
+    def emit(step):
+        print(f"[auto-fix] {step}", flush=True)
+        yield step + "\n\n"
+        time.sleep(0.3)
+
+    def generate():
+        try:
+            yield from emit("Reading file...")
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            yield from emit("File read successfully.")
+        except Exception as e:
+            yield from emit(f"Failed to read file: {str(e)}")
+            return
+
+        # Large files: never blind-rewrite with a small model (context limits
+        # make that corrupt the file). Run the analyzer to report real issues.
+        if len(content) > 5000:
+            yield from emit("File is large (" + str(len(content)) + " bytes) � running dart analyze instead of a full rewrite.")
+            summary = "Auto-fix check finished (large file � analyzer used)."
+            try:
+                if file_path.endswith('.dart'):
+                    proc = subprocess.run(['dart', 'analyze', file_path], capture_output=True, text=True, cwd=PROJECT_ROOT, timeout=120)
+                    out = (proc.stdout or '').strip()
+                    if not out:
+                        out = (proc.stderr or '').strip()
+                    if proc.returncode == 0 or 'No issues found' in out:
+                        yield from emit("? dart analyze: No issues found � this file has no errors to fix.")
+                        summary = "dart analyze: No issues found � nothing to fix."
+                    else:
+                        summary = "dart analyze found issues � see the chat output."
+                        for line in (out.splitlines() or ['Analyzer output unavailable'])[:25]:
+                            yield from emit(line.strip())
+                else:
+                    yield from emit("Not a Dart file � I won't rewrite it. Tell me the specific error and I can help.")
+                    summary = "Not a Dart file � no rewrite performed."
+            except Exception as e:
+                yield from emit("Analyzer could not run: " + str(e))
+                summary = "Analyzer could not run."
+            yield from emit("Auto-fix complete. No rewrite was applied (large file protected).")
+            try:
+                requests.post(
+                    'https://ntfy.sh/' + get_ntfy_topic(),
+                    data=f"ACE checked {os.path.basename(file_path)}.\n{summary}",
+                    headers={"Title": "ACE auto-fix check", "Priority": "default"},
+                    timeout=10
+                )
+                yield from emit("Notification sent.")
+            except Exception as e:
+                yield from emit(f"ntfy error: {e}")
+            try:
+                push_notification('autofix', summary)
+            except Exception:
+                pass
+            return
+
+        yield from emit("Generating fix...")
+        messages = [
+            {"role": "system", "content": f"You are ACE, an expert debugger. Fix the following code. The error is: {error_text}. Respond with ONLY the complete fixed file contents as raw code. Do NOT wrap it in markdown fences, backticks, or explanations."},
+            {"role": "user", "content": content}
+        ]
+        try:
+            fix_response = call_chat_completion('qwen2.5-coder:1.5b', messages, 0.3, 4000, 'http://localhost:11434/v1', '')
+            if fix_response.status_code == 200:
+                fixed_code = strip_markdown_fences(extract_reply(fix_response) or '')
+                if not fixed_code:
+                    yield from emit("Fix generation failed: empty reply")
+                    return
+                yield from emit("Fix generated.")
+            else:
+                yield from emit(f"Fix generation failed: {fix_response.status_code}")
+                return
+        except Exception as e:
+            yield from emit(f"Fix generation error: {str(e)}")
+            return
+
+        yield from emit("Applying fix...")
+        try:
+            ok, msg = safe_write_file(file_path, fixed_code)
+            if not ok:
+                yield from emit(msg)
+                return
+            yield from emit("Fix applied successfully! " + msg)
+        except Exception as e:
+            yield from emit(f"Failed to write file: {str(e)}")
+            return
+
+        try:
+            requests.post(
+                'https://ntfy.sh/' + get_ntfy_topic(),
+                data=f"ACE fixed it!\nAuto-fix applied to {file_path}.\nError: {error_text}",
+                headers={"Title": "ACE fixed it!", "Priority": "high"},
+                timeout=10
+            )
+            yield from emit("Notification sent.")
+        except Exception as e:
+            yield from emit(f"ntfy error: {e}")
+
+        yield from emit("Auto-fix complete.")
+        try:
+            push_notification('autofix', 'Fix applied to ' + os.path.basename(file_path))
+        except Exception:
+            pass
+
+    response = Response(generate(), mimetype='text/plain')
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Connection'] = 'keep-alive'
+    return response
+
 if __name__ == '__main__':
     threading.Thread(target=alarm_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, threaded=True)
+
 
 
 

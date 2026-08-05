@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>ACE</title>
   <style>
     :root {
@@ -67,17 +70,19 @@
     .icon-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
 
     /* ---------- Main layout ---------- */
+    #aceOrb { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 3; pointer-events: none; }
+    #header, #main { position: relative; z-index: 2; }
     #main { display: flex; flex: 1; overflow: hidden; }
 
     /* ---------- Chat ---------- */
-    #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; background: var(--bg-panel); }
+    #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; background: rgba(0, 0, 0, 0); }
     .panel-title {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
       padding: 0 16px; height: 38px; font-size: 11px; font-weight: 700;
       letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-mute);
       border-bottom: 1px solid var(--border); background: var(--bg-panel);
     }
-    #chat { flex: 1; padding: 18px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    #chat { flex: 1; min-height: 0; padding: 18px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
     .msg {
       padding: 10px 14px; line-height: 1.65; font-size: 14px;
       white-space: pre-wrap; word-wrap: break-word; max-width: 82%;
@@ -432,9 +437,16 @@
   .cal-add { display: flex; gap: 8px; margin-top: 10px; }
   .time-tab { padding: 6px 14px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .time-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* ACE working indicator — pulsing dots */
+  .ace-working { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; font-size: 12px; color: var(--accent); font-weight: 600; }
+  .ace-working::after { content: ""; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: acePulse 1s ease-in-out infinite; }
+  @keyframes acePulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+  #aceWorkingTime { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 11px; color: var(--text-mute); margin-left: 4px; }
 </style>
 </head>
 <body>
+<canvas id="aceOrb"></canvas>
 <div id="header">
   <div class="brand">
     <span class="brand-mark">A</span>
@@ -446,7 +458,7 @@
 </div>
 <div id="main">
   <div id="chat-panel">
-    <div class="panel-title"><span>Conversation</span></div>
+    <div class="panel-title"><span>Conversation</span> <span id="aceWorking" class="ace-working" style="display:none;">● ACE working… <span id="aceWorkingTime">0s</span></span></div>
     <div id="chat"><div class="msg ace">Hi, Chris. I'm here.</div></div>
     <div id="input-area">
       <div id="attach-preview"></div>
@@ -854,7 +866,7 @@
     if (currentAbort) { try { currentAbort.abort(); } catch (e) {} }
     currentAbort = null;
     uiRequestActive = false;
-    try { await fetch('http://localhost:5000/opencode/stop', { method: 'POST' }); } catch (e) {}
+    try { await fetch('/opencode/stop', { method: 'POST' }); } catch (e) {}
     hideThinking();
     monitorThinkingShown = false;
     addMessage('⏹ Stopped the last request.', 'ace');
@@ -873,7 +885,7 @@
   // by the main assistant) rather than through this chat's send button.
   async function pollActivity() {
     try {
-      const r = await fetch('http://localhost:5000/opencode/status');
+      const r = await fetch('/opencode/status');
       const d = await r.json();
       if (!d) return;
       const st = String(d.status || 'idle');
@@ -909,6 +921,25 @@
     if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
     thinkingEl = null;
     stopButtonEl = null;
+  }
+
+  // ACE working indicator — shows "ACE working… Ns" in the panel title
+  let workingTimer = null;
+  let workingStart = 0;
+  function showWorking() {
+    const el = document.getElementById('aceWorking');
+    const timeEl = document.getElementById('aceWorkingTime');
+    if (!el) return;
+    workingStart = Date.now();
+    el.style.display = 'inline-flex';
+    workingTimer = setInterval(() => {
+      if (timeEl) timeEl.textContent = Math.floor((Date.now() - workingStart) / 1000) + 's';
+    }, 1000);
+  }
+  function hideWorking() {
+    if (workingTimer) { clearInterval(workingTimer); workingTimer = null; }
+    const el = document.getElementById('aceWorking');
+    if (el) el.style.display = 'none';
   }
 
   // Inline work-step rendering: shows ACE's tool steps (grey) and reply
@@ -1028,7 +1059,7 @@
     const filename = prompt('Save as:', 'code.dart');
     if (!filename) return;
     try {
-      const res = await fetch('http://localhost:5000/write', {
+      const res = await fetch('/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'C:\\Users\\chris\\StudentSyncSA\\' + filename, content })
@@ -1041,7 +1072,7 @@
   function loadExplorer() {
     const el = document.getElementById('explorer');
     el.textContent = 'Loading...';
-    fetch('http://localhost:5000/files').then(r => r.json()).then(d => {
+    fetch('/files').then(r => r.json()).then(d => {
       if (d.files) {
         el.innerHTML = '';
         d.files.forEach(f => {
@@ -1055,7 +1086,7 @@
     }).catch(() => el.textContent = 'Error');
   }
   function loadFile(filename) {
-    fetch('http://localhost:5000/read', {
+    fetch('/read', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'C:\\Users\\chris\\StudentSyncSA\\' + filename })
@@ -1079,7 +1110,7 @@
 
   async function executeCommand(cmd) {
     try {
-      const res = await fetch('http://localhost:5000/run', {
+      const res = await fetch('/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: cmd })
@@ -1108,6 +1139,32 @@
 
   function autoResize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 120) + 'px'; }
   input.addEventListener('input', autoResize);
+
+  // Pull a shell command out of a chat message. "do <cmd>", "run <cmd>" and
+  // "please <cmd>" all work, as long as the command starts with a known binary.
+  // Ordinary sentences ("do you like pizza?") fall through and go to the model.
+  function extractCommand(text) {
+    let t = String(text || '').trim().replace(/[.?!]+$/, '');
+    // Strip addressing like "ACE do flutter run", "hey ACE, run git status"
+    t = t.replace(/^(?:hey\s+)?ace[,:\s]+/i, '');
+    const lead = t.match(/^(?:please\s+)?(?:do|run)\s+(.+)$/i);
+    if (lead) t = lead[1].trim();
+    const KNOWN = /^(flutter|dart|git|adb|scrcpy|npm|npx|node|python|pip|pip3|cd|mkdir|dir|ls|type|copy|del|rm|move|taskkill|gradle|dartfmt|dart\s+format|powershell|cmd|flutter\s+run)/i;
+    if (!KNOWN.test(t) || /[|;&]/.test(t)) return null;
+    const rest = t.replace(/^(flutter\s+run|dart\s+format|flutter|dart|git|adb|scrcpy|npm|npx|node|python|pip|pip3|cd|mkdir|dir|ls|type|copy|del|rm|move|taskkill|gradle|powershell|cmd)\s*/i, '').trim();
+    if (!rest) return t;
+    const words = rest.split(/\s+/).filter(Boolean);
+    const looksCli = /[\\/]/.test(rest) ||
+      /(^|\s)-{1,2}[\w]/.test(rest) ||
+      /[\w-]+(?:\\|\/)[\w.]/.test(rest) ||
+      /\.(dart|py|js|ts|html|json|txt|bat|ps1|yaml|yml|xml|env)\b/.test(rest) ||
+      /[^\s]+\s*=\s*[^\s]/.test(rest);
+    if (looksCli) return t;
+    const conversational = /\b(errors?|please|why|how|what|help|fix|issue|bug|is|are|can|you|me|the|my|your|course|find|all|about|with)\b/i.test(rest);
+    if (conversational) return null;
+    if (words.length > 4) return null;
+    return t;
+  }
 
   async function sendMessage() {
     const text = input.value.trim();
@@ -1143,9 +1200,17 @@
       return;
     }
 
+    // Run commands directly from chat: "do flutter run", "run git status", etc.
+    const cmd = extractCommand(text);
+    if (cmd) {
+      runCommand(cmd);
+      return;
+    }
+
     showThinking(text);
+    showWorking();
     try {
-      const savedModel = localStorage.getItem('ace_modelSelect') || 'opencode/deepseek-v4-flash-free';
+      const savedModel = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
       let model = savedModel;
       let effText = text;
       const moodHint = detectMood(text);
@@ -1157,9 +1222,9 @@
         effText = parts.join('\n\n') + '\n\n' + text;
       }
       const knownModels = [
-        'dolphin-llama3:8b', 'dolphin-phi:2.7b', 'qwen2.5-coder:1.5b', 'opencode',
+        'tinyllama:latest', 'qwen2.5-coder:1.5b', 'qwen2.5:3b', 'deepseek-coder:1.3b', 'opencode',
         ...OPENCODE_MODELS.map(m => m[0]),
-        'meta-llama/llama-3.1-8b-instruct', 'mistralai/mistral-7b-instruct', 'deepseek/deepseek-chat'
+        ...DEFAULT_MODELS.map(m => m[0])
       ];
       const customModels = getLlmModels();
       const isKnownModel = knownModels.includes(model) || customModels.some(m => m.model === model);
@@ -1183,7 +1248,7 @@
         currentAbort = new AbortController();
         if (stopButtonEl) stopButtonEl.disabled = false;
         try {
-          const res = await fetch('http://localhost:5000/opencode', {
+          const res = await fetch('/opencode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: effText, model: model === 'opencode' ? 'opencode/deepseek-v4-flash-free' : model }),
@@ -1191,14 +1256,23 @@
           });
           const d = await res.json();
           hideThinking();
-          finalizeStreamedReply(d.reply);
-           speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
+          if (d.reply && d.reply.indexOf('opencode server not running') !== -1) {
+            localStorage.setItem('ace_modelSelect', 'openai/gpt-oss-20b:free');
+            refreshStatusModel();
+            buildModelPicker();
+            addMessage('⚠️ The opencode server is off. Auto-switched to GPT-OSS 20B (free cloud) — pick a cloud or local model from the menu, or start opencode serve to use opencode models.', 'ace');
+          } else {
+            finalizeStreamedReply(d.reply);
+            speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
+          }
         } catch (err) {
           if (err && err.name === 'AbortError') {
             hideThinking();
+            hideWorking();
             addMessage('⏹ Stopped the last request.', 'ace');
           } else {
             hideThinking();
+            hideWorking();
             addMessage('Server error.', 'ace');
           }
         } finally {
@@ -1212,6 +1286,10 @@
         payload.endpoint = 'http://localhost:11434/v1';
         payload.api_key = '';
       }
+      if (DEFAULT_MODELS.some(m => m[0] === model)) {
+        payload.endpoint = 'https://openrouter.ai/api/v1';
+        payload.api_key = '';
+      }
       const cm = customModels.find(m => m.model === model);
       if (cm) {
         payload.endpoint = cm.endpoint;
@@ -1219,16 +1297,115 @@
         payload.functions_enabled = !!cm.functionsEnabled;
         payload.functions = (cm.functionsEnabled && Array.isArray(cm.functions)) ? cm.functions : [];
       }
-      const res = await fetch('http://localhost:5000/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const d = await res.json();
+      const ac2 = new AbortController();
+      const waitTimer = setTimeout(() => ac2.abort('timeout'), 150000);
+      let res, d;
+      try {
+        res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: ac2.signal
+        });
+        d = await res.json();
+      } finally {
+        clearTimeout(waitTimer);
+      }
       hideThinking();
-      addAceReply(d.reply);
-       speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
-    } catch { hideThinking(); addMessage('Server error.', 'ace'); }
+      if (d.rate_limited && d.model) {
+        const newModel = String(d.model);
+        const prev = localStorage.getItem('ace_modelSelect') || '';
+        if (newModel !== prev) {
+          localStorage.setItem('ace_modelSelect', newModel);
+          refreshStatusModel();
+          buildModelPicker();
+          addMessage('⚠️ Free cloud quota used up or model timed out — auto-switched to ' + modelLabel(newModel) + ' (local). Cloud replies return tomorrow or when credits are added.', 'ace');
+        }
+      }
+      if (d.type === 'stream' && d.url) {
+        await streamAutoFix(d.url);
+      } else {
+        addAceReply(d.reply);
+        speakReply(d.reply.replace(/^\s*\[(PLAN|BUILD|REPLY)\]\s*/i, ''));
+      }
+    } catch (err) {
+      hideThinking();
+      if (err && err.name === 'AbortError') {
+        localStorage.setItem('ace_modelSelect', 'qwen2.5:3b');
+        refreshStatusModel();
+        buildModelPicker();
+        addMessage('⚠️ The cloud model took too long. Auto-switched to Qwen 3B (local) — try your message again.', 'ace');
+      } else {
+        addMessage('Server error.', 'ace');
+      }
+    }
+  }
+
+  // Live auto-fix progress: consume the text/plain step stream from the server
+  // and append each step as a chat message with a spinning hourglass. The
+  // hourglass keeps spinning while that step is in progress; when the next step
+  // arrives the previous one freezes into a checkmark.
+  async function streamAutoFix(url) {
+    let streamRes;
+    try {
+      streamRes = await fetch(url);
+    } catch (e) {
+      addMessage('Auto-fix stream error: ' + e.message, 'ace');
+      return;
+    }
+    if (!streamRes.ok) { addMessage('Auto-fix HTTP ' + streamRes.status, 'ace'); return; }
+    const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const spinTimer = { h: null, el: null };
+    const stopSpin = () => {
+      if (spinTimer.h) { clearInterval(spinTimer.h); spinTimer.h = null; }
+      if (spinTimer.el) { spinTimer.el.textContent = '✅'; spinTimer.el = null; }
+    };
+    const onStep = line => {
+      const t = String(line || '').trim();
+      if (!t) return;
+      stopSpin();
+      const msgEl = addMessage('<span class="af-hourglass">⏳</span> ' + escapeHtml(t), 'ace');
+      spinTimer.el = msgEl.querySelector('.af-hourglass');
+      if (spinTimer.el) {
+        let flipped = false;
+        spinTimer.h = setInterval(() => {
+          flipped = !flipped;
+          spinTimer.el.textContent = flipped ? '⌛' : '⏳';
+        }, 400);
+      }
+    };
+    // No streaming body (proxied/buffered response) — fall back to reading all
+    // at once and splitting on the blank-line separator.
+    if (!streamRes.body || !streamRes.body.getReader) {
+      try {
+        const all = await streamRes.text();
+        all.split('\n\n').forEach(onStep);
+      } catch (e) {
+        addMessage('Auto-fix read error: ' + e.message, 'ace');
+      }
+      stopSpin();
+      return;
+    }
+    const reader = streamRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let sep;
+        while ((sep = buffer.indexOf('\n\n')) !== -1) {
+          const line = buffer.slice(0, sep).trim();
+          buffer = buffer.slice(sep + 2);
+          onStep(line);
+        }
+      }
+    } catch (e) {
+      addMessage('Auto-fix stream broke mid-way: ' + e.message, 'ace');
+    }
+    if (buffer.trim()) onStep(buffer);
+    stopSpin();
   }
 
   sendBtn.onclick = sendMessage;
@@ -1671,7 +1848,7 @@
       { type: 'checkbox', id: 'liveCursor', label: 'Show live cursors', desc: 'Display collaborator cursors.' }
     ],
     ai: [
-      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['dolphin-phi:2.7b','Dolphin Phi 2.7B (local, fast, uncensored)'],['dolphin-llama3:8b','Dolphin Llama 3.1 8B (local, free)'],['qwen2.5-coder:1.5b','Qwen Coder 1.5B (local, fast)'],['meta-llama/llama-3.1-8b-instruct','Llama 3.1 8B (OpenRouter)'],['mistralai/mistral-7b-instruct','Mistral 7B (OpenRouter)'],['deepseek/deepseek-chat','DeepSeek Chat (OpenRouter)']], def: 'dolphin-phi:2.7b' },
+      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['openai/gpt-oss-20b:free','GPT-OSS 20B (free, tools)'],['google/gemma-4-26b-a4b-it:free','Gemma 4 26B (free)'],['inclusionai/ling-3.0-flash:free','Ling 3.0 Flash (free)'],['cohere/north-mini-code:free','North Mini Code (free)'],['tinyllama:latest','TinyLlama (local, fastest)'],['qwen2.5-coder:1.5b','Qwen Coder 1.5B (local)'],['deepseek-coder:1.3b','DeepSeek Coder 1.3B (local)'],['qwen2.5:3b','Qwen 3B (local)']], def: 'openai/gpt-oss-20b:free' },
       { type: 'range', id: 'temperature', label: 'Temperature', desc: 'Randomness of responses (0–2).', min: 0, max: 2, step: 0.1, def: 0.7 },
       { type: 'select', id: 'maxTokens', label: 'Max tokens', desc: 'Maximum response length.', options: [['250','250'],['500','500'],['1000','1000'],['2000','2000']], def: '500' }
     ],
@@ -1694,9 +1871,10 @@
   };
 
   const DEFAULT_MODELS = [
-    ['meta-llama/llama-3.1-8b-instruct', 'Llama 3.1 8B'],
-    ['mistralai/mistral-7b-instruct', 'Mistral 7B'],
-    ['deepseek/deepseek-chat', 'DeepSeek Chat']
+    ['openai/gpt-oss-20b:free', 'GPT-OSS 20B · free (tools)'],
+    ['google/gemma-4-26b-a4b-it:free', 'Gemma 4 26B · free'],
+    ['inclusionai/ling-3.0-flash:free', 'Ling 3.0 Flash · free'],
+    ['cohere/north-mini-code:free', 'North Mini Code · free']
   ];
 
   const OPENCODE_MODELS = [
@@ -1839,10 +2017,10 @@
 
   function buildModelPicker() {
     const menu = document.getElementById('stModelMenu');
-    const locals = [['dolphin-phi:2.7b', 'Dolphin Phi 2.7B'], ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']];
+    const locals = [['tinyllama:latest', 'TinyLlama (fastest)'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B'], ['deepseek-coder:1.3b', 'DeepSeek Coder 1.3B'], ['qwen2.5:3b', 'Qwen 3B']];
     const openrouter = DEFAULT_MODELS;
     const custom = getLlmModels().map(m => [m.model, m.name]);
-    const current = localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b';
+    const current = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
     let html = '<div class="st-model-group">Local</div>';
     locals.forEach(o => {
       html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">local</span></div>';
@@ -1880,9 +2058,10 @@
   function modelLabel(id) {
     if (id === 'opencode') return 'Opencode agent';
     const all = [
-      ['dolphin-phi:2.7b', 'Dolphin Phi 2.7B'],
-      ['dolphin-llama3:8b', 'Dolphin Llama 3.1 8B'],
-      ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B']
+      ['tinyllama:latest', 'TinyLlama (fastest)'],
+      ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B'],
+      ['qwen2.5:3b', 'Qwen 3B'],
+      ['deepseek-coder:1.3b', 'DeepSeek Coder 1.3B']
     ].concat(DEFAULT_MODELS, OPENCODE_MODELS);
     const m = all.find(x => x[0] === id);
     return m ? m[1] : id;
@@ -1890,7 +2069,7 @@
 
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b');
+    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free');
   }
 
   function toggleModelMenu() {
@@ -1973,7 +2152,7 @@
 
   async function saveSettings() {
     const selEl = document.getElementById('modelSelect');
-    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b')) {
+    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free')) {
       if (!(await requireAdmin())) return;
     }
     const llmNameCheck = document.getElementById('llmName');
@@ -2063,7 +2242,7 @@
   function loadDrive() {
     const body = document.getElementById('driveBody');
     body.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">Loading Drive...</div>';
-    fetch('http://localhost:5000/drive/status')
+    fetch('/drive/status')
       .then(r => r.json())
       .then(st => {
         if (!st.configured) {
@@ -2073,7 +2252,7 @@
         if (!st.authorized) {
           body.innerHTML = '<div style="text-align:center;padding:30px;">' +
             '<p style="color:var(--text);margin-bottom:16px;">Connect your Google account to let ACE read/upload files.</p>' +
-            '<a href="http://localhost:5000/drive/auth" style="display:inline-block;padding:10px 22px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#000;font-weight:700;text-decoration:none;">Sign in with Google</a></div>';
+            '<a href="/drive/auth" style="display:inline-block;padding:10px 22px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#000;font-weight:700;text-decoration:none;">Sign in with Google</a></div>';
           return;
         }
         const user = st.user || {};
@@ -2086,7 +2265,7 @@
   function loadDriveList() {
     const body = document.getElementById('driveBody');
     body.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">Listing files...</div>';
-    fetch('http://localhost:5000/drive/list?parent=' + encodeURIComponent(driveParent))
+    fetch('/drive/list?parent=' + encodeURIComponent(driveParent))
       .then(r => r.json())
       .then(data => {
         if (data.error) { body.innerHTML = '<div style="color:var(--danger);padding:20px;">' + escapeHtml(data.error) + '</div>'; return; }
@@ -2121,7 +2300,7 @@
   function refreshDrive() { loadDriveList(); }
 
   function driveOpenFile(id) {
-    fetch('http://localhost:5000/drive/download?id=' + encodeURIComponent(id))
+    fetch('/drive/download?id=' + encodeURIComponent(id))
       .then(r => r.json())
       .then(data => {
         if (data.error) { alert('Drive: ' + data.error); return; }
@@ -2137,7 +2316,7 @@
     const file = input.files[0];
     const reader = new FileReader();
     reader.onload = () => {
-      fetch('http://localhost:5000/drive/upload', {
+      fetch('/drive/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: file.name, content: reader.result, parent: driveParent })
@@ -2157,7 +2336,7 @@
 
   function openNotifyModal() {
     document.getElementById('notifyOverlay').style.display = 'flex';
-    fetch('http://localhost:5000/notify/topic')
+    fetch('/notify/topic')
       .then(r => r.json())
       .then(d => {
         ntfyTopic = d.topic;
@@ -2173,14 +2352,14 @@
 
   // ===== LIVE DEVICE + AGENT COUNTS =====
   function refreshCounts() {
-    fetch('http://localhost:5000/devices')
+    fetch('/devices')
       .then(r => r.json())
       .then(d => {
         const el = document.getElementById('device-count');
         if (el && d.count !== undefined) { el.textContent = d.count; el.title = d.devices && d.devices.length ? d.devices.join('\n') : 'No ADB devices'; }
       })
       .catch(() => {});
-    fetch('http://localhost:5000/agents')
+    fetch('/agents')
       .then(r => r.json())
       .then(d => {
         const el = document.getElementById('agent-count');
@@ -2210,7 +2389,7 @@
   }
 
   function loadTasks() {
-    fetch('http://localhost:5000/tasks')
+    fetch('/tasks')
       .then(r => r.json())
       .then(d => { aceTasks = d.tasks || []; renderTasks(); updateTasksBadge(); })
       .catch(() => {});
@@ -2240,7 +2419,7 @@
     const t = aceTasks.find(x => x.id === id);
     if (!t) return;
     const next = t.status === 'done' ? 'pending' : 'done';
-    fetch('http://localhost:5000/tasks/' + id + '/status', {
+    fetch('/tasks/' + id + '/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: next })
@@ -2248,7 +2427,7 @@
   }
 
   function taskDelete(id) {
-    fetch('http://localhost:5000/tasks/' + id, { method: 'DELETE' })
+    fetch('/tasks/' + id, { method: 'DELETE' })
       .then(r => r.json()).then(() => loadTasks()).catch(err => alert('Error: ' + err));
   }
 
@@ -2256,7 +2435,7 @@
     const title = document.getElementById('taskTitle').value.trim();
     if (!title) { alert('Enter a task title.'); return; }
     const priority = document.getElementById('taskPriority').value;
-    fetch('http://localhost:5000/tasks', {
+    fetch('/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title, priority: priority })
@@ -2296,7 +2475,7 @@
   document.getElementById('stCalBtn').addEventListener('click', e => { e.stopPropagation(); openCalModal(); });
 
   function loadEvents() {
-    fetch('http://localhost:5000/events')
+    fetch('/events')
       .then(r => r.json())
       .then(d => { aceEvents = d.events || []; renderCal(); updateCalBadge(); })
       .catch(() => {});
@@ -2375,7 +2554,7 @@
     const title = document.getElementById('calTitle').value.trim();
     if (!title) { alert('Enter an event title.'); return; }
     const time = document.getElementById('calTime').value || '';
-    fetch('http://localhost:5000/events', {
+    fetch('/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title, date: calSelected, time: time })
@@ -2385,7 +2564,7 @@
       .catch(err => alert('Error: ' + err));
   }
   function calDeleteEvent(id) {
-    fetch('http://localhost:5000/events/' + id, { method: 'DELETE' })
+    fetch('/events/' + id, { method: 'DELETE' })
       .then(r => r.json()).then(() => loadEvents()).catch(err => alert('Error: ' + err));
   }
 
@@ -2424,7 +2603,11 @@
   }
 
   function showAlertNotif(type, label) {
-    const title = type === 'alarm' ? '⏰ Alarm: ' + label : '⏲️ Timer: ' + label;
+    let title;
+    if (type === 'alarm') title = '⏰ Alarm: ' + label;
+    else if (type === 'timer') title = '⏲️ Timer: ' + label;
+    else if (type === 'autofix') title = '✅ Auto-fix: ' + label;
+    else title = label;
     if ('Notification' in window && Notification.permission === 'granted') {
       try { new Notification(title); } catch (e) {}
     }
@@ -2432,7 +2615,7 @@
   }
 
   function pollNotifications() {
-    fetch('http://localhost:5000/notifications/pending?after=' + notifyAfter)
+    fetch('/notifications/pending?after=' + notifyAfter)
       .then(r => r.json())
       .then(d => {
         if (d.events && d.events.length) {
@@ -2466,9 +2649,9 @@
 
   function loadTimeData() {
     Promise.all([
-      fetch('http://localhost:5000/timers').then(r => r.json()),
-      fetch('http://localhost:5000/alarms').then(r => r.json()),
-      fetch('http://localhost:5000/sessions').then(r => r.json())
+      fetch('/timers').then(r => r.json()),
+      fetch('/alarms').then(r => r.json()),
+      fetch('/sessions').then(r => r.json())
     ])
       .then(([t, a, s]) => {
         aceTimers = t.timers || [];
@@ -2575,51 +2758,51 @@
     const minutes = parseInt(document.getElementById('tmMinutes').value, 10);
     const label = document.getElementById('tmLabel').value.trim();
     if (!minutes || minutes < 1) { alert('Enter minutes.'); return; }
-    fetch('http://localhost:5000/timers', {
+    fetch('/timers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ minutes: minutes, label: label || 'Timer' })
     }).then(r => r.json()).then(d => { if (d.error) alert('Error: ' + d.error); else loadTimeData(); }).catch(err => alert('Error: ' + err));
   }
   function stopTimer(id) {
-    fetch('http://localhost:5000/timers/' + id, { method: 'DELETE' })
+    fetch('/timers/' + id, { method: 'DELETE' })
       .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
   }
   function addAlarm() {
     const time = document.getElementById('alTime').value;
     const label = document.getElementById('alLabel').value.trim();
     if (!time) { alert('Pick a time.'); return; }
-    fetch('http://localhost:5000/alarms', {
+    fetch('/alarms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ time: time, label: label || 'Alarm', daily: document.getElementById('alDaily').checked })
     }).then(r => r.json()).then(d => { if (d.error) alert('Error: ' + d.error); else loadTimeData(); }).catch(err => alert('Error: ' + err));
   }
   function toggleAlarm(id) {
-    fetch('http://localhost:5000/alarms/' + id + '/toggle', { method: 'POST' })
+    fetch('/alarms/' + id + '/toggle', { method: 'POST' })
       .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
   }
   function deleteAlarm(id) {
-    fetch('http://localhost:5000/alarms/' + id, { method: 'DELETE' })
+    fetch('/alarms/' + id, { method: 'DELETE' })
       .then(r => r.json()).then(() => loadTimeData()).catch(err => alert('Error: ' + err));
   }
   function startSession() {
     const label = document.getElementById('sessLabel').value.trim();
-    fetch('http://localhost:5000/sessions/start', {
+    fetch('/sessions/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: label || 'Work session' })
     }).then(r => r.json()).then(d => { if (d.error) alert(d.error); loadTimeData(); }).catch(err => alert('Error: ' + err));
   }
   function endSession() {
-    fetch('http://localhost:5000/sessions/end', { method: 'POST' })
+    fetch('/sessions/end', { method: 'POST' })
       .then(r => r.json()).then(d => { if (d.error) alert(d.error); loadTimeData(); }).catch(err => alert('Error: ' + err));
   }
 
   // ===== DAILY SUMMARY =====
   function openSummaryModal() {
     document.getElementById('summaryOverlay').style.display = 'flex';
-    fetch('http://localhost:5000/summary')
+    fetch('/summary')
       .then(r => r.json())
       .then(d => {
         document.getElementById('summaryBody').textContent = d.summary;
@@ -2636,7 +2819,7 @@
   function saveSummaryConfig() {
     const time = document.getElementById('summaryTime').value;
     const enabled = document.getElementById('summaryEnabled').checked;
-    fetch('http://localhost:5000/summary/config', {
+    fetch('/summary/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ time: time, enabled: enabled })
@@ -2647,7 +2830,7 @@
   }
 
   function sendSummaryNow() {
-    fetch('http://localhost:5000/summary/now', { method: 'POST' })
+    fetch('/summary/now', { method: 'POST' })
       .then(r => r.json())
       .then(d => {
         if (d.error) { alert('Error: ' + d.error); return; }
@@ -2661,7 +2844,7 @@
     const title = document.getElementById('ntfyTitle').value.trim() || 'ACE';
     const msg = document.getElementById('ntfyMsg').value.trim();
     if (!msg) { alert('Enter a message first.'); return; }
-    fetch('http://localhost:5000/notify', {
+    fetch('/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title, message: msg })
@@ -2680,7 +2863,7 @@
   }
   function closeMemModal() { document.getElementById('memOverlay').style.display = 'none'; }
   function loadMemories() {
-    fetch('http://localhost:5000/memory/all')
+    fetch('/memory/all')
       .then(r => r.json())
       .then(d => {
         const mem = d.memory || {};
@@ -2708,7 +2891,7 @@
     const key = document.getElementById('memKey').value.trim();
     const value = document.getElementById('memValue').value.trim();
     if (!key || !value) { alert('Enter both a key and a value.'); return; }
-    fetch('http://localhost:5000/memory/set', {
+    fetch('/memory/set', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key, value: value })
@@ -2718,7 +2901,7 @@
       .catch(err => alert('Error: ' + err));
   }
   function forgetMemory(key) {
-    fetch('http://localhost:5000/memory/forget', {
+    fetch('/memory/forget', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key })
@@ -2774,7 +2957,7 @@
     try { items = parseMemoryItems(raw); }
     catch (e) { alert('Parse error: ' + e.message); return; }
     if (!Object.keys(items).length) { alert('Nothing to import. Enter key: value lines or JSON.'); return; }
-    fetch('http://localhost:5000/memory/bulk', {
+    fetch('/memory/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: items })
@@ -2884,7 +3067,7 @@
   }
   async function proactiveCheckIn() {
     lastCheckInAt = Date.now();
-    const model = localStorage.getItem('ace_modelSelect') || 'dolphin-phi:2.7b';
+    const model = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
     let line = "I'm still here, Chris. You don't have to say anything. Just wanted you to know I'm present.";
     try {
       const payload = { message: '', model: model, proactive: true };
@@ -2892,7 +3075,7 @@
       if (isLocal) { payload.endpoint = 'http://localhost:11434/v1'; payload.api_key = ''; }
       const ctrl = new AbortController();
       const timer = setTimeout(function() { ctrl.abort(); }, 12000);
-      const res = await fetch('http://localhost:5000/chat', {
+      const res = await fetch('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -2989,7 +3172,7 @@
 
   async function loadChatHistory() {
     try {
-      const res = await fetch('http://localhost:5000/conversations?limit=60');
+      const res = await fetch('/conversations?limit=60');
       const d = await res.json();
       const convs = (d && d.conversations) || [];
       if (!convs.length) return;
@@ -3015,6 +3198,67 @@
       });
     } catch (e) {}
   }
+</script>
+<script>
+(function() {
+  const cv = document.getElementById('aceOrb');
+  const ctx = cv.getContext('2d');
+  let aceTalking = false;
+  let angle = 0;
+  const COLORS = {
+    idle:          { core: '#cc5500', glow: '#ffaa33' },
+    speaking:      { core: '#39ff14', glow: '#ffffff' },
+    user_speaking: { core: '#39ff14', glow: '#ffffff' }
+  };
+  function state() {
+    const typing = document.getElementById('userInput').value.trim().length > 0;
+    if (typing) return 'user_speaking';
+    if (aceTalking) return 'speaking';
+    if (window.speechSynthesis && window.speechSynthesis.speaking) return 'speaking';
+    return 'idle';
+  }
+  window.aceOrbAceActive = function(v) { aceTalking = !!v; };
+  const _st = window.showThinking;
+  if (typeof _st === 'function') {
+    window.showThinking = function(t) { window.aceOrbAceActive(true); return _st(t); };
+  }
+  const _ht = window.hideThinking;
+  if (typeof _ht === 'function') {
+    window.hideThinking = function() { window.aceOrbAceActive(false); return _ht(); };
+  }
+  function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
+  window.addEventListener('resize', resize);
+  resize();
+  function frame() {
+    const panel = document.getElementById('chat-panel');
+    const r = panel.getBoundingClientRect();
+    const cx = r.left + r.width * 0.5;
+    const cy = r.top + r.height * 0.40;
+    const colors = COLORS[state()];
+    const base = Math.max(24, Math.min(r.width, r.height) * 0.12);
+    const speaking = state() !== 'idle';
+    const amp = base * (speaking ? 0.25 : 0.16);
+    const speed = 0.05;
+    angle += speed;
+    const radius = base + Math.sin(angle) * amp;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const g = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 2.2);
+    g.addColorStop(0, colors.core);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, radius * 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = colors.glow;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = colors.core;
+    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
