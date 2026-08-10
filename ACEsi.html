@@ -3449,17 +3449,19 @@
   document.body.appendChild(btn);
   const panel = document.createElement('div');
   panel.id = 'aceInspectPanel';
-  panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button></div></div><div id="aceInspectBody"><pre></pre></div>';
+  panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:#f87171;color:#f87171">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
   document.body.appendChild(panel);
   let cur = 'status', expanded = false;
   const pre = panel.querySelector('#aceInspectBody pre');
   const head = panel.querySelector('#aceInspectHead');
   head.onclick = function(e){ if (e.target.tagName==='BUTTON') return; expanded = !expanded; panel.classList.toggle('expanded', expanded); aceInspect.render(); };
-  btn.onclick = async function(){ aceInspect.open = !aceInspect.open; panel.style.display = aceInspect.open ? 'flex' : 'none'; if (aceInspect.open){ try{ await fetch('/cdp/connect',{method:'GET'}); }catch(e){} aceInspect.render(); } };
+  btn.onclick = function(){ aceInspect.open = true; panel.style.display = 'flex'; aceInspect.connect(); };
   async function api(path){ const r = await fetch(path); return r.json(); }
   window.aceInspect = {
     open: false,
-    toggle: function(tab){ cur = tab; aceInspect.render(); },
+    connect: async function(){ try{ await fetch('/cdp/connect',{method:'GET'}); }catch(e){} this.render(); },
+    toggle: function(tab){ cur = tab; this.render(); },
+    close: function(){ this.open = false; panel.style.display = 'none'; },
     render: async function(){
       pre.textContent = 'loading…';
       let data;

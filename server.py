@@ -57,8 +57,14 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
 CEREBRAS_MODEL = "gpt-oss-120b"
 
-# Local fallback (OpenAI-compatible) — keeps ACEsi alive when OpenRouter free
-# quota is exhausted (429). Small model chosen for 8 GB RAM / CPU-only.
+# Local fallback (OpenAI-compatible) — keeps ACEsi alive AND autonomous when
+# OpenRouter free quota is exhausted (429), with no network at all.
+# IMPORTANT: pick a TOOL-capable model (the base qwen2.5 / mistral DO support
+# tools on modern Ollama). Lighter offline options already pulled here:
+#   qwen2.5:7b            (default — good quality + tools)
+#   qwen2.5-coder:1.5b    (fast, tools, code-tilted)
+#   mistral:7b            (tools)
+#   qwen2.5:3b            (tools, lighter)
 OLLAMA_ENDPOINT = "http://localhost:11434/v1"
 OLLAMA_MODEL = "qwen2.5:7b"
 
@@ -1373,27 +1379,56 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3):
         except Exception as e:
             print(f"❌ {name} exc: {e}")
         return None
-    for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-                                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-                                 ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)):
-        res = one(name, ep, key, model)
-        if res is not None:
-            return res
-    for model in OPENROUTER_FALLBACKS:
-        res = one("OpenRouter-fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model)
-        if res is not None:
-            return res
-    # Last resort: local Ollama, plain (no tools) — keep ACEsi alive if cloud quota exhausted.
+    # Offline mode: skip cloud providers entirely, go straight to local Ollama.
+    if os.environ.get("ACE_OFFLINE") == "1":
+        print("🔌 ACE_OFFLINE=1 set — skipping cloud providers, using local Ollama")
+    else:
+        for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+                                     ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                                     ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)):
+            res = one(name, ep, key, model)
+            if res is not None:
+                return res
+        for model in OPENROUTER_FALLBACKS:
+            res = one("OpenRouter-fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model)
+            if res is not None:
+                return res
+    # Last resort: local Ollama — offline + tool-capable so ACEsi stays autonomous
+    # with NO network. Uses the full tools schema so cdp_*/edit_file are callable.
     try:
-        print("🦙 llm_reply via Ollama")
-        r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions",
-            json={"model": OLLAMA_MODEL, "messages": messages, "stream": False,
-                  "max_tokens": min(max_tokens, 512), "temperature": temperature},
-            timeout=(15, 280))
+        print("🦙 llm_reply via Ollama model=%s" % OLLAMA_MODEL)
+        payload = {"model": OLLAMA_MODEL, "messages": messages, "stream": False,
+                   "max_tokens": min(max_tokens, 512), "temperature": temperature,
+                   "tools": TOOLS_SCHEMA, "tool_choice": "auto"}
+        r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions", json=payload,
+                         timeout=(15, 280))
         if r.status_code == 200:
-            t = (r.json()["choices"][0]["message"].get("content") or "").strip()
+            msg = r.json()["choices"][0]["message"]
+            t = (msg.get("content") or "").strip()
+            tcs = []
+            for tc in (msg.get("tool_calls") or []):
+                fn = tc.get("function") or {}
+                nm = fn.get("name")
+                am = fn.get("arguments")
+                if isinstance(am, str):
+                    try:
+                        args = json.loads(am)
+                    except Exception:
+                        args = {}
+                elif isinstance(am, dict):
+                    args = am
+                else:
+                    args = {}
+                if nm:
+                    tcs.append((nm, args))
+            if tcs:
+                print(f"✅ llm_reply via Ollama ({len(tcs)} tool_call(s))")
+                return t, tcs
             if t:
+                print(f"✅ llm_reply via Ollama ({len(t)} chars, no tools)")
                 return t, []
+            return None
+        print(f"❌ Ollama {r.status_code}: {r.text[:160]}")
     except Exception as e:
         print(f"❌ Ollama exc: {e}")
     return "", []
