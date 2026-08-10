@@ -22,6 +22,7 @@ class ItsUrl {
   static bool isItsHost(String url) {
     return url.contains('univenierp01') ||
         url.contains('univenerp01') ||
+        url.contains('univenerip01') ||
         url.contains('unlvenierp01') ||
         url.contains('/pls/prodi41') ||
         url.contains('/pls/');
@@ -40,13 +41,16 @@ class ItsUrl {
     final rest = url.substring(restStart);
     final q = rest.indexOf('?');
     final sl = rest.indexOf('/');
+    final hash = rest.indexOf('#');
     int cut;
-    if (q == -1 && sl == -1) {
+    if (q == -1 && sl == -1 && hash == -1) {
       cut = rest.length;
-    } else if (q != -1 && (sl == -1 || q < sl)) {
-      cut = q;
     } else {
-      cut = sl;
+      // choose the smallest non-negative index among q, sl, hash
+      cut = rest.length;
+      if (q != -1 && q < cut) cut = q;
+      if (sl != -1 && sl < cut) cut = sl;
+      if (hash != -1 && hash < cut) cut = hash;
     }
     final proc = rest.substring(0, cut);
     final tail = rest.substring(cut);
@@ -67,8 +71,9 @@ class ItsUrl {
     var out = url;
     if (isItsHost(out)) {
       out = out
-          .replaceFirst('unlven', 'univen')
-          .replaceFirst('univenerp01', 'univenierp01');
+          .replaceAll('unlven', 'univen')
+          .replaceAll('univenerp01', 'univenierp01')
+          .replaceAll('univenerip01', 'univenierp01');
       if (out.startsWith('http://')) {
         out = out.replaceFirst('http://', 'https://');
       }

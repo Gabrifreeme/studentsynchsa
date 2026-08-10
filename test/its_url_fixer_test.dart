@@ -79,6 +79,15 @@ void main() {
       );
     });
 
+    test('fixes host typo univenerip01 -> univenierp01', () {
+      expect(
+        ItsUrl.normalize(
+          'https://univenerip01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+        ),
+        'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+      );
+    });
+
     test('upgrades plain http to https for ITS URLs', () {
       expect(
         ItsUrl.normalize(
@@ -136,6 +145,7 @@ void main() {
   group('ItsUrl.isItsHost / hasProcedure', () {
     test('detects ITS hosts', () {
       expect(ItsUrl.isItsHost('https://univenierp01.univen.ac.za/pls/prodi41/x'), isTrue);
+      expect(ItsUrl.isItsHost('https://univenerip01.univen.ac.za/pls/prodi41/x'), isTrue);
       expect(ItsUrl.isItsHost('http://unlvenierp01.univen.ac.za/pls/x'), isTrue);
       expect(ItsUrl.isItsHost('https://alecto.cput.ac.za/pls/prodi41/w99pkg.mi_login'), isTrue);
       expect(ItsUrl.isItsHost('https://www.univen.ac.za'), isFalse);

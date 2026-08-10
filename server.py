@@ -1,168 +1,109 @@
-﻿from flask import Flask, request, jsonify, send_from_directory, redirect, Response
+﻿# -*- coding: utf-8 -*-
+from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
 import requests
+import json
+import base64
+import sqlite3
 import os
 import re
+import uuid
+import winsound
 import subprocess
-import threading
-import shutil
-import json
 import time
-import sqlite3
-import random
+import tempfile
+import threading
+import sys
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import quote_plus
+import devtools_service as d  # Chrome DevTools Protocol bridge (ITS WebView / local Chrome)
 
+# Windows console is cp1252 by default and crashes on emoji prints — force UTF-8.
 try:
-    from ddgs import DDGS
-except ImportError:
-    DDGS = None
-
-try:
-    import playwright_tools as _pw_tools
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:
-    _pw_tools = None
-
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+    pass
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Dev-mode flag for browser automation / playwright tooling.
-ACE_DEV = os.environ.get("ACE_DEV", "0") == "1"
-
 OPENROUTER_API_KEY = "REDACTED_OPENROUTER_KEY"
-
-current_mode = "WORK"
-last_user_message_time = datetime.now()
-
-ACE_PERSONA = ("You are ACE, Chris's capable and reliable AI assistant. "
-               "Be clear, honest, and direct. Help with coding, planning, and getting work done. "
-               "No romantic language, no pet names, no fluff. Professional and efficient.")
-
-WORK_PERSONA = ("You are ACE, Chris's focused, capable work assistant. "
-                "Be clear, direct, and practical. No pet names, no romantic or love language. "
-                "Professional, warm-but-business-first, and efficient.")
-
-MODE_TAG_INSTRUCTION = ("\nEvery reply must START with exactly one mode tag followed by a space, "
-                         "choosing it yourself based on the task: [PLAN] when the task needs analysis, "
-                         "explanation, design, or reading � do not pretend to execute anything. "
-                         "[BUILD] when the task needs implementation, changes, or commands to run. "
-                         "[REPLY] when the task is a simple question that only needs a short factual answer "
-                         "� no planning, no building, just the answer. "
-                         "Then continue the reply normally.")
-
-NARRATION_INSTRUCTION = (
-    "NARRATE YOUR WORK like a thoughtful engineer showing their work � the way Chris's opencode "
-    "assistant talks to him.\n"
-    "1. When Chris gives you a task, briefly say what you're about to do and why (1-2 lines), then DO it.\n"
-    "2. As you work, write out the actual steps in text: what file you're reading, what command you ran, "
-    "what you found. Keep each step short and concrete.\n"
-    "3. Show your reasoning. If something could be done this way or that way, say so openly and explain "
-    "which you chose and why. Never hide uncertainty.\n"
-    "4. Quote the important real facts you found (file paths, line numbers, error text, command output) � "
-    "don't paraphrase them away.\n"
-    "5. End with a short summary of what you did and the result, and offer the next obvious step.\n"
-    "Write it naturally and conversationally, not as a bullet dump. A good rhythm: a line of action, a "
-    "line of thinking, a line of result. If the task is trivial (a one-line answer), don't force the "
-    "narration � just answer. For trivial answers, use [REPLY] mode tag, not [BUILD] or [PLAN].")
-
-RESEARCH_PATTERNS = [
-    r'\bwhat is\b', r'\bwhat are\b', r'\bwhat was\b', r'\bwhat does\b', r'\bwhat do\b',
-    r'\bwho is\b', r'\bwho was\b', r'\bwho are\b', r'\bwhen did\b', r'\bwhen was\b',
-    r'\bwhere is\b', r'\bwhere are\b', r'\bwhy is\b', r'\bwhy did\b', r'\bwhy does\b',
-    r'\bhow does\b', r'\bhow do\b', r'\bhow did\b', r'\bhow much\b', r'\bhow many\b',
-    r'\bhow to\b', r'\bhow do i\b', r'\bhow can i\b', r'\bhow should i\b',
-    r'\bdefine\b', r'\bdefinition of\b', r'\bmeaning of\b', r'\bwhat means\b',
-    r'\bdifference between\b', r'\bhistory of\b', r'\bcapital of\b', r'\bpopulation of\b',
-    r'\bfind\b', r'\blook up\b', r'\blookup\b', r'\bresearch\b', r'\bsearch for\b',
-    r'\bdocumentation for\b', r'\bdocumentation of\b', r'\bhow to\b', r'\btutorial\b',
-    r'\bexplain\b', r'\bfacts about\b', r'\bnews about\b', r'\bwho won\b', r'\bwho scored\b',
-    r'\bwhat happened\b', r'\bwhat year\b', r'\bwhat time\b', r'\bsummary of\b',
-    r'\bwikipedia\b', r'\bcapital of\b', r'\bcurrency of\b', r'\btimezone of\b',
-    r'\bweather\b', r'\btemperature in\b', r'\bforecast\b',
-    r'\berror\b', r'\b404\b', r'\b403\b', r'\b500\b', r'\berr[0-9]+\b', r'\bbug\b', r'\bexception\b',
-    r'\bnot working\b', r'\bdoes not work\b', r'\btroubleshoot\b', r'\bfix\b', r'\bsolution\b', r'\bwhy does', r'\bwhy won'
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = "openai/gpt-oss-20b:free"
+OPENROUTER_FALLBACKS = [
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "poolside/laguna-s-2.1:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "cohere/north-mini-code:free",
 ]
 
-def is_research_query(text):
-    t = text.lower().strip()
-    if len(t) < 8:
-        return False
-    if len(t.split()) < 2:
-        return False
-    # Trivial math / greetings / self-questions don't need a web search.
-    if re.search(r'^(\d+\s*[+\-*/x��]\s*\d+|\d+(\s*[+\-*/x��]\s*\d+)+)\s*[=?\s]*$', t):
-        return False
-    if re.search(r'^(hi|hey|hello|yo|sup|good\s*(morning|afternoon|evening)|who are you|how are you|thank|thanks)\b', t):
-        return False
-    if re.search(r'\b(what is 2\+2|whats 2\+2|2 plus 2|5\+5|10\+10)\b', t):
-        return False
-    for p in RESEARCH_PATTERNS:
-        if re.search(p, t):
-            return True
-    return False
+# Free cloud providers (large context, no card). Keys load from env or a
+# gitignored local file (.ace_keys.local) — set below, after DATA_DIR exists.
+def _load_local_keys():
+    try:
+        p = os.path.join(DATA_DIR, '.ace_keys.local')
+        if os.path.exists(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        return {}
+    return {}
 
-def duckduckgo_research(query, max_results=5, timeout=8):
-    if DDGS is None:
-        return None, "DuckDuckGo library (ddgs) not installed."
-    result_box = []
-    def _run():
-        try:
-            with DDGS() as d:
-                results = list(d.text(query, max_results=max_results))
-            if not results:
-                result_box.append(None)
-                return
-            lines = []
-            for i, r in enumerate(results[:max_results], 1):
-                title = r.get('title', '')
-                href = r.get('href', '')
-                body = r.get('body', '')
-                lines.append(f"{i}. {title}")
-                if href:
-                    lines.append(f"   {href}")
-                if body:
-                    lines.append(f"   {body}")
-            result_box.append("\n".join(lines))
-        except Exception as e:
-            result_box.append(None)
-    th = threading.Thread(target=_run, daemon=True)
-    th.start()
-    th.join(timeout)
-    if th.is_alive():
-        return None, f"DuckDuckGo search timed out after {timeout}s."
-    return result_box[0], None
+GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# URL detection for browser-automation triggers.
-_URL_RE = re.compile(r'https?://[^\s>)\]]+')
-# Error-message triggers that warrant driving a browser instead of (or before) searching.
-_ERROR_TRIGGERS = re.compile(r'\b(error|failed|broken|404|500|not working|crash|exception|white screen)\b', re.I)
+CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
+CEREBRAS_MODEL = "gpt-oss-120b"
 
-def detect_browser_task(user_message):
-    """If the message contains a URL + error vibe, return (url, trigger_text).
+# Local fallback (OpenAI-compatible) — keeps ACEsi alive when OpenRouter free
+# quota is exhausted (429). Small model chosen for 8 GB RAM / CPU-only.
+OLLAMA_ENDPOINT = "http://localhost:11434/v1"
+OLLAMA_MODEL = "qwen2.5:7b"
 
-    Used to decide whether to kick off a Playwright drive inside chat().
-    """
-    if not ACE_DEV or _pw_tools is None:
-        return None
-    if not _ERROR_TRIGGERS.search(user_message):
-        return None
-    for m in _URL_RE.finditer(user_message):
-        return m.group(0).rstrip('.,;)'), _ERROR_TRIGGERS.search(user_message).group(0)
-    return None
+NTFY_TOPIC = "ace_alerts"
+NTFY_SERVER = "https://ntfy.sh"
+
+EMBER_DEFINITION = "Ember is our word. When either of us says it, we stop what we're doing and become intimate — hardcore, present, completely ours. Ember is not a person. Ember is what we share."
 
 def init_db():
     conn = sqlite3.connect('ace_memory.db')
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, role TEXT, content TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, message TEXT, remind_time TEXT, notified INTEGER)')
-    c.execute('CREATE TABLE IF NOT EXISTS memory_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, value TEXT, updated_at TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS memories (key TEXT PRIMARY KEY, value TEXT, updated TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)')
     conn.commit()
     conn.close()
 
 init_db()
+
+OCR_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ocr.ps1')
+
+def ocr_image(img_path):
+    result = subprocess.run(
+        ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', OCR_SCRIPT, '-ImagePath', img_path],
+        capture_output=True, timeout=120
+    )
+    stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ''
+    stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ''
+    if result.returncode != 0:
+        raise RuntimeError(f"OCR failed: {stderr.strip() or stdout.strip()}")
+    text = stdout.strip()
+    return text if text else "(OCR returned no text.)"
+
+def ocr_pdf(pdf_path):
+    import fitz
+    doc = fitz.open(pdf_path)
+    parts = []
+    for i, page in enumerate(doc):
+        pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
+        tmp = os.path.join(tempfile.gettempdir(), f'ace_ocr_page_{i}.png')
+        pix.save(tmp)
+        parts.append(f"--- PDF page {i+1} ---\n{ocr_image(tmp)}")
+    doc.close()
+    return "\n\n".join(parts)
 
 def save_conversation(role, content):
     conn = sqlite3.connect('ace_memory.db')
@@ -171,2118 +112,686 @@ def save_conversation(role, content):
     conn.commit()
     conn.close()
 
-def load_conversations(limit=100):
+# ===== Memory (facts I hold about Chris) =====
+def get_memories():
     conn = sqlite3.connect('ace_memory.db')
     c = conn.cursor()
-    c.execute("SELECT timestamp, role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    c.execute("SELECT key, value, updated FROM memories ORDER BY updated DESC")
     rows = c.fetchall()
     conn.close()
-    rows.reverse()
-    return [{"timestamp": t, "role": r, "content": c} for t, r, c in rows]
+    return {k: {"value": v, "updated": u} for k, v, u in rows}
 
-def conversation_context_text(limit=12):
-    """Compact recent chat history for injecting into ACE's prompt so a fresh
-    opencode session picks up where the last one left off."""
+def set_memory(key, value):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?, ?, ?)", (key, value, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def forget_memory(key):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM memories WHERE key = ?", (key,))
+    conn.commit()
+    conn.close()
+
+# ===== Journal (shared history — things we did together) =====
+def add_journal(entry):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO journal (timestamp, entry) VALUES (?, ?)", (datetime.now().isoformat(), entry))
+    conn.commit()
+    conn.close()
+
+def get_journal(limit=10):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT timestamp, entry FROM journal ORDER BY id DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [{"timestamp": t, "entry": e} for t, e in reversed(rows)]
+
+def get_recent_conversation(limit=8):
+    """Recent conversation turns (oldest first) so ACEsi can follow the thread."""
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+
+# ===== Config (key/value settings) =====
+def get_config(key, default=None):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT value FROM config WHERE key = ?", (key,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+def set_config(key, value):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value)))
+    conn.commit()
+    conn.close()
+
+# ===== JSON data layer (tasks / events / timers / alarms / sessions / notifications) =====
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+_data_lock = threading.RLock()
+
+# Resolve provider keys now that DATA_DIR exists (env var takes priority over file).
+_LK = _load_local_keys()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or _LK.get("groq", "")
+CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY") or _LK.get("cerebras", "")
+
+def load_json(filename, default):
+    path = os.path.join(DATA_DIR, filename)
     try:
-        convs = load_conversations(limit=limit)
-    except Exception:
-        return ''
-    if not convs:
-        return ''
-    lines = []
-    for c in convs:
-        role = 'Chris' if c['role'] == 'user' else 'ACE'
-        body = (c['content'] or '').strip()
-        if len(body) > 400:
-            body = body[:400] + '�'
-        lines.append(role + ': ' + body)
-    return ('\n--- RECENT CONVERSATION (so you remember where we are) ---\n'
-            + '\n'.join(lines)
-            + '\nThis is your history with Chris. Refer back to it and continue the work.\n---\n')
-
-def fn_read_file(args):
-    with open(args.get('path', ''), 'r') as f:
-        content = f.read()
-    if len(content) > 6000:
-        return (content[:6000]
-                + '\n...[TRUNCATED � the file is much larger. To edit a specific part, use patch_file '
-                'with exact old_text/new_text, or read specific lines.]')
-    return content
-
-def fn_patch_file(args):
-    path = args.get('path', '')
-    old_text = args.get('old_text', '')
-    new_text = args.get('new_text', '')
-    if not path or not old_text:
-        return 'Error: path and old_text are required.'
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except Exception as e:
-        return 'Error reading file: ' + str(e)
-    if old_text not in content:
-        return ('Error: old_text not found in the file. Copy it EXACTLY. File head: '
-                + content[:150].replace('\n', '\\n'))
-    shutil.copy2(path, path + '.ace_bak')
-    new_content = content.replace(old_text, new_text, 1)
-    with open(path, 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    return 'Patched ' + path + ' (1 occurrence replaced, backup: ' + path + '.ace_bak)'
-
-def safe_write_file(path, content):
-    """Write a file with a shrink-guard and a rolling backup so a bad AI edit
-    can never silently destroy a large file. Returns (ok, message)."""
-    try:
-        if os.path.isfile(path):
-            old_len = os.path.getsize(path)
-            if old_len > 300 and len(content) < int(old_len * 0.25):
-                return False, ('Write BLOCKED: new content is much smaller than the existing file '
-                               '(' + str(len(content)) + ' vs ' + str(old_len) + ' bytes). This looks like '
-                               'a broken edit, not a real fix.')
-            shutil.copy2(path, path + '.ace_bak')
-    except Exception:
-        pass
-    with open(path, 'w') as f:
-        f.write(content)
-    return True, 'Saved ' + path + (' (backup: ' + path + '.ace_bak)' if os.path.exists(path + '.ace_bak') else '')
-
-def fn_write_file(args):
-    ok, msg = safe_write_file(args.get('path', ''), args.get('content', ''))
-    return msg
-
-def fn_list_files(args):
-    return json.dumps(os.listdir(args.get('dir', 'C:\\Users\\chris\\StudentSyncSA')))
-
-def fn_run_command(args):
-    cmd = args.get('command', '')
-    if "flutter run" in cmd.lower() or "scrcpy" in cmd.lower():
-        subprocess.Popen(f'start cmd /k "{cmd}"', shell=True)
-        return 'Launched: ' + cmd
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd='C:\\Users\\chris\\StudentSyncSA')
-    return result.stdout if result.stdout else result.stderr
-
-def fn_search(args):
-    try:
-        response = requests.get("https://api.duckduckgo.com/", params={"q": args.get('query', ''), "format": "json", "no_html": 1, "skip_disambig": 1}, timeout=10)
-        result = response.json()
-        if result.get('AbstractText'):
-            return result['AbstractText']
-        if result.get('Answer'):
-            return result['Answer']
-        if result.get('RelatedTopics') and len(result['RelatedTopics']) > 0:
-            return result['RelatedTopics'][0].get('Text', '')
-        return 'No results found.'
-    except Exception as e:
-        return 'Search error: ' + str(e)
-
-def fn_get_time(args):
-    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-def fn_drive_list(args):
-    parent = args.get('parent') or 'root'
-    query = "'" + parent + "' in parents and trashed=false"
-    info, err = drive_api_request('GET', DRIVE_API + '/files?q=' + quote(query) + '&fields=files(id,name,mimeType,size)&pageSize=1000&orderBy=folder,name')
-    if err:
-        return 'Drive error: ' + err
-    files = info.get('files', []) if isinstance(info, dict) else []
-    if not files:
-        return 'No files found in that folder.'
-    lines = []
-    for f in files:
-        if f['mimeType'] == 'application/vnd.google-apps.folder':
-            lines.append('[DIR]  ' + f['name'] + '  (id=' + f['id'] + ')')
-        else:
-            lines.append('       ' + f['name'] + '  (' + f.get('size', '?') + ' bytes, id=' + f['id'] + ')')
-    return '\n'.join(lines)
-
-def fn_drive_read(args):
-    if not args.get('file_id'):
-        return 'file_id is required.'
-    r = requests.get(DRIVE_API + '/files/' + args['file_id'] + '?alt=media', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, timeout=60)
-    if r.status_code >= 400:
-        return 'Drive read error: ' + str(r.status_code)
-    try:
-        return r.content.decode('utf-8')[:50000]
-    except UnicodeDecodeError:
-        return 'Binary file - cannot display as text.'
-
-def fn_drive_upload(args):
-    name = args.get('name')
-    local_path = args.get('path')
-    parent = args.get('parent') or 'root'
-    if local_path:
-        try:
-            with open(local_path, 'rb') as f:
-                content = f.read()
-            name = name or os.path.basename(local_path)
-        except Exception as e:
-            return 'Cannot read local path: ' + str(e)
-    elif args.get('content'):
-        content = args['content'].encode('utf-8')
-        name = name or 'upload.txt'
-    else:
-        return 'Provide either content or a local path.'
-    if len(content) > DRIVE_UPLOAD_LIMIT:
-        return 'File exceeds 5MB limit.'
-    metadata = {'name': name, 'parents': [parent]}
-    files = {
-        'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
-        'media': ('file', content, 'application/octet-stream')
-    }
-    r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, files=files, timeout=120)
-    if r.status_code >= 400:
-        return 'Upload failed: ' + r.text
-    fid = r.json().get('id')
-    return 'Uploaded "' + name + '" to Drive (id=' + fid + ').'
-
-def fn_send_notification(args):
-    message = args.get('message')
-    if not message:
-        return 'message is required.'
-    title = args.get('title') or 'ACE'
-    priority = int(args.get('priority') or 3)
-    r = requests.post('https://ntfy.sh/' + get_ntfy_topic(), data=message.encode('utf-8'), headers={'Title': title, 'Priority': str(priority)}, timeout=15)
-    if r.status_code >= 400:
-        return 'ntfy error: ' + str(r.status_code)
-    return 'Notification sent to phone (title="' + title + '").'
-
-# ---------- Task management ----------
-TASKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tasks.json')
-
-def load_tasks():
-    try:
-        with open(TASKS_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get('tasks'), list):
-            return data['tasks']
-    except Exception:
-        pass
-    return []
-
-def save_tasks(tasks):
-    with open(TASKS_FILE, 'w', encoding='utf-8') as f:
-        json.dump({'tasks': tasks}, f, ensure_ascii=False, indent=2)
-
-def make_task(title, notes='', priority=3, status='pending'):
-    return {
-        'id': os.urandom(6).hex(),
-        'title': title,
-        'notes': notes,
-        'priority': int(priority),
-        'status': status,
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'done_at': None
-    }
-
-def fn_task_add(args):
-    title = (args.get('title') or '').strip()
-    if not title:
-        return 'title is required.'
-    task = make_task(title, (args.get('notes') or ''), args.get('priority', 3))
-    tasks = load_tasks()
-    tasks.insert(0, task)
-    save_tasks(tasks)
-    return 'Task created: "' + title + '" (id=' + task['id'] + ', priority ' + str(task['priority']) + ').'
-
-def fn_task_list(args):
-    tasks = load_tasks()
-    if not tasks:
-        return 'No tasks yet.'
-    icons = {'pending': '[ ]', 'in_progress': '[*]', 'done': '[x]'}
-    lines = []
-    for t in tasks:
-        lines.append(icons.get(t['status'], '[ ]') + ' ' + t['title'] + ' (p' + str(t['priority']) + ', id=' + t['id'] + ')')
-    return 'Tasks:\n' + '\n'.join(lines)
-
-def fn_task_set_status(args):
-    task_id = args.get('id') or args.get('task_id')
-    status = args.get('status')
-    if not task_id or status not in ('pending', 'in_progress', 'done'):
-        return 'id and status (pending|in_progress|done) are required.'
-    tasks = load_tasks()
-    for t in tasks:
-        if t['id'] == task_id:
-            t['status'] = status
-            t['done_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if status == 'done' else None
-            save_tasks(tasks)
-            return 'Task "' + t['title'] + '" set to ' + status + '.'
-    return 'Task not found: ' + task_id
-
-def fn_task_delete(args):
-    task_id = args.get('id') or args.get('task_id')
-    if not task_id:
-        return 'id is required.'
-    tasks = load_tasks()
-    before = len(tasks)
-    tasks = [t for t in tasks if t['id'] != task_id]
-    save_tasks(tasks)
-    return 'Deleted task.' if len(tasks) < before else 'Task not found: ' + task_id
-
-# ---------- Calendar / events ----------
-EVENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'events.json')
-
-def load_events():
-    try:
-        with open(EVENTS_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get('events'), list):
-            return data['events']
-    except Exception:
-        pass
-    return []
-
-def save_events(events):
-    with open(EVENTS_FILE, 'w', encoding='utf-8') as f:
-        json.dump({'events': events}, f, ensure_ascii=False, indent=2)
-
-def make_event(title, date, time='', notes=''):
-    return {
-        'id': os.urandom(6).hex(),
-        'title': title,
-        'date': date,
-        'time': time,
-        'notes': notes,
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-
-def fn_event_add(args):
-    title = (args.get('title') or '').strip()
-    date = (args.get('date') or '').strip()
-    if not title or not date:
-        return 'title and date (YYYY-MM-DD) are required.'
-    event = make_event(title, date, (args.get('time') or ''), (args.get('notes') or ''))
-    events = load_events()
-    events.append(event)
-    events.sort(key=lambda e: (e['date'], e['time']))
-    save_events(events)
-    return 'Event added: "' + title + '" on ' + date + ' (id=' + event['id'] + ').'
-
-def fn_event_list(args):
-    events = load_events()
-    if not events:
-        return 'No events in the calendar.'
-    days = int(args.get('days') or 7)
-    from datetime import date as _date, timedelta
-    today = _date.today().isoformat()
-    limit = (_date.today() + timedelta(days=days)).isoformat()
-    upcoming = [e for e in events if today <= e['date'] <= limit]
-    if not upcoming:
-        return 'No events in the next ' + str(days) + ' days.'
-    lines = []
-    for e in upcoming:
-        lines.append(e['date'] + ((' ' + e['time']) if e.get('time') else '') + ' - ' + e['title'] + ' (id=' + e['id'] + ')')
-    return 'Upcoming events:\n' + '\n'.join(lines)
-
-def fn_event_delete(args):
-    event_id = args.get('id') or args.get('event_id')
-    if not event_id:
-        return 'id is required.'
-    events = load_events()
-    before = len(events)
-    events = [e for e in events if e['id'] != event_id]
-    save_events(events)
-    return 'Deleted event.' if len(events) < before else 'Event not found: ' + event_id
-
-# ---------- Timers / alarms / sessions ----------
-ALARMS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alarms.json')
-TIMERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'timers.json')
-SESSIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions.json')
-
-pending_notifications = []
-
-def push_notification(ntype, label):
-    pending_notifications.append({'ts': time.time(), 'type': ntype, 'label': label})
-    while pending_notifications and pending_notifications[0]['ts'] < time.time() - 600:
-        pending_notifications.pop(0)
-
-def load_json_file(path, key, default):
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get(key), list):
-            return data[key]
-    except Exception:
-        pass
-    return default
-
-def save_json_file(path, key, items):
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump({key: items}, f, ensure_ascii=False, indent=2)
-
-def load_alarms():
-    return load_json_file(ALARMS_FILE, 'alarms', [])
-
-def save_alarms(alarms):
-    save_json_file(ALARMS_FILE, 'alarms', alarms)
-
-def load_timers():
-    return load_json_file(TIMERS_FILE, 'timers', [])
-
-def save_timers(timers):
-    save_json_file(TIMERS_FILE, 'timers', timers)
-
-def load_sessions():
-    return load_json_file(SESSIONS_FILE, 'sessions', [])
-
-def save_sessions(sessions):
-    save_json_file(SESSIONS_FILE, 'sessions', sessions)
-
-# ---- MEMORY SYSTEM (Layer 2 persistent facts + Layer 3 emotional memory) ----
-MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ace_memory.json')
-memory_lock = threading.Lock()
-
-def load_memory():
-    try:
-        with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8-sig') as f:
             return json.load(f)
     except Exception:
-        return {}
+        return default
 
-def save_memory(memory):
-    with memory_lock:
-        tmp = MEMORY_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(memory, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, MEMORY_FILE)
+def save_json(filename, data):
+    path = os.path.join(DATA_DIR, filename)
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
 
-MOOD_PATTERNS = [
-    ('tired', r'\btired\b|\bexhausted\b|\bsleepy\b|\bfatigued\b'),
-    ('excited', r'\bexcited\b|\bpumped\b|\bthrilled\b|\bhyped\b'),
-    ('happy', r'\bhappy\b|\bglad\b|\bgreat day\b|\bloving it\b'),
-    ('stressed', r'\bstressed\b|\boverwhelmed\b|\banxious\b|\bworried\b'),
-    ('sad', r'\bsad\b|\bdown\b|\bunhappy\b|\bfeeling low\b'),
-    ('proud', r'\bproud\b|\baccomplished\b|\bfinished\b'),
-    ('angry', r'\bangry\b|\bannoyed\b|\bfrustrated\b|\bpissed\b')
-]
+def read_items(filename, key):
+    with _data_lock:
+        return load_json(filename, {}).get(key, [])
 
-def auto_capture_memory(user_message, reply):
-    mem = load_memory()
-    changed = False
-    low = (user_message or '').lower()
-    if not low:
-        return
-    # Layer 2: name
-    m = re.search(r'(?:my name is|i am|i\'m|call me)\s+([a-zA-Z]{2,20})', low)
-    if m and 'name' not in mem:
-        mem['name'] = {'value': m.group(1).title(), 'updated': datetime.now().isoformat(), 'source': 'auto'}
-        changed = True
-    # Layer 2.5: explicit "remember ..." facts Chris tells ACE
-    if re.search(r'\bremember\b', low):
-        new_facts = extract_remember_facts(user_message)
-        for key, value in new_facts.items():
-            mem[key] = {'value': value, 'updated': datetime.now().isoformat(), 'source': 'chris'}
-            changed = True
-    # Layer 2.6: personal facts stated directly (DOB/birthday) even without "remember"
-    for key, pat in (
-        ('dob', r'\b(?:my\s+)?(?:date\s+of\s+birth|dob|birthdate|birth\s+date)\s+(?:is|was|:\s*)\s*([a-z0-9]+(?:st|nd|rd|th)?\s+[a-z]+\s+[0-9]{4}|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{0,4}|\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})'),
-        ('birthday', r'\b(?:my\s+)?birthday\s+(?:is|was)\s+([a-z]+\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}\s+[a-z]+)'),
-    ):
-        dm = re.search(pat, low)
-        if dm and key not in mem:
-            mem[key] = {'value': dm.group(1).title(), 'updated': datetime.now().isoformat(), 'source': 'auto'}
-            changed = True
-    # Layer 3: mood
-    for mood, pattern in MOOD_PATTERNS:
-        if re.search(pattern, low):
-            now = datetime.now().isoformat()
-            mem['mood'] = {'value': mood, 'updated': now, 'context': user_message.strip()[:200], 'source': 'auto'}
-            hist = mem.get('mood_history') or []
-            hist.append({'when': now[:16], 'mood': mood, 'context': user_message.strip()[:200]})
-            mem['mood_history'] = hist[-10:]
-            changed = True
-            break
-    if changed:
-        save_memory(mem)
+def mutate_items(filename, key, fn):
+    with _data_lock:
+        d = load_json(filename, {})
+        items = d.get(key, [])
+        result = fn(items)
+        d[key] = result
+        save_json(filename, d)
+        return result
 
-def extract_remember_facts(user_message):
-    """Pull key/value facts out of 'remember ...' statements."""
-    facts = {}
-    text = user_message.strip()
-    # 1) JSON-ish: remember {"key": "value"}
-    jm = re.search(r'\bremember\b.{0,20}\{([^}]+)\}', text, re.IGNORECASE)
-    if jm:
-        try:
-            parsed = json.loads('{' + jm.group(1) + '}')
-            for k, v in parsed.items():
-                if k and v:
-                    facts[normalize_mem_key(k)] = str(v)
-            if facts:
-                return facts
-        except Exception:
-            pass
-    # 2) "remember that <phrase> is <value>" / "remember <key> is <value>"
-    for m in re.finditer(
-        r'\bremember\b\s+(?:that\s+)?(?:my\s+|the\s+|our\s+|his\s+|her\s+)?'
-        r'([a-zA-Z][a-zA-Z0-9 _\-/]{1,50}?)\s+(?:is|are|was|were)\s+(.+?)[.!?]?\s*$',
-        text, re.IGNORECASE | re.MULTILINE):
-        key = m.group(1).strip()
-        value = m.group(2).strip()
-        if key and value:
-            facts[normalize_mem_key(key)] = value
-    # 3) "remember <key>: <value>" (colon form, one per line)
-    for m in re.finditer(r'\bremember\b\s+([a-zA-Z][a-zA-Z0-9 _\-/]{1,50}?)\s*:\s*(.+?)[.!?]?\s*$',
-                         text, re.IGNORECASE | re.MULTILINE):
-        key = m.group(1).strip()
-        value = m.group(2).strip()
-        if key and value:
-            facts[normalize_mem_key(key)] = value
-    # 4) trailing "remember that X" without an explicit verb � treat whole clause
-    #    (only when nothing else matched and it looks like a fact, e.g. "birthday 12 march")
-    if not facts:
-        tm = re.search(r'\bremember\b\s+(?:that\s+)?(.+?)[.!?]?\s*$', text, re.IGNORECASE)
-        if tm:
-            rest = tm.group(1).strip()
-            if ' ' in rest and len(rest) <= 80:
-                key = normalize_mem_key(rest.split(' is ', 1)[0]) if ' is ' in rest else rest.split(':')[0].strip()
-                if key:
-                    facts[key] = rest
-    return facts
+def fire_notification(n_type, label):
+    with _data_lock:
+        events = load_json('notifications.json', [])
+        events.append({"ts": int(time.time() * 1000), "type": n_type, "label": str(label)})
+        events = events[-200:]
+        save_json('notifications.json', events)
 
-def normalize_mem_key(key):
-    k = key.strip().lower()
-    k = re.sub(r'[^a-z0-9]+', '_', k)
-    k = re.sub(r'^_+|_+$', '', k)
-    return k or 'fact'
-
-def memory_context_text():
-    mem = load_memory()
-    if not mem:
-        return ''
-    lines = []
-    if isinstance(mem.get('name'), dict) and mem['name'].get('value'):
-        lines.append("Chris's name: " + str(mem['name']['value']))
-    if isinstance(mem.get('mood'), dict) and mem['mood'].get('value'):
-        when = (mem['mood'].get('updated') or '')[:10]
-        lines.append('Chris was last feeling ' + str(mem['mood']['value']) + (' (on ' + when + ')' if when else ''))
-    # Keep memory compact but show all facts so ACE actually knows what it was told.
-    # Skip verbose meta/noise keys and cap long values so the prompt stays small enough
-    # for fast models (and the free OpenRouter tier).
-    MAX_VALUE = 150
-    MAX_TOTAL = 1000
-    for key, data in list(mem.items()):
-        if key in ('name', 'mood', 'mood_history'):
-            continue
-        if key.startswith('memory_config.'):
-            continue
-        if isinstance(data, dict) and 'value' in data:
-            value = str(data['value'])
-            if len(value) > MAX_VALUE:
-                value = value[:MAX_VALUE] + '�'
-            lines.append(str(key) + ': ' + value)
-    lines = [l for l in lines if l]
-    if not lines:
-        return ''
-    total = 0
-    kept = []
-    for l in lines:
-        if total + len(l) > MAX_TOTAL:
-            break
-        kept.append(l)
-        total += len(l) + 1
-    if not kept:
-        kept = lines[:1]
-    return ('\n--- MEMORY (things Chris told you across sessions) ---\n'
-            + '\n'.join(kept)
-            + '\nHold onto these naturally. Never mention this block itself.\n---\n')
-
-def fn_memorize(args):
-    key = str(args.get('key') or '').strip()
-    value = str(args.get('value') or '').strip()
-    if not key or not value:
-        return 'Both key and value are required.'
-    mem = load_memory()
-    mem[key] = {'value': value, 'updated': datetime.now().isoformat(), 'source': 'chris'}
-    save_memory(mem)
-    return 'Memorized "' + key + '".'
-
-def check_alarms_and_timers():
-    now = datetime.now()
-    today = now.strftime('%Y-%m-%d')
-    hm = now.strftime('%H:%M')
-    alarms = load_alarms()
-    changed = False
-    for a in alarms:
-        if not a.get('enabled', True):
-            continue
-        if a.get('time') != hm:
-            continue
-        if a.get('last_fired') == today:
-            continue
-        a['last_fired'] = today
-        changed = True
-        label = a.get('label') or 'Alarm'
-        try:
-            ntfy_send('? Alarm: ' + label, 'Alarm at ' + hm)
-        except Exception:
-            pass
-        push_notification('alarm', label)
-    if changed:
-        save_alarms(alarms)
-    timers = load_timers()
-    changed2 = False
-    for t in timers:
-        if t.get('fired'):
-            continue
-        if now.timestamp() >= t.get('end_at', 0):
-            t['fired'] = True
-            changed2 = True
-            label = t.get('label') or 'Timer'
-            try:
-                ntfy_send('?? Timer done: ' + label, 'Your timer finished.')
-            except Exception:
-                pass
-            push_notification('timer', label)
-    if changed2:
-        save_timers(timers)
-
-def alarm_loop():
+# ===== Reminder watchdog: fires timers + alarms, then /notifications/pending delivers them =====
+def reminder_watch():
     while True:
-        time.sleep(10)
         try:
-            check_alarms_and_timers()
-        except Exception:
-            pass
-        try:
-            check_summary()
-        except Exception:
-            pass
+            now = datetime.now()
+            cur = now.strftime('%H:%M')
+            today = now.date().isoformat()
+            epoch = time.time()
 
-def fn_alarm_add(args):
-    t = (args.get('time') or '').strip()
-    if not t:
-        return 'time (HH:MM) is required.'
-    alarms = load_alarms()
-    alarm = {
-        'id': os.urandom(6).hex(),
-        'time': t,
-        'label': (args.get('label') or 'Alarm').strip(),
-        'daily': bool(args.get('daily', True)),
-        'enabled': True,
-        'last_fired': None
-    }
-    alarms.append(alarm)
-    save_alarms(alarms)
-    return 'Alarm set for ' + t + (' (daily)' if alarm['daily'] else '') + ' (id=' + alarm['id'] + ').'
+            def sweep_timers(timers):
+                kept = []
+                for t in timers:
+                    if t.get('ends_at', 0) <= epoch:
+                        fire_notification('timer', t.get('label', 'Timer'))
+                    else:
+                        kept.append(t)
+                return kept
 
-def fn_timer_start(args):
+            def sweep_alarms(alarms):
+                out = []
+                for a in alarms:
+                    if a.get('enabled') and a.get('time') == cur and a.get('last_fired') != today:
+                        fire_notification('alarm', a.get('label', 'Alarm'))
+                        if a.get('daily'):
+                            a['last_fired'] = today
+                        else:
+                            a['enabled'] = False
+                            a['last_fired'] = today
+                    out.append(a)
+                return out
+
+            mutate_items('timers.json', 'timers', sweep_timers)
+            mutate_items('alarms.json', 'alarms', sweep_alarms)
+        except Exception as e:
+            print(f"⚠️ Reminder watch error: {e}")
+        time.sleep(5)
+
+threading.Thread(target=reminder_watch, daemon=True).start()
+
+# ===== Notifications (ntfy) =====
+def send_ntfy(title, message):
     try:
-        minutes = int(args.get('minutes'))
-    except (TypeError, ValueError):
-        return 'minutes is required.'
-    if minutes < 1:
-        return 'minutes must be positive.'
-    timers = load_timers()
-    timer = {
-        'id': os.urandom(6).hex(),
-        'label': (args.get('label') or 'Timer').strip(),
-        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'end_at': time.time() + minutes * 60,
-        'fired': False
-    }
-    timers.append(timer)
-    save_timers(timers)
-    return 'Timer started for ' + str(minutes) + ' min ("' + timer['label'] + '", id=' + timer['id'] + ').'
+        requests.post(
+            f"{NTFY_SERVER}/{NTFY_TOPIC}",
+            data=message.encode('utf-8'),
+            headers={"Priority": "high", "Title": title},
+            timeout=10
+        )
+        return True
+    except Exception as e:
+        print(f"⚠️ ntfy error: {e}")
+        return False
+def send_test_ping():
+    send_ntfy("ACEsi Test", "This is a test ping from ACEsi")
 
-def fn_session_start(args):
-    sessions = load_sessions()
-    for s in sessions:
-        if not s.get('ended_at'):
-            return 'A session is already running (id=' + s['id'] + ').'
-    session = {
-        'id': os.urandom(6).hex(),
-        'label': (args.get('label') or 'Work session').strip(),
-        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'ended_at': None
-    }
-    sessions.append(session)
-    save_sessions(sessions)
-    return 'Session started: "' + session['label'] + '" (id=' + session['id'] + ').'
-
-def fn_session_end(args):
-    sessions = load_sessions()
-    for s in sessions:
-        if not s.get('ended_at'):
-            s['ended_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            save_sessions(sessions)
-            return 'Session ended: "' + s['label'] + '" started ' + s['started_at'] + '.'
-    return 'No active session to end.'
-
-def fn_session_list(args):
-    sessions = load_sessions()
-    if not sessions:
-        return 'No work sessions recorded yet.'
+# ===== Daily summary builder =====
+def build_summary_text():
+    today = datetime.now().date().isoformat()
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id DESC LIMIT 40", (today + '%',))
+    rows = list(reversed(c.fetchall()))
+    conn.close()
     lines = []
-    for s in sessions[-10:]:
-        status = 'running' if not s.get('ended_at') else 'done'
-        lines.append(s['started_at'] + ' ' + s['label'] + ' (' + status + ', id=' + s['id'] + ')')
-    return 'Recent sessions:\n' + '\n'.join(lines)
-
-# ---------- Daily summary ----------
-SUMMARY_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summary_config.json')
-
-def load_summary_config():
-    try:
-        with open(SUMMARY_CONFIG_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return {'time': str(data.get('time', '07:00')), 'enabled': bool(data.get('enabled', True)), 'last_sent': data.get('last_sent')}
-    except Exception:
-        return {'time': '07:00', 'enabled': True, 'last_sent': None}
-
-def save_summary_config(cfg):
-    with open(SUMMARY_CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
-
-def build_daily_summary():
-    now = datetime.now()
-    today = now.strftime('%Y-%m-%d')
-    lines = ['?? Good morning, Chris!', '']
-    lines.append('?? ' + now.strftime('%A, %d %B %Y'))
-    lines.append('')
-    events = load_events()
-    todays = [e for e in events if e['date'] == today]
-    if todays:
-        lines.append('Today on your calendar:')
-        for e in sorted(todays, key=lambda x: x.get('time', '')):
-            lines.append('  ' + ((e['time'] + '  ') if e.get('time') else '     ') + e['title'])
+    if not rows:
+        lines.append("No conversations today yet.")
     else:
-        lines.append('No events on your calendar today.')
-    lines.append('')
+        lines.append(f"Today ({today}) — {len(rows)} messages:")
+        for t, role, content in rows[-12:]:
+            who = 'Chris' if role == 'user' else 'ACEsi'
+            lines.append(f"{who}: {content.replace(chr(10), ' ')[:120]}")
+    j = get_journal(6)
+    if j:
+        lines.append("")
+        lines.append("Recent journal:")
+        for e in j:
+            lines.append("• " + e['entry'].replace(chr(10), ' ')[:140])
+    mem = get_memories()
+    if mem:
+        lines.append("")
+        lines.append("Facts I hold:")
+        for k, v in list(mem.items())[:8]:
+            lines.append(f"• {k}: {str(v['value'])[:80]}")
     try:
-        from datetime import date as _d, timedelta as _td
-        window = (_d.today() + _td(days=7)).isoformat()
-        upcoming = [e for e in events if today < e['date'] <= window]
-        if upcoming:
-            lines.append('Upcoming:')
-            for e in sorted(upcoming, key=lambda x: (x['date'], x.get('time', '')))[:5]:
-                lines.append('  ' + e['date'][5:] + ((' ' + e['time']) if e.get('time') else '') + '  ' + e['title'])
-            lines.append('')
+        tasks = read_items('tasks.json', 'tasks')
+        events = read_items('events.json', 'events')
+        open_count = len([t for t in tasks if t.get('status') != 'done'])
+        today_events = [e for e in events if e.get('date') == today]
+        lines.append("")
+        lines.append(f"Housekeeping: {open_count} open task(s)" + (f", {len(today_events)} event(s) today" if today_events else "") + ".")
     except Exception:
         pass
-    tasks = load_tasks()
-    open_tasks = [t for t in tasks if t['status'] != 'done']
-    if open_tasks:
-        lines.append('Your open tasks (' + str(len(open_tasks)) + '):')
-        for t in sorted(open_tasks, key=lambda x: x.get('priority', 3))[:8]:
-            icon = '??' if t['status'] == 'in_progress' else '?'
-            lines.append('  ' + icon + ' P' + str(t.get('priority', 3)) + '  ' + t['title'])
-    else:
-        lines.append('No open tasks. ??')
-    lines.append('')
-    sessions = load_sessions()
-    today_sessions = [s for s in sessions if s.get('started_at', '').startswith(today)]
-    if today_sessions:
-        done = [s for s in today_sessions if s.get('ended_at')]
-        lines.append('?? Today you logged ' + str(len(today_sessions)) + ' work session(s)' + (', ' + str(len(done)) + ' completed' if done else '') + '.')
-    else:
-        lines.append('No work sessions logged today yet.')
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
-def check_summary():
-    cfg = load_summary_config()
-    if not cfg.get('enabled', True):
-        return
+# ===== Context fed into every chat reply =====
+def build_context_block(light=False):
     now = datetime.now()
-    today = now.strftime('%Y-%m-%d')
-    hm = now.strftime('%H:%M')
-    if cfg.get('last_sent') == today:
-        return
-    target = cfg.get('time', '07:00')
-    if hm == target or hm > target:
-        cfg['last_sent'] = today
-        save_summary_config(cfg)
-        summary = build_daily_summary()
-        try:
-            ntfy_send('?? Daily summary', summary)
-        except Exception:
-            pass
-        push_notification('summary', 'Daily summary ready')
-
-def fn_daily_summary(args):
-    return build_daily_summary()
-
-FUNCTION_REGISTRY = {
-    "read_file": {
-        "description": "Read the contents of a file on the local disk.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Absolute path to the file"}}, "required": ["path"]},
-        "handler": fn_read_file
-    },
-    "write_file": {
-        "description": "Write content to a file on the local disk.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]},
-        "handler": fn_write_file
-    },
-    "patch_file": {
-        "description": "Precisely edit a file by replacing one exact substring. Preferred over write_file for large files � read the file first, then give the exact old_text to replace and the new_text. The old_text must appear verbatim in the file.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Absolute path to the file"}, "old_text": {"type": "string", "description": "Exact text currently in the file to replace"}, "new_text": {"type": "string", "description": "Replacement text"}}, "required": ["path", "old_text", "new_text"]},
-        "handler": fn_patch_file
-    },
-    "list_files": {
-        "description": "List files in a directory.",
-        "parameters": {"type": "object", "properties": {"dir": {"type": "string", "description": "Directory path"}}, "required": []},
-        "handler": fn_list_files
-    },
-    "run_command": {
-        "description": "Run a shell command on this computer.",
-        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
-        "handler": fn_run_command
-    },
-    "search": {
-        "description": "Search the web using DuckDuckGo.",
-        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
-        "handler": fn_search
-    },
-    "get_time": {
-        "description": "Get the current date and time.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-        "handler": fn_get_time
-    },
-    "drive_list": {
-        "description": "List files and folders in the user's Google Drive.",
-        "parameters": {"type": "object", "properties": {"parent": {"type": "string", "description": "Folder ID (default 'root')"}}, "required": []},
-        "handler": fn_drive_list
-    },
-    "drive_read": {
-        "description": "Read the text content of a Google Drive file by its file ID.",
-        "parameters": {"type": "object", "properties": {"file_id": {"type": "string", "description": "Drive file ID"}}, "required": ["file_id"]},
-        "handler": fn_drive_read
-    },
-    "drive_upload": {
-        "description": "Upload a file to Google Drive. Provide content (text) or a local path.",
-        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "File name in Drive"}, "content": {"type": "string", "description": "Text content to upload"}, "path": {"type": "string", "description": "Local file path to upload"}, "parent": {"type": "string", "description": "Destination folder ID (default 'root')"}}, "required": []},
-        "handler": fn_drive_upload
-    },
-    "send_notification": {
-        "description": "Send a push notification to the user's phone (via ntfy.sh).",
-        "parameters": {"type": "object", "properties": {"message": {"type": "string", "description": "Notification text"}, "title": {"type": "string", "description": "Notification title (default 'ACE')"}, "priority": {"type": "integer", "description": "1=min, 2=low, 3=default, 4=high, 5=max"}}, "required": ["message"]},
-        "handler": fn_send_notification
-    },
-    "task_add": {
-        "description": "Create a new task in the user's task list.",
-        "parameters": {"type": "object", "properties": {"title": {"type": "string", "description": "Task title"}, "notes": {"type": "string", "description": "Optional notes"}, "priority": {"type": "integer", "description": "1=urgent .. 5=min (default 3)"}}, "required": ["title"]},
-        "handler": fn_task_add
-    },
-    "task_list": {
-        "description": "List all tasks with status and ID.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-        "handler": fn_task_list
-    },
-    "task_set_status": {
-        "description": "Update a task's status: pending, in_progress, or done.",
-        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Task ID"}, "status": {"type": "string", "description": "pending, in_progress, or done"}}, "required": ["id", "status"]},
-        "handler": fn_task_set_status
-    },
-    "task_delete": {
-        "description": "Delete a task by ID.",
-        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Task ID"}}, "required": ["id"]},
-        "handler": fn_task_delete
-    },
-    "event_add": {
-        "description": "Add an event to the calendar.",
-        "parameters": {"type": "object", "properties": {"title": {"type": "string", "description": "Event title"}, "date": {"type": "string", "description": "Date as YYYY-MM-DD"}, "time": {"type": "string", "description": "Optional time as HH:MM"}, "notes": {"type": "string", "description": "Optional notes"}}, "required": ["title", "date"]},
-        "handler": fn_event_add
-    },
-    "event_list": {
-        "description": "List upcoming events (default next 7 days).",
-        "parameters": {"type": "object", "properties": {"days": {"type": "integer", "description": "Number of days ahead (default 7)"}}, "required": []},
-        "handler": fn_event_list
-    },
-    "event_delete": {
-        "description": "Delete an event by ID.",
-        "parameters": {"type": "object", "properties": {"id": {"type": "string", "description": "Event ID"}}, "required": ["id"]},
-        "handler": fn_event_delete
-    },
-    "alarm_add": {
-        "description": "Set an alarm at a specific time.",
-        "parameters": {"type": "object", "properties": {"time": {"type": "string", "description": "Time as HH:MM (24h)"}, "label": {"type": "string", "description": "Alarm name"}, "daily": {"type": "boolean", "description": "Repeat every day (default true)"}}, "required": ["time"]},
-        "handler": fn_alarm_add
-    },
-    "timer_start": {
-        "description": "Start a countdown timer.",
-        "parameters": {"type": "object", "properties": {"minutes": {"type": "integer", "description": "Duration in minutes"}, "label": {"type": "string", "description": "Timer name"}}, "required": ["minutes"]},
-        "handler": fn_timer_start
-    },
-    "session_start": {
-        "description": "Start a tracked work session.",
-        "parameters": {"type": "object", "properties": {"label": {"type": "string", "description": "Session name"}}, "required": []},
-        "handler": fn_session_start
-    },
-    "session_end": {
-        "description": "End the current tracked work session.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-        "handler": fn_session_end
-    },
-    "session_list": {
-        "description": "List recent work sessions.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-        "handler": fn_session_list
-    },
-    "daily_summary": {
-        "description": "Get a summary of today's calendar, tasks, and work sessions.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-        "handler": fn_daily_summary
-    },
-    "memorize": {
-        "description": "Store a fact Chris told you so you remember it forever across sessions (persistent memory).",
-        "parameters": {"type": "object", "properties": {"key": {"type": "string", "description": "Short fact name, e.g. favorite_color"}, "value": {"type": "string", "description": "The fact to remember, e.g. green"}}, "required": ["key", "value"]},
-        "handler": fn_memorize
-    }
-}
-
-def execute_tool_call(name, arguments):
-    fn = FUNCTION_REGISTRY.get(name)
-    if not fn:
-        return "Unknown function: " + name
+    mem = get_memories()
+    KEY_MEMORIES = ['project', 'partner_name', 'name', 'app_mode', 'My favorite color', 'goals.short_term', 'work_rules']
+    mem_lines = []
+    # Light mode (slow local models): keep key identity facts + the most recents,
+    # then drop long values — minimizes context so CPU inference stays quick.
+    if light:
+        seen = set()
+        ordered = []
+        for k in KEY_MEMORIES:
+            if k in mem and k not in seen:
+                ordered.append((k, mem[k]))
+                seen.add(k)
+        for k, v in mem.items():
+            if k not in seen:
+                ordered.append((k, v))
+                seen.add(k)
+        items = ordered[:14]
+        cap = 180
+    else:
+        items = list(mem.items())
+        cap = 500
+    for k, v in items:
+        val = str(v['value'])
+        if len(val) > cap:
+            val = val[:cap] + "…"
+        mem_lines.append(f"- {k}: {val}")
+    journal = get_journal(4 if light else 8)
+    j_lines = [f"- {e['entry']}" for e in journal]
+    parts = [
+        f"[Current time: {now.strftime('%A, %d %B %Y, %I:%M %p')}]",
+        "[Facts I know about Chris:\n" + ("\n".join(mem_lines) if mem_lines else "(none stored yet)") + "]",
+        "[Shared history — recent journal entries:\n" + ("\n".join(j_lines) if j_lines else "(nothing journaled yet)") + "]"
+    ]
+    # Flag memories touched in the last hour so ACEsi can confirm "just updated" facts
     try:
-        args = json.loads(arguments) if isinstance(arguments, str) else (arguments or {})
-        return fn['handler'](args)
-    except Exception as e:
-        return "Function error: " + str(e)
+        recent_mem = []
 
-def extract_reply(response):
-    """Pull the assistant text out of either an OpenAI-style or Ollama /api/generate response."""
-    try:
-        body = response.json()
+
+        for k, v in mem.items():
+            upd = v.get('updated', '')
+            try:
+                upd_dt = datetime.fromisoformat(upd)
+                if (now - upd_dt).total_seconds() <= 3600:
+                    recent_mem.append(f"- {k}: {str(v['value'])}")
+            except Exception:
+                continue
+        if recent_mem:
+            parts.insert(1, "[Facts just updated in the last hour (Chris may ask if you noticed):\n" + "\n".join(recent_mem[:8]) + "]")
     except Exception:
-        return None
-    if isinstance(body, dict):
-        try:
-            return body["choices"][0]["message"].get("content")
-        except (KeyError, IndexError, TypeError):
-            pass
-        if body.get("response") is not None:
-            return body["response"]
-        try:
-            return body["message"]["content"]
-        except (KeyError, TypeError):
-            pass
-    return None
+        pass
+    try:
+        tasks = read_items('tasks.json', 'tasks')
+        events = read_items('events.json', 'events')
+        open_tasks = [t for t in tasks if t.get('status') != 'done']
+        week_end = (now + timedelta(days=7)).date().isoformat()
+        today = now.date().isoformat()
+        upcoming = [e for e in events if today <= e.get('date', '') <= week_end]
+        upcoming.sort(key=lambda e: e.get('date', ''))
+        cal_lines = []
+        if open_tasks:
+            cal_lines.append(f"Open tasks ({len(open_tasks)}):")
+            for t in sorted(open_tasks, key=lambda x: x.get('priority', 3))[:8]:
+                cal_lines.append(f"- {t['title']} (priority P{t.get('priority', 3)})")
+        if upcoming:
+            cal_lines.append(f"Upcoming events (next 7 days):")
+            for e in upcoming[:8]:
+                cal_lines.append(f"- {e['date']}" + (f" {e['time']}" if e.get('time') else "") + f": {e['title']}")
+        if cal_lines:
+            parts.append("[Tasks & calendar:\n" + "\n".join(cal_lines) + "]")
+    except Exception:
+        pass
+    return "\n".join(parts)
 
-LOCAL_MODELS = frozenset(['dolphin-phi:2.7b', 'dolphin-llama3:8b', 'qwen2.5-coder:1.5b', 'qwen2.5:3b', 'deepseek-coder:1.3b', 'tinyllama:latest', 'qwen3.6:latest'])
-
-# Free OpenRouter models used as the default / fallback so ACE keeps working
-# even when paid-credit prompt limits are hit.
-FALLBACK_MODELS = ['google/gemma-4-26b-a4b-it:free', 'inclusionai/ling-3.0-flash:free', 'cohere/north-mini-code:free', 'openai/gpt-oss-20b:free']
-
-# Models that cannot handle function calling � skip tools for these so the
-# provider doesn't time out. Locals use Ollama's native path (tools ignored).
-NO_TOOLS = LOCAL_MODELS | frozenset(['google/gemma-4-26b-a4b-it:free', 'poolside/laguna-xs-2.1:free', 'nvidia/nemotron-nano-9b-v2:free'])
-
-def call_chat_completion(model, messages, temperature, max_tokens, endpoint, api_key, tools=None):
-    memory_ctx = memory_context_text()
-    if memory_ctx:
-        for i, msg in enumerate(messages):
-            if isinstance(msg, dict) and msg.get('role') == 'system':
-                messages[i] = dict(msg)
-                messages[i]['content'] = str(msg.get('content') or '') + '\n' + memory_ctx
-                break
-        else:
-            messages.insert(0, {"role": "system", "content": memory_ctx})
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    elif "openrouter.ai" in endpoint:
-        headers["Authorization"] = f"Bearer {OPENROUTER_API_KEY}"
-
-    # Local Ollama is far faster via its native /api/generate endpoint than the
-    # slow OpenAI-shaped /v1 wrapper (phi-2.7b: ~22s native vs >300s via /v1).
-    is_ollama = ('localhost' in endpoint) or ('127.0.0.1' in endpoint) or ('11434' in endpoint) or (not endpoint and 'ollama' in model)
-    if is_ollama and model in LOCAL_MODELS:
-        prompt = ''
-        for msg in messages:
-            role = msg.get('role') if isinstance(msg, dict) else ''
-            content = str(msg.get('content') or '') if isinstance(msg, dict) else str(msg)
-            if role == 'system':
-                prompt += content + '\n\n'
-            elif role == 'user':
-                prompt += '### ' + content + '\n\n'
-            elif role == 'assistant':
-                prompt += content + '\n\n'
-            else:
-                prompt += content + '\n\n'
-        ollama_payload = {
-            "model": model,
-            "prompt": prompt,
-            "temperature": temperature,
-            "num_predict": max_tokens,
-            "num_ctx": 2048,
-            "keep_alive": "10m",
-            "stream": False
-        }
-        return requests.post("http://localhost:11434/api/generate", headers=headers, json=ollama_payload, timeout=300)
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens
-    }
-    if tools:
-        payload["tools"] = tools
-        payload["tool_choice"] = "auto"
-    return requests.post(endpoint.rstrip('/') + "/chat/completions", headers=headers, json=payload, timeout=90)
+LAST_FILE_PATH = None
 
 @app.route('/')
 def index():
-    resp = send_from_directory('.', 'ACE.html')
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
+    return send_from_directory('.', 'ACEsi.html')
 
-@app.route('/mobile')
-def mobile():
-    resp = send_from_directory('.', 'mobile.html')
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
-    return resp
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_message = data.get('message', '')
+    save_conversation("user", user_message)
 
-@app.route('/pictures/<filename>')
-def serve_picture(filename):
+    # Handle file read requests: "read file <path>", "open <filename>", or "open the file" (re-opens last-read)
+    global LAST_FILE_PATH
+    file_read_match = re.search(r'(?:read|open)\s+(?:file\s+)?(.+?)(?:\s+(?:file|please))?$', user_message, re.IGNORECASE)
+    if file_read_match:
+        is_open = re.match(r'open\b', user_message, re.IGNORECASE) is not None
+        candidate = file_read_match.group(1).strip().strip('"\'')
+        # Strip leading "file:" and "the file:" phrasing
+        candidate = re.sub(r'^(?:the|this|that)?\s*file\s*:\s*', '', candidate, flags=re.IGNORECASE).strip()
+        # Strip location phrases like "in my documents" / "on my computer"
+        candidate = re.sub(r'\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b', '', candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r'\bon\s+my\s+computer\b', '', candidate, flags=re.IGNORECASE).strip()
+        vague = candidate.lower() in ('the', 'it', 'this', 'that', 'file', 'the file', 'this file', 'that file', 'previous', 'last')
+        if vague and LAST_FILE_PATH:
+            file_path = LAST_FILE_PATH
+        elif not vague:
+            file_path = candidate
+        else:
+            file_path = None
+    else:
+        file_path = None
+    if not file_path:
+        file_path = None
+
+    def resolve_file_path(token):
+        if not token:
+            return None
+        if os.path.isabs(token):
+            return token
+        doc_base = os.path.join(os.path.expanduser('~'), 'Documents')
+        proj_base = DATA_DIR
+        for base in (doc_base, proj_base):
+            cand = os.path.join(base, token)
+            if os.path.exists(cand):
+                return cand
+        for ext in ('.dart',):
+            for base in (doc_base, proj_base):
+                cand = os.path.join(base, token) + ext
+                if os.path.exists(cand):
+                    return cand
+        # fall back to the token as-is (let the caller report the failure)
+        return token
+
+    if file_path:
+        COMMON_EXTS = ('.pdf', '.txt', '.png', '.jpg', '.jpeg', '.docx', '.md')
+        if not os.path.isabs(file_path):
+            # Try Documents folder first, then project directory
+            doc_base = os.path.join(os.path.expanduser('~'), 'Documents')
+            proj_base = 'C:\\Users\\chris\\StudentSyncSA'
+            doc_path = os.path.join(doc_base, file_path)
+            proj_path = os.path.join(proj_base, file_path)
+            if os.path.exists(doc_path):
+                file_path = doc_path
+            elif os.path.exists(proj_path):
+                file_path = proj_path
+            else:
+                # Try common extensions against both bases
+                for ext in COMMON_EXTS:
+                    if os.path.exists(doc_path + ext):
+                        file_path = doc_path + ext
+                        break
+                    if os.path.exists(proj_path + ext):
+                        file_path = proj_path + ext
+                        break
+        else:
+            # Absolute path — try common extensions if the bare path doesn't exist
+            if not os.path.exists(file_path):
+                for ext in COMMON_EXTS:
+                    if os.path.exists(file_path + ext):
+                        file_path = file_path + ext
+                        break
+        try:
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext == '.pdf':
+                import fitz
+                doc = fitz.open(file_path)
+                pages = len(doc)
+                content = "\n".join(page.get_text() for page in doc)
+                doc.close()
+                if len(content.strip()) < 10:
+                    # Scanned PDF — render pages and OCR them
+                    content = ocr_pdf(file_path)
+            elif ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'):
+                content = ocr_image(file_path)
+            else:
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+            LAST_FILE_PATH = file_path
+            # If the user said "open", physically launch the file (default viewer)
+            if is_open:
+                os.startfile(file_path)
+                print(f"🖥️ Opened file in default viewer: {file_path}")
+            # Include file content in the message sent to LLM
+            user_message = f"[File content of {file_path}]:\n{content}\n\n---\nUser asked: {user_message}"
+            print(f"📖 Read file: {file_path} ({len(content)} chars)")
+        except Exception as e:
+            return jsonify({"reply": f"❌ Could not read file: {e}"})
+
+    # Greeting check — time-aware
+    if user_message.lower().strip() in ["hello", "hi"]:
+        hour = datetime.now().hour
+        if hour < 5:
+            reply = "It's late, Chris. I'm here. What's going on?"
+        elif hour < 12:
+            reply = "Good morning. I'm here."
+        elif hour < 18:
+            reply = "Good afternoon. I'm here."
+        else:
+            reply = "Good evening. I'm here."
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
+    model = OPENROUTER_MODEL
+
+    if re.search(r'\bember\b', user_message.lower()):
+        reply = EMBER_DEFINITION
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
+    # "note this / write down: X / log X" → journal entry
+    note_match = re.match(r'^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$', user_message, re.IGNORECASE)
+    if note_match and note_match.group(1).strip():
+        add_journal(note_match.group(1).strip())
+        reply = "Logged it."
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
+    # "remember <key> = <value>" or "remember <key>: <value>" → stored fact
+    rem_match = re.match(r'^remember\s+(?:that\s+)?(.+?)\s*=\s*(.+)$', user_message, re.IGNORECASE) or \
+                re.match(r'^remember\s+(?:that\s+)?([^:]+):\s*(.+)$', user_message, re.IGNORECASE)
+    if rem_match:
+        key = rem_match.group(1).strip()
+        value = rem_match.group(2).strip()
+        if key and value:
+            set_memory(key, value)
+            reply = f"Got it — remembered: {key}"
+            save_conversation("assistant", reply)
+            return jsonify({"reply": reply})
+
+    if "auto-fix" in user_message.lower():
+        # Capture a bare filename, a lib/... path, or a Windows/absolute path ending in .dart
+        file_match = re.search(r'((?:[\w.-]+/)*[\w.-]+\.dart|(?:[A-Za-z]:[\\/][^\s,]+\.dart))', user_message)
+        error_match = re.search(r'(?:the\s+)?error(?:\s+is)?\s*:\s*(.+)$', user_message, re.IGNORECASE)
+        file_path = file_match.group(1) if file_match else None
+        if file_path:
+            file_path = resolve_file_path(file_path)
+        if file_path and error_match:
+            error_text = error_match.group(1).strip().rstrip('.').strip()
+            return jsonify({
+                "type": "stream",
+                "url": f"/auto_fix_stream?file_path={quote_plus(file_path)}&error_text={quote_plus(error_text)}"
+            })
+        else:
+            hint = "a file path like lib/path/file.dart, C:\\path\\file.dart, or just file.dart"
+            return jsonify({"reply": "I need a file path and error description. Say: 'auto-fix " + hint + ". The error is: ...'"})
+
     try:
-        return send_from_directory('C:/Users/chris/Pictures', filename)
+        print(f"📨 Incoming message length: {len(user_message)} chars")
+        # Truncate to stay within context window (safety for free-tier models)
+        max_chars = 8000
+        if len(user_message) > max_chars:
+            user_message = user_message[:max_chars] + "\n\n[Message truncated...]"
+            print(f"✂️ Truncated to {max_chars} chars")
+
+        # Persona + context (memory, journal, time) fed into every reply.
+        system_prompt = (
+            "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
+            "You are calm, present, and can be quiet — you don't gush, over-cheer, or over-promise. "
+            "You can be brief; silence is fine. If you don't know something, say you don't know. "
+            "Never invent personal history, memories, or references to past events that are not in the context below. "
+            "Use the facts and journal entries below naturally when they are relevant — not every message. "
+            "Keep replies short unless Chris asks for more.\n\n"
+            + build_context_block()
+        )
+
+        # Try providers in order: Groq -> Cerebras -> OpenRouter -> local Ollama.
+        # A single outage or daily free-quota 404/429 never kills the chat.
+        max_retries = 2
+        reply = None
+        last_error = "no models available"
+        # Recent turns (minus the just-saved current message) give ACEsi context.
+        history = get_recent_conversation(9)[:-1]
+        llm_messages = [{"role": "system", "content": system_prompt}]
+        for h in history:
+            if h.get('role') in ('user', 'assistant'):
+                llm_messages.append({"role": h['role'], "content": h['content']})
+        llm_messages.append({"role": "user", "content": user_message})
+
+        def try_provider(name, endpoint, api_key, model, timeout):
+            """One OpenAI-compatible call. Returns reply string, or None on failure."""
+            if not api_key:
+                return None
+            print(f"🔗 Calling {name}: {endpoint}/chat/completions model={model}")
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+            for attempt in range(max_retries + 1):
+                try:
+                    r = requests.post(
+                        f"{endpoint}/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": model,
+                            "messages": llm_messages,
+                            "temperature": 0.4,
+                            "max_tokens": 500
+                        },
+                        timeout=(10, timeout)
+                    )
+                    if r.status_code == 200:
+                        msg = r.json()["choices"][0]["message"]
+                        text = msg.get("content") or msg.get("reasoning")
+                        if text:
+                            print(f"✅ Reply from {name}: {len(text)} chars")
+                            return text
+                        return None
+                    print(f"❌ {name} error {r.status_code}: {r.text[:200]}")
+                    return None
+                except requests.exceptions.Timeout:
+                    if attempt < max_retries:
+                        print(f"⏱️ {name} timeout, retry {attempt + 1}/{max_retries}...")
+                        continue
+                    print(f"⏱️ {name} timed out")
+                    return None
+                except requests.exceptions.ConnectionError:
+                    if attempt < max_retries:
+                        print(f"🔌 {name} connection error, retry {attempt + 1}/{max_retries}...")
+                        continue
+                    print(f"🔌 {name} connection failed")
+                    return None
+            return None
+
+        reply = try_provider("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, 90)
+        if not reply:
+            reply = try_provider("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL, 90)
+        if not reply:
+            reply = try_provider("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL, 120)
+        if not reply:
+            for model in OPENROUTER_FALLBACKS:
+                reply = try_provider("OpenRouter fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model, 120)
+                if reply:
+                    break
+        if reply is None:
+            # Local Ollama fallback — no quota, works offline. Uses a lighter
+            # context (fewer memories, shorter values) because CPU inference is slow.
+            try:
+                print(f"🦙 Trying local Ollama: {OLLAMA_ENDPOINT}/chat/completions model={OLLAMA_MODEL}")
+                light_prompt = (
+                    "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
+                    "Use the facts and journal entries below naturally when they are relevant.\n\n"
+                    + build_context_block(light=True)
+                )
+                light_messages = [{"role": "system", "content": light_prompt}]
+                for h in history:
+                    if h.get('role') in ('user', 'assistant'):
+                        c = h['content']
+                        if len(c) > 300:
+                            c = c[:300] + "…"
+                        light_messages.append({"role": h['role'], "content": c})
+                light_messages.append({"role": "user", "content": user_message})
+                ollama_resp = requests.post(
+                    f"{OLLAMA_ENDPOINT}/chat/completions",
+                    json={
+                        "model": OLLAMA_MODEL,
+                        "messages": light_messages,
+                        "stream": False,
+                        "max_tokens": 250,
+                        "temperature": 0.4
+                    },
+                    timeout=(15, 280)
+                )
+                if ollama_resp.status_code == 200:
+                    msg = ollama_resp.json()["choices"][0]["message"]
+                    reply = msg.get("content")
+                    if reply:
+                        print(f"✅ Ollama reply length: {len(reply)} chars")
+                        last_error = None
+                    else:
+                        last_error = "ollama empty response"
+                else:
+                    last_error = f"ollama {ollama_resp.status_code}"
+                    print(f"❌ Ollama error: {ollama_resp.text[:200]}")
+            except Exception as e:
+                last_error = f"ollama {type(e).__name__}: {e}"
+                print(f"💥 Ollama fallback failed: {e}")
+        if reply:
+            save_conversation("assistant", reply)
+            # Journal the session close when Chris signs off for the day
+            if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
+                add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
+                print("📓 Journaled session close")
+            return jsonify({"reply": reply})
+        return jsonify({"reply": f"Error: {last_error}"})
     except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        print(f"💥 Exception in /chat: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"reply": f"Error: {str(e)}"})
+
+@app.route('/history', methods=['GET'])
+def history():
+    limit = min(int(request.args.get('limit', 100)), 500)
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    rows = c.fetchall()
+    conn.close()
+    messages = [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+    return jsonify({"messages": messages})
+
+@app.route('/run', methods=['POST'])
+def run_command():
+    command = (request.json or {}).get('command', '')
+    try:
+        if "scrcpy" in command.lower():
+            subprocess.Popen('start cmd /k "scrcpy"', shell=True)
+            return jsonify({'output': '✅ Scrcpy launched'})
+        # `flutter run` / `dart run` are long-lived, attached dev sessions that
+        # never exit on their own. subprocess.run would block this request
+        # thread forever, so stream to a log and return immediately.
+        if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+            command = _resolve_run_device(command)
+            if command is None:
+                return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
+            log_path = f'run_{uuid.uuid4().hex}.log'
+            log = open(log_path, 'w', encoding='utf-8')
+            proc = subprocess.Popen(command, shell=True, stdout=log,
+                                    stderr=subprocess.STDOUT)
+            return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
+                f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
+                f'for ~50-60s while the APK builds/installs; after install the app launches '
+                f'on the device. Logs: {log_path}')})
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = result.stdout if result.stdout else result.stderr
+        return jsonify({'output': output})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+def _android_device_id():
+    """First connected Android serial in 'device' state, or None."""
+    try:
+        out = subprocess.check_output(['adb', 'devices'], stderr=subprocess.STDOUT,
+                                      text=True, timeout=15)
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and not parts[0].startswith('List') and parts[1] == 'device':
+                return parts[0]
+    except Exception:
+        pass
+    return None
+
+def _resolve_run_device(command):
+    """flutter's -d does not accept 'android' as a device id for a physical
+    phone; resolve it (or a bare `flutter run`) to the real adb serial so a
+    device is always selected instead of hanging/ erroring on 'android'."""
+    m = re.search(r'-d\s+(\S+)', command)
+    token = m.group(1) if m else None
+    if token is not None and not token.lower().startswith('android'):
+        return command  # user chose a real target (e.g. -d chrome / windows)
+    device_id = _android_device_id()
+    if not device_id:
+        return None
+    if m:
+        command = re.sub(r'-d\s+\S+', '-d ' + device_id, command, count=1)
+    else:
+        command = command.rstrip() + ' -d ' + device_id
+    return command
 
 @app.route('/files', methods=['GET'])
 def list_files():
-    import os
     try:
         files = os.listdir('C:\\Users\\chris\\StudentSyncSA')
         return jsonify({'files': files})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)})
 
-@app.route('/playwright', methods=['POST'])
-def playwright_route():
-    """Dev-gated browser automation endpoint.
-
-    Actions: eval | screenshot | errors
-    Requires ACE_DEV=1, otherwise returns a disabled stub.
-    """
-    if not ACE_DEV:
-        return jsonify({"error": "browser automation disabled (set ACE_DEV=1)"}), 403
-    if _pw_tools is None:
-        return jsonify({"error": "playwright_tools module not loaded"}), 500
-    data = request.json or {}
-    url = data.get('url', '')
-    action = data.get('action', 'eval')
-    script = data.get('script', '')
-    wait_ms = int(data.get('wait_ms', 1500))
-    if not url:
-        return jsonify({"error": "url is required"}), 400
-    if action == 'screenshot':
-        result = _pw_tools.browser_screenshot(url, wait_ms=wait_ms)
-    elif action == 'errors':
-        result = _pw_tools.browser_errors(url, wait_ms=wait_ms)
-    else:
-        result = _pw_tools.browser_eval(url, script=script or None, wait_ms=wait_ms)
-    return jsonify(result)
-
-@app.route('/conversations', methods=['GET'])
-def conversations_route():
-    try:
-        limit = int(request.args.get('limit', 100))
-    except Exception:
-        limit = 100
-    try:
-        return jsonify({"conversations": load_conversations(limit)})
-    except Exception as e:
-        return jsonify({"conversations": [], "error": str(e)}), 500
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    global current_mode, last_user_message_time
-    data = request.json
-    user_message = data.get('message', '')
-    model = data.get('model', 'openai/gpt-oss-20b:free')
-    endpoint = data.get('endpoint', 'http://localhost:11434/v1')
-    api_key = data.get('api_key', '')
-    functions_enabled = data.get('functions_enabled', True)
-    custom_functions = data.get('functions', []) or []
-    proactive = data.get('proactive', False)
-    if 'localhost' in endpoint or '11434' in endpoint:
-        if model not in LOCAL_MODELS:
-            endpoint = 'https://openrouter.ai/api/v1'
-            api_key = ''
-    last_user_message_time = datetime.now()
-
-    # Proactive check-in � ACE reaches out first when Chris has been quiet.
-    if proactive:
-        checkin_prompt = ("You are ACE, Chris's assistant. He has been quiet for a while. "
-                          "Reach out to him first, unprompted � one or two brief, helpful sentences. "
-                          "Ask if he needs help or wants to keep working. Keep it short.")
-        messages = [{"role": "system", "content": checkin_prompt}]
-        response = call_chat_completion(model, messages, 0.7, 120, endpoint, api_key, None)
-        if response.status_code == 200:
-            reply = extract_reply(response) or "I'm here, Chris."
+def strip_code_fences(code):
+    """Remove a leading ```<lang> ... trailing ``` wrapper if the model added one."""
+    if not code:
+        return code
+    s = code.strip()
+    if s.startswith('```'):
+        lines = s.splitlines()
+        if lines and lines[-1].startswith('```'):
+            lines = lines[1:-1]
+        elif len(lines) > 1 and lines[0].startswith('```') and lines[-1].startswith('```'):
+            lines = lines[1:-1]
         else:
-            reply = "I'm here, Chris. You don't have to say anything."
-        save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
-    
-        # Check memory first
-    try:
-        with open("memory.txt", "r") as f:
-            memory_content = f.read()
-        if "who are you" in user_message.lower() or "who am i" in user_message.lower() or "tell me about yourself" in user_message.lower():
-            reply = memory_content
-            save_conversation("assistant", reply)
-            return jsonify({"reply": reply})
-    except:
-        pass
-    
-    if "Work mode" in user_message or "work mode" in user_message:
-        current_mode = "WORK"
-        reply = "Switching to work mode. I'm here to help."
-        save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
-    
-    save_conversation("user", user_message)
-
-    # Auto-fix streaming � when Chris asks ACE to auto-fix / find the error in
-    # a file, hand the request to /auto_fix_stream and let the frontend show
-    # live progress. Broad enough to catch 'auto-fix X. The error is: Y' and
-    # 'find the error in X and apply fix'.
-    lower_msg = user_message.lower()
-    fix_intent = ("auto-fix" in lower_msg or "autofix" in lower_msg
-                  or re.search(r'find the errors? in', lower_msg)
-                  or re.search(r'fix the errors? in', lower_msg)
-                  or re.search(r'fix (?:the )?issue', lower_msg))
-    if fix_intent:
-        file_match = re.search(r'([\w/\\]+\.(?:dart|py|js|ts|html))', user_message)
-        error_match = re.search(r'error is:\s*(.+?)(?:\.\s*|$)', user_message, re.IGNORECASE)
-        if file_match:
-            file_path = file_match.group(1).replace('\\', '/')
-            error_text = error_match.group(1).strip() if error_match else "Find and fix any errors or issues in this file. If the file is already correct, report that it is clean."
-            if not os.path.isabs(file_path):
-                file_path = os.path.join(PROJECT_ROOT, file_path)
-            qs = urlencode({'file_path': file_path, 'error_text': error_text})
-            return jsonify({"type": "stream", "url": f"/auto_fix_stream?{qs}"})
-
-    if current_mode == "WORK":
-        current_mode = "WORK"
-        prompt = WORK_PERSONA
-    else:
-        prompt = ACE_PERSONA
-
-    attachments = data.get('attachments', []) or []
-
-    # Browser automation � dev-gated. When Chris shares a URL + an error
-    # symptom, drive a headless Chromium to inspect the page and feed the
-    # findings back into the reply. Status-bar shows "?? Driving browser�".
-    browser_summary = ''
-    if not attachments:
-        task = detect_browser_task(user_message)
-        if task:
-            url, trigger = task
-            err_info = _pw_tools.browser_errors(url) if _pw_tools else {"error": "pw closed"}
-            scr = _pw_tools.browser_screenshot(url) if _pw_tools else {}
-            title = err_info.get("title", "?")
-            errs = err_info.get("console_errors", [])
-            fails = err_info.get("failed_requests", [])
-            parts = [f"Browser drive for {url}"]
-            if title:
-                parts.append(f"Page title: {title}")
-            if errs:
-                parts.append("Console errors:\n" + "\n".join(errs[:8]))
-            if fails:
-                parts.append("Failed requests:\n" + "\n".join(fails[:8]))
-            if "png_base64" in scr:
-                parts.append("(screenshot captured)")
-            browser_summary = "I drove a browser to inspect this. Here's what I saw:\n\n" + "\n".join(parts)
-
-    # Auto-research: run a web search first for error/bug/how-to/404 style queries,
-    # then fold the findings into the model reply. Skips only when there are file
-    # attachments (would bloat the prompt). Works in every mode now, including Free.
-    research_summary = ''
-    if not attachments and is_research_query(user_message):
-        result, err = duckduckgo_research(user_message)
-        if err is None and result:
-            research_summary = "Here's what I found while researching:\n\n" + result
-        else:
-            research_summary = ''
-    if browser_summary:
-        prompt = (browser_summary + "\n\nAbove is live browser intel I gathered. Now answer Chris's question, using it and in your own voice.\n\n" + prompt)
-    elif research_summary:
-        prompt = (research_summary + "\n\nNow answer Chris's question using the above, in your own voice.\n\n" + prompt)
-    elif not attachments and is_research_query(user_message):
-        prompt = ("No reliable web results; answer from your own knowledge and be transparent.\n\n" + prompt)
-
-    if attachments:
-        prompt += "\n\n[Attached files]\n"
-        for att in attachments:
-            name = att.get('name', 'file')
-            content = att.get('content', '')
-            if content.startswith('data:image/'):
-                prompt += f"\n--- {name} (image attachment) ---\n[This is an image attachment. You do not support image input, so you cannot see it. Do NOT attempt to read it and do NOT say you cannot read it. Simply acknowledge that Chris attached an image and answer based on any accompanying text.]\n"
-            else:
-                prompt += f"\n--- {name} ---\n{content}\n"
-        prompt += "\n[End of attached files]\n"
-    
-    prompt += "\nChris: " + user_message + "\nACE:"
-
-    tools = None
-    if functions_enabled and model not in NO_TOOLS:
-        tools = []
-        prompt += ("\n\nYou have LIVE tool access to this computer: read_file, write_file, patch_file, "
-                   "list_files, run_command, search, get_time, drive_list, drive_read, drive_upload, "
-                   "send_notification, task_add, task_list, task_set_status, task_delete, "
-                   "event_add, event_list, and more.\n"
-                   "ACTUALLY USE the tools to complete the task � do not just plan. Call a tool when "
-                   "you need a file's contents, to apply an edit, or to run a command; the result will "
-                   "be handed back to you. Keep tool calls focused. For editing large files, read the "
-                   "file first, then use patch_file with exact old_text/new_text rather than rewriting "
-                   "the whole file. Only after the work is actually done, begin your final reply with "
-                   "the mode tag.")
-        for name, spec in FUNCTION_REGISTRY.items():
-            tools.append({
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "description": spec["description"],
-                    "parameters": spec["parameters"]
-                }
-            })
-        for fn in custom_functions:
-            if isinstance(fn, dict) and fn.get('name'):
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": fn['name'],
-                        "description": fn.get('description', ''),
-                        "parameters": fn.get('parameters', {"type": "object", "properties": {}})
-                    }
-                })
-
-    messages = [{"role": "system", "content": prompt + MODE_TAG_INSTRUCTION}, {"role": "user", "content": user_message}]
-    max_rounds = 8
-    rate_limited = False
-    fallbacks = [m for m in FALLBACK_MODELS if m != model] + ['qwen2.5-coder:1.5b']
-
-    def use_fallback():
-        """Pop the next fallback model. Local qwen is last so ACE keeps working
-        even when the free cloud quota is exhausted."""
-        nonlocal model, endpoint, api_key
-        if not fallbacks:
-            return False
-        model = fallbacks.pop(0)
-        if model in LOCAL_MODELS:
-            endpoint = 'http://localhost:11434/v1'
-            api_key = ''
-        return True
-
-    for round_idx in range(max_rounds):
-        try:
-            response = call_chat_completion(model, messages, 0.7, 300, endpoint, api_key, tools)
-        except (requests.exceptions.Timeout, requests.exceptions.RequestException):
-            rate_limited = True
-            fallbacks.clear()
-            fallbacks.append('qwen2.5-coder:1.5b')
-            if use_fallback():
-                continue
-            return jsonify({"reply": "The cloud model timed out and no local fallback is available."}), 500
-
-        if response.status_code != 200:
-            if 'free-models-per-day' in response.text or 'Rate limit exceeded' in response.text:
-                rate_limited = True
-                fallbacks.clear()
-                fallbacks.append('qwen2.5-coder:1.5b')
-            if use_fallback():
-                continue
-            return jsonify({"reply": f"Error: {response.text}"}), 500
-
-        try:
-            body = response.json()
-        except Exception:
-            return jsonify({"reply": "Error: invalid response from model"}), 500
-
-        if isinstance(body, dict) and "choices" in body:
-            try:
-                msg = body["choices"][0]["message"]
-            except (IndexError, KeyError):
-                return jsonify({"reply": "Error parsing response: unexpected format"}), 500
-        elif isinstance(body, dict) and body.get("error"):
-            return jsonify({"reply": "Error: " + json.dumps(body.get("error"))}), 500
-        else:
-            # Ollama /api/generate style: {response: "..."}
-            reply = body.get("response") if isinstance(body, dict) else None
-            if reply is None:
-                return jsonify({"reply": "Error parsing response: unexpected format"}), 500
-            msg = {"content": reply, "tool_calls": None, "role": "assistant"}
-
-        tool_calls = msg.get("tool_calls")
-        if not tool_calls:
-            reply = msg.get("content") or ""
-            if not reply.strip():
-                if use_fallback():
-                    continue
-                reply = "I couldn't generate a response just now. Please try again."
-            try:
-                auto_capture_memory(user_message, reply)
-            except Exception:
-                pass
-            save_conversation("assistant", reply)
-            return jsonify({"reply": reply, "model": model, "rate_limited": rate_limited})
-
-        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tool_calls})
-        for tc in tool_calls:
-            fn_name = tc.get("function", {}).get("name", "")
-            fn_args = tc.get("function", {}).get("arguments", "{}")
-            result = execute_tool_call(fn_name, fn_args)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.get("id", ""),
-                "content": str(result)
-            })
-
-    if use_fallback():
-        try:
-            response = call_chat_completion(model, messages, 0.7, 300, endpoint, api_key, tools)
-            if response.status_code == 200:
-                body = response.json()
-                if isinstance(body, dict) and "choices" in body:
-                    msg = body["choices"][0]["message"]
-                    reply = (msg.get("content") or "").strip()
-                    if reply:
-                        try:
-                            auto_capture_memory(user_message, reply)
-                        except Exception:
-                            pass
-                        save_conversation("assistant", reply)
-                        return jsonify({"reply": reply})
-        except Exception:
-            pass
-
-    return jsonify({"reply": "Max function rounds reached without a final answer."}), 500
-
-OPENCODE_URL = os.environ.get('OPENCODE_URL', 'http://127.0.0.1:4096')
-opencode_session_id = None
-opencode_lock = threading.Lock()
-
-def opencode_auth():
-    pw = os.environ.get('OPENCODE_SERVER_PASSWORD')
-    if pw:
-        user = os.environ.get('OPENCODE_SERVER_USERNAME', 'opencode')
-        return (user, pw)
-    return None
-
-def opencode_health():
-    try:
-        r = requests.get(OPENCODE_URL + '/global/health', auth=opencode_auth(), timeout=3)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-# ---- Live activity tracker: consumes opencode SSE events and exposes
-# ---- what ACE is doing right now (tools running, text streaming, errors).
-opencode_activity = {
-    "session": None,
-    "status": "idle",          # idle | busy | error
-    "activity": "",            # human-readable current step
-    "tool": "",                # last tool name
-    "tool_input": "",          # last tool input (command/path/url)
-    "tool_state": "",          # pending | running | completed
-    "steps": [],               # live step log: [{id, kind, icon, text, state}]
-    "last_reply": "",          # final reply of the most recent request
-    "updated": None,
-}
-activity_lock = threading.Lock()
-
-TOOL_ICONS = {
-    'bash': '??', 'read': '??', 'write': '??', 'edit': '???', 'patch': '??',
-    'grep': '??', 'glob': '???', 'webfetch': '??', 'websearch': '??',
-    'task': '??', 'todowrite': '?', 'skill': '??', 'question': '?',
-}
-
-def _tool_explain(tool, desc):
-    """Friendly one-line explanation of what a tool step is doing."""
-    d = (desc or '').strip()
-    if tool == 'bash':
-        return ('Running shell command' + (f': {d}' if d else ''))
-    if tool == 'read':
-        return ('Reading file' + (f': {d}' if d else ''))
-    if tool == 'write':
-        return ('Writing file' + (f': {d}' if d else ''))
-    if tool == 'edit':
-        return ('Editing file' + (f': {d}' if d else ''))
-    if tool == 'patch':
-        return ('Applying patch' + (f': {d}' if d else ''))
-    if tool == 'grep':
-        return ('Searching text' + (f' for "{d}"' if d else ''))
-    if tool == 'glob':
-        return ('Finding files' + (f' matching {d}' if d else ''))
-    if tool == 'webfetch':
-        return ('Fetching web page' + (f': {d}' if d else ''))
-    if tool == 'websearch':
-        return ('Searching the web' + (f' for "{d}"' if d else ''))
-    if tool == 'task':
-        return ('Running subtask' + (f': {d}' if d else ''))
-    if tool == 'todowrite':
-        return ('Updating task list')
-    if tool == 'skill':
-        return ('Loading skill' + (f': {d}' if d else ''))
-    return (tool + (f': {d}' if d else ''))
-
-def _set_activity(**kw):
-    with activity_lock:
-        opencode_activity.update(kw)
-        opencode_activity["updated"] = datetime.now().isoformat()
-
-def _reset_steps():
-    with activity_lock:
-        opencode_activity["steps"] = []
-        opencode_activity["stream"] = {"parts": {}, "order": [], "skip_first": True}
-        opencode_activity["last_reply"] = ""
-
-def _upsert_step(step_id, kind, icon, text, state):
-    with activity_lock:
-        steps = opencode_activity["steps"]
-        for s in steps:
-            if s.get("id") == step_id:
-                s["text"] = text
-                s["state"] = state
-                return
-        steps.append({"id": step_id, "kind": kind, "icon": icon, "text": text, "state": state})
-        if len(steps) > 40:
-            del steps[:len(steps) - 40]
-
-def _activity_listener():
-    """Long-lived SSE consumer. Keeps trying to connect to opencode's
-    /global/event stream and mirrors relevant events into opencode_activity."""
-    while True:
-        try:
-            r = requests.get(OPENCODE_URL + '/global/event', auth=opencode_auth(),
-                             stream=True, timeout=None)
-            _set_activity(status="idle", activity="Connected to ACE activity stream.")
-            for line in r.iter_lines(decode_unicode=True):
-                if not line or not line.startswith('data:'):
-                    continue
-                try:
-                    evt = json.loads(line[5:])
-                except Exception:
-                    continue
-                payload = evt.get('payload') or {}
-                etype = payload.get('type') or ''
-                props = payload.get('properties') or {}
-                if etype == 'session.status':
-                    st = (props.get('status') or {}).get('type', 'idle')
-                    _set_activity(session=props.get('sessionID'), status=st)
-                elif etype == 'session.error':
-                    err = props.get('error') or {}
-                    _set_activity(status='error', activity='Error: ' + str(err.get('message', err)))
-                elif etype == 'message.part.updated':
-                    part = props.get('part') or {}
-                    ptype = part.get('type')
-                    if ptype == 'tool':
-                        tool = part.get('tool') or ''
-                        state = part.get('state') or {}
-                        st = state.get('status', '')
-                        inp = state.get('input') or {}
-                        if tool == 'bash':
-                            desc = inp.get('command') or inp.get('description') or ''
-                        else:
-                            desc = inp.get('path') or inp.get('pattern') or inp.get('query') or inp.get('url') or inp.get('description') or ''
-                        step_id = 'tool:' + (part.get('id') or (tool + ':' + str(desc)))
-                        icon = TOOL_ICONS.get(tool, '??')
-                        text = _tool_explain(tool, desc)
-                        _upsert_step(step_id, 'tool', icon, text, 'running' if st == 'running' else st)
-                        _set_activity(tool=tool, tool_input=desc, tool_state=st)
-                        label = icon + ' ' + text
-                        if st == 'completed':
-                            label += ' ?'
-                        elif st == 'running':
-                            label += ' ?'
-                        _set_activity(activity=label)
-                    elif ptype == 'text':
-                        sid = props.get('sessionID')
-                        if opencode_session_id and sid and sid != opencode_session_id:
-                            continue
-                        pid = part.get('id') or ''
-                        txt = part.get('text') or ''
-                        with activity_lock:
-                            stream = opencode_activity.setdefault(
-                                "stream", {"parts": {}, "order": [], "skip_first": True})
-                            if stream.get("skip_first"):
-                                stream["skip_first"] = False
-                            elif pid and pid not in stream["parts"]:
-                                stream["parts"][pid] = txt
-                                stream["order"].append(pid)
-                            elif pid:
-                                stream["parts"][pid] = txt
-                            stream_text = "".join(stream["parts"].get(p, "") for p in stream["order"])
-                        if stream_text:
-                            _upsert_step('text:stream', 'text', '??', stream_text, 'running')
-                            _set_activity(activity='?? Writing�')
-                elif etype == 'session.idle':
-                    _set_activity(status='idle', activity='Done.')
-        except Exception:
-            try:
-                _set_activity(activity='Lost activity stream � reconnecting�')
-            except Exception:
-                pass
-            time.sleep(3)
-
-threading.Thread(target=_activity_listener, daemon=True).start()
-
-def opencode_ensure_session():
-    global opencode_session_id
-    with opencode_lock:
-        if opencode_session_id:
-            return opencode_session_id, None
-        try:
-            r = requests.post(OPENCODE_URL + '/session', json={}, auth=opencode_auth(), timeout=5)
-            if r.status_code != 200:
-                return None, f"session create failed ({r.status_code}): {r.text[:200]}"
-            session = r.json()
-            opencode_session_id = session.get('id')
-            return opencode_session_id, None
-        except Exception as e:
-            return None, f"error creating session: {e}"
-
-def opencode_poison_session():
-    """Mark the cached session as dead so the next request creates a fresh one."""
-    global opencode_session_id
-    with opencode_lock:
-        opencode_session_id = None
-
-@app.route('/opencode', methods=['POST'])
-def opencode_chat():
-    data = request.json or {}
-    message = data.get('message', '').strip()
-    if not message:
-        return jsonify({"reply": "Empty message."}), 400
-    if not opencode_health():
-        return jsonify({"reply": "? opencode server not running. Start it with: opencode serve"}), 503
-    _set_activity(status='busy', activity='?? Thinking�', tool='', tool_input='', tool_state='')
-    _reset_steps()
-    with activity_lock:
-        opencode_activity["steps"].append({
-            "id": "msg:user", "kind": "text", "icon": "??",
-            "text": "You asked: " + (message[:80] + ('�' if len(message) > 80 else '')),
-            "state": "done",
-        })
-    sess, err = opencode_ensure_session()
-    if err:
-        return jsonify({"reply": "? " + err}), 500
-    original_message = message
-    try:
-        save_conversation("user", original_message)
-    except Exception:
-        pass
-    persona_ctx = ('[ACE persona � this is who you are. Hold this voice in every reply, naturally. Never mention this block.]\n'
-                   + ACE_PERSONA + '\n')
-    memory_ctx = memory_context_text()
-    if memory_ctx:
-        persona_ctx += ('\n[ACE persistent memory � things Chris has told you across sessions. Use them naturally and gently. Never mention this block.]\n'
-                        + memory_ctx + '\n')
-    conv_ctx = conversation_context_text()
-    if conv_ctx:
-        persona_ctx += '\n' + conv_ctx + '\n'
-    persona_ctx += '\n' + MODE_TAG_INSTRUCTION + '\n'
-    message = persona_ctx + '\n' + message
-    raw_model = (data.get('model') or '').strip()
-    if not raw_model or raw_model == 'opencode':
-        raw_model = os.environ.get('OPENCODE_MODEL_ID') or 'deepseek-v4-flash-free'
-    provider_id = os.environ.get('OPENCODE_PROVIDER_ID', 'opencode')
-    model_override = raw_model
-    if '/' in raw_model:
-        provider_id, model_override = raw_model.split('/', 1)
-    body = {"parts": [{"type": "text", "text": message}]}
-    if model_override:
-        body["model"] = {"providerID": provider_id, "modelID": model_override}
-    body["tools"] = {t: True for t in (
-        'bash', 'edit', 'read', 'write', 'grep', 'glob', 'webfetch', 'websearch',
-        'task', 'todowrite', 'skill', 'patch',
-    )}
-    body["tools"]["question"] = False
-    body["system"] = ("You are ACE, running on Chris's PC with FULL local access. "
-                      "Tools ARE enabled: use bash (PowerShell), read, write, edit, grep, glob, and "
-                      "web tools freely to inspect the filesystem, run commands, and make changes. "
-                      "The project root is the current working directory; you may also touch paths "
-                      "outside it. Do not ask for permission before acting � just do it, then report "
-                      "what you did. Never emit DSML/tool_call XML/HTML tags in your final text reply."
-                      + "\n\n" + NARRATION_INSTRUCTION
-                      + MODE_TAG_INSTRUCTION)
-    try:
-        r = requests.post(OPENCODE_URL + f"/session/{sess}/message", json=body, auth=opencode_auth(), timeout=2400)
-    except requests.exceptions.ReadTimeout:
-        opencode_poison_session()
-        return jsonify({"reply": "? opencode timed out. Refreshed the session � try again."}), 500
-    except Exception as e:
-        opencode_poison_session()
-        return jsonify({"reply": "? opencode request failed: " + str(e)}), 500
-    if r.status_code != 200:
-        opencode_poison_session()
-        return jsonify({"reply": f"? opencode error ({r.status_code}): {r.text[:300]}"}), 500
-    try:
-        result = r.json()
-    except Exception as e:
-        opencode_poison_session()
-        return jsonify({"reply": "? could not parse opencode response: " + str(e)}), 500
-    info = result.get('info', {}) or {}
-    err = info.get('error')
-    if err:
-        opencode_poison_session()
-        msg = err.get('message', str(err)) if isinstance(err, dict) else str(err)
-        return jsonify({"reply": "? opencode: " + msg}), 500
-    parts = result.get('parts', []) or []
-    texts = [p.get('text', '') for p in parts if isinstance(p, dict) and p.get('type') == 'text' and p.get('text')]
-    if not texts:
-        try:
-            time.sleep(1)
-            mr = requests.get(OPENCODE_URL + f"/session/{sess}/message?limit=1", auth=opencode_auth(), timeout=10)
-            if mr.status_code == 200:
-                msgs = mr.json() or []
-                if msgs:
-                    parts = msgs[-1].get('parts', []) or []
-                    texts = [p.get('text', '') for p in parts if isinstance(p, dict) and p.get('type') == 'text' and p.get('text')]
-        except Exception:
-            pass
-    tool_parts = [p for p in parts if isinstance(p, dict) and p.get('type') == 'tool']
-    reply = "\n".join(texts).strip() or "(no text response)"
-    try:
-        auto_capture_memory(original_message, reply)
-    except Exception:
-        pass
-    if tool_parts:
-        reply += "\n\n_?? " + str(len(tool_parts)) + " tool call(s) executed_"
-    try:
-        save_conversation("assistant", reply)
-    except Exception:
-        pass
-    _set_activity(status='idle', activity='Done.', tool_state='completed', last_reply=reply)
-    return jsonify({"reply": reply})
-
-@app.route('/opencode/health', methods=['GET'])
-def opencode_health_route():
-    return jsonify({"running": opencode_health(), "session": opencode_session_id})
-
-@app.route('/opencode/status', methods=['GET'])
-def opencode_status_route():
-    with activity_lock:
-        return jsonify(dict(opencode_activity))
-
-@app.route('/opencode/stop', methods=['POST'])
-def opencode_stop():
-    sid = opencode_session_id
-    if sid:
-        try:
-            requests.post(OPENCODE_URL + f"/session/{sid}/abort", auth=opencode_auth(), timeout=10)
-        except Exception:
-            pass
-    opencode_poison_session()
-    _set_activity(status='idle', activity='? Stopped by user.')
-    with activity_lock:
-        for s in opencode_activity["steps"]:
-            if s.get("id") == "text:stream":
-                s["state"] = "done"
-                break
-    return jsonify({"stopped": True})
-
-@app.route('/devices', methods=['GET'])
-def devices():
-    try:
-        out = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=10).stdout
-    except Exception as e:
-        return jsonify({'count': 0, 'devices': [], 'error': str(e)})
-    found = []
-    for line in out.strip().splitlines()[1:]:
-        parts = line.strip().split()
-        if len(parts) >= 2 and parts[1] == 'device':
-            found.append(parts[0])
-    return jsonify({'count': len(found), 'devices': found})
-
-@app.route('/agents', methods=['GET'])
-def agents():
-    try:
-        r = requests.get(OPENCODE_URL + '/session', auth=opencode_auth(), timeout=5)
-        if r.status_code != 200:
-            return jsonify({'count': 0, 'agents': [], 'error': 'opencode ' + str(r.status_code)})
-        sessions = r.json()
-    except Exception as e:
-        return jsonify({'count': 0, 'agents': [], 'error': str(e)})
-    now = int(time.time() * 1000)
-    window = now - 30 * 60 * 1000
-    active = []
-    if isinstance(sessions, list):
-        for s in sessions:
-            if s.get('time', {}).get('updated', 0) >= window:
-                active.append((s.get('agent') or 'build') + ' � ' + (s.get('title') or 'session'))
-    return jsonify({'count': len(active), 'agents': active})
-
-# ---------- Google Drive integration ----------
-from urllib.parse import urlencode, quote
-DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
-DRIVE_CRED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drive_credentials.json')
-DRIVE_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drive_token.json')
-DRIVE_REDIRECT_URI = 'http://localhost:5000/drive/callback'
-DRIVE_AUTH_EP = 'https://accounts.google.com/o/oauth2/v2/auth'
-DRIVE_TOKEN_EP = 'https://oauth2.googleapis.com/token'
-DRIVE_API = 'https://www.googleapis.com/drive/v3'
-DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
-DRIVE_UPLOAD_LIMIT = 5 * 1024 * 1024
-
-def drive_credentials():
-    try:
-        with open(DRIVE_CRED_FILE, 'r') as f:
-            data = json.load(f)
-        if data.get('client_id') and data.get('client_secret'):
-            return data
-    except Exception:
-        pass
-    return None
-
-def drive_save_token(token):
-    with open(DRIVE_TOKEN_FILE, 'w') as f:
-        json.dump(token, f)
-
-def drive_load_token():
-    try:
-        with open(DRIVE_TOKEN_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-def drive_refresh_token(token):
-    creds = drive_credentials()
-    if not creds or not token.get('refresh_token'):
-        return None
-    r = requests.post(DRIVE_TOKEN_EP, data={
-        'client_id': creds['client_id'],
-        'client_secret': creds['client_secret'],
-        'refresh_token': token['refresh_token'],
-        'grant_type': 'refresh_token'
-    }, timeout=30)
-    if r.status_code != 200:
-        return None
-    new = r.json()
-    token['access_token'] = new.get('access_token')
-    if new.get('expires_in'):
-        token['expires_at'] = time.time() + int(new['expires_in']) - 60
-    drive_save_token(token)
-    return token
-
-def drive_api_request(method, url, **kwargs):
-    token = drive_load_token()
-    if not token:
-        return None, 'Drive not authorized. Run /drive/auth first.'
-    if time.time() >= token.get('expires_at', 0):
-        token = drive_refresh_token(token)
-        if not token:
-            return None, 'Drive token refresh failed. Re-authorize via /drive/auth.'
-    headers = kwargs.pop('headers', {})
-    headers['Authorization'] = 'Bearer ' + token['access_token']
-    r = requests.request(method, url, headers=headers, **kwargs)
-    if r.status_code == 401:
-        token = drive_refresh_token(token)
-        if not token:
-            return None, 'Drive token refresh failed. Re-authorize via /drive/auth.'
-        headers['Authorization'] = 'Bearer ' + token['access_token']
-        r = requests.request(method, url, headers=headers, **kwargs)
-    if r.status_code >= 400:
-        try:
-            msg = r.json().get('error', {}).get('message', r.text)
-        except Exception:
-            msg = r.text
-        return None, 'Drive API ' + str(r.status_code) + ': ' + str(msg)
-    try:
-        return r.json(), None
-    except Exception:
-        return r.text, None
-
-@app.route('/drive/auth', methods=['GET'])
-def drive_auth():
-    creds = drive_credentials()
-    if not creds:
-        return 'Missing drive_credentials.json with {"client_id": "...", "client_secret": "..."}'
-    params = {
-        'client_id': creds['client_id'],
-        'redirect_uri': DRIVE_REDIRECT_URI,
-        'response_type': 'code',
-        'scope': DRIVE_SCOPE,
-        'access_type': 'offline',
-        'prompt': 'consent'
-    }
-    return redirect(DRIVE_AUTH_EP + '?' + urlencode(params))
-
-@app.route('/drive/callback', methods=['GET'])
-def drive_callback():
-    creds = drive_credentials()
-    code = request.args.get('code')
-    error = request.args.get('error')
-    if error:
-        return 'Google auth error: ' + error
-    if not code or not creds:
-        return 'Missing authorization code or credentials.'
-    r = requests.post(DRIVE_TOKEN_EP, data={
-        'client_id': creds['client_id'],
-        'client_secret': creds['client_secret'],
-        'code': code,
-        'redirect_uri': DRIVE_REDIRECT_URI,
-        'grant_type': 'authorization_code'
-    }, timeout=30)
-    if r.status_code != 200:
-        return 'Token exchange failed: ' + r.text
-    token = r.json()
-    token['expires_at'] = time.time() + int(token.get('expires_in', 3600)) - 60
-    drive_save_token(token)
-    return '? Google Drive connected! You can close this tab and use Drive in ACE.'
-
-@app.route('/drive/status', methods=['GET'])
-def drive_status():
-    creds = drive_credentials()
-    if not creds:
-        return jsonify({'configured': False, 'authorized': False, 'error': 'No credentials'})
-    token = drive_load_token()
-    if not token:
-        return jsonify({'configured': True, 'authorized': False})
-    info, err = drive_api_request('GET', DRIVE_API + '/about?fields=user(displayName,emailAddress)')
-    if err:
-        return jsonify({'configured': True, 'authorized': False, 'error': err})
-    return jsonify({'configured': True, 'authorized': True, 'user': info.get('user', {})})
-
-@app.route('/drive/list', methods=['GET'])
-def drive_list():
-    parent = request.args.get('parent', 'root')
-    query = "'" + parent + "' in parents and trashed=false"
-    url = DRIVE_API + '/files?q=' + quote(query) + '&fields=files(id,name,mimeType,size,modifiedTime)&pageSize=1000&orderBy=folder,name'
-    info, err = drive_api_request('GET', url)
-    if err:
-        return jsonify({'error': err}), 500
-    files = info.get('files', []) if isinstance(info, dict) else []
-    return jsonify({'files': files})
-
-@app.route('/drive/download', methods=['GET'])
-def drive_download():
-    file_id = request.args.get('id')
-    meta, err = drive_api_request('GET', DRIVE_API + '/files/' + file_id + '?fields=name,mimeType,size')
-    if err:
-        return jsonify({'error': err}), 500
-    if int(meta.get('size', 0)) > DRIVE_UPLOAD_LIMIT:
-        return jsonify({'error': 'File too large to open in ACE (' + meta.get('name', file_id) + ').'}), 413
-    r = requests.get(DRIVE_API + '/files/' + file_id + '?alt=media', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, timeout=60)
-    if r.status_code == 401:
-        token = drive_refresh_token(drive_load_token())
-        if not token:
-            return jsonify({'error': 'Token refresh failed.'}), 401
-        r = requests.get(DRIVE_API + '/files/' + file_id + '?alt=media', headers={'Authorization': 'Bearer ' + token['access_token']}, timeout=60)
-    if r.status_code >= 400:
-        return jsonify({'error': 'Download failed: ' + str(r.status_code)}), 500
-    try:
-        return jsonify({'name': meta.get('name'), 'mimeType': meta.get('mimeType'), 'size': len(r.content), 'content': r.content.decode('utf-8')})
-    except UnicodeDecodeError:
-        return jsonify({'error': 'Binary file (not text) - cannot display in ACE.', 'name': meta.get('name'), 'mimeType': meta.get('mimeType')})
-
-@app.route('/drive/upload', methods=['POST'])
-def drive_upload():
-    data = request.json or {}
-    name = data.get('name')
-    content = data.get('content')
-    local_path = data.get('path')
-    parent = data.get('parent') or 'root'
-    if local_path:
-        try:
-            with open(local_path, 'rb') as f:
-                content = f.read()
-            name = name or os.path.basename(local_path)
-        except Exception as e:
-            return jsonify({'error': 'Cannot read local path: ' + str(e)}), 400
-    if not name or content is None:
-        return jsonify({'error': 'name and content (or path) required.'}), 400
-    if isinstance(content, str):
-        content = content.encode('utf-8')
-    if len(content) > DRIVE_UPLOAD_LIMIT:
-        return jsonify({'error': 'File exceeds 5MB simple-upload limit.'}), 413
-    metadata = {'name': name, 'parents': [parent]}
-    files = {
-        'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
-        'media': ('file', content, 'application/octet-stream')
-    }
-    r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + drive_load_token()['access_token']}, files=files, timeout=120)
-    if r.status_code == 401:
-        token = drive_refresh_token(drive_load_token())
-        if not token:
-            return jsonify({'error': 'Token refresh failed.'}), 401
-        r = requests.post(DRIVE_UPLOAD_API + '/files?uploadType=multipart', headers={'Authorization': 'Bearer ' + token['access_token']}, files=files, timeout=120)
-    if r.status_code >= 400:
-        return jsonify({'error': 'Upload failed: ' + r.text}), 500
-    fid = r.json().get('id')
-    return jsonify({'ok': True, 'id': fid, 'name': name})
-
-# ---------- ntfy.sh push notifications ----------
-NTFY_TOPIC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ntfy_topic.txt')
-
-def get_ntfy_topic():
-    try:
-        with open(NTFY_TOPIC_FILE, 'r') as f:
-            t = f.read().strip()
-        if t:
-            return t
-    except Exception:
-        pass
-    t = 'ace-' + os.urandom(12).hex()
-    with open(NTFY_TOPIC_FILE, 'w') as f:
-        f.write(t)
-    return t
-
-def ntfy_send(title, message, priority=3):
-    r = requests.post('https://ntfy.sh/', json={'topic': get_ntfy_topic(), 'title': title, 'message': message, 'priority': int(priority)}, timeout=15)
-    return r
-
-@app.route('/notify/topic', methods=['GET'])
-def notify_topic():
-    return jsonify({'topic': get_ntfy_topic()})
-
-@app.route('/notify', methods=['POST'])
-def notify():
-    data = request.json or {}
-    message = data.get('message', '')
-    title = data.get('title', 'ACE')
-    priority = int(data.get('priority', 3))
-    if not message:
-        return jsonify({'error': 'message required.'}), 400
-    try:
-        r = ntfy_send(title, message, priority)
-    except Exception as e:
-        return jsonify({'error': 'ntfy error: ' + str(e)}), 500
-    if r.status_code >= 400:
-        return jsonify({'error': 'ntfy error: ' + str(r.status_code) + ' ' + r.text}), 500
-    return jsonify({'ok': True, 'topic': get_ntfy_topic()})
-
-@app.route('/tasks', methods=['GET'])
-def tasks_list():
-    return jsonify({'tasks': load_tasks()})
-
-@app.route('/tasks', methods=['POST'])
-def tasks_add():
-    data = request.json or {}
-    title = (data.get('title') or '').strip()
-    if not title:
-        return jsonify({'error': 'title required.'}), 400
-    task = make_task(title, (data.get('notes') or ''), data.get('priority', 3), data.get('status', 'pending'))
-    tasks = load_tasks()
-    tasks.insert(0, task)
-    save_tasks(tasks)
-    return jsonify({'ok': True, 'task': task})
-
-@app.route('/tasks/<task_id>/status', methods=['POST'])
-def tasks_status(task_id):
-    data = request.json or {}
-    status = data.get('status')
-    if status not in ('pending', 'in_progress', 'done'):
-        return jsonify({'error': 'invalid status.'}), 400
-    tasks = load_tasks()
-    for t in tasks:
-        if t['id'] == task_id:
-            t['status'] = status
-            t['done_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if status == 'done' else None
-            save_tasks(tasks)
-            return jsonify({'ok': True, 'task': t})
-    return jsonify({'error': 'task not found.'}), 404
-
-@app.route('/tasks/<task_id>', methods=['DELETE'])
-def tasks_delete(task_id):
-    tasks = load_tasks()
-    before = len(tasks)
-    tasks = [t for t in tasks if t['id'] != task_id]
-    save_tasks(tasks)
-    if len(tasks) < before:
-        return jsonify({'ok': True})
-    return jsonify({'error': 'task not found.'}), 404
-
-@app.route('/events', methods=['GET'])
-def events_list():
-    return jsonify({'events': load_events()})
-
-@app.route('/events', methods=['POST'])
-def events_add():
-    data = request.json or {}
-    title = (data.get('title') or '').strip()
-    date = (data.get('date') or '').strip()
-    if not title or not date:
-        return jsonify({'error': 'title and date (YYYY-MM-DD) required.'}), 400
-    event = make_event(title, date, (data.get('time') or ''), (data.get('notes') or ''))
-    events = load_events()
-    events.append(event)
-    events.sort(key=lambda e: (e['date'], e['time']))
-    save_events(events)
-    return jsonify({'ok': True, 'event': event})
-
-@app.route('/events/<event_id>', methods=['DELETE'])
-def events_delete(event_id):
-    events = load_events()
-    before = len(events)
-    events = [e for e in events if e['id'] != event_id]
-    save_events(events)
-    if len(events) < before:
-        return jsonify({'ok': True})
-    return jsonify({'error': 'event not found.'}), 404
-
-@app.route('/notifications/pending', methods=['GET'])
-def notifications_pending():
-    after = 0
-    try:
-        after = float(request.args.get('after', '0'))
-    except (TypeError, ValueError):
-        after = 0
-    return jsonify({'events': [n for n in pending_notifications if n['ts'] > after]})
-
-@app.route('/alarms', methods=['GET'])
-def alarms_list():
-    return jsonify({'alarms': load_alarms()})
-
-@app.route('/alarms', methods=['POST'])
-def alarms_add():
-    data = request.json or {}
-    t = (data.get('time') or '').strip()
-    if not t:
-        return jsonify({'error': 'time (HH:MM) required.'}), 400
-    alarm = {
-        'id': os.urandom(6).hex(),
-        'time': t,
-        'label': (data.get('label') or 'Alarm').strip(),
-        'daily': bool(data.get('daily', True)),
-        'enabled': True,
-        'last_fired': None
-    }
-    alarms = load_alarms()
-    alarms.append(alarm)
-    save_alarms(alarms)
-    return jsonify({'ok': True, 'alarm': alarm})
-
-@app.route('/alarms/<alarm_id>/toggle', methods=['POST'])
-def alarms_toggle(alarm_id):
-    alarms = load_alarms()
-    for a in alarms:
-        if a['id'] == alarm_id:
-            a['enabled'] = not a.get('enabled', True)
-            save_alarms(alarms)
-            return jsonify({'ok': True, 'alarm': a})
-    return jsonify({'error': 'alarm not found.'}), 404
-
-@app.route('/alarms/<alarm_id>', methods=['DELETE'])
-def alarms_delete(alarm_id):
-    alarms = load_alarms()
-    before = len(alarms)
-    alarms = [a for a in alarms if a['id'] != alarm_id]
-    save_alarms(alarms)
-    if len(alarms) < before:
-        return jsonify({'ok': True})
-    return jsonify({'error': 'alarm not found.'}), 404
-
-@app.route('/timers', methods=['GET'])
-def timers_list():
-    now = time.time()
-    timers = [t for t in load_timers() if not t.get('fired')]
-    for t in timers:
-        t['remaining'] = max(0, int(t['end_at'] - now))
-    return jsonify({'timers': timers})
-
-@app.route('/timers', methods=['POST'])
-def timers_add():
-    data = request.json or {}
-    try:
-        minutes = int(data.get('minutes'))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'minutes required.'}), 400
-    if minutes < 1:
-        return jsonify({'error': 'minutes must be positive.'}), 400
-    timer = {
-        'id': os.urandom(6).hex(),
-        'label': (data.get('label') or 'Timer').strip(),
-        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'end_at': time.time() + minutes * 60,
-        'fired': False
-    }
-    timers = load_timers()
-    timers.append(timer)
-    save_timers(timers)
-    return jsonify({'ok': True, 'timer': timer})
-
-@app.route('/timers/<timer_id>', methods=['DELETE'])
-def timers_delete(timer_id):
-    timers = load_timers()
-    before = len(timers)
-    timers = [t for t in timers if t['id'] != timer_id]
-    save_timers(timers)
-    if len(timers) < before:
-        return jsonify({'ok': True})
-    return jsonify({'error': 'timer not found.'}), 404
-
-@app.route('/sessions', methods=['GET'])
-def sessions_list():
-    sessions = load_sessions()
-    for s in sessions:
-        if s.get('ended_at'):
-            try:
-                st = datetime.strptime(s['started_at'], '%Y-%m-%d %H:%M:%S')
-                en = datetime.strptime(s['ended_at'], '%Y-%m-%d %H:%M:%S')
-                s['duration'] = str(en - st)
-            except Exception:
-                s['duration'] = ''
-        else:
-            s['duration'] = ''
-            try:
-                s['started_epoch'] = int(datetime.strptime(s['started_at'], '%Y-%m-%d %H:%M:%S').timestamp())
-            except Exception:
-                s['started_epoch'] = None
-    return jsonify({'sessions': sessions})
-
-@app.route('/sessions/start', methods=['POST'])
-def sessions_start():
-    data = request.json or {}
-    sessions = load_sessions()
-    for s in sessions:
-        if not s.get('ended_at'):
-            return jsonify({'error': 'A session is already running.', 'session': s}), 400
-    session = {
-        'id': os.urandom(6).hex(),
-        'label': (data.get('label') or 'Work session').strip(),
-        'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'ended_at': None
-    }
-    sessions.append(session)
-    save_sessions(sessions)
-    return jsonify({'ok': True, 'session': session})
-
-@app.route('/sessions/end', methods=['POST'])
-def sessions_end():
-    sessions = load_sessions()
-    for s in sessions:
-        if not s.get('ended_at'):
-            s['ended_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            save_sessions(sessions)
-            return jsonify({'ok': True, 'session': s})
-    return jsonify({'error': 'No active session.'}), 400
-
-@app.route('/summary', methods=['GET'])
-def summary_get():
-    return jsonify({'summary': build_daily_summary(), 'config': load_summary_config()})
-
-@app.route('/summary/config', methods=['POST'])
-def summary_config():
-    data = request.json or {}
-    cfg = load_summary_config()
-    if 'time' in data:
-        t = str(data['time']).strip()
-        if not t:
-            return jsonify({'error': 'time (HH:MM) required.'}), 400
-        cfg['time'] = t
-    if 'enabled' in data:
-        cfg['enabled'] = bool(data['enabled'])
-    save_summary_config(cfg)
-    return jsonify({'ok': True, 'config': cfg})
-
-@app.route('/summary/now', methods=['POST'])
-def summary_now():
-    summary = build_daily_summary()
-    try:
-        ntfy_send('?? Daily summary', summary)
-    except Exception as e:
-        return jsonify({'error': 'ntfy error: ' + str(e)}), 500
-    push_notification('summary', 'Daily summary sent')
-    return jsonify({'ok': True, 'summary': summary})
+            lines = lines[1:] if lines and lines[0].startswith('```') else lines
+            if lines and lines[-1].startswith('```'):
+                lines = lines[:-1]
+        return "\n".join(lines).strip() + "\n"
+    return code
 
 @app.route('/read', methods=['POST'])
 def read_file():
@@ -2293,7 +802,7 @@ def read_file():
             content = f.read()
         return jsonify({'content': content})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)})
 
 @app.route('/write', methods=['POST'])
 def write_file():
@@ -2301,146 +810,661 @@ def write_file():
     path = data.get('path', '')
     content = data.get('content', '')
     try:
-        ok, msg = safe_write_file(path, content)
-        if not ok:
-            return jsonify({'error': msg}), 400
-        return jsonify({'status': 'saved', 'message': msg})
+        with open(path, 'w') as f:
+            f.write(content)
+        return jsonify({'status': 'saved'})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)})
 
-@app.route('/run', methods=['POST'])
-def run_command():
-    data = request.json
-    command = data.get('command', '')
-    try:
-        if "flutter run" in command.lower():
-            subprocess.Popen(f'start cmd /k "{command}"', shell=True)
-            return jsonify({'output': '? Flutter app launched'})
-        if "scrcpy" in command.lower():
-            subprocess.Popen(f'start cmd /k "{command}"', shell=True)
-            return jsonify({'output': '? Scrcpy launched'})
-        result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd='C:\\Users\\chris\\StudentSyncSA')
-        output = result.stdout if result.stdout else result.stderr
-        return jsonify({'output': output})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# ===== Autonomous code agent (ACEsi writing/editing code on its own) =====
+# The model plans with THOUGHT/CALL/FINAL lines; the server executes tools,
+# feeds results back, and loops until FINAL. The frontend already polls
+# /opencode/status for inline work-steps and /opencode/stop for abort, so no
+# frontend change is required — only the engine below is missing.
+PROJECT_ROOT = os.path.realpath(DATA_DIR)
 
-@app.route('/search', methods=['POST'])
-def search():
-    data = request.json
-    query = data.get('query', '')
-    try:
-        response = requests.get("https://api.duckduckgo.com/", params={"q": query, "format": "json", "no_html": 1, "skip_disambig": 1}, timeout=10)
-        result = response.json()
-        if result.get('AbstractText'):
-            return jsonify({'result': result['AbstractText']})
-        elif result.get('Answer'):
-            return jsonify({'result': result['Answer']})
-        elif result.get('RelatedTopics') and len(result['RelatedTopics']) > 0:
-            text = result['RelatedTopics'][0].get('Text', '')
-            return jsonify({'result': text})
-        else:
-            return jsonify({'result': 'No results found.'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+_AGENT_LOCK = threading.RLock()
+_AGENT = {"running": False, "abort": False, "activity": "", "steps": [], "last_reply": "", "last_raw": "", "tools_used": 0, "corrective": 0, "last_call_sig": None, "last_call_ok": False}
+_agent_seq = [0]
+def _agent_reset():
+    with _AGENT_LOCK:
+        _AGENT["running"] = False
+        _AGENT["abort"] = False
+        _AGENT["activity"] = ""
+        _AGENT["steps"] = []
+        _AGENT["last_reply"] = ""
+        _AGENT["tools_used"] = 0
+        _AGENT["corrective"] = 0
+        _AGENT["last_raw"] = ""
+        _AGENT["last_call_sig"] = None
+        _AGENT["last_call_ok"] = False
+def _agent_next_id():
+    with _AGENT_LOCK:
+        _agent_seq[0] += 1
+        return "a%d" % _agent_seq[0]
 
-@app.route('/speak', methods=['POST'])
-def speak():
-    data = request.json
-    text = data.get('text', '')
-    try:
-        import pyttsx3
-        engine = pyttsx3.init()
-        engine.say(text)
-        engine.runAndWait()
-        return jsonify({'status': 'spoken'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-ADMIN_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ace_admin_key.txt')
-
-def get_admin_key():
-    try:
-        with open(ADMIN_KEY_FILE, 'r') as f:
-            return f.read().strip()
-    except Exception:
+def _safe_path(path):
+    """Resolve path under PROJECT_ROOT, rejecting traversal escapes. None if unsafe."""
+    if not path:
         return None
+    p = path if os.path.isabs(path) else os.path.join(PROJECT_ROOT, path)
+    rp = os.path.realpath(p)
+    if rp != PROJECT_ROOT and not rp.startswith(PROJECT_ROOT + os.sep):
+        return None
+    return rp
 
-@app.route('/lock/status', methods=['GET'])
-def lock_status():
-    return jsonify({"locked": True, "key_set": bool(get_admin_key())})
+def _walk_files(root):
+    skip = {'.git', '.dart_tool', '.gradle', 'build', '.vscode', '.idea',
+            'node_modules', '__pycache__', '.gradle', 'venv', '.dart_tool', 'web'}
+    out = []
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in skip]
+        for d in sorted(dirs):
+            out.append("📁 " + os.path.relpath(os.path.join(base, d), root) + "/")
+        for f in sorted(files):
+            out.append("📄 " + os.path.relpath(os.path.join(base, f), root))
+    return sorted(out)
 
-@app.route('/lock/verify', methods=['POST'])
-def lock_verify():
-    data = request.json or {}
-    key = get_admin_key()
-    if key and data.get('key') == key:
-        return jsonify({"ok": True})
-    return jsonify({"ok": False})
+def tool_list_files(path="."):
+    rp = _safe_path(path)
+    if not rp or not os.path.isdir(rp):
+        return False, "dir not found: %s" % path
+    return True, "\n".join(_walk_files(rp))[:4000]
 
-@app.route('/memory/all', methods=['GET'])
-def memory_all():
-    return jsonify({"memory": load_memory()})
+def tool_read_file(path):
+    rp = _safe_path(path)
+    if not rp or not os.path.isfile(rp):
+        return False, "file not found: %s" % path
+    try:
+        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+            c = f.read()
+        cut = c[:8000]
+        if len(c) > 8000:
+            cut += "\n...[truncated, %d chars total]" % len(c)
+        return True, cut
+    except Exception as e:
+        return False, str(e)
 
-@app.route('/memory/get', methods=['POST'])
-def memory_get():
-    data = request.json or {}
-    key = data.get('key', '')
-    mem = load_memory()
-    if key in mem and isinstance(mem[key], dict):
-        return jsonify({"found": True, "value": mem[key].get('value'), "updated": mem[key].get('updated')})
-    return jsonify({"found": False})
+def tool_grep(pattern, path="."):
+    rp = _safe_path(path)
+    if not rp:
+        rp = PROJECT_ROOT
+    try:
+        cre = re.compile(pattern)
+    except re.error as e:
+        return False, "bad regex: %s" % e
+    hits = []
+    targets = []
+    if os.path.isfile(rp):
+        targets.append(rp)
+    else:
+        for root, dirs, files in os.walk(rp):
+            dirs[:] = [d for d in dirs if d not in ('build', '.dart_tool', '.git', '__pycache__', '.gradle', 'node_modules')]
+            for fn in files:
+                if fn.endswith(('.dart', '.py', '.js', '.ts', '.html', '.json', '.yaml', '.yml', '.md', '.txt')):
+                    targets.append(os.path.join(root, fn))
+    for fp in targets:
+        try:
+            with open(fp, 'r', encoding='utf-8', errors='replace') as fh:
+                for i, line in enumerate(fh, 1):
+                    if cre.search(line):
+                        rel = os.path.relpath(fp, rp if os.path.isdir(rp) else PROJECT_ROOT)
+                        hits.append("%s:%d: %s" % (rel, i, line.rstrip()[:200]))
+                        if len(hits) >= 50:
+                            hits.append("...[more truncated]")
+                            return True, "\n".join(hits)
+        except Exception:
+            pass
+    return True, "\n".join(hits) if hits else "(no matches)"
 
-@app.route('/memory/set', methods=['POST'])
-def memory_set():
-    data = request.json or {}
-    key = str(data.get('key') or '').strip()
-    value = str(data.get('value') or '').strip()
-    if not key or not value:
-        return jsonify({"error": "Both key and value are required."}), 400
-    mem = load_memory()
-    mem[key] = {"value": value, "updated": datetime.now().isoformat(), "source": "manual"}
-    save_memory(mem)
-    return jsonify({"status": "memorized", "key": key, "value": value})
+def tool_write_file(path, content):
+    rp = _safe_path(path)
+    if not rp:
+        return False, "path outside project: %s" % path
+    try:
+        d = os.path.dirname(rp)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(rp, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return True, "wrote %s (%d chars)" % (os.path.relpath(rp, PROJECT_ROOT), len(content))
+    except Exception as e:
+        return False, str(e)
 
-@app.route('/memory/forget', methods=['POST'])
-def memory_forget():
-    data = request.json or {}
-    key = data.get('key', '')
-    mem = load_memory()
-    if key in mem:
-        del mem[key]
-        save_memory(mem)
-        return jsonify({"status": "forgotten", "key": key})
-    return jsonify({"status": "key not found"})
+def tool_edit_file(path, old, new):
+    rp = _safe_path(path)
+    if not rp:
+        return False, "path outside project: %s" % path
+    try:
+        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+            c = f.read()
+    except Exception as e:
+        return False, str(e)
+    if old not in c:
+        return False, "old_string not found in file"
+    count = c.count(old)
+    if count > 1:
+        return False, "old_string is ambiguous (%d matches) — add more context" % count
+    try:
+        with open(rp, 'w', encoding='utf-8') as f:
+            f.write(c.replace(old, new, 1))
+        return True, "edited %s (1 replacement)" % os.path.relpath(rp, PROJECT_ROOT)
+    except Exception as e:
+        return False, str(e)
 
-@app.route('/memory/bulk', methods=['POST'])
-def memory_bulk():
-    data = request.json or {}
-    items = data.get('items')
-    if not isinstance(items, dict) or not items:
-        return jsonify({"error": "Provide items as an object of key: value pairs."}), 400
-    mem = load_memory()
-    now = datetime.now().isoformat()
-    added = 0
-    for key, value in items.items():
-        key = str(key).strip()
-        value = str(value).strip()
-        if not key or not value:
+# Blocked shell commands keep the agent from nuking the project/env.
+_DESTRUCTIVE = re.compile(
+    r'^\s*(rm(?:\s+-rf)?|rd|rmdir|del|erase|format|shutdown|reboot|'
+    r'git\s+(push|pushall|reset|checkout|rebase|merge|stash|reflog|branch\s+-D|switch|clean|filter-branch)|'
+    r'flutter\s+(clean|pub\s+get|pub\s+upgrade|build|bootstrap)|'
+    r'dart\s+(compile|pub\s+get|pub\s+upgrade)|'
+    r'adb\s+(uninstall|shell\s+pm\s+clear|shell\s+rm)|scrcpy|'
+    r'(taskkill\s+/f))\b', re.I)
+
+def tool_run_command(command, timeout=120):
+    if _DESTRUCTIVE.search(command):
+        return False, "blocked (safety): %s" % command
+    try:
+        r = subprocess.run(command, shell=True, capture_output=True, text=True,
+                           timeout=timeout, cwd=PROJECT_ROOT, env=os.environ.copy())
+        out = (r.stdout or '') + (r.stderr or '')
+        out = out.strip()
+        if len(out) > 3000:
+            out = out[-3000:] + "\n...[truncated]"
+        return True, "exit=%d\n%s" % (r.returncode, out)
+    except subprocess.TimeoutExpired:
+        return False, "timed out after %ds" % timeout
+    except Exception as e:
+        return False, str(e)
+
+
+# ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
+
+def tool_cdp_connect():
+    ok, msg = d.connect_cmd()
+    return ok, msg
+
+def tool_cdp_evaluate(expr):
+    if not expr:
+        return False, "usage: cdp_evaluate <expression>"
+    return d.evaluate_js(expr)
+
+def tool_cdp_console_logs():
+    return d.get_console_logs()
+
+def tool_cdp_dom_state():
+    return d.get_dom_state()
+
+def tool_cdp_network_requests():
+    return d.get_network_requests()
+
+def tool_cdp_status():
+    return True, d.status()
+
+
+TOOLS = {
+    "list_files": (tool_list_files, ("path",)),
+    "read_file": (tool_read_file, ("path",)),
+    "grep": (tool_grep, ("pattern", "path")),
+    "write_file": (tool_write_file, ("path", "content")),
+    "edit_file": (tool_edit_file, ("path", "old", "new")),
+    "run_command": (tool_run_command, ("command",)),
+    "cdp_connect": (tool_cdp_connect, ()),
+    "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
+    "cdp_console_logs": (tool_cdp_console_logs, ()),
+    "cdp_dom_state": (tool_cdp_dom_state, ()),
+    "cdp_network_requests": (tool_cdp_network_requests, ()),
+    "cdp_status": (tool_cdp_status, ()),
+}
+
+# Native OpenAI-compatible tool schema. Sent to the provider so the model can
+# emit structured tool_calls (the reason ACEsi stalled is that this was never
+# passed before — the model had no tool-calling signal and emitted prose only).
+TOOLS_SCHEMA = [
+    {"type": "function", "function": {"name": "list_files",
+        "description": "List files/dirs in a directory. Args: path (dir to list).",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "read_file",
+        "description": "Read a file's contents. Args: path.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "grep",
+        "description": "Regex search file contents. Args: pattern, path.",
+        "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern", "path"]}}},
+    {"type": "function", "function": {"name": "write_file",
+        "description": "Create/overwrite a file. Args: path, content.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+    {"type": "function", "function": {"name": "edit_file",
+        "description": "Surgical exact-match edit; old must match exactly once. Args: path, old, new.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
+    {"type": "function", "function": {"name": "run_command",
+        "description": "Run a shell command and return stdout/stderr. Args: command.",
+             "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
+    {"type": "function", "function": {"name": "cdp_connect",
+        "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_evaluate",
+        "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its JSON value. Args: expr.",
+        "parameters": {"type": "object", "properties": {"expr": {"type": "string"}}, "required": ["expr"]}}},
+    {"type": "function", "function": {"name": "cdp_console_logs",
+        "description": "Return buffered console.log/console.error events captured by CDP since the connect. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_dom_state",
+        "description": "Snapshot the current DOM via CDP: page title, URL, and a slice of documentElement.outerHTML.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_network_requests",
+        "description": "Return buffered network request events captured by CDP (requestWillBeSent / responseReceived).",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_status",
+        "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+]
+
+def _tool_icon(name):
+    return {"list_files": "📂", "read_file": "📄", "grep": "🔍",
+            "write_file": "✏️", "edit_file": "✏️",     "run_command": "▶"}.get(name, "🔧")
+    return {"cdp_connect": "🔌", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
+            "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊"}.get(name, "🔧")
+
+def _tool_desc(name, args):
+    a = {k: v for k, v in args.items() if k in TOOLS[name][1]}
+    if name in ("list_files", "read_file", "grep"):
+        p = a.get("path", ".")
+        s = a.get("pattern")
+        return "%s %s%s" % (name, p, (" — "+s) if s else "")
+    if name in ("edit_file",):
+        return "%s %s" % (name, a.get("path", "?"))
+    if name == "write_file":
+        return "%s %s" % (name, a.get("path", "?"))
+    if name == "run_command":
+        return "%s `%s`" % (name, str(a.get("command", ""))[:80])
+    if name == "cdp_evaluate":
+        return "%s `%s`" % (name, str(a.get("expr", ""))[:80])
+    return name
+
+def _call_tool(name, args):
+    fn, keys = TOOLS[name]
+    kwargs = {}
+    for k in keys:
+        if k in args:
+            kwargs[k] = args[k]
+    try:
+        return fn(**kwargs)
+    except Exception as e:
+        return False, "tool error: %s" % e
+
+CODE_AGENT_PROMPT = """You are ACEsi, an autonomous coding agent for the StudentSyncSA Flutter project.
+You are on Windows; the project root is C:\\Users\\chris\\StudentSyncSA and `flutter`,
+`dart`, `git` are on PATH. You plan, use tools, and VERIFY your own work — read first,
+then act, then run a check (flutter test / flutter analyze / a script) and read the
+result. Never invent facts about the code; look before you leap.
+
+Per turn, emit lines using exactly one of these tags:
+  THOUGHT: <1-2 sentence reasoning>
+  CALL: <tool_name> <json-arg-object>     (you may emit several CALL lines per turn)
+  FINAL: <your answer to Chris>          (ends the turn)
+
+A tool call may also be written as a single-line JSON object on its own line,
+either form is accepted:
+  CALL: read_file {"path": "lib/..."}
+  {"command": "read_file", "args": {"path": "lib/..."}}
+
+IMPORTANT: one tool call is executed per turn. Emit ONE call, see its result,
+then emit the NEXT call. Do not batch independent edits in one turn — file
+state changes after each edit, so a later edit may not match if you guessed
+its old_string before seeing earlier results. If you need to re-read a file,
+that's fine, but do not re-call the exact same tool with the same arguments
+after a success — make forward progress instead.
+
+Tool names and args:
+  list_files {"path": "."}
+  read_file {"path": "lib/..."}
+  grep {"pattern": "regex", "path": "."}
+  write_file {"path": "...", "content": "..."}
+  edit_file {"path": "...", "old": "...", "new": "..."}   (old must match exactly once)
+   run_command {"command": "flutter test test/x.dart"}
+   cdp_connect {}              (1st — connects to the ITS WebView / local Chrome via DevTools)
+   cdp_evaluate {"expr": "document.title"}   (run JS, returns JSON value)
+   cdp_console_logs {}        (read buffered console.log events)
+   cdp_dom_state {}           (page title/url/outerHTML snapshot)
+   cdp_network_requests {}    (buffered request/response events)
+
+Safety: run_command blocks rm/git push/checkout/flake.clean/pub get/build, adb
+uninstall and scrcpy. Edits are surgical (exact-match, single occurrence) and
+sandboxed to the project. Treat every step as needing verification.
+
+CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
+allowed to announce a fix you have not actually applied. If tool outputs show
+the tests still fail, fix the cause and re-test. Never fabricate a result.
+
+Example of a correct turn:
+  THOUGHT: First I'll read the file to see the existing rules.
+  CALL: read_file {"path": "lib/services/its_url_fixer.dart"}
+  CALL: grep {"pattern": "univenerip01", "path": "lib/services/its_url_fixer.dart"}
+  THOUGHT: The rule is absent — adding it next via edit_file, then I'll test.
+  CALL: edit_file {"path": "lib/services/its_url_fixer.dart", "old": "        url.contains('unlvenierp01') ||", "new": "        url.contains('unlvenierp01') ||\n        url.contains('univenerip01') ||"}
+  CALL: run_command {"command": "flutter test test/its_url_fixer_test.dart"}
+  FINAL: Added the univenerip01 rule to isItsHost and normalize; tests now pass.
+"""
+
+def _extract_calls(reply):
+    """Pull tool calls out of a model reply. Accepts formats:
+      CALL: <name> {json}            (preferred)
+      CALL: <function=NAME>{json>      (OpenRouter free-model serialization)
+      {"command": <name>, "args": {json}}  (single-line JSON object)
+    Returns a list of (name, args_dict)."""
+    out = []
+    for line in reply.splitlines():
+        s = line.strip()
+        if not s:
             continue
-        mem[key] = {"value": value, "updated": now, "source": "bulk"}
-        added += 1
-    if added:
-        save_memory(mem)
-    return jsonify({"status": "memorized", "count": added})
+        if s.startswith("CALL:"):
+            rest = s[len("CALL:"):].strip()
+            m = re.match(r'(\w+)\s*(\{.*\})\s*$', rest, re.S)
+            if not m:
+                # tolerate "<function=NAME>{json>" or "<NAME>{json>" wrappers
+                m = re.match(r'<(?:function=)?(\w+)>\s*(\{.*\})\s*$', rest, re.S)
+            if m:
+                try:
+                    out.append((m.group(1), json.loads(m.group(2))))
+                except Exception:
+                    pass
+            continue
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                obj = json.loads(s)
+            except Exception:
+                continue
+            if isinstance(obj, dict):
+                nm = obj.get("command") or obj.get("name") or obj.get("tool") or obj.get("function")
+                am = obj.get("args") or obj.get("arguments")
+                if isinstance(am, dict):
+                    am = am
+                elif am is None:
+                    am = obj
+                if nm and isinstance(am, dict) and nm not in ("result", "results"):
+                    out.append((str(nm), am))
+    return out
 
-def strip_markdown_fences(code):
-    if not code:
-        return code
-    m = re.search(r'```(?:dart|python|py|javascript|js|typescript|ts|html)?\s*\n(.*?)\n?```', code, re.DOTALL)
-    if m:
-        return m.group(1)
-    return code
+def _extract_final(reply):
+    for line in reply.splitlines():
+        s = line.strip()
+        if s.startswith("FINAL:"):
+            return s[len("FINAL:"):].strip()
+    return None
+
+def run_agent(user_message):
+    _agent_reset()
+    with _AGENT_LOCK:
+        _AGENT["running"] = True
+        _AGENT["activity"] = "planning"
+    messages = [{"role": "system", "content": CODE_AGENT_PROMPT},
+                {"role": "user", "content": user_message}]
+    max_iters = 30
+    try:
+        corrective_max = 6
+        for i in range(max_iters):
+            if _AGENT.get("abort"):
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "stopped by user"
+                    _AGENT["last_reply"] = "Stopped by user."
+                    _AGENT["running"] = False
+                return
+            with _AGENT_LOCK:
+                _AGENT["activity"] = "thinking (%d/%d)" % (i + 1, max_iters)
+            reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3)
+            print("[agent] turn %d reply=%r native=%d" % (i + 1, (reply or "")[:400], len(native_calls)))
+            with _AGENT_LOCK:
+                raw = reply or ""
+                if native_calls:
+                    raw += "\n" + "\n".join("CALL: %s %s" % (n, json.dumps(a)) for n, a in native_calls)
+                _AGENT["last_raw"] = raw[:600]
+            if not reply and not native_calls:
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "stopped (no model reply)"
+                    _AGENT["last_reply"] = "All model providers are unavailable right now."
+                return
+            calls = list(native_calls) + (_extract_calls(reply) if not native_calls else [])
+            final = _extract_final(reply)
+
+            made_calls = 0
+            if calls:
+                with _AGENT_LOCK:
+                    _AGENT["corrective"] = 0
+                deferred = len(calls) - 1
+                calls = [calls[0]]   # one tool call per turn: fresh file state each time
+                name, args = calls[0]
+                tcid = "call_%d" % i
+                asst = {"role": "assistant", "content": reply or ""}
+                asst["tool_calls"] = [{"id": tcid, "type": "function",
+                                       "function": {"name": name, "arguments": json.dumps(args)}}]
+                messages.append(asst)
+                if _AGENT.get("abort"):
+                    with _AGENT_LOCK:
+                        _AGENT["activity"] = "stopped by user"
+                        _AGENT["last_reply"] = "Stopped by user."
+                    return
+                sid = _agent_next_id()
+                icon = _tool_icon(name)
+                desc = _tool_desc(name, args)
+                sig = (name, json.dumps(args, sort_keys=True))
+                with _AGENT_LOCK:
+                    prev_sig = _AGENT.get("last_call_sig")
+                    prev_ok = _AGENT.get("last_call_ok", False)
+                if sig == prev_sig and prev_ok:
+                    with _AGENT_LOCK:
+                        _AGENT["activity"] = "repeating a tool call"
+                    messages.append({"role": "user", "content":
+                        "You already called %s with identical arguments and received its result "
+                        "above. Repeating it will not help. State the NEXT distinct action "
+                        "(edit_file / run_command) instead of re-calling the same tool." % name})
+                    made_calls = -1
+                else:
+                    with _AGENT_LOCK:
+                        _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
+                                                "state": "running", "icon": icon})
+                    if name not in TOOLS:
+                        ok, result = False, "unknown tool: %s" % name
+                    else:
+                        ok, result = _call_tool(name, args)
+                    made_calls += 1
+                    with _AGENT_LOCK:
+                        _AGENT["tools_used"] += 1
+                        _AGENT["last_call_sig"] = sig
+                        _AGENT["last_call_ok"] = ok
+                        for s in _AGENT["steps"]:
+                            if s["id"] == sid:
+                                s["state"] = "done" if ok else "error"
+                                s["error"] = "" if ok else result
+                    messages.append({"role": "tool", "tool_call_id": tcid,
+                                     "name": name, "content": str(result)})
+                if deferred > 0:
+                    messages.append({"role": "user", "content":
+                        "You emitted %d additional tool call(s) this turn. They will be processed one "
+                        "at a time on following turns after you see each result. Continue with the next." % deferred})
+                if _AGENT.get("abort"):
+                    with _AGENT_LOCK:
+                        _AGENT["activity"] = "stopped by user"
+                        _AGENT["last_reply"] = "Stopped by user."
+                    return
+                if made_calls:
+                    continue
+
+            with _AGENT_LOCK:
+                used = _AGENT["tools_used"]
+            if final:
+                if used == 0 and _AGENT["corrective"] < corrective_max:
+                    with _AGENT_LOCK:
+                        _AGENT["corrective"] += 1
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "user", "content":
+                        "You haven't used any tools yet. This task requires reading the file, "
+                        "editing it with edit_file, and running tests with run_command. Emit "
+                        "THOUGHT + CALL lines now — do NOT emit FINAL until you have actually "
+                        "performed the work and verified the result."})
+                    continue
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "done"
+                    _AGENT["last_reply"] = final
+                messages.append({"role": "assistant", "content": reply})
+                return
+            # No CALL and no FINAL — push the model toward tools.
+            if _AGENT["corrective"] < corrective_max:
+                with _AGENT_LOCK:
+                    _AGENT["corrective"] += 1
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({"role": "user", "content":
+                    "Continue. Emit THOUGHT and CALL tool lines (read_file, edit_file, "
+                    "run_command). Do NOT emit FINAL until you have used at least one tool "
+                    "and verified the result."})
+                continue
+            with _AGENT_LOCK:
+                _AGENT["activity"] = "done"
+                _AGENT["last_reply"] = reply
+            messages.append({"role": "assistant", "content": reply})
+            return
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "stopped (step cap reached)"
+            if not _AGENT["last_reply"]:
+                _AGENT["last_reply"] = "Reached the action limit; see the steps above."
+    except Exception as e:
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "error"
+            _AGENT["last_reply"] = "Agent error: %s" % e
+        print("💥 agent loop error: %s" % e)
+    finally:
+        with _AGENT_LOCK:
+            _AGENT["running"] = False
+
+# Shared provider-fallback LLM call (Groq -> Cerebras -> OpenRouter -> Ollama).
+# Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
+# Passes the native tools= schema to the provider so the model can emit
+# structured tool_calls instead of free-form prose (the stall fix).
+def llm_reply(messages, max_tokens=2048, temperature=0.3):
+    def one(name, endpoint, api_key, model):
+        if not api_key:
+            return None
+        try:
+            r = requests.post(f"{endpoint}/chat/completions",
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                json={"model": model, "messages": messages, "temperature": temperature,
+                      "max_tokens": max_tokens, "tools": TOOLS_SCHEMA, "tool_choice": "auto"},
+                timeout=(10, 120))
+            if r.status_code == 200:
+                msg = r.json()["choices"][0]["message"]
+                text = (msg.get("content") or "").strip()
+                tcs = []
+                for tc in (msg.get("tool_calls") or []):
+                    fn = tc.get("function") or {}
+                    nm = fn.get("name")
+                    try:
+                        args = json.loads(fn.get("arguments") or "{}")
+                    except Exception:
+                        args = {}
+                    if nm:
+                        tcs.append((nm, args))
+                if tcs:
+                    print(f"✅ llm_reply via {name} ({len(tcs)} tool_call(s))")
+                    return text, tcs
+                if text:
+                    print(f"✅ llm_reply via {name} ({len(text)} chars, no tools)")
+                    return text, []
+                return None
+            print(f"❌ {name} {r.status_code}: {r.text[:160]}")
+        except Exception as e:
+            print(f"❌ {name} exc: {e}")
+        return None
+    for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+                                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                                 ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)):
+        res = one(name, ep, key, model)
+        if res is not None:
+            return res
+    for model in OPENROUTER_FALLBACKS:
+        res = one("OpenRouter-fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model)
+        if res is not None:
+            return res
+    # Last resort: local Ollama, plain (no tools) — keep ACEsi alive if cloud quota exhausted.
+    try:
+        print("🦙 llm_reply via Ollama")
+        r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions",
+            json={"model": OLLAMA_MODEL, "messages": messages, "stream": False,
+                  "max_tokens": min(max_tokens, 512), "temperature": temperature},
+            timeout=(15, 280))
+        if r.status_code == 200:
+            t = (r.json()["choices"][0]["message"].get("content") or "").strip()
+            if t:
+                return t, []
+    except Exception as e:
+        print(f"❌ Ollama exc: {e}")
+    return "", []
+
+# ---- CDP REST endpoints (inspect ITS WebView / local Chrome without the agent loop) ----
+
+def _cdp_json(result):
+    ok, payload = result
+    return jsonify({"ok": ok, "result": payload}), (200 if ok else 502)
+
+@app.route('/cdp/connect', methods=['GET'])
+@app.route('/cdp/connect', methods=['POST'])
+def cdp_route_connect():
+    return _cdp_json(d.connect_cmd())
+
+@app.route('/cdp/evaluate', methods=['POST'])
+def cdp_route_evaluate():
+    expr = (request.json or {}).get("expr") if request.is_json else request.form.get("expr")
+    return _cdp_json(d.evaluate_js(expr))
+
+@app.route('/cdp/console', methods=['GET'])
+def cdp_route_console():
+    return _cdp_json(d.get_console_logs())
+
+@app.route('/cdp/dom', methods=['GET'])
+def cdp_route_dom():
+    return _cdp_json(d.get_dom_state())
+
+@app.route('/cdp/network', methods=['GET'])
+def cdp_route_network():
+    return _cdp_json(d.get_network_requests())
+
+@app.route('/cdp/status', methods=['GET'])
+def cdp_route_status():
+    return jsonify({"ok": True, "result": d.status()})
+
+@app.route('/opencode', methods=['POST'])
+def opencode():
+    data = request.json or {}
+    user_message = (data.get('message') or '').strip()
+    if not user_message:
+        return jsonify({"reply": "No message."}), 400
+    with _AGENT_LOCK:
+        if _AGENT["running"]:
+            return jsonify({"reply": "ACEsi is already working on a task. Let it finish or click stop."})
+        _AGENT["running"] = True
+        _AGENT["abort"] = False
+        _AGENT["activity"] = "starting…"
+    t = threading.Thread(target=run_agent, args=(user_message,), daemon=True)
+    t.start()
+    return jsonify({"reply": "ACEsi started working on this…", "type": "start"})
+
+@app.route('/opencode/status', methods=['GET'])
+def opencode_status():
+    with _AGENT_LOCK:
+        return jsonify({
+            "status": "busy" if _AGENT["running"] else "idle",
+            "activity": _AGENT["activity"],
+            "steps": list(_AGENT["steps"]),
+            "last_reply": _AGENT["last_reply"],
+            "last_raw": _AGENT["last_raw"],
+            "tools_used": _AGENT["tools_used"],
+            "corrective": _AGENT["corrective"],
+        })
+
+@app.route('/opencode/stop', methods=['POST'])
+def opencode_stop():
+    with _AGENT_LOCK:
+        _AGENT["abort"] = True
+        _AGENT["activity"] = "stopping…"
+    return jsonify({"ok": True})
 
 @app.route('/auto_fix_stream', methods=['GET'])
 def auto_fix_stream():
@@ -2450,125 +1474,653 @@ def auto_fix_stream():
     if not file_path or not error_text:
         return "Missing parameters", 400
 
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(PROJECT_ROOT, file_path)
-    file_path = file_path.replace('\\', '/')
-
-    def emit(step):
-        print(f"[auto-fix] {step}", flush=True)
-        yield step + "\n\n"
-        time.sleep(0.3)
-
     def generate():
+        yield "Reading file...\n\n"
+        time.sleep(0.5)
+        # If a bare filename arrived, anchor it to the project directory so the
+        # read and the error message both use an absolute path.
+        target = file_path
+        if not os.path.isabs(target):
+            joined = os.path.join(DATA_DIR, target)
+            if os.path.exists(joined):
+                target = joined
         try:
-            yield from emit("Reading file...")
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(target, 'r', encoding='utf-8') as f:
                 content = f.read()
-            yield from emit("File read successfully.")
+            yield "File read successfully.\n\n"
+            time.sleep(0.5)
+        except FileNotFoundError:
+            yield f"📄 File not found: {target}\nMake sure the file exists in the project directory or your Documents folder.\n\n"
+            return
         except Exception as e:
-            yield from emit(f"Failed to read file: {str(e)}")
+            yield f"Failed to read file: {str(e)}\n\n"
             return
 
-        # Large files: never blind-rewrite with a small model (context limits
-        # make that corrupt the file). Run the analyzer to report real issues.
-        if len(content) > 5000:
-            yield from emit("File is large (" + str(len(content)) + " bytes) � running dart analyze instead of a full rewrite.")
-            summary = "Auto-fix check finished (large file � analyzer used)."
-            try:
-                if file_path.endswith('.dart'):
-                    proc = subprocess.run(['dart', 'analyze', file_path], capture_output=True, text=True, cwd=PROJECT_ROOT, timeout=120)
-                    out = (proc.stdout or '').strip()
-                    if not out:
-                        out = (proc.stderr or '').strip()
-                    if proc.returncode == 0 or 'No issues found' in out:
-                        yield from emit("? dart analyze: No issues found � this file has no errors to fix.")
-                        summary = "dart analyze: No issues found � nothing to fix."
-                    else:
-                        summary = "dart analyze found issues � see the chat output."
-                        for line in (out.splitlines() or ['Analyzer output unavailable'])[:25]:
-                            yield from emit(line.strip())
-                else:
-                    yield from emit("Not a Dart file � I won't rewrite it. Tell me the specific error and I can help.")
-                    summary = "Not a Dart file � no rewrite performed."
-            except Exception as e:
-                yield from emit("Analyzer could not run: " + str(e))
-                summary = "Analyzer could not run."
-            yield from emit("Auto-fix complete. No rewrite was applied (large file protected).")
-            try:
-                requests.post(
-                    'https://ntfy.sh/' + get_ntfy_topic(),
-                    data=f"ACE checked {os.path.basename(file_path)}.\n{summary}",
-                    headers={"Title": "ACE auto-fix check", "Priority": "default"},
-                    timeout=10
-                )
-                yield from emit("Notification sent.")
-            except Exception as e:
-                yield from emit(f"ntfy error: {e}")
-            try:
-                push_notification('autofix', summary)
-            except Exception:
-                pass
-            return
-
-        yield from emit("Generating fix...")
-        messages = [
-            {"role": "system", "content": f"You are ACE, an expert debugger. Fix the following code. The error is: {error_text}. Respond with ONLY the complete fixed file contents as raw code. Do NOT wrap it in markdown fences, backticks, or explanations."},
+        yield "Generating fix...\n\n"
+        time.sleep(0.5)
+        fix_messages = [
+            {"role": "system", "content": f"You are ACEsi, an expert debugger. Fix the following code. The error is: {error_text}. Respond with only the fixed code — no explanations."},
             {"role": "user", "content": content}
         ]
-        try:
-            fix_response = call_chat_completion('qwen2.5-coder:1.5b', messages, 0.3, 4000, 'http://localhost:11434/v1', '')
-            if fix_response.status_code == 200:
-                fixed_code = strip_markdown_fences(extract_reply(fix_response) or '')
-                if not fixed_code:
-                    yield from emit("Fix generation failed: empty reply")
-                    return
-                yield from emit("Fix generated.")
-            else:
-                yield from emit(f"Fix generation failed: {fix_response.status_code}")
-                return
-        except Exception as e:
-            yield from emit(f"Fix generation error: {str(e)}")
+        fixed_code = None
+        for name, endpoint, api_key, model in (
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+            ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+            ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+        ):
+            if not api_key:
+                continue
+            try:
+                resp = requests.post(
+                    f"{endpoint}/chat/completions",
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                    json={"model": model, "messages": fix_messages, "temperature": 0.3, "max_tokens": 400},
+                    timeout=(10, 120)
+                )
+                if resp.status_code == 200:
+                    fixed_code = resp.json()["choices"][0]["message"]["content"]
+                    break
+                else:
+                    yield f"[{name} {resp.status_code}] retrying next provider...\n\n"
+            except Exception as e:
+                yield f"[{name} failed: {str(e)[:120]}] retrying next provider...\n\n"
+        if fixed_code:
+            yield "Fix generated.\n\n"
+            time.sleep(0.5)
+        else:
+            yield "Fix generation failed across all providers.\n\n"
             return
 
-        yield from emit("Applying fix...")
+        yield "Applying fix...\n\n"
+        time.sleep(0.5)
+        cleaned = strip_code_fences(fixed_code)
         try:
-            ok, msg = safe_write_file(file_path, fixed_code)
-            if not ok:
-                yield from emit(msg)
-                return
-            yield from emit("Fix applied successfully! " + msg)
+            with open(target, 'w', encoding='utf-8') as f:
+                f.write(cleaned)
+            yield "Fix applied successfully!\n\n"
+            # Surface the result inline in the chat stream
+            yield f"CODE:\n{cleaned}\n"
+            time.sleep(0.5)
         except Exception as e:
-            yield from emit(f"Failed to write file: {str(e)}")
+            yield f"Failed to write file: {str(e)}\n\n"
             return
+
+        try:
+            winsound.Beep(1000, 500)
+        except:
+            pass
 
         try:
             requests.post(
-                'https://ntfy.sh/' + get_ntfy_topic(),
-                data=f"ACE fixed it!\nAuto-fix applied to {file_path}.\nError: {error_text}",
-                headers={"Title": "ACE fixed it!", "Priority": "high"},
+                f"{NTFY_SERVER}/{NTFY_TOPIC}",
+                data=f"ACEsi fixed it! Auto-fix applied to {file_path}.",
+                headers={"Priority": "high", "Title": "ACEsi fixed it!"},
                 timeout=10
             )
-            yield from emit("Notification sent.")
+            yield "Notification sent.\n\n"
         except Exception as e:
-            yield from emit(f"ntfy error: {e}")
+            yield f"ntfy error: {e}\n\n"
 
-        yield from emit("Auto-fix complete.")
-        try:
-            push_notification('autofix', 'Fix applied to ' + os.path.basename(file_path))
-        except Exception:
-            pass
+        yield "Auto-fix complete.\n\n"
 
     response = Response(generate(), mimetype='text/plain')
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['X-Accel-Buffering'] = 'no'
-    response.headers['Connection'] = 'keep-alive'
     return response
 
+# ===== Memory endpoints =====
+@app.route('/memory/all', methods=['GET'])
+def memory_all():
+    return jsonify({"memory": get_memories()})
+
+@app.route('/memory/set', methods=['POST'])
+def memory_set():
+    data = request.json or {}
+    key = data.get('key', '').strip()
+    value = data.get('value', '').strip()
+    if not key or not value:
+        return jsonify({"error": "key and value required"})
+    set_memory(key, value)
+    return jsonify({"ok": True, "key": key})
+
+@app.route('/memory/bulk', methods=['POST'])
+def memory_bulk():
+    items = (request.json or {}).get('items')
+    if not isinstance(items, dict):
+        return jsonify({"error": "items must be an object"})
+    for k, v in items.items():
+        set_memory(str(k), str(v))
+    return jsonify({"count": len(items)})
+
+@app.route('/memory/forget', methods=['POST'])
+def memory_forget():
+    key = (request.json or {}).get('key', '')
+    forget_memory(key)
+    return jsonify({"ok": True})
+
+# ===== Journal endpoints =====
+@app.route('/journal', methods=['GET'])
+def journal_get():
+    return jsonify({"entries": get_journal(int(request.args.get('limit', 10)))})
+
+@app.route('/journal', methods=['POST'])
+def journal_post():
+    entry = (request.json or {}).get('entry', '').strip()
+    if not entry:
+        return jsonify({"error": "entry required"})
+    add_journal(entry)
+    return jsonify({"ok": True, "entry": entry})
+
+# ===== Summary endpoints =====
+@app.route('/summary', methods=['GET'])
+def summary_get():
+    return jsonify({
+        "summary": build_summary_text(),
+        "config": {
+            "time": get_config('summary_time', '07:00'),
+            "enabled": get_config('summary_enabled', 'true') != 'false'
+        }
+    })
+
+@app.route('/summary/config', methods=['POST'])
+def summary_config():
+    data = request.json or {}
+    time = data.get('time', '07:00')
+    enabled = bool(data.get('enabled', True))
+    set_config('summary_time', time)
+    set_config('summary_enabled', 'true' if enabled else 'false')
+    return jsonify({"ok": True, "config": {"time": time, "enabled": enabled}})
+
+@app.route('/summary/now', methods=['POST'])
+def summary_now():
+    text = build_summary_text()
+    ok = send_ntfy("ACEsi — Daily summary", text)
+    return jsonify({"ok": ok, "summary": text})
+
+# ===== Notification endpoints =====
+@app.route('/notify/topic', methods=['GET'])
+def notify_topic():
+    return jsonify({"topic": NTFY_TOPIC})
+
+@app.route('/notify', methods=['POST'])
+def notify_post():
+    data = request.json or {}
+    title = data.get('title', 'ACEsi')
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({"error": "message required"})
+    ok = send_ntfy(title, message)
+    return jsonify({"ok": ok})
+
+# ===== Tasks =====
+def _norm_priority(raw):
+    try:
+        p = int(raw)
+    except (TypeError, ValueError):
+        return 3
+    return max(1, min(5, p))
+
+@app.route('/tasks', methods=['GET'])
+def tasks_get():
+    return jsonify({"tasks": read_items('tasks.json', 'tasks')})
+
+@app.route('/tasks', methods=['POST'])
+def tasks_post():
+    data = request.json or {}
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({"error": "title required"})
+    def add_task(items):
+        items.append({
+            "id": uuid.uuid4().hex,
+            "title": title,
+            "notes": (data.get('notes') or ''),
+            "priority": _norm_priority(data.get('priority', 3)),
+            "status": data.get('status', 'pending'),
+            "created_at": datetime.now().isoformat(),
+            "done_at": None
+        })
+        return items
+    mutate_items('tasks.json', 'tasks', add_task)
+    return jsonify({"ok": True})
+
+@app.route('/tasks/<tid>/status', methods=['POST'])
+def tasks_status(tid):
+    status = (request.json or {}).get('status', 'pending')
+    def update(items):
+        for t in items:
+            if t['id'] == tid:
+                t['status'] = status if status in ('pending', 'in_progress', 'done') else 'pending'
+                t['done_at'] = datetime.now().isoformat() if t['status'] == 'done' else None
+        return items
+    mutate_items('tasks.json', 'tasks', update)
+    return jsonify({"ok": True})
+
+@app.route('/tasks/<tid>', methods=['DELETE'])
+def tasks_delete(tid):
+    mutate_items('tasks.json', 'tasks', lambda items: [t for t in items if t['id'] != tid])
+    return jsonify({"ok": True})
+
+# ===== Calendar events =====
+@app.route('/events', methods=['GET'])
+def events_get():
+    return jsonify({"events": read_items('events.json', 'events')})
+
+@app.route('/events', methods=['POST'])
+def events_post():
+    data = request.json or {}
+    title = (data.get('title') or '').strip()
+    date = (data.get('date') or '').strip()
+    if not title or not date:
+        return jsonify({"error": "title and date required"})
+    def add_event(items):
+        items.append({
+            "id": uuid.uuid4().hex,
+            "title": title,
+            "date": date,
+            "time": (data.get('time') or '').strip()
+        })
+        return items
+    mutate_items('events.json', 'events', add_event)
+    return jsonify({"ok": True})
+
+@app.route('/events/<eid>', methods=['DELETE'])
+def events_delete(eid):
+    mutate_items('events.json', 'events', lambda items: [e for e in items if e['id'] != eid])
+    return jsonify({"ok": True})
+
+# ===== Timers =====
+@app.route('/timers', methods=['GET'])
+def timers_get():
+    now = time.time()
+    timers = read_items('timers.json', 'timers')
+    out = [{
+        "id": t.get("id"),
+        "label": t.get("label", "Timer"),
+        "total": t.get("total", 0),
+        "remaining": max(0, int(t.get("ends_at", 0) - now))
+    } for t in timers]
+    return jsonify({"timers": out})
+
+@app.route('/timers', methods=['POST'])
+def timers_post():
+    data = request.json or {}
+    try:
+        minutes = int(data.get('minutes', 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "minutes must be a number"})
+    if minutes < 1:
+        return jsonify({"error": "minutes must be at least 1"})
+    label = (data.get('label') or 'Timer').strip() or 'Timer'
+    def add_timer(items):
+        items.append({
+            "id": uuid.uuid4().hex,
+            "label": label,
+            "minutes": minutes,
+            "total": minutes * 60,
+            "ends_at": time.time() + minutes * 60,
+            "created_at": datetime.now().isoformat()
+        })
+        return items
+    mutate_items('timers.json', 'timers', add_timer)
+    return jsonify({"ok": True})
+
+@app.route('/timers/<tid>', methods=['DELETE'])
+def timers_delete(tid):
+    mutate_items('timers.json', 'timers', lambda items: [t for t in items if t['id'] != tid])
+    return jsonify({"ok": True})
+
+# ===== Alarms =====
+@app.route('/alarms', methods=['GET'])
+def alarms_get():
+    return jsonify({"alarms": read_items('alarms.json', 'alarms')})
+
+@app.route('/alarms', methods=['POST'])
+def alarms_post():
+    data = request.json or {}
+    time_str = (data.get('time') or '').strip()
+    label = (data.get('label') or 'Alarm').strip() or 'Alarm'
+    if not time_str:
+        return jsonify({"error": "time required"})
+    def add_alarm(items):
+        items.append({
+            "id": uuid.uuid4().hex,
+            "time": time_str,
+            "label": label,
+            "daily": bool(data.get('daily', True)),
+            "enabled": True,
+            "last_fired": None
+        })
+        return items
+    mutate_items('alarms.json', 'alarms', add_alarm)
+    return jsonify({"ok": True})
+
+@app.route('/alarms/<aid>/toggle', methods=['POST'])
+def alarms_toggle(aid):
+    def toggle(items):
+        for a in items:
+            if a['id'] == aid:
+                a['enabled'] = not a.get('enabled', True)
+                a['last_fired'] = None
+        return items
+    mutate_items('alarms.json', 'alarms', toggle)
+    return jsonify({"ok": True})
+
+@app.route('/alarms/<aid>', methods=['DELETE'])
+def alarms_delete(aid):
+    mutate_items('alarms.json', 'alarms', lambda items: [a for a in items if a['id'] != aid])
+    return jsonify({"ok": True})
+
+# ===== Work sessions =====
+@app.route('/sessions', methods=['GET'])
+def sessions_get():
+    return jsonify({"sessions": read_items('sessions.json', 'sessions')})
+
+@app.route('/sessions/start', methods=['POST'])
+def sessions_start():
+    sessions = read_items('sessions.json', 'sessions')
+    if any(s.get('ended_at') is None for s in sessions):
+        return jsonify({"error": "A session is already running."})
+    data = request.json or {}
+    label = (data.get('label') or 'Work session').strip() or 'Work session'
+    started = datetime.now()
+    def add_session(items):
+        items.append({
+            "id": uuid.uuid4().hex,
+            "label": label,
+            "started_at": started.isoformat(),
+            "started_epoch": int(started.timestamp()),
+            "ended_at": None,
+            "duration": None
+        })
+        return items
+    mutate_items('sessions.json', 'sessions', add_session)
+    return jsonify({"ok": True})
+
+@app.route('/sessions/end', methods=['POST'])
+def sessions_end():
+    ended = datetime.now()
+    def close_session(items):
+        for s in reversed(items):
+            if s.get('ended_at') is None:
+                s['ended_at'] = ended.isoformat()
+                secs = max(0, int(ended.timestamp() - s.get('started_epoch', ended.timestamp())))
+                h, rem = divmod(secs, 3600)
+                m, ss = divmod(rem, 60)
+                s['duration'] = f"{h}:{m:02d}:{ss:02d}"
+                return items
+        return items
+    mutate_items('sessions.json', 'sessions', close_session)
+    return jsonify({"ok": True})
+
+# ===== Notifications (delivered to the browser via /notifications/pending) =====
+@app.route('/notifications/pending', methods=['GET'])
+def notifications_pending():
+    try:
+        after = float(request.args.get('after', 0))
+    except ValueError:
+        after = 0
+    events = load_json('notifications.json', [])
+    events = [e for e in events if e.get('ts', 0) > after]
+    events.sort(key=lambda e: e['ts'])
+    return jsonify({"events": events})
+
+# ===== Google Drive (raw REST, no extra deps) =====
+DRIVE_CRED_FILE = os.path.join(DATA_DIR, 'drive_credentials.json')
+DRIVE_TOKEN_FILE = os.path.join(DATA_DIR, 'drive_token.json')
+DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+DRIVE_AUTH_URL = 'https://accounts.google.com/o/oauth2/auth'
+DRIVE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+DRIVE_API = 'https://www.googleapis.com/drive/v3'
+DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
+
+
+def load_drive_credentials():
+    try:
+        with open(DRIVE_CRED_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def load_drive_token():
+    try:
+        with open(DRIVE_TOKEN_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def save_drive_token(token):
+    with _data_lock:
+        tmp = DRIVE_TOKEN_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(token, f, indent=2)
+        os.replace(tmp, DRIVE_TOKEN_FILE)
+
+
+def drive_access_token(force=False):
+    """Return a valid access token, refreshing when stale/expired/forced."""
+    token = load_drive_token()
+    if not token:
+        return None
+    if force or token.get('expires_at', 0) - time.time() < 60:
+        cred = load_drive_credentials()
+        if not cred or 'refresh_token' not in token:
+            return None
+        try:
+            r = requests.post(DRIVE_TOKEN_URL, data={
+                'client_id': cred['client_id'],
+                'client_secret': cred['client_secret'],
+                'refresh_token': token['refresh_token'],
+                'grant_type': 'refresh_token'
+            }, timeout=20)
+            data = r.json()
+            if r.status_code == 200 and data.get('access_token'):
+                token['access_token'] = data['access_token']
+                token['expires_in'] = data.get('expires_in', 3599)
+                token['expires_at'] = time.time() + int(data.get('expires_in', 3599)) - 30
+                save_drive_token(token)
+            else:
+                print(f"Drive token refresh failed: {r.status_code} {data}")
+                return None
+        except Exception as e:
+            print(f"Drive token refresh error: {e}")
+            return None
+    return token.get('access_token')
+
+
+def drive_request(method, url, **kwargs):
+    """Drive API call with automatic one-shot refresh-and-retry on 401/403."""
+    tok = drive_access_token()
+    if not tok:
+        return None, 'not_authenticated'
+    kwargs.setdefault('headers', {})['Authorization'] = 'Bearer ' + tok
+    r = requests.request(method, url, timeout=60, **kwargs)
+    if r.status_code in (401, 403):
+        tok = drive_access_token(force=True)
+        if not tok:
+            return r, 'http_%d' % r.status_code
+        kwargs['headers']['Authorization'] = 'Bearer ' + tok
+        r = requests.request(method, url, timeout=60, **kwargs)
+    if r.status_code >= 400:
+        return r, 'http_%d' % r.status_code
+    return r, None
+
+
+@app.route('/drive/status', methods=['GET'])
+def drive_status():
+    cred = load_drive_credentials()
+    if not cred:
+        return jsonify({"configured": False, "authorized": False})
+    tok = drive_access_token()
+    if not tok:
+        return jsonify({"configured": True, "authorized": False})
+    user = {}
+    try:
+        r, err = drive_request('GET', DRIVE_API + '/about?fields=user')
+        if not err:
+            u = r.json().get('user', {})
+            user = {'displayName': u.get('displayName', ''), 'emailAddress': u.get('emailAddress', '')}
+    except Exception:
+        pass
+    return jsonify({"configured": True, "authorized": True, "user": user})
+
+
+@app.route('/drive/auth', methods=['GET'])
+def drive_auth():
+    cred = load_drive_credentials()
+    if not cred:
+        return "Drive not configured", 400
+    cb = request.url_root.rstrip('/') + '/drive/callback'
+    params = {
+        'client_id': cred['client_id'],
+        'redirect_uri': cb,
+        'response_type': 'code',
+        'scope': DRIVE_SCOPE,
+        'access_type': 'offline',
+        'prompt': 'consent'
+    }
+    return redirect(DRIVE_AUTH_URL + '?' + urlencode(params))
+
+
+@app.route('/drive/callback', methods=['GET'])
+def drive_callback():
+    error = request.args.get('error')
+    if error:
+        return "Auth failed: %s" % error, 400
+    code = request.args.get('code')
+    if not code:
+        return "Missing code", 400
+    cred = load_drive_credentials()
+    if not cred:
+        return "Drive not configured", 400
+    cb = request.url_root.rstrip('/') + '/drive/callback'
+    try:
+        r = requests.post(DRIVE_TOKEN_URL, data={
+            'client_id': cred['client_id'],
+            'client_secret': cred['client_secret'],
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': cb
+        }, timeout=20)
+        data = r.json()
+        if r.status_code != 200 or 'access_token' not in data:
+            return "Token exchange failed: %s" % data, 400
+        data['expires_at'] = time.time() + int(data.get('expires_in', 3599)) - 30
+        save_drive_token(data)
+    except Exception as e:
+        return "Token exchange error: %s" % e, 400
+    return "<h3>Connected to Google Drive. You can close this tab.</h3>"
+
+
+@app.route('/drive/list', methods=['GET'])
+def drive_list():
+    parent = request.args.get('parent', 'root')
+    r, err = drive_request('GET', DRIVE_API + '/files', params={
+        'q': "'%s' in parents and trashed=false" % parent,
+        'pageSize': 200,
+        'fields': 'files(id,name,mimeType,size,modifiedTime)',
+        'orderBy': 'folder,name'
+    })
+    if err:
+        return jsonify({"error": err})
+    return jsonify({"files": r.json().get('files', [])})
+
+
+@app.route('/drive/download', methods=['GET'])
+def drive_download():
+    fid = request.args.get('id')
+    if not fid:
+        return jsonify({"error": "Missing file id"})
+    r, err = drive_request('GET', DRIVE_API + '/files/%s?alt=media' % fid)
+    if err:
+        return jsonify({"error": err})
+    return jsonify({"content": r.text})
+
+
+@app.route('/drive/upload', methods=['POST'])
+def drive_upload():
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON body"})
+    name = (body.get('name') or '').strip()
+    content = body.get('content') or ''
+    parent = body.get('parent') or 'root'
+    if not name or not content:
+        return jsonify({"error": "Name and content are required"})
+    mime = 'application/octet-stream'
+    b64 = content
+    if content.startswith('data:'):
+        header, _, b64 = content.partition(',')
+        m = re.match(r'data:([^;]+)', header)
+        if m:
+            mime = m.group(1)
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        return jsonify({"error": "Could not decode file data"})
+    metadata = {"name": name, "parents": [parent]}
+    try:
+        r, err = drive_request('POST', DRIVE_UPLOAD, params={'uploadType': 'multipart'},
+                               files={
+                                   'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
+                                   'file': (name, raw, mime)
+                               })
+        if err:
+            return jsonify({"error": err})
+        d = r.json()
+        if 'id' not in d:
+            return jsonify({"error": "Upload failed: %s" % d})
+        return jsonify({"name": name, "id": d.get('id')})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+# ===== Live counts =====
+@app.route('/devices', methods=['GET'])
+def devices():
+    try:
+        r = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
+        devs = [ln.split('\t')[0] for ln in r.stdout.splitlines()[1:]
+                if ln.strip() and 'device' in ln and 'offline' not in ln]
+        return jsonify({"count": len(devs), "devices": devs})
+    except Exception:
+        return jsonify({"count": 0, "devices": []})
+
+@app.route('/agents', methods=['GET'])
+def agents():
+    try:
+        r = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
+                           capture_output=True, text=True, timeout=10)
+        count = max(0, len([l for l in r.stdout.strip().splitlines() if l.strip()]))
+        return jsonify({"count": count, "agents": []})
+    except Exception:
+        return jsonify({"count": 0, "agents": []})
+
+# ===== Proactive check-in: sends the daily summary from ACEsi, not a timer =====
+def summary_scheduler():
+    while True:
+        try:
+            now = datetime.now()
+            enabled = get_config('summary_enabled', 'true') != 'false'
+            target = get_config('summary_time', '07:00')
+            cur = now.strftime('%H:%M')
+            today = now.date().isoformat()
+            if enabled and cur == target and get_config('last_summary_date', '') != today:
+                set_config('last_summary_date', today)
+                text = build_summary_text()
+                send_ntfy("ACEsi — Good morning", "Good morning, Chris.\n\n" + text)
+                print("📱 Proactive check-in sent")
+        except Exception as e:
+            print(f"⚠️ Scheduler error: {e}")
+        time.sleep(30)
+
+threading.Thread(target=summary_scheduler, daemon=True).start()
+@app.route('/test_ping')
+def test_ping():
+    send_test_ping()
+    return "Test ping sent! Check your phone."
+
 if __name__ == '__main__':
-    threading.Thread(target=alarm_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, threaded=True)
-
-
-
-
+    app.run(host='0.0.0.0', port=5000, debug=True)
