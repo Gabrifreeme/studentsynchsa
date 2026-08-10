@@ -398,24 +398,59 @@ LAST_FILE_PATH = None
 def index():
     return send_from_directory('.', 'ACEsi.html')
 
+
+# Strict file read/open detection. Only messages that LEAD with read/open AND
+# whose target is clearly file-like (contains "file", a path separator, an
+# absolute path, or a known file extension) are treated as file requests.
+# UI instructions like "open the app" / "read the notifications" fall through
+# to the LLM instead of being misrouted as file paths.
+def _match_file_request(message):
+    m = re.match(
+        r'^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|do\s+you\s+mind\s+)?'
+        r'(?:read|open)\s+(.+?)$',
+        message, re.IGNORECASE)
+    if not m:
+        return False, None, False
+    tail = m.group(1).strip().strip('"\'')
+    # strip trailing "file"/"please" and leading "file:" / "the file:" phrasing
+    tail = re.sub(r'\s+(?:file|please)\s*$', '', tail, flags=re.IGNORECASE).strip()
+    tail = re.sub(r'^(?:the|this|that)?\s*file\s*[: ]?\s*', '', tail, flags=re.IGNORECASE).strip()
+    # strip location phrases like "in my documents" / "on my computer"
+    tail = re.sub(r'\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b', '', tail, flags=re.IGNORECASE)
+    tail = re.sub(r'\bon\s+my\s+computer\b', '', tail, flags=re.IGNORECASE).strip()
+    candidate = tail
+    has_file_word = re.search(r'\bfile\b', message, re.IGNORECASE) is not None
+    # "file manager/explorer" or "files app" are UI instructions, not documents
+    not_file_ui = re.search(
+        r'\bfile\s+(?:manager|explorer)\b|\bfiles?\s+app\b',
+        message, re.IGNORECASE) is None
+    file_like = (
+        os.path.isabs(candidate)
+        or bool(re.search(r'[/\\]', candidate))
+        or (has_file_word and not_file_ui)
+        or bool(re.search(
+            r'(?:\.(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|'
+            r'pdf|png|jpe?g|gif|bmp|webp|docx?|xlsx?|pptx?|json|ya?ml|xml|'
+            r'csv|log|html?|css|sql|zip|tar|gz|7z|gitignore|env))$', candidate, re.IGNORECASE))
+    )
+    if not file_like:
+        return False, None, False
+    is_open = re.match(r'open\b', message, re.IGNORECASE) is not None
+    vague = candidate.lower() in ('', 'the', 'it', 'this', 'that', 'file', 'the file',
+                                  'this file', 'that file', 'previous', 'last')
+    return True, candidate, vague
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
     user_message = data.get('message', '')
     save_conversation("user", user_message)
 
-    # Handle file read requests: "read file <path>", "open <filename>", or "open the file" (re-opens last-read)
+    # Handle file read requests via the strict matcher above.
     global LAST_FILE_PATH
-    file_read_match = re.search(r'(?:read|open)\s+(?:file\s+)?(.+?)(?:\s+(?:file|please))?$', user_message, re.IGNORECASE)
-    if file_read_match:
-        is_open = re.match(r'open\b', user_message, re.IGNORECASE) is not None
-        candidate = file_read_match.group(1).strip().strip('"\'')
-        # Strip leading "file:" and "the file:" phrasing
-        candidate = re.sub(r'^(?:the|this|that)?\s*file\s*:\s*', '', candidate, flags=re.IGNORECASE).strip()
-        # Strip location phrases like "in my documents" / "on my computer"
-        candidate = re.sub(r'\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b', '', candidate, flags=re.IGNORECASE)
-        candidate = re.sub(r'\bon\s+my\s+computer\b', '', candidate, flags=re.IGNORECASE).strip()
-        vague = candidate.lower() in ('the', 'it', 'this', 'that', 'file', 'the file', 'this file', 'that file', 'previous', 'last')
+    is_file_req, candidate, vague = _match_file_request(user_message)
+    if is_file_req:
         if vague and LAST_FILE_PATH:
             file_path = LAST_FILE_PATH
         elif not vague:
@@ -1548,6 +1583,12 @@ are surgical (exact-match, single occurrence) and sandboxed to the project.
 Treat every step as needing verification. ALWAYS run flutter_analyze or
 flutter_test after edits before committing; only git_commit when tests pass.
 You cannot see screenshots — verify screen state with ui_dump, not ui_screenshot.
+
+DISPATCH RULE — when the instruction is about the app/device (open the app,
+tap, swipe, type, press a key, screenshot, check the UI): use the ui_* tools
+(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot).
+read_file is ONLY for reading source/config files on disk — never feed a UI
+instruction into read_file, and never use a user instruction as a file path.
 
 CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
 allowed to announce a fix you have not actually applied. If tool outputs show
