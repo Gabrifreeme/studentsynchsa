@@ -75,6 +75,8 @@ ntfy_topic.txt
 
 ace_memory.json
 
+.ace_keys.local
+
 tasks.json
 
 events.json
@@ -84,3 +86,5 @@ timers.json
 sessions.json
 summary_config.json
 *.ace_bak
+
+ui_screenshots/

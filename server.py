@@ -1109,6 +1109,108 @@ def tool_flutter_analyze():
     return _run_args(["flutter", "analyze"], timeout=600)
 
 
+# ---- UI testing: interact with the app on the connected Android device ----
+
+ACE_PACKAGE = "com.studentsyncsa.studentsyncsa"
+ACE_UI_SHOTS = os.path.join(PROJECT_ROOT, "ui_screenshots")
+_UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
+            "up": "19", "down": "20", "left": "21", "right": "22",
+            "esc": "111", "power": "26", "recents": "187"}
+
+
+def _ui_adb(args, timeout=120, cap=3000):
+    cmd = subprocess.list2cmdline(["adb"] + args)
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                           timeout=timeout, env=os.environ.copy())
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        if cap and len(out) > cap:
+            out = out[-cap:] + "\n...[truncated]"
+        return r.returncode == 0, out
+    except subprocess.TimeoutExpired:
+        return False, "timed out after %ds" % timeout
+    except Exception as e:
+        return False, str(e)
+
+
+def tool_ui_device():
+    ok, out = _ui_adb(["devices"])
+    size = ""
+    ok2, size = _ui_adb(["shell", "wm", "size"])
+    ok3, dens = _ui_adb(["shell", "wm", "density"])
+    return True, "%s\nscreen: %s | density: %s" % (out, size, dens)
+
+
+def tool_ui_app_open():
+    return _ui_adb(["shell", "monkey", "-p", ACE_PACKAGE,
+                    "-c", "android.intent.category.LAUNCHER", "1"])
+
+
+def tool_ui_tap(x, y):
+    try:
+        x, y = int(x), int(y)
+    except Exception:
+        return False, "usage: ui_tap x=<int> y=<int>"
+    return _ui_adb(["shell", "input", "tap", str(x), str(y)])
+
+
+def tool_ui_swipe(x1, y1, x2, y2, duration=200):
+    try:
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        duration = int(duration)
+    except Exception:
+        return False, "usage: ui_swipe x1 y1 x2 y2 [duration=200]"
+    return _ui_adb(["shell", "input", "swipe", str(x1), str(y1),
+                    str(x2), str(y2), str(duration)])
+
+
+def tool_ui_type(text):
+    if not text:
+        return False, "usage: ui_type text=<string to type>"
+    safe = str(text).replace(" ", "%s").replace("'", "").replace('"', "")
+    return _ui_adb(["shell", "input", "text", safe])
+
+
+def tool_ui_key(key):
+    k = str(key).strip().lower()
+    if k in _UI_KEYS:
+        return _ui_adb(["shell", "input", "keyevent", _UI_KEYS[k]])
+    if k.isdigit():
+        return _ui_adb(["shell", "input", "keyevent", k])
+    return False, "usage: ui_key key=%s" % "/".join(sorted(_UI_KEYS))
+
+
+def tool_ui_dump():
+    _ui_adb(["shell", "uiautomator", "dump", "/sdcard/ui.xml"])
+    ok, out = _ui_adb(["shell", "cat", "/sdcard/ui.xml"], cap=None)
+    if not ok or "<hierarchy" not in out:
+        return False, "ui dump failed: %s" % out[:500]
+    nodes = out.count("<node")
+    trimmed = out[:3000] + ("\n..." if len(out) > 3000 else "")
+    return True, "%d visible nodes\n%s" % (nodes, trimmed)
+
+
+def tool_ui_screenshot(name=None):
+    try:
+        os.makedirs(ACE_UI_SHOTS, exist_ok=True)
+        fname = "%s_%s.png" % (name or "ui", datetime.now().strftime("%H%M%S"))
+        path = os.path.join(ACE_UI_SHOTS, fname)
+        r = subprocess.run(
+            subprocess.list2cmdline(["adb", "exec-out", "screencap", "-p"]),
+            shell=True, capture_output=True, timeout=60, env=os.environ.copy())
+        data = r.stdout if isinstance(r.stdout, bytes) else r.stdout.encode()
+        if not data.startswith(b"\x89PNG"):
+            return False, "screencap failed: %s" % r.stderr[:300]
+        with open(path, "wb") as f:
+            f.write(data)
+        return True, "%s (%d KB) -- NOTE: you cannot view images; the user can via the Inspect panel." % (
+            path, len(data) // 1024)
+    except subprocess.TimeoutExpired:
+        return False, "screencap timed out"
+    except Exception as e:
+        return False, str(e)
+
+
 # ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
 
 def tool_cdp_connect():
@@ -1151,6 +1253,14 @@ TOOLS = {
     "pub_upgrade": (tool_pub_upgrade, ()),
     "flutter_test": (tool_flutter_test, ("path",)),
     "flutter_analyze": (tool_flutter_analyze, ()),
+    "ui_device": (tool_ui_device, ()),
+    "ui_app_open": (tool_ui_app_open, ()),
+    "ui_tap": (tool_ui_tap, ("x", "y")),
+    "ui_swipe": (tool_ui_swipe, ("x1", "y1", "x2", "y2", "duration")),
+    "ui_type": (tool_ui_type, ("text",)),
+    "ui_key": (tool_ui_key, ("key",)),
+    "ui_dump": (tool_ui_dump, ()),
+    "ui_screenshot": (tool_ui_screenshot, ("name",)),
     "cdp_connect": (tool_cdp_connect, ()),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
     "cdp_console_logs": (tool_cdp_console_logs, ()),
@@ -1214,6 +1324,30 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "flutter_analyze",
         "description": "Static analysis via `flutter analyze`. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_device",
+        "description": "Show connected Android devices, screen size and density. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_app_open",
+        "description": "Launch the StudentSyncSA app on the connected device. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_tap",
+        "description": "Tap the screen at pixel (x,y). Use ui_device for screen size first. Args: x, y.",
+        "parameters": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}}},
+    {"type": "function", "function": {"name": "ui_swipe",
+        "description": "Swipe from (x1,y1) to (x2,y2) over duration ms (default 200). Args: x1 y1 x2 y2, duration optional.",
+        "parameters": {"type": "object", "properties": {"x1": {"type": "integer"}, "y1": {"type": "integer"}, "x2": {"type": "integer"}, "y2": {"type": "integer"}, "duration": {"type": "integer"}}, "required": ["x1", "y1", "x2", "y2"]}}},
+    {"type": "function", "function": {"name": "ui_type",
+        "description": "Type text into the focused field (spaces become %s). Args: text.",
+        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "ui_key",
+        "description": "Send a key event: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a keyevent code. Args: key.",
+        "parameters": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}}},
+    {"type": "function", "function": {"name": "ui_dump",
+        "description": "Dump the on-screen UI hierarchy (accessibility nodes). Use to verify what is visible. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_screenshot",
+        "description": "Capture the screen to ui_screenshots/*.png and return the path. NOTE: the AI cannot view images. Args: name (optional).",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_connect",
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -1242,7 +1376,9 @@ def _tool_icon(name):
             "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
             "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
             "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
-            "flutter_test": "🧪", "flutter_analyze": "🔬"}.get(name, "🔧")
+            "flutter_test": "🧪", "flutter_analyze": "🔬",
+            "ui_device": "📱", "ui_app_open": "📱", "ui_tap": "🖱️", "ui_swipe": "🖱️",
+            "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷"}.get(name, "🔧")
 
 def _tool_desc(name, args):
     a = {k: v for k, v in args.items() if k in TOOLS[name][1]}
@@ -1264,6 +1400,15 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, str(a.get("branch", ""))[:40])
     if name == "pub_add":
         return "%s `%s`" % (name, str(a.get("package", ""))[:80])
+    if name == "ui_tap":
+        return "%s (%s,%s)" % (name, a.get("x"), a.get("y"))
+    if name == "ui_swipe":
+        return "%s (%s,%s)->(%s,%s)" % (name, a.get("x1"), a.get("y1"),
+                                        a.get("x2"), a.get("y2"))
+    if name == "ui_type":
+        return "%s `%s`" % (name, str(a.get("text", ""))[:60])
+    if name == "ui_screenshot":
+        return "%s %s" % (name, a.get("name") or "")
     return name
 
 def _call_tool(name, args):
@@ -1318,6 +1463,14 @@ Tool names and args:
    pub_upgrade {}               (upgrade all dependencies)
    flutter_test {"path": "test/..."}    (run tests; omit path for full suite)
    flutter_analyze {}           (static analysis)
+   ui_device {}                 (connected devices + screen size/density)
+   ui_app_open {}               (launch the app on the device)
+   ui_tap {"x": 540, "y": 1200}  (tap screen at pixel coords)
+   ui_swipe {"x1": 540, "y1": 2100, "x2": 540, "y2": 400}  (scroll/gesture)
+   ui_type {"text": "hello"}    (type into focused field)
+   ui_key {"key": "back"}       (back/home/enter/tab/menu/arrows/esc/power/recents)
+   ui_dump {}                   (accessibility hierarchy of what's on screen)
+   ui_screenshot {"name": "login"}  (save png; you cannot view images)
    cdp_connect {}              (1st — connects to the ITS WebView / local Chrome via DevTools)
    cdp_evaluate {"expr": "document.title"}   (run JS, returns JSON value)
    cdp_console_logs {}        (read buffered console.log events)
@@ -1327,10 +1480,11 @@ Tool names and args:
 Safety: run_command blocks rm/git push/checkout/flake.clean/pub get/build, adb
 uninstall and scrcpy. Use the dedicated git_* tools for commits/branches/merges
 (they do NOT push; git_merge rolls back on conflict). build_apk/pub_*/flutter_*
-run via dedicated tools. Edits are surgical (exact-match, single occurrence) and
-sandboxed to the project. Treat every step as needing verification. ALWAYS run
-flutter_analyze or flutter_test after edits before committing; only git_commit
-when tests pass.
+run via dedicated tools. ui_* tools drive the connected Android device. Edits
+are surgical (exact-match, single occurrence) and sandboxed to the project.
+Treat every step as needing verification. ALWAYS run flutter_analyze or
+flutter_test after edits before committing; only git_commit when tests pass.
+You cannot see screenshots — verify screen state with ui_dump, not ui_screenshot.
 
 CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
 allowed to announce a fix you have not actually applied. If tool outputs show
