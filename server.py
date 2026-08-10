@@ -57,16 +57,12 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
 CEREBRAS_MODEL = "gpt-oss-120b"
 
-# Local fallback (OpenAI-compatible) — keeps ACEsi alive AND autonomous when
-# OpenRouter free quota is exhausted (429), with no network at all.
-# IMPORTANT: pick a TOOL-capable model (the base qwen2.5 / mistral DO support
-# tools on modern Ollama). Lighter offline options already pulled here:
-#   qwen2.5:7b            (default — good quality + tools)
-#   qwen2.5-coder:1.5b    (fast, tools, code-tilted)
-#   mistral:7b            (tools)
-#   qwen2.5:3b            (tools, lighter)
+# Local fallback (OpenAI-compatible) — the FINAL provider in llm_reply, so ACEsi
+# stays alive AND autonomous when the cloud quota is exhausted (429) or offline.
+# Model is tool-capable (cdp_*/edit_file/run_command callable). qwen2.5-coder:1.5b
+# is tiny + fast on CPU; swap to a bigger pulled tool model if you want more quality.
 OLLAMA_ENDPOINT = "http://localhost:11434/v1"
-OLLAMA_MODEL = "qwen2.5:7b"
+OLLAMA_MODEL = "qwen2.5-coder:1.5b"
 
 NTFY_TOPIC = "ace_alerts"
 NTFY_SERVER = "https://ntfy.sh"
@@ -1152,13 +1148,56 @@ Example of a correct turn:
   FINAL: Added the univenerip01 rule to isItsHost and normalize; tests now pass.
 """
 
+def _unwrap_typed(o):
+    """Recursively unwrap Ollama 'JSON-schema style' args like
+    {"expr": {"type": "string", "value": "42 * 2"}} -> {"expr": "42 * 2"}."""
+    if isinstance(o, dict):
+        if set(o.keys()) <= {"type", "value", "description", "enum"} and "value" in o:
+            return o["value"]
+        return {k: _unwrap_typed(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_unwrap_typed(x) for x in o]
+    return o
+
+
+def _json_tool(obj):
+    """Given a parsed JSON dict, return (name, args) if it describes a tool call."""
+    if not isinstance(obj, dict):
+        return None
+    nm = obj.get("name") or obj.get("command") or obj.get("tool")
+    am = obj.get("arguments") or obj.get("args") or obj.get("parameters")
+    fn = obj.get("function")
+    if isinstance(fn, dict):
+        nm = nm or fn.get("name")
+        am = am or fn.get("arguments")
+    if isinstance(am, str):
+        try:
+            am = json.loads(am)
+        except Exception:
+            am = None
+    if isinstance(am, dict) and isinstance(nm, str) and nm not in ("result", "results"):
+        return nm, _unwrap_typed(am)
+    return None
+
+
 def _extract_calls(reply):
     """Pull tool calls out of a model reply. Accepts formats:
       CALL: <name> {json}            (preferred)
       CALL: <function=NAME>{json>      (OpenRouter free-model serialization)
       {"command": <name>, "args": {json}}  (single-line JSON object)
+      ```json { "name":..., "arguments":{...} } ```   (Ollama prose-style)
     Returns a list of (name, args_dict)."""
     out = []
+    # 1) fenced JSON blocks describing a tool call (qwen2.5-coder:1.5b style)
+    for m in re.finditer(r'```(?:json)?\s*\n?(.*?)```', reply, re.S):
+        blob = m.group(1).strip()
+        try:
+            obj = json.loads(blob)
+        except Exception:
+            continue
+        hit = _json_tool(obj)
+        if hit:
+            out.append(hit)
     for line in reply.splitlines():
         s = line.strip()
         if not s:
@@ -1171,7 +1210,7 @@ def _extract_calls(reply):
                 m = re.match(r'<(?:function=)?(\w+)>\s*(\{.*\})\s*$', rest, re.S)
             if m:
                 try:
-                    out.append((m.group(1), json.loads(m.group(2))))
+                    out.append((m.group(1), _unwrap_typed(json.loads(m.group(2)))))
                 except Exception:
                     pass
             continue
@@ -1180,16 +1219,16 @@ def _extract_calls(reply):
                 obj = json.loads(s)
             except Exception:
                 continue
-            if isinstance(obj, dict):
-                nm = obj.get("command") or obj.get("name") or obj.get("tool") or obj.get("function")
-                am = obj.get("args") or obj.get("arguments")
-                if isinstance(am, dict):
-                    am = am
-                elif am is None:
-                    am = obj
-                if nm and isinstance(am, dict) and nm not in ("result", "results"):
-                    out.append((str(nm), am))
-    return out
+            hit = _json_tool(obj)
+            if hit:
+                out.append(hit)
+    seen, uniq = set(), []
+    for name, args in out:
+        key = (name, json.dumps(args, sort_keys=True))
+        if key not in seen:
+            seen.add(key)
+            uniq.append((name, args))
+    return uniq
 
 def _extract_final(reply):
     for line in reply.splitlines():
