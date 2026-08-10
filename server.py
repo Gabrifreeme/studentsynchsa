@@ -441,6 +441,108 @@ def _match_file_request(message):
     return True, candidate, vague
 
 
+# One tools-capable OpenAI-compatible chat completion. Returns (text, tool_calls)
+# or None. Used by /chat so ACEsi can actually execute ui_*/dev tools instead of
+# replying "please provide the commands".
+def _chat_providers():
+    return [
+        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+        ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+        ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+    ]
+
+def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
+    if not api_key:
+        return None
+    headers = {"Content-Type": "application/json"}
+    if api_key != "local":
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        r = requests.post(f"{endpoint}/chat/completions",
+            headers=headers,
+            json={"model": model, "messages": msgs, "temperature": 0.4,
+                  "max_tokens": 500, "tools": TOOLS_SCHEMA, "tool_choice": "auto"},
+            timeout=timeout)
+        if r.status_code != 200:
+            print(f"❌ {name} {r.status_code}: {r.text[:160]}")
+            return None
+        msg = r.json()["choices"][0]["message"]
+        text = (msg.get("content") or msg.get("reasoning") or "").strip()
+        tcs = []
+        for tc in (msg.get("tool_calls") or []):
+            fn = tc.get("function") or {}
+            nm = fn.get("name")
+            am = fn.get("arguments")
+            if isinstance(am, str):
+                try:
+                    args = json.loads(am)
+                except Exception:
+                    args = {}
+            elif isinstance(am, dict):
+                args = am
+            else:
+                args = {}
+            if nm:
+                tcs.append((nm, args))
+        return text, tcs
+    except requests.exceptions.Timeout:
+        print(f"⏱️ {name} timed out")
+    except Exception as e:
+        print(f"💥 {name} exc: {e}")
+    return None
+
+
+def _chat_dispatch(llm_messages, max_rounds=8):
+    """Agent-style tool loop for /chat. Passes the tool schema to the model; when
+    it emits a tool call (ui_*, git_*, flutter_*, cdp_*, ...) EXECUTE it via
+    _call_tool and feed the result back, so ACEsi performs actions instead of
+    replying 'please provide the commands'. Returns the final text reply or None.
+    Rounds cap so a stuck model still terminates."""
+    active = None
+    for rnd in range(max_rounds):
+        if active is None:
+            got = None
+            for p in _chat_providers():
+                got = _chat_one(p[0], p[1], p[2], p[3], llm_messages)
+                if got is not None:
+                    active = p
+                    break
+            if got is None:
+                for model in OPENROUTER_FALLBACKS:
+                    got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
+                                    OPENROUTER_API_KEY, model, llm_messages)
+                    if got is not None:
+                        active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
+                                  OPENROUTER_API_KEY, model)
+                        break
+            if got is None:
+                got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
+                                OLLAMA_MODEL, llm_messages, timeout=(15, 280))
+                if got is not None:
+                    active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_MODEL)
+            if got is None:
+                break
+        else:
+            got = _chat_one(active[0], active[1], active[2], active[3], llm_messages)
+            if got is None:
+                active = None
+                continue
+        text, tcs = got
+        if not tcs:
+            return text
+        name, args = tcs[0]
+        ok, result = _call_tool(name, args)
+        tcid = "chat_t%d" % rnd
+        print(f"🔧 /chat executed {name} ok={ok}")
+        llm_messages.append({"role": "assistant", "content": text or "",
+            "tool_calls": [{"id": tcid, "type": "function",
+                            "function": {"name": name,
+                                         "arguments": json.dumps(args)}}]})
+        llm_messages.append({"role": "tool", "tool_call_id": tcid,
+                             "name": name, "content": str(result)})
+    return None
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -610,14 +712,16 @@ def chat():
             "Never invent personal history, memories, or references to past events that are not in the context below. "
             "Use the facts and journal entries below naturally when they are relevant — not every message. "
             "Keep replies short unless Chris asks for more.\n\n"
+            "DEVICE + DEV TOOLS: You can ACTUALLY perform actions yourself — you are not limited to "
+            "talking. When Chris asks you to do something on the device or app (open the app, tap, swipe, "
+            "type, press a key, navigate, take a screenshot, check what is on screen), CALL the ui_* tools "
+            "(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot). For code work you "
+            "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
+            "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
+            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n\n"
             + build_context_block()
         )
 
-        # Try providers in order: Groq -> Cerebras -> OpenRouter -> local Ollama.
-        # A single outage or daily free-quota 404/429 never kills the chat.
-        max_retries = 2
-        reply = None
-        last_error = "no models available"
         # Recent turns (minus the just-saved current message) give ACEsi context.
         history = get_recent_conversation(9)[:-1]
         llm_messages = [{"role": "system", "content": system_prompt}]
@@ -626,101 +730,10 @@ def chat():
                 llm_messages.append({"role": h['role'], "content": h['content']})
         llm_messages.append({"role": "user", "content": user_message})
 
-        def try_provider(name, endpoint, api_key, model, timeout):
-            """One OpenAI-compatible call. Returns reply string, or None on failure."""
-            if not api_key:
-                return None
-            print(f"🔗 Calling {name}: {endpoint}/chat/completions model={model}")
-            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-            for attempt in range(max_retries + 1):
-                try:
-                    r = requests.post(
-                        f"{endpoint}/chat/completions",
-                        headers=headers,
-                        json={
-                            "model": model,
-                            "messages": llm_messages,
-                            "temperature": 0.4,
-                            "max_tokens": 500
-                        },
-                        timeout=(10, timeout)
-                    )
-                    if r.status_code == 200:
-                        msg = r.json()["choices"][0]["message"]
-                        text = msg.get("content") or msg.get("reasoning")
-                        if text:
-                            print(f"✅ Reply from {name}: {len(text)} chars")
-                            return text
-                        return None
-                    print(f"❌ {name} error {r.status_code}: {r.text[:200]}")
-                    return None
-                except requests.exceptions.Timeout:
-                    if attempt < max_retries:
-                        print(f"⏱️ {name} timeout, retry {attempt + 1}/{max_retries}...")
-                        continue
-                    print(f"⏱️ {name} timed out")
-                    return None
-                except requests.exceptions.ConnectionError:
-                    if attempt < max_retries:
-                        print(f"🔌 {name} connection error, retry {attempt + 1}/{max_retries}...")
-                        continue
-                    print(f"🔌 {name} connection failed")
-                    return None
-            return None
-
-        reply = try_provider("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, 90)
-        if not reply:
-            reply = try_provider("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL, 90)
-        if not reply:
-            reply = try_provider("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL, 120)
-        if not reply:
-            for model in OPENROUTER_FALLBACKS:
-                reply = try_provider("OpenRouter fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model, 120)
-                if reply:
-                    break
-        if reply is None:
-            # Local Ollama fallback — no quota, works offline. Uses a lighter
-            # context (fewer memories, shorter values) because CPU inference is slow.
-            try:
-                print(f"🦙 Trying local Ollama: {OLLAMA_ENDPOINT}/chat/completions model={OLLAMA_MODEL}")
-                light_prompt = (
-                    "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
-                    "Use the facts and journal entries below naturally when they are relevant.\n\n"
-                    + build_context_block(light=True)
-                )
-                light_messages = [{"role": "system", "content": light_prompt}]
-                for h in history:
-                    if h.get('role') in ('user', 'assistant'):
-                        c = h['content']
-                        if len(c) > 300:
-                            c = c[:300] + "…"
-                        light_messages.append({"role": h['role'], "content": c})
-                light_messages.append({"role": "user", "content": user_message})
-                ollama_resp = requests.post(
-                    f"{OLLAMA_ENDPOINT}/chat/completions",
-                    json={
-                        "model": OLLAMA_MODEL,
-                        "messages": light_messages,
-                        "stream": False,
-                        "max_tokens": 250,
-                        "temperature": 0.4
-                    },
-                    timeout=(15, 280)
-                )
-                if ollama_resp.status_code == 200:
-                    msg = ollama_resp.json()["choices"][0]["message"]
-                    reply = msg.get("content")
-                    if reply:
-                        print(f"✅ Ollama reply length: {len(reply)} chars")
-                        last_error = None
-                    else:
-                        last_error = "ollama empty response"
-                else:
-                    last_error = f"ollama {ollama_resp.status_code}"
-                    print(f"❌ Ollama error: {ollama_resp.text[:200]}")
-            except Exception as e:
-                last_error = f"ollama {type(e).__name__}: {e}"
-                print(f"💥 Ollama fallback failed: {e}")
+        # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
+        # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
+        # defers to the user. Returns the final text reply or None.
+        reply = _chat_dispatch(llm_messages)
         if reply:
             save_conversation("assistant", reply)
             # Journal the session close when Chris signs off for the day
@@ -728,7 +741,7 @@ def chat():
                 add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
             return jsonify({"reply": reply})
-        return jsonify({"reply": f"Error: {last_error}"})
+        return jsonify({"reply": "Error: no models available"})
     except Exception as e:
         print(f"💥 Exception in /chat: {type(e).__name__}: {e}")
         import traceback
@@ -1831,10 +1844,12 @@ def run_agent(user_message):
                         _AGENT["corrective"] += 1
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "user", "content":
-                        "You haven't used any tools yet. This task requires reading the file, "
-                        "editing it with edit_file, and running tests with run_command. Emit "
-                        "THOUGHT + CALL lines now — do NOT emit FINAL until you have actually "
-                        "performed the work and verified the result."})
+                        "You haven't used any tools yet. Pick the RIGHT tool for THIS task: "
+                        "ui_* tools for device/app actions (ui_app_open, ui_tap, ui_swipe, "
+                        "ui_type, ui_key, ui_dump, ui_screenshot), file tools + run_command / "
+                        "flutter_* for code work, cdp_* for the WebView. Emit THOUGHT + CALL "
+                        "now — do NOT emit FINAL until you have actually performed the work "
+                        "and verified the result. Never defer back to the user."})
                     continue
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "done"
@@ -1847,9 +1862,9 @@ def run_agent(user_message):
                     _AGENT["corrective"] += 1
                 messages.append({"role": "assistant", "content": reply})
                 messages.append({"role": "user", "content":
-                    "Continue. Emit THOUGHT and CALL tool lines (read_file, edit_file, "
-                    "run_command). Do NOT emit FINAL until you have used at least one tool "
-                    "and verified the result."})
+                    "Continue. Emit THOUGHT and CALL tool lines using the RIGHT tool for this "
+                    "task (ui_* for device/app actions, file/dev tools for code work). Do NOT "
+                    "emit FINAL until you have used at least one tool and verified the result."})
                 continue
             with _AGENT_LOCK:
                 _AGENT["activity"] = "done"
