@@ -59,5 +59,34 @@ class ChatDispatchTest(unittest.TestCase):
         self.assertIsNone(reply)
 
 
+class NullArgsTest(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import server as s
+        self.server = s
+
+    def test_ui_tap_null_args_rejected_with_clear_error(self):
+        ok, err = self.server._call_tool("ui_tap", {"x": None, "y": None})
+        self.assertFalse(ok)
+        self.assertIn("missing REQUIRED argument", err)
+        self.assertIn("x", err)
+        self.assertIn("y", err)
+
+    def test_ui_type_null_text_rejected(self):
+        ok, err = self.server._call_tool("ui_type", {"text": None})
+        self.assertFalse(ok)
+        self.assertIn("text", err)
+
+    def test_ui_key_null_rejected(self):
+        ok, err = self.server._call_tool("ui_key", {"key": None})
+        self.assertFalse(ok)
+        self.assertIn("key", err)
+
+    def test_missing_key_treated_like_null(self):
+        ok, err = self.server._call_tool("ui_tap", {"x": 100})
+        self.assertFalse(ok)
+        self.assertIn("y", err)
+
+
 if __name__ == "__main__":
     unittest.main()

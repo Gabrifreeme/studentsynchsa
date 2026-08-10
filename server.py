@@ -1433,23 +1433,38 @@ TOOLS_SCHEMA = [
         "description": "Launch the StudentSyncSA app on the connected device. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "ui_tap",
-        "description": "Tap the screen at pixel (x,y). Use ui_device for screen size first. Args: x, y.",
-        "parameters": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}}},
+        "description": "Tap the screen at a pixel coordinate. Call ui_device FIRST to learn the screen size (e.g. 1080x2412). REQUIRED arguments: x (horizontal pixel from left edge), y (vertical pixel from top edge). Both must be integer pixel values, never null, never strings.",
+        "parameters": {"type": "object", "properties": {
+            "x": {"type": "integer", "title": "x", "description": "REQUIRED. Horizontal pixel coordinate from the LEFT edge of the screen. Integer, e.g. 540 on a 1080-wide screen."},
+            "y": {"type": "integer", "title": "y", "description": "REQUIRED. Vertical pixel coordinate from the TOP edge of the screen. Integer, e.g. 1200 on a 2412-tall screen."}},
+            "required": ["x", "y"]}}},
     {"type": "function", "function": {"name": "ui_swipe",
-        "description": "Swipe from (x1,y1) to (x2,y2) over duration ms (default 200). Args: x1 y1 x2 y2, duration optional.",
-        "parameters": {"type": "object", "properties": {"x1": {"type": "integer"}, "y1": {"type": "integer"}, "x2": {"type": "integer"}, "y2": {"type": "integer"}, "duration": {"type": "integer"}}, "required": ["x1", "y1", "x2", "y2"]}}},
+        "description": "Swipe (scroll/gesture) from a start pixel (x1,y1) to an end pixel (x2,y2). REQUIRED: x1, y1, x2, y2 (integer pixels). OPTIONAL: duration (integer ms, default 200). For a downward scroll use a larger y2 than y1.",
+        "parameters": {"type": "object", "properties": {
+            "x1": {"type": "integer", "title": "x1", "description": "REQUIRED. Start horizontal pixel coordinate from the LEFT edge."},
+            "y1": {"type": "integer", "title": "y1", "description": "REQUIRED. Start vertical pixel coordinate from the TOP edge."},
+            "x2": {"type": "integer", "title": "x2", "description": "REQUIRED. End horizontal pixel coordinate from the LEFT edge."},
+            "y2": {"type": "integer", "title": "y2", "description": "REQUIRED. End vertical pixel coordinate from the TOP edge."},
+            "duration": {"type": "integer", "title": "duration", "description": "OPTIONAL. Gesture duration in milliseconds. Default 200."}},
+            "required": ["x1", "y1", "x2", "y2"]}}},
     {"type": "function", "function": {"name": "ui_type",
-        "description": "Type text into the focused field (spaces become %s). Args: text.",
-        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+        "description": "Type a text string into the currently focused input field on the device. REQUIRED argument: text (the exact characters to type; spaces are sent as %s). Never null.",
+        "parameters": {"type": "object", "properties": {
+            "text": {"type": "string", "title": "text", "description": "REQUIRED. The exact text to type, e.g. \"john@school.edu\". Never null or empty."}},
+            "required": ["text"]}}},
     {"type": "function", "function": {"name": "ui_key",
-        "description": "Send a key event: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a keyevent code. Args: key.",
-        "parameters": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}}},
+        "description": "Send a single key event to the device. REQUIRED argument: key. Allowed values: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric Android keyevent code (e.g. 4 = BACK).",
+        "parameters": {"type": "object", "properties": {
+            "key": {"type": "string", "title": "key", "description": "REQUIRED. One of: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric keyevent code. Never null."}},
+            "required": ["key"]}}},
     {"type": "function", "function": {"name": "ui_dump",
-        "description": "Dump the on-screen UI hierarchy (accessibility nodes). Use to verify what is visible. Args: none.",
+        "description": "Dump the on-screen UI accessibility hierarchy (all visible text, buttons, bounds). Use this to VERIFY what is actually on screen after taps/navigation. No arguments required.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "ui_screenshot",
-        "description": "Capture the screen to ui_screenshots/*.png and return the path. NOTE: the AI cannot view images. Args: name (optional).",
-        "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": []}}},
+        "description": "Capture the screen to ui_screenshots/*.png and return the saved path. NOTE: the AI cannot view images — use ui_dump to read the screen. OPTIONAL argument: name (string used in the filename).",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot, e.g. \"login\". Omit or set to null to auto-name."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "restart",
         "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
         "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": []}}},
@@ -1521,11 +1536,31 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, a.get("what") or "cdp")
     return name
 
+_REQUIRED_ARGS = {}
+for _t in TOOLS_SCHEMA:
+    _req = (_t.get("function") or {}).get("parameters") or {}
+    _name = (_t.get("function") or {}).get("name")
+    if _name:
+        _REQUIRED_ARGS[_name] = [r for r in (_req.get("required") or []) if r]
+
+
 def _call_tool(name, args):
     fn, keys = TOOLS[name]
+    args = args or {}
+    missing = []
+    for k in _REQUIRED_ARGS.get(name, ()):
+        if k not in args or args[k] is None or args[k] == "":
+            missing.append(k)
+    if missing:
+        return False, ("ui tool error: missing REQUIRED argument%s %s "
+                       "(you passed %r). Pass every argument as a non-null value, "
+                       "e.g. ui_tap {\"x\": 540, \"y\": 1200}."
+                       % ("s" if len(missing) > 1 else "",
+                          ", ".join("%r" % m for m in missing),
+                          {k: v for k, v in args.items()}))
     kwargs = {}
     for k in keys:
-        if k in args:
+        if k in args and args[k] is not None:
             kwargs[k] = args[k]
     try:
         return fn(**kwargs)
