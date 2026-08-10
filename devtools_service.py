@@ -116,6 +116,31 @@ def _select_target(targets):
     return None
 
 
+def restart_local_chrome():
+    """Kill any Chrome on the CDP port (and drop the session), then relaunch it."""
+    global _session
+    try:
+        _session = None
+        r = subprocess.run("netstat -ano", shell=True, capture_output=True,
+                           text=True, timeout=30)
+        pids = set()
+        for line in r.stdout.splitlines():
+            if "127.0.0.1:9230" in line and "LISTENING" in line:
+                parts = line.split()
+                if parts:
+                    pids.add(parts[-1])
+        for p in pids:
+            try:
+                subprocess.run("taskkill /F /PID %s" % p, shell=True,
+                               capture_output=True, text=True, timeout=30)
+            except Exception:
+                pass
+        time.sleep(1)
+    except Exception:
+        pass
+    return _ensure_local_browser()
+
+
 def _ensure_local_browser():
     """If no local Chrome/Chromium devtools server is reachable on the default port,
     launch a detached headless Chrome with --remote-allow-origins=* so WebSocket

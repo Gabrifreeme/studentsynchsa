@@ -826,7 +826,7 @@ def write_file():
 PROJECT_ROOT = os.path.realpath(DATA_DIR)
 
 _AGENT_LOCK = threading.RLock()
-_AGENT = {"running": False, "abort": False, "activity": "", "steps": [], "last_reply": "", "last_raw": "", "tools_used": 0, "corrective": 0, "last_call_sig": None, "last_call_ok": False}
+_AGENT = {"running": False, "abort": False, "activity": "", "steps": [], "last_reply": "", "last_raw": "", "tools_used": 0, "corrective": 0, "last_call_sig": None, "last_call_ok": False, "last_error": ""}
 _agent_seq = [0]
 def _agent_reset():
     with _AGENT_LOCK:
@@ -840,6 +840,7 @@ def _agent_reset():
         _AGENT["last_raw"] = ""
         _AGENT["last_call_sig"] = None
         _AGENT["last_call_ok"] = False
+        _AGENT["last_error"] = ""
 def _agent_next_id():
     with _AGENT_LOCK:
         _agent_seq[0] += 1
@@ -1211,6 +1212,58 @@ def tool_ui_screenshot(name=None):
         return False, str(e)
 
 
+# ---- Self-hosting / self-healing runtime controls ----
+
+ACE_HOST_FLAG = os.path.join(PROJECT_ROOT, "ace_host.flag")
+ACE_HOST_PID = os.path.join(PROJECT_ROOT, "ace_host.pid")
+
+
+def _watchdog_alive():
+    try:
+        if not os.path.exists(ACE_HOST_PID):
+            return False
+        pid = int(open(ACE_HOST_PID).read().strip())
+        r = subprocess.run("tasklist /FI \"PID eq %d\"" % pid, shell=True,
+                           capture_output=True, text=True, timeout=30)
+        return str(pid) in r.stdout
+    except Exception:
+        return False
+
+
+def tool_restart(what="cdp"):
+    w = str(what or "cdp").lower().strip()
+    if w == "server":
+        if _watchdog_alive():
+            with open(ACE_HOST_FLAG, "w") as f:
+                f.write("restart")
+            return True, ("ace_host.py watchdog (pid %s) will restart the server within ~3s; "
+                          "the API may drop briefly." % open(ACE_HOST_PID).read().strip())
+        return True, ("no watchdog running (ace_host.pid not found). Restart manually: "
+                      "`python ace_host.py` (auto-restarts on crash) or `python -u server.py`.")
+    if w == "chrome":
+        ok = d.restart_local_chrome()
+        return ok, ("local CDP chrome relaunched at http://127.0.0.1:9230"
+                    if ok else "failed to relaunch chrome")
+    if w == "cdp":
+        old = d.status()[:160]
+        sess = d._get_session(force=True)
+        new = sess.ws.url if sess else "none"
+        return True, "cdp session reset. previous: %s\nnew target: %s" % (old, new)
+    if w == "ollama":
+        try:
+            rr = requests.get("http://localhost:11434/api/tags", timeout=3)
+            return True, "ollama is already running (%d models)" % len(rr.json().get("models", []))
+        except Exception:
+            try:
+                subprocess.Popen(["ollama", "serve"],
+                                 creationflags=subprocess.DETACHED_PROCESS,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True, "ollama was down — started `ollama serve` detached. Wait ~5s then retry."
+            except Exception as e:
+                return False, "failed to start ollama: %s" % e
+    return False, "usage: restart what=server|chrome|cdp|ollama"
+
+
 # ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
 
 def tool_cdp_connect():
@@ -1261,6 +1314,7 @@ TOOLS = {
     "ui_key": (tool_ui_key, ("key",)),
     "ui_dump": (tool_ui_dump, ()),
     "ui_screenshot": (tool_ui_screenshot, ("name",)),
+    "restart": (tool_restart, ("what",)),
     "cdp_connect": (tool_cdp_connect, ()),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
     "cdp_console_logs": (tool_cdp_console_logs, ()),
@@ -1348,6 +1402,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "ui_screenshot",
         "description": "Capture the screen to ui_screenshots/*.png and return the path. NOTE: the AI cannot view images. Args: name (optional).",
         "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": []}}},
+    {"type": "function", "function": {"name": "restart",
+        "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
+        "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_connect",
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -1378,10 +1435,13 @@ def _tool_icon(name):
             "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
             "flutter_test": "🧪", "flutter_analyze": "🔬",
             "ui_device": "📱", "ui_app_open": "📱", "ui_tap": "🖱️", "ui_swipe": "🖱️",
-            "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷"}.get(name, "🔧")
+            "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷",
+            "restart": "🔄"}.get(name, "🔧")
 
 def _tool_desc(name, args):
-    a = {k: v for k, v in args.items() if k in TOOLS[name][1]}
+    a = {k: v for k, v in args.items() if k in (TOOLS.get(name, (None, ()))[1] or ())}
+    if name not in TOOLS:
+        return name
     if name in ("list_files", "read_file", "grep"):
         p = a.get("path", ".")
         s = a.get("pattern")
@@ -1409,6 +1469,8 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, str(a.get("text", ""))[:60])
     if name == "ui_screenshot":
         return "%s %s" % (name, a.get("name") or "")
+    if name == "restart":
+        return "%s `%s`" % (name, a.get("what") or "cdp")
     return name
 
 def _call_tool(name, args):
@@ -1471,6 +1533,7 @@ Tool names and args:
    ui_key {"key": "back"}       (back/home/enter/tab/menu/arrows/esc/power/recents)
    ui_dump {}                   (accessibility hierarchy of what's on screen)
    ui_screenshot {"name": "login"}  (save png; you cannot view images)
+   restart {"what": "chrome"}   (self-host: server|chrome|cdp|ollama)
    cdp_connect {}              (1st — connects to the ITS WebView / local Chrome via DevTools)
    cdp_evaluate {"expr": "document.title"}   (run JS, returns JSON value)
    cdp_console_logs {}        (read buffered console.log events)
@@ -1641,6 +1704,32 @@ def run_agent(user_message):
                         _AGENT["last_reply"] = "Stopped by user."
                     return
                 sid = _agent_next_id()
+                if name not in TOOLS:
+                    with _AGENT_LOCK:
+                        _AGENT["steps"].append({"id": sid, "kind": "work",
+                                                "text": name, "state": "error",
+                                                "error": "unknown tool", "icon": "🔧"})
+                    made_calls += 1
+                    with _AGENT_LOCK:
+                        _AGENT["tools_used"] += 1
+                        _AGENT["last_call_sig"] = (name, json.dumps(args, sort_keys=True))
+                        _AGENT["last_call_ok"] = False
+                        _AGENT["last_error"] = "unknown tool: %s" % name
+                    messages.append({"role": "tool", "tool_call_id": tcid,
+                                     "name": name, "content": "unknown tool: %s" % name})
+                    messages.append({"role": "user", "content":
+                        "Tool '%s' is not available. Check the tool list in the system prompt and "
+                        "use one of the real tools (read_file, edit_file, run_command, git_*, "
+                        "build_apk, pub_*, flutter_test, flutter_analyze, ui_*, cdp_*, restart)." % name})
+                    if deferred > 0:
+                        messages.append({"role": "user", "content":
+                            "You emitted %d additional tool call(s) this turn. Continue with the next one." % deferred})
+                    if _AGENT.get("abort"):
+                        with _AGENT_LOCK:
+                            _AGENT["activity"] = "stopped by user"
+                            _AGENT["last_reply"] = "Stopped by user."
+                        return
+                    continue
                 icon = _tool_icon(name)
                 desc = _tool_desc(name, args)
                 sig = (name, json.dumps(args, sort_keys=True))
@@ -1668,12 +1757,19 @@ def run_agent(user_message):
                         _AGENT["tools_used"] += 1
                         _AGENT["last_call_sig"] = sig
                         _AGENT["last_call_ok"] = ok
+                        if not ok:
+                            _AGENT["last_error"] = "%s: %s" % (name, str(result)[:300])
                         for s in _AGENT["steps"]:
                             if s["id"] == sid:
                                 s["state"] = "done" if ok else "error"
                                 s["error"] = "" if ok else result
                     messages.append({"role": "tool", "tool_call_id": tcid,
                                      "name": name, "content": str(result)})
+                    if not ok:
+                        messages.append({"role": "user", "content":
+                            "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
+                            "root cause first (read the file / inspect the state), then take a "
+                            "corrective action. This is self-healing: fix the actual problem."})
                 if deferred > 0:
                     messages.append({"role": "user", "content":
                         "You emitted %d additional tool call(s) this turn. They will be processed one "
@@ -1724,10 +1820,13 @@ def run_agent(user_message):
             if not _AGENT["last_reply"]:
                 _AGENT["last_reply"] = "Reached the action limit; see the steps above."
     except Exception as e:
+        import traceback
         with _AGENT_LOCK:
             _AGENT["activity"] = "error"
+            _AGENT["last_error"] = ("%s: %s" % (type(e).__name__, e))[:400]
             _AGENT["last_reply"] = "Agent error: %s" % e
         print("💥 agent loop error: %s" % e)
+        print(traceback.format_exc())
     finally:
         with _AGENT_LOCK:
             _AGENT["running"] = False
@@ -1883,7 +1982,35 @@ def opencode_status():
             "last_raw": _AGENT["last_raw"],
             "tools_used": _AGENT["tools_used"],
             "corrective": _AGENT["corrective"],
+            "last_error": _AGENT["last_error"],
         })
+
+@app.route('/opencode/heal', methods=['POST', 'GET'])
+def opencode_heal():
+    """Self-healing: feed the last run's failures back to ACEsi and let it fix them."""
+    with _AGENT_LOCK:
+        if _AGENT["running"]:
+            return jsonify({"reply": "ACEsi is already working — let it finish or stop first."}), 409
+        steps = list(_AGENT["steps"])
+        last_error = _AGENT.get("last_error", "")
+        last_reply = _AGENT.get("last_reply", "")
+    failed = [s for s in steps if s.get("state") == "error"]
+    if not failed and not last_error:
+        return jsonify({"reply": "Nothing to heal — the last run had no failing steps."})
+    detail = "\n".join("• %s: %s" % (s.get("text", s.get("id")), (s.get("error") or "")[:400])
+                       for s in failed[-5:])
+    msg = ("SELF-HEALING RUN. A previous ACEsi run left errors behind. Recover from them:\n"
+           "FAILING STEPS:\n%s\nLAST ERROR: %s\nLAST REPLY: %s\n\n"
+           "Diagnose the root cause, fix it (edit_file / run_command / flutter_test / "
+           "flutter_analyze / git_commit), and confirm with FINAL. Do not redo work that "
+           "already succeeded." % (detail or "(none)", last_error or "(none)", last_reply))
+    with _AGENT_LOCK:
+        _AGENT["running"] = True
+        _AGENT["abort"] = False
+        _AGENT["activity"] = "healing…"
+    t = threading.Thread(target=run_agent, args=(msg,), daemon=True)
+    t.start()
+    return jsonify({"reply": "Heal started — fixing %d failing step(s)." % len(failed)})
 
 @app.route('/opencode/stop', methods=['POST'])
 def opencode_stop():
