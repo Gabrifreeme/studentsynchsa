@@ -980,6 +980,135 @@ def tool_run_command(command, timeout=120):
         return False, str(e)
 
 
+# ---- Git / build / dependency tools (dedicated, bypass the shell blocklist
+# ---- but with their own guardrails) ----
+
+def _run_shell(cmd, timeout=300, cwd=None):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                           timeout=timeout, cwd=cwd or PROJECT_ROOT,
+                           env=os.environ.copy())
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        if len(out) > 4000:
+            out = out[-4000:] + "\n...[truncated]"
+        return r.returncode == 0, "exit=%d\n%s" % (r.returncode, out)
+    except subprocess.TimeoutExpired:
+        return False, "timed out after %ds" % timeout
+    except Exception as e:
+        return False, str(e)
+
+
+def _run_args(args, timeout=300):
+    # Windows-safe: list2cmdline does proper quoting, shell=True resolves .bat
+    cmdline = subprocess.list2cmdline(args)
+    try:
+        r = subprocess.run(cmdline, shell=True, capture_output=True, text=True,
+                           timeout=timeout, cwd=PROJECT_ROOT,
+                           env=os.environ.copy())
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        if len(out) > 4000:
+            out = out[-4000:] + "\n...[truncated]"
+        return r.returncode == 0, "exit=%d\n%s" % (r.returncode, out)
+    except subprocess.TimeoutExpired:
+        return False, "timed out after %ds" % timeout
+    except Exception as e:
+        return False, str(e)
+
+
+def tool_git_status():
+    return _run_args(["git", "status", "--short", "--branch"], timeout=30)
+
+
+def tool_git_log(n=10):
+    try:
+        n = max(1, min(int(n), 50))
+    except Exception:
+        n = 10
+    return _run_args(["git", "log", "--oneline", "-%d" % n], timeout=30)
+
+
+def tool_git_commit(message, files=None):
+    if not message or not str(message).strip():
+        return False, "usage: git_commit message=<commit message>"
+    if files:
+        if isinstance(files, str):
+            files = [files]
+        stage = ["git", "add", "-A", "--"] + [str(f) for f in files]
+    else:
+        stage = ["git", "add", "-A"]
+    ok1, out1 = _run_args(stage, timeout=60)
+    if not ok1:
+        return False, out1
+    ok2, out2 = _run_args(["git", "-c", "user.name=ACEsi",
+                           "-c", "user.email=acesi@local",
+                           "commit", "-m", str(message)], timeout=60)
+    if "nothing to commit" in out2 or "no changes added" in out2:
+        return True, "nothing to commit (working tree clean)"
+    return ok2, out2
+
+
+def tool_git_branch(name=None, create=False):
+    if name and create:
+        return _run_args(["git", "checkout", "-b", str(name)], timeout=60)
+    return _run_args(["git", "branch", "-a"], timeout=30)
+
+
+def tool_git_merge(branch):
+    if not branch:
+        return False, "usage: git_merge branch=<branch-name>"
+    b = str(branch).strip()
+    ok, out = _run_args(["git", "branch", "--list", b], timeout=30)
+    if not ok or b not in out:
+        return False, "branch '%s' does not exist locally: %s" % (b, out)
+    ok2, out2 = _run_args(["git", "merge", "--no-commit", "--no-ff", b], timeout=180)
+    if "CONFLICT" in out2:
+        return False, "merge conflicts in %s:\n%s\nResolve conflicts with edit_file, then git_commit." % (b, out2)
+    _run_args(["git", "merge", "--abort"], timeout=60)  # roll back --no-commit staging
+    if not ok2:
+        return False, out2
+    return _run_args(["git", "merge", b], timeout=180)
+
+
+def tool_build_apk(mode="release"):
+    mode = (mode or "release").lower().strip()
+    if mode not in ("release", "debug"):
+        return False, "usage: build_apk mode=release|debug"
+    ok, out = _run_args(["flutter", "build", "apk", "--" + mode], timeout=600)
+    apk = os.path.join(PROJECT_ROOT, "build", "app", "outputs",
+                       "flutter-apk", "app-%s.apk" % mode)
+    exists = os.path.exists(apk)
+    if ok and exists:
+        size = os.path.getsize(apk) // 1024
+        return True, "%s\nAPK: %s (%d KB)" % (out, apk, size)
+    return ok, out
+
+
+def tool_pub_add(package):
+    if not package:
+        return False, "usage: pub_add package=<name[@version]>"
+    return _run_args(["flutter", "pub", "add", str(package).strip()], timeout=300)
+
+
+def tool_pub_remove(package):
+    if not package:
+        return False, "usage: pub_remove package=<name>"
+    return _run_args(["flutter", "pub", "remove", str(package).strip()], timeout=300)
+
+
+def tool_pub_upgrade():
+    return _run_args(["flutter", "pub", "upgrade"], timeout=300)
+
+
+def tool_flutter_test(path=None):
+    if path and str(path).strip():
+        return _run_args(["flutter", "test", str(path).strip()], timeout=600)
+    return _run_args(["flutter", "test"], timeout=600)
+
+
+def tool_flutter_analyze():
+    return _run_args(["flutter", "analyze"], timeout=600)
+
+
 # ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
 
 def tool_cdp_connect():
@@ -1011,6 +1140,17 @@ TOOLS = {
     "write_file": (tool_write_file, ("path", "content")),
     "edit_file": (tool_edit_file, ("path", "old", "new")),
     "run_command": (tool_run_command, ("command",)),
+    "git_status": (tool_git_status, ()),
+    "git_log": (tool_git_log, ("n",)),
+    "git_commit": (tool_git_commit, ("message", "files")),
+    "git_branch": (tool_git_branch, ("name", "create")),
+    "git_merge": (tool_git_merge, ("branch",)),
+    "build_apk": (tool_build_apk, ("mode",)),
+    "pub_add": (tool_pub_add, ("package",)),
+    "pub_remove": (tool_pub_remove, ("package",)),
+    "pub_upgrade": (tool_pub_upgrade, ()),
+    "flutter_test": (tool_flutter_test, ("path",)),
+    "flutter_analyze": (tool_flutter_analyze, ()),
     "cdp_connect": (tool_cdp_connect, ()),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
     "cdp_console_logs": (tool_cdp_console_logs, ()),
@@ -1041,6 +1181,39 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "run_command",
         "description": "Run a shell command and return stdout/stderr. Args: command.",
              "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
+    {"type": "function", "function": {"name": "git_status",
+        "description": "Short git status incl. current branch. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "git_log",
+        "description": "Recent commit log. Args: n (optional, default 10, max 50).",
+        "parameters": {"type": "object", "properties": {"n": {"type": "integer"}}, "required": []}}},
+    {"type": "function", "function": {"name": "git_commit",
+        "description": "Stage changes and commit as ACEsi. Args: message (commit message), files (optional, list of paths to stage instead of git add -A).",
+        "parameters": {"type": "object", "properties": {"message": {"type": "string"}, "files": {"type": "array", "items": {"type": "string"}}}, "required": ["message"]}}},
+    {"type": "function", "function": {"name": "git_branch",
+        "description": "List branches, or create+switch to a new branch when create=true. Args: name, create (bool, optional).",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "create": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "git_merge",
+        "description": "Merge an existing local branch into the current branch. Reports conflicts if any (resolve with edit_file then git_commit). Args: branch.",
+        "parameters": {"type": "object", "properties": {"branch": {"type": "string"}}, "required": ["branch"]}}},
+    {"type": "function", "function": {"name": "build_apk",
+        "description": "Build an Android APK with flutter build apk --release (default) or --debug. Returns the artifact path. Args: mode (optional).",
+        "parameters": {"type": "object", "properties": {"mode": {"type": "string"}}, "required": []}}},
+    {"type": "function", "function": {"name": "pub_add",
+        "description": "Add a dependency via `flutter pub add <package>` (updates pubspec.yaml + pub get). Args: package (e.g. 'http:^1.2.0').",
+        "parameters": {"type": "object", "properties": {"package": {"type": "string"}}, "required": ["package"]}}},
+    {"type": "function", "function": {"name": "pub_remove",
+        "description": "Remove a dependency via `flutter pub remove <package>`. Args: package.",
+        "parameters": {"type": "object", "properties": {"package": {"type": "string"}}, "required": ["package"]}}},
+    {"type": "function", "function": {"name": "pub_upgrade",
+        "description": "Upgrade all dependencies via `flutter pub upgrade`. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "flutter_test",
+        "description": "Run the Flutter test suite. Args: path (optional, test file/dir to run).",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}}},
+    {"type": "function", "function": {"name": "flutter_analyze",
+        "description": "Static analysis via `flutter analyze`. Args: none.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_connect",
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -1065,7 +1238,11 @@ def _tool_icon(name):
     return {"list_files": "📂", "read_file": "📄", "grep": "🔍",
             "write_file": "✏️", "edit_file": "✏️",     "run_command": "▶"}.get(name, "🔧")
     return {"cdp_connect": "🔌", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
-            "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊"}.get(name, "🔧")
+            "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊",
+            "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
+            "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
+            "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
+            "flutter_test": "🧪", "flutter_analyze": "🔬"}.get(name, "🔧")
 
 def _tool_desc(name, args):
     a = {k: v for k, v in args.items() if k in TOOLS[name][1]}
@@ -1081,6 +1258,12 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, str(a.get("command", ""))[:80])
     if name == "cdp_evaluate":
         return "%s `%s`" % (name, str(a.get("expr", ""))[:80])
+    if name == "git_commit":
+        return "%s `%s`" % (name, str(a.get("message", ""))[:80])
+    if name == "git_merge":
+        return "%s `%s`" % (name, str(a.get("branch", ""))[:40])
+    if name == "pub_add":
+        return "%s `%s`" % (name, str(a.get("package", ""))[:80])
     return name
 
 def _call_tool(name, args):
@@ -1124,6 +1307,17 @@ Tool names and args:
   write_file {"path": "...", "content": "..."}
   edit_file {"path": "...", "old": "...", "new": "..."}   (old must match exactly once)
    run_command {"command": "flutter test test/x.dart"}
+   git_status {}                (branch + changed files)
+   git_log {"n": 10}            (recent commits)
+   git_commit {"message": "..."}   (git add -A + commit as ACEsi)
+   git_branch {"name": "...", "create": true}   (list, or create+checkout)
+   git_merge {"branch": "..."}  (merge into current branch; reports conflicts)
+   build_apk {"mode": "release"}  (flutter build apk --release|--debug, returns APK path)
+   pub_add {"package": "http:^1.2.0"}   (add dependency + pub get)
+   pub_remove {"package": "http"}       (remove dependency)
+   pub_upgrade {}               (upgrade all dependencies)
+   flutter_test {"path": "test/..."}    (run tests; omit path for full suite)
+   flutter_analyze {}           (static analysis)
    cdp_connect {}              (1st — connects to the ITS WebView / local Chrome via DevTools)
    cdp_evaluate {"expr": "document.title"}   (run JS, returns JSON value)
    cdp_console_logs {}        (read buffered console.log events)
@@ -1131,8 +1325,12 @@ Tool names and args:
    cdp_network_requests {}    (buffered request/response events)
 
 Safety: run_command blocks rm/git push/checkout/flake.clean/pub get/build, adb
-uninstall and scrcpy. Edits are surgical (exact-match, single occurrence) and
-sandboxed to the project. Treat every step as needing verification.
+uninstall and scrcpy. Use the dedicated git_* tools for commits/branches/merges
+(they do NOT push; git_merge rolls back on conflict). build_apk/pub_*/flutter_*
+run via dedicated tools. Edits are surgical (exact-match, single occurrence) and
+sandboxed to the project. Treat every step as needing verification. ALWAYS run
+flutter_analyze or flutter_test after edits before committing; only git_commit
+when tests pass.
 
 CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
 allowed to announce a fix you have not actually applied. If tool outputs show
