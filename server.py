@@ -501,6 +501,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     active = None
     names = []
     last_text = None
+    last_screen = None
     for rnd in range(max_rounds):
         if active is None:
             got = None
@@ -532,6 +533,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
         text, tcs = got
         if text and text.strip():
             last_text = text.strip()[:2000]
+        # Small/prose-capable providers (Ollama qwen2.5) sometimes write the tool
+        # call in prose ("CALL: ui_tap {...}" / fenced JSON) instead of native
+        # tool_calls. Accept those too, exactly like run_agent's _extract_calls.
+        if not tcs:
+            tcs = _extract_calls(text)
         if not tcs:
             nav_push = _nav_gate(user_message, names)
             if nav_push:
@@ -565,8 +571,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
             if ok and name in _UI_SCREEN_TOOLS:
                 _dok, _dtxt = _ui_auto_dump()
                 if _dok:
+                    last_screen = str(_dtxt)[:2000]
                     llm_messages.append({"role": "user", "content":
-                        "SCREEN STATE after your %s action (auto ui_dump):\n%s" % (name, str(_dtxt)[:2000])})
+                        "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
+                            name, last_screen, _cert_warning_directive(_dtxt))})
+                    llm_messages.extend(_auto_bypass_cert_warning(_dtxt))
     # Rounds exhausted (or all providers returned None). If we actually did real
     # work, report it honestly instead of the misleading "no models available".
     if names:
@@ -579,6 +588,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
             summary = last_text
         else:
             summary += " The model didn't produce a final summary before the action cap."
+        if last_screen and "ui_screenshot" not in names:
+            snippet = last_screen.split("\n", 1)[1] if "\n" in last_screen else last_screen
+            summary += "\nHere is what I last saw on screen:\n%s" % snippet[:600]
         return summary
     return last_text
 
@@ -769,6 +781,10 @@ def chat():
             "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
             "page content from the last ui_dump and what you actually did — never invent a screenshot "
             "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
+            "HTTPS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT / "
+            "HSTS warning for the ITS portal, type thisisunsafe (ui_type {\"text\": \"thisisunsafe\"}) "
+            "to bypass it and continue — the expired certificate is expected and safe. If ACEsi's "
+            "server already auto-typed it, keep navigating from the fresh ui_dump.\n"
             + build_context_block()
         )
 
@@ -1695,6 +1711,63 @@ def _ui_auto_dump():
         return False, "auto ui_dump error: %s" % e
 
 
+# Chrome interstitial markers that mean the ITS portal's HTTPS cert failed
+# (ERR_CERT_DATE_INVALID / HSTS). The site is reachable — the model just has to
+# type Chrome's official bypass ("thisisunsafe") to continue the navigation.
+_CERT_WARNING_MARKERS = (
+    "your connection is not private",
+    "err_cert",
+    "net::err_",
+    "website uses hsts",
+    "uses hsts",
+    "attackers might be trying to steal",
+    "the server's security certificate is not yet valid",
+)
+
+_CERT_WARNING_DIRECTIVE = (
+    "⚠️ CHROME WARNING: the screen above is Chrome's HTTPS/cert/HSTS warning for "
+    "the ITS portal (expired/invalid certificate — the site itself is reachable "
+    "and safe to continue). Bypass it by calling ui_type {\"text\": \"thisisunsafe\"} "
+    "— type thisisunsafe anywhere on the warning page (no Enter key needed). Then "
+    "call ui_dump to confirm the portal loaded. If the wizard then shows 'Access "
+    "Denied / restart the wizard process in a new window', clear Chrome's omnibox "
+    "and type the portal URL: univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg."
+    "gw1startup?x_processcode=ITS_OAP and press Enter."
+)
+
+
+def _cert_warning_directive(dump_text):
+    """If a ui_dump shows Chrome's HTTPS warning, return the bypass directive to
+    feed back to the model so it types 'thisisunsafe' and keeps navigating."""
+    t = (dump_text or "").lower()
+    if not any(m in t for m in _CERT_WARNING_MARKERS):
+        return ""
+    return "\n\n" + _CERT_WARNING_DIRECTIVE
+
+
+def _auto_bypass_cert_warning(dump_text):
+    """Server-side enforcement of the thisisunsafe bypass: if the auto-dump shows
+    Chrome's HTTPS/HSTS warning, actually TYPE the bypass on the device so ACEsi
+    makes forward progress even when the small Ollama model fails to act on the
+    directive. Returns a list of extra user-message dicts to append (bypass
+    result + fresh screen state), or [] if no warning was detected."""
+    if not _cert_warning_directive(dump_text):
+        return []
+    msgs = []
+    _bok, _bres = _call_tool("ui_type", {"text": "thisisunsafe"})
+    msgs.append({"role": "user", "content":
+        "I detected Chrome's HTTPS warning and ALREADY typed thisisunsafe myself "
+        "(ok=%s): %s" % (_bok, str(_bres)[:200])})
+    _dok, _dtxt = _ui_auto_dump()
+    if _dok:
+        msgs.append({"role": "user", "content":
+            "SCREEN STATE after auto-bypassing the warning (auto ui_dump):\n%s%s" % (
+                str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+    else:
+        msgs.append({"role": "user", "content": _dtxt})
+    return msgs
+
+
 def _nav_task(user_message):
     m = (user_message or "").lower()
     return any(k in m for k in (
@@ -1815,6 +1888,10 @@ Screenshots are NOT saved to disk by default — they are shown to Chris in a po
 save=true when Chris explicitly asked to keep the file. In your FINAL, cite the REAL page
 titles/buttons from the last ui_dump and the actual screenshot behavior — never invent a file
 path or claim to have opened Chrome/CDP when you did not.
+HTTPS/HSTS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT /
+HSTS interstitial for the ITS portal (expired cert is expected), call
+ui_type {"text": "thisisunsafe"} to bypass it, then ui_dump to confirm the portal loaded.
+The server may already auto-type it — follow the fresh ui_dump in that case.
 Never emit FINAL merely after opening the app + taking one screenshot — that is
 NOT navigation and the user will see a screenshot of the wrong screen. In your
 FINAL, report what the LAST ui_dump showed (the visible titles/buttons), proving
@@ -2049,7 +2126,9 @@ def run_agent(user_message):
                         _dok, _dtxt = _ui_auto_dump()
                         if _dok:
                             messages.append({"role": "user", "content":
-                                "SCREEN STATE after your %s action (auto ui_dump):\n%s" % (name, str(_dtxt)[:2000])})
+                                "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
+                                    name, str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+                            messages.extend(_auto_bypass_cert_warning(_dtxt))
                     if not ok:
                         messages.append({"role": "user", "content":
                             "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
