@@ -1586,6 +1586,276 @@ def tool_ui_screenshot(name=None, save=False):
         return False, str(e)
 
 
+# ---- UI validation: assertions + scripted test harness ----
+# Chris wants ACEsi to validate the UI after every change. The assertion tools
+# below dump the accessibility hierarchy (same uiautomator command as ui_dump)
+# and compare it against expected labels/elements, returning ok=True only when
+# the assertion HOLDS. They are read-only (never navigate) so they are safe to
+# call inside any /chat run or a scripted ui_test_run.
+
+_UI_LAST_TEST = {"ts": 0, "name": "", "passed": 0, "total": 0, "report": ""}
+
+
+def _ui_parse_nodes(xml):
+    """Parse a uiautomator XML dump into node dicts (text/content-desc/
+    resource-id/class/visibility/bounds + tap center). Uses only stdlib (ET)."""
+    import xml.etree.ElementTree as ET
+    nodes = []
+    for n in ET.fromstring(xml).iter("node"):
+        b = n.get("bounds", "")
+        x1 = y1 = x2 = y2 = None
+        m = re.findall(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b)
+        if m:
+            x1, y1, x2, y2 = (int(v) for v in m[0])
+        nodes.append({
+            "text": (n.get("text") or "").strip(),
+            "desc": (n.get("content-desc") or "").strip(),
+            "rid": (n.get("resource-id") or "").strip(),
+            "cls": (n.get("class") or "").strip(),
+            "clickable": n.get("clickable") == "true",
+            "focusable": n.get("focusable") == "true",
+            "visible": (n.get("visible-to-user") or "true") != "false",
+            "enabled": n.get("enabled") != "false",
+            "bounds": b, "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            "cx": (x1 + x2) // 2 if x1 is not None else None,
+            "cy": (y1 + y2) // 2 if y1 is not None else None,
+        })
+    return nodes
+
+
+def _ui_dump_nodes(timeout=45):
+    """Full uiautomator dump parsed into node dicts. Returns (ok, nodes|err)."""
+    _ui_adb(["shell", "uiautomator", "dump", "/sdcard/ui.xml"])
+    ok, out = _ui_adb(["shell", "cat", "/sdcard/ui.xml"], cap=None)
+    if not ok or "<hierarchy" not in out:
+        return False, "ui dump failed: %s" % out[:500]
+    try:
+        return True, _ui_parse_nodes(out)
+    except Exception as e:
+        return False, "ui dump parse error: %s" % e
+
+
+def _ui_screen_size():
+    """(width, height) of the device screen, or (None, None)."""
+    try:
+        ok, out = _ui_adb(["shell", "wm", "size"], timeout=30)
+        m = re.search(r"(\d+)x(\d+)", out)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return None, None
+
+
+def _ui_node_labels(node):
+    """Node label candidates the model cares about (text then content-desc)."""
+    return [node.get("text") or "", node.get("desc") or ""]
+
+
+def _ui_assert_find(rid=None, text=None, desc=None, cls=None):
+    """Find nodes matching the given selectors (all that are provided must match;
+    text matches as a case-insensitive substring of text OR content-desc). Returns
+    (ok, nodes) where nodes is the matching list, ok=False if the dump failed."""
+    dko, dkres = _ui_dump_nodes()
+    if not dko:
+        return False, dkres
+    matched = []
+    for n in dkres:
+        if rid and n["rid"] != str(rid):
+            continue
+        if cls and str(cls) not in n["cls"]:
+            continue
+        if desc and n["desc"] != str(desc):
+            continue
+        if text:
+            tl = str(text).lower()
+            if tl not in (n["text"] or "").lower() and tl not in (n["desc"] or "").lower():
+                continue
+        matched.append(n)
+    if not (rid or text or desc or cls):
+        return True, []
+    return True, matched
+
+
+def tool_ui_assert_text(text, present=True):
+    if not text or not str(text).strip():
+        return False, "ui_assert_text usage: text=<string to look for> [present=true|false]"
+    dko, dkres = _ui_dump_nodes()
+    if not dko:
+        return False, "ui_assert_text FAIL: %s" % dkres
+    tl = str(text).strip().lower()
+    found = [n for n in dkres if tl in (n["text"] or "").lower() or tl in (n["desc"] or "").lower()]
+    want_present = str(present).lower() not in ("0", "false", "no")
+    if want_present and found:
+        return True, "PASS: ui_assert_text found %r on screen (%d match%s)" % (
+            text, len(found), "es" if len(found) > 1 else "")
+    if (not want_present) and not found:
+        return True, "PASS: ui_assert_text confirmed %r is NOT on screen" % text
+    if want_present:
+        labels = [l for n in dkres for l in _ui_node_labels(n) if l][:30]
+        return False, "FAIL: ui_assert_text: %r NOT on screen. Labels: %s" % (
+            text, " | ".join(labels))
+    return False, "FAIL: ui_assert_text: %r IS on screen (asserted absent): %d match%s" % (
+        text, len(found), "es" if len(found) > 1 else "")
+
+
+def tool_ui_assert_element(resource_id="", text="", desc="", cls="", present=True):
+    selectors = dict(rid=resource_id, text=text, desc=desc, cls=cls)
+    if not any(v for v in selectors.values()):
+        return False, "ui_assert_element usage: give at least one of resource_id, text, desc, cls"
+    dko, matched = _ui_assert_find(**selectors)
+    if not dko:
+        return False, "ui_assert_element FAIL: %s" % matched
+    want_present = str(present).lower() not in ("0", "false", "no")
+    sel = ", ".join("%s=%r" % (k, v) for k, v in selectors.items() if v)
+    if want_present and matched:
+        m = matched[0]
+        return True, "PASS: ui_assert_element (%s) found at %s [%s]" % (
+            sel, m["bounds"], m["cls"] or "?")
+    if (not want_present) and not matched:
+        return True, "PASS: ui_assert_element confirmed no element matches (%s)" % sel
+    rids = sorted({n["rid"] for n in matched or [] if n["rid"]})[:10]
+    return False, "FAIL: ui_assert_element (%s) not found%s" % (
+        sel, "; existing resource-ids: %s" % (", ".join(rids) if rids else " none visible"))
+
+
+def tool_ui_assert_visible(resource_id="", text="", desc="", cls=""):
+    selectors = dict(rid=resource_id, text=text, desc=desc, cls=cls)
+    if not any(v for v in selectors.values()):
+        return False, "ui_assert_visible usage: give at least one of resource_id, text, desc, cls"
+    dko, matched = _ui_assert_find(**selectors)
+    if not dko:
+        return False, "ui_assert_visible FAIL: %s" % matched
+    W, H = _ui_screen_size()
+    sel = ", ".join("%s=%r" % (k, v) for k, v in selectors.items() if v)
+    for n in matched:
+        if n["x1"] is None:
+            continue
+        if not n["visible"] or not n["enabled"]:
+            continue
+        on_screen = True
+        if W is not None and H is not None:
+            if n["x1"] < 0 or n["y1"] < 0 or n["x2"] > W or n["y2"] > H:
+                on_screen = False
+        if on_screen:
+            return True, "PASS: ui_assert_visible (%s) is VISIBLE on screen at %s" % (sel, n["bounds"])
+    return False, "FAIL: ui_assert_visible (%s) found but NOT visible/interactable on screen" % sel
+
+
+def _ui_split_fragments(s):
+    parts = []
+    for line in str(s).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        for p in line.split(","):
+            p = p.strip().strip("'\"")
+            if p:
+                parts.append(p)
+    return parts
+
+
+def _ui_expect_parse(expected):
+    """Accept an expected-state JSON dict ({present:[],absent:[]}) or plain text
+    (each line/comma fragment must be present). Returns (present, absent) or
+    (None, error)."""
+    s = str(expected or "").strip()
+    if not s:
+        return None, "ui_expect usage: expected=<JSON {present:[],absent:[]} or text fragments>"
+    present, absent = [], []
+    try:
+        d = json.loads(s)
+        if isinstance(d, dict):
+            for k in ("present", "include", "must"):
+                if isinstance(d.get(k), list) or isinstance(d.get(k), str):
+                    present = _ui_split_fragments("\n".join(
+                        d[k] if isinstance(d[k], list) else [d[k]])) if d.get(k) else []
+                    break
+            if isinstance(d.get("absent"), list) or isinstance(d.get("absent"), str):
+                absent = _ui_split_fragments("\n".join(
+                    d["absent"] if isinstance(d["absent"], list) else [d["absent"]])) if d.get("absent") else []
+        else:
+            present = _ui_split_fragments(d)
+    except Exception:
+        present = _ui_split_fragments(s)
+    if not present and not absent:
+        return None, "ui_expect: expected state had no present/absent fragments"
+    return (present or [], absent or []), None
+
+
+def tool_ui_expect(expected):
+    """Compare the current ui_dump against an expected state. `expected` is either
+    a JSON dict {"present": [labels that must be on screen], "absent": [labels that
+    must be absent]} or a plain string of fragments that must all be present."""
+    parsed = _ui_expect_parse(expected)
+    if parsed is None or parsed[1]:
+        err = parsed[1] if parsed else "ui_expect usage error"
+        return False, err
+    present, absent = parsed[0]
+    dko, dkres = _ui_dump_nodes()
+    if not dko:
+        return False, "ui_expect FAIL: %s" % dkres
+    corpus = " | ".join(l for n in dkres for l in _ui_node_labels(n) if l).lower()
+    missing = [f for f in present if f.lower() not in corpus]
+    unexpected = [f for f in absent if f.lower() in corpus]
+    if not missing and not unexpected:
+        return True, "PASS: ui_expect — screen matches expected state (present=%d, absent=%d)" % (
+            len(present), len(absent))
+    bits = []
+    if missing:
+        bits.append("missing on screen: %s" % ", ".join(repr(m) for m in missing))
+    if unexpected:
+        bits.append("should be absent but present: %s" % ", ".join(repr(u) for u in unexpected))
+    return False, "FAIL: ui_expect — %s" % "; ".join(bits)
+
+
+def tool_ui_test_run(steps, name=""):
+    """Scripted UI test harness. `steps` is a JSON list of {tool, args} entries
+    (any ui_* action or ui_assert_* tool). Each step runs sequentially; the tool
+    result decides PASS/FAIL per step. Reports a pass/fail summary, and stores the
+    result in the global so /opencode/status can surface it."""
+    if isinstance(steps, str):
+        try:
+            steps = json.loads(steps)
+        except Exception:
+            return False, "ui_test_run usage: steps=<JSON list of {tool,args}>"
+    if not isinstance(steps, list) or not steps:
+        return False, "ui_test_run usage: steps=<non-empty JSON list of {tool,args}>"
+    lines, passed = [], 0
+    for i, step in enumerate(steps, 1):
+        if not isinstance(step, dict) or not step.get("tool"):
+            return False, "ui_test_run: step %d must be a {tool:..., args:...} dict" % i
+        tool, args = step["tool"], step.get("args") or {}
+        if tool not in TOOLS:
+            return False, "ui_test_run: step %d unknown tool %r" % (i, tool)
+        try:
+            ok, res = _call_tool(tool, args)
+        except Exception as e:
+            ok, res = False, "harness error: %s" % e
+        if ok:
+            passed += 1
+        sres = str(res)
+        if len(sres) > 300:
+            sres = sres[:300] + "…"
+        detail = (" — %s" % sres) if ok else (" — %s" % sres)
+        lines.append("%2d. [%s] %s %s%s" % (
+            i, "PASS" if ok else "FAIL", tool,
+            _tool_desc_short(tool, args), detail))
+    total = len(steps)
+    verdict = "TEST PASSED (%d/%d)" % (passed, total) if passed == total \
+        else "TEST FAILED (%d/%d)" % (passed, total)
+    report = "ui_test_run %s: %s\n%s" % (name or "scenario", verdict, "\n".join(lines))
+    with _AGENT_LOCK:
+        _UI_LAST_TEST.update({"ts": time.time(), "name": name or "",
+                              "passed": passed, "total": total, "report": report})
+    print("🧪 ui_test_run %s: %s" % (name or "", verdict))
+    return passed == total, report
+
+
+def _tool_desc_short(name, args):
+    try:
+        return _tool_desc(name, args)
+    except Exception:
+        return name
+
+
 # ---- Self-hosting / self-healing runtime controls ----
 
 ACE_HOST_FLAG = os.path.join(PROJECT_ROOT, "ace_host.flag")
@@ -1688,6 +1958,11 @@ TOOLS = {
     "ui_key": (tool_ui_key, ("key",)),
     "ui_dump": (tool_ui_dump, ()),
     "ui_screenshot": (tool_ui_screenshot, ("name", "save")),
+    "ui_assert_text": (tool_ui_assert_text, ("text", "present")),
+    "ui_assert_element": (tool_ui_assert_element, ("resource_id", "text", "desc", "cls", "present")),
+    "ui_assert_visible": (tool_ui_assert_visible, ("resource_id", "text", "desc", "cls")),
+    "ui_expect": (tool_ui_expect, ("expected",)),
+    "ui_test_run": (tool_ui_test_run, ("steps", "name")),
     "restart": (tool_restart, ("what",)),
     "cdp_connect": (tool_cdp_connect, ()),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
@@ -1792,6 +2067,40 @@ TOOLS_SCHEMA = [
             "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot when save=true, e.g. \"login\". Omit or null to auto-name."},
             "save": {"type": "boolean", "title": "save", "description": "OPTIONAL. Defaults to false. Set true ONLY when Chris asked to keep the screenshot as a file. Must be boolean true, not a string."}},
             "required": []}}},
+    {"type": "function", "function": {"name": "ui_assert_text",
+        "description": "UI VALIDATION: assert whether text exists on screen (case-insensitive substring of any visible text/content-desc). REQUIRED: text (the string to look for). OPTIONAL: present (boolean, default true; set false to assert the text is ABSENT). Returns PASS when the assertion holds, FAIL with a label list otherwise.",
+        "parameters": {"type": "object", "properties": {
+            "text": {"type": "string", "title": "text", "description": "REQUIRED. Text to search the live screen for, e.g. \"Welcome\"."},
+            "present": {"type": "boolean", "title": "present", "description": "OPTIONAL. true = assert text exists (default), false = assert text does NOT exist."}},
+            "required": ["text"]}}},
+    {"type": "function", "function": {"name": "ui_assert_element",
+        "description": "UI VALIDATION: assert whether an element with the given properties exists in the accessibility tree (NOT that it is visible/on-screen — use ui_assert_visible for that). OPTIONAL AND COMBINABLE filters: resource_id (exact resource-id), text (case-insensitive substring of text OR content-desc), desc (exact content-desc), cls (substring of class, e.g. Button). OPTIONAL: present (default true; false asserts the element is ABSENT). Provide at least one filter.",
+        "parameters": {"type": "object", "properties": {
+            "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id, e.g. \"com.studentsyncsa:id/btn_login\"."},
+            "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
+            "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
+            "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."},
+            "present": {"type": "boolean", "description": "OPTIONAL. true = assert present (default), false = assert absent."}},
+            "required": []}}},
+    {"type": "function", "function": {"name": "ui_assert_visible",
+        "description": "UI VALIDATION: assert whether a matching element is actually VISIBLE and interactable on screen (on-screen bounds, visible-to-user, enabled). OPTIONAL AND COMBINABLE filters: resource_id, text, desc, cls (same semantics as ui_assert_element). Provide at least one filter.",
+        "parameters": {"type": "object", "properties": {
+            "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id."},
+            "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
+            "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
+            "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."}},
+            "required": []}}},
+    {"type": "function", "function": {"name": "ui_expect",
+        "description": "UI VALIDATION: compare the current ui_dump against an expected screen state. REQUIRED: expected — either a JSON object {\"present\": [labels that must be on screen], \"absent\": [labels that must be absent]} or a plain string whose lines/commas are fragments that must all be present. Returns PASS/FAIL with the specific missing/unexpected fragments.",
+        "parameters": {"type": "object", "properties": {
+            "expected": {"type": "string", "title": "expected", "description": "REQUIRED. Expected state — JSON {present:[...],absent:[...]} or plain text fragments."}},
+            "required": ["expected"]}}},
+    {"type": "function", "function": {"name": "ui_test_run",
+        "description": "UI VALIDATION HARNESS: run a scripted sequence of UI actions + assertions and report PASS/FAIL. REQUIRED: steps — a JSON list of {\"tool\": \"ui_tap\", \"args\": {...}} entries (any ui_* action or ui_assert_* tool). Each step is judged by the tool's ok flag; concludes 'TEST PASSED (n/total)' or 'TEST FAILED'. OPTIONAL: name (string label for the report).",
+        "parameters": {"type": "object", "properties": {
+            "steps": {"type": "string", "title": "steps", "description": "REQUIRED. JSON list of {tool, args} step objects, e.g. [{\"tool\":\"ui_app_open\",\"args\":{}},{\"tool\":\"ui_assert_text\",\"args\":{\"text\":\"Login\"}}]."},
+            "name": {"type": "string", "title": "name", "description": "OPTIONAL. Test/scenario name shown in the report."}},
+            "required": ["steps"]}}},
     {"type": "function", "function": {"name": "restart",
         "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
         "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": []}}},
@@ -1852,6 +2161,29 @@ OLLAMA_TOOLS_SCHEMA = [
         "description": "Capture screen (shown to Chris in a popup; not saved unless save=true).",
         "parameters": {"type": "object", "properties": {
             "name": {"type": "string"}, "save": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_assert_text",
+        "description": "Assert text is (or isn't, present=false) on screen. Args: text (string), present optional bool.",
+        "parameters": {"type": "object", "properties": {
+            "text": {"type": "string"}, "present": {"type": "boolean"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "ui_assert_element",
+        "description": "Assert an element exists by resource_id / text / desc / cls. Args: resource_id, text, desc, cls optional, present optional bool.",
+        "parameters": {"type": "object", "properties": {
+            "resource_id": {"type": "string"}, "text": {"type": "string"},
+            "desc": {"type": "string"}, "cls": {"type": "string"},
+            "present": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_assert_visible",
+        "description": "Assert an element is visible+enabled on screen. Args: resource_id / text / desc / cls optional.",
+        "parameters": {"type": "object", "properties": {
+            "resource_id": {"type": "string"}, "text": {"type": "string"},
+            "desc": {"type": "string"}, "cls": {"type": "string"}}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_expect",
+        "description": "Compare screen to expected state. Args: expected = JSON {present:[],absent:[]} or text fragments.",
+        "parameters": {"type": "object", "properties": {
+            "expected": {"type": "string"}}, "required": ["expected"]}}},
+    {"type": "function", "function": {"name": "ui_test_run",
+        "description": "Run scripted UI actions+assertions. Args: steps = JSON list of {tool,args}, name optional.",
+        "parameters": {"type": "object", "properties": {
+            "steps": {"type": "string"}, "name": {"type": "string"}}, "required": ["steps"]}}},
     {"type": "function", "function": {"name": "run_command",
         "description": "Run a shell command and return stdout/stderr. Args: command.",
         "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
@@ -1878,6 +2210,8 @@ def _tool_icon(name):
             "flutter_test": "🧪", "flutter_analyze": "🔬",
             "ui_device": "📱", "ui_app_open": "📱", "ui_tap": "🖱️", "ui_swipe": "🖱️",
             "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷",
+            "ui_assert_text": "✅", "ui_assert_element": "✅", "ui_assert_visible": "👁️",
+            "ui_expect": "🎯", "ui_test_run": "🧪",
             "restart": "🔄"}.get(name, "🔧")
 
 def _tool_desc(name, args):
@@ -1911,6 +2245,13 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, str(a.get("text", ""))[:60])
     if name == "ui_screenshot":
         return "%s %s" % (name, a.get("name") or "")
+    if name in ("ui_assert_text", "ui_assert_element", "ui_assert_visible"):
+        return "%s %s" % (name, ", ".join(
+            "%s=%r" % (k, v) for k, v in (a or {}).items() if v not in (None, "")))
+    if name == "ui_expect":
+        return "%s `%s`" % (name, str(a.get("expected", ""))[:80])
+    if name == "ui_test_run":
+        return "%s `%s`" % (name, str(a.get("name") or "scenario")[:40])
     if name == "restart":
         return "%s `%s`" % (name, a.get("what") or "cdp")
     return name
@@ -2643,6 +2984,7 @@ def opencode_status():
             "corrective": _AGENT["corrective"],
             "last_error": _AGENT["last_error"],
             "shot_ts": _LAST_SHOT["ts"],
+            "ui_test": dict(_UI_LAST_TEST),
         })
 
 @app.route('/opencode/heal', methods=['POST', 'GET'])
