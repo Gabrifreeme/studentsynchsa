@@ -23,7 +23,7 @@ class ChatDispatchTest(unittest.TestCase):
             ("Opened the app and captured ui_screenshots/navigation.png.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):
@@ -231,7 +231,7 @@ class ChatDispatchProseCallTest(unittest.TestCase):
             ("Done, I reached the portal.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):
@@ -262,9 +262,11 @@ class ChatDispatchProseCallTest(unittest.TestCase):
                                       user_message="open the app, go to the portal, screenshot it")
         self.assertEqual(reply, "Done, I reached the portal.")
         # The two prose CALL: lines from turn 1 must have been EXECUTED even
-        # though they arrived with zero native tool_calls.
+        # though they arrived with zero native tool_calls, AND since the user
+        # asked to screenshot it but the model finished text-only, the server
+        # auto-captures a screenshot (ui_screenshot appended by _chat_dispatch).
         self.assertEqual([t[0] for t in self.executed],
-                         ["ui_app_open", "ui_dump", "ui_tap"])
+                         ["ui_app_open", "ui_dump", "ui_tap", "ui_screenshot"])
 
 
 class CertWarningTest(unittest.TestCase):

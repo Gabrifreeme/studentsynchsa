@@ -63,6 +63,10 @@ CEREBRAS_MODEL = "gpt-oss-120b"
 # is tiny + fast on CPU; swap to a bigger pulled tool model if you want more quality.
 OLLAMA_ENDPOINT = "http://localhost:11434/v1"
 OLLAMA_MODEL = "qwen2.5:7b"
+# /chat dispatch prefers the much-faster 3b tool model on this CPU-only box;
+# 7b costs ~80s per round vs ~20-40s for 3b. Quality is slightly lower but the
+# dispatch loop + auto-dump makes it work. llm_reply (opencode path) keeps 7b.
+OLLAMA_CHAT_MODEL = "qwen2.5:3b"
 
 NTFY_TOPIC = "ace_alerts"
 NTFY_SERVER = "https://ntfy.sh"
@@ -451,17 +455,23 @@ def _chat_providers():
         ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
     ]
 
-def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
+def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
+              tools_schema=None):
     if not api_key:
         return None
     headers = {"Content-Type": "application/json"}
     if api_key != "local":
         headers["Authorization"] = f"Bearer {api_key}"
+    # Use a compact schema for Ollama: on this 2012-CPU box prefill is ~10 tok/s,
+    # and the full 30-tool schema (~2.7k tokens) alone blows the round timeout.
+    if tools_schema is None:
+        tools_schema = TOOLS_SCHEMA
+    body = {"model": model, "messages": msgs, "temperature": 0.4,
+            "max_tokens": 500, "tools": tools_schema, "tool_choice": "auto"}
     try:
         r = requests.post(f"{endpoint}/chat/completions",
             headers=headers,
-            json={"model": model, "messages": msgs, "temperature": 0.4,
-                  "max_tokens": 500, "tools": TOOLS_SCHEMA, "tool_choice": "auto"},
+            json=body,
             timeout=timeout)
         if r.status_code != 200:
             print(f"❌ {name} {r.status_code}: {r.text[:160]}")
@@ -492,93 +502,276 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
     return None
 
 
+def _ollama_local_messages(llm_messages):
+    """Return a compacted copy of llm_messages for the LOCAL Ollama model: swap
+    the giant persona for the terse OLLAMA_SYS_PROMPT. Critically, only KEEP the
+    original task message plus the last 3 turns of tool feedback — otherwise the
+    steadily-growing SCREEN STATE blocks (~1.5k chars each after every tool)
+    re-bloat each round's prefill back toward minutes on this CPU."""
+    sys_ = None
+    first_user = None
+    tail = []
+    for m in llm_messages:
+        role = m.get("role")
+        if role == "system":
+            sys_ = {"role": "system", "content": OLLAMA_SYS_PROMPT}
+        elif role == "user" and first_user is None and "SCREEN STATE" not in str(m.get("content", "")):
+            if "You only described" not in str(m.get("content", "")) and \
+               "I detected Chrome" not in str(m.get("content", "")) and \
+               "SCREEN STATE" not in str(m.get("content", "")):
+                first_user = m
+        elif role in ("user", "assistant", "tool"):
+            tail.append(m)
+    return ([m for m in (sys_, first_user) if m] + tail[-3:]) if sys_ else (
+        [m for m in (first_user,) if m] + tail[-3:])
+
+
+def _final_summary_call(active, llm_messages, names, last_screen):
+    """After the dispatch loop ends (time budget / round cap) with real actions
+    executed, give the model ONE short call to write a proper final summary
+    instead of the mechanical 'action cap' string. Returns text or None."""
+    done = ", ".join(n for n in names if n in
+                     ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
+                      "ui_dump", "ui_screenshot", "ui_device"))
+    prompt = (
+        "The device actions are complete. Actions executed: %s.\n"
+        "Write a short, natural final summary (2-3 sentences) of what you did "
+        "and where the process ended up. Cite real text from the last screen "
+        "dump you received. Do not call any tools." % (done or "none")
+    )
+    if last_screen:
+        prompt += "\nLast screen heard:\n%s" % last_screen[:800]
+    msgs = _ollama_local_messages(llm_messages)
+    msgs.append({"role": "user", "content": prompt})
+    is_ollama = (active and active[0] == "Ollama") or not active
+    try:
+        if is_ollama:
+            got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
+                            msgs, timeout=(15, 120), tools_schema=OLLAMA_TOOLS_SCHEMA)
+        elif active:
+            got = _chat_one(active[0], active[1], active[2], active[3], msgs)
+        else:
+            got = None
+    except Exception:
+        got = None
+    if got:
+        text = (got[0] or "").strip()
+        if text:
+            return text
+    return None
+
+
 def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     """Agent-style tool loop for /chat. Passes the tool schema to the model; when
     it emits a tool call (ui_*, git_*, flutter_*, cdp_*, ...) EXECUTE it via
     _call_tool and feed the result back, so ACEsi performs actions instead of
     replying 'please provide the commands'. Returns the final text reply or None.
-    Rounds cap so a stuck model still terminates."""
+    Rounds cap so a stuck model still terminates.
+    Publishes live work-steps to _AGENT so the frontend (which polls
+    /opencode/status) renders progress inline, exactly like run_agent does."""
+    with _AGENT_LOCK:
+        _AGENT["running"] = True
+        _AGENT["abort"] = False
+        _AGENT["activity"] = "planning"
+        _AGENT["steps"] = []
+        _AGENT["tools_used"] = 0
+        _AGENT["last_error"] = ""
     active = None
     names = []
     last_text = None
     last_screen = None
-    for rnd in range(max_rounds):
-        if active is None:
-            got = None
-            for p in _chat_providers():
-                got = _chat_one(p[0], p[1], p[2], p[3], llm_messages)
-                if got is not None:
-                    active = p
-                    break
-            if got is None:
-                for model in OPENROUTER_FALLBACKS:
-                    got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                    OPENROUTER_API_KEY, model, llm_messages)
-                    if got is not None:
-                        active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                  OPENROUTER_API_KEY, model)
-                        break
-            if got is None:
-                got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                OLLAMA_MODEL, llm_messages, timeout=(15, 420))
-                if got is not None:
-                    active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_MODEL)
-            if got is None:
+    dead_rounds = 0
+    last_batch_sig = None
+    repeat_count = 0
+    dispatch_start = time.time()
+    time_budget = 300 if _nav_task(user_message) else 240
+    try:
+        for rnd in range(max_rounds):
+            # Hard time budget: on these slow CPUs a stuck model otherwise burns
+            # max_rounds × ~50s each. When the budget expires mid-navigation we
+            # stop and let the tail logic force a screenshot + honest summary.
+            if time.time() - dispatch_start > time_budget:
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "stopped (time budget %.0fs)" % time_budget
+                print("⏰ /chat stop: time budget %.0fs reached" % time_budget)
                 break
-        else:
-            got = _chat_one(active[0], active[1], active[2], active[3], llm_messages)
-            if got is None:
-                active = None
-                continue
-        text, tcs = got
-        if text and text.strip():
-            last_text = text.strip()[:2000]
-        # Small/prose-capable providers (Ollama qwen2.5) sometimes write the tool
-        # call in prose ("CALL: ui_tap {...}" / fenced JSON) instead of native
-        # tool_calls. Accept those too, exactly like run_agent's _extract_calls.
-        if not tcs:
-            tcs = _extract_calls(text)
-        if not tcs:
-            nav_push = _nav_gate(user_message, names)
-            if nav_push:
-                llm_messages.append({"role": "user", "content": nav_push})
-                active = None
-                continue
-            if _nav_task(user_message) and not names:
-                llm_messages.append({"role": "user", "content":
-                    "You only described a plan but did NOT call any tool. This task "
-                    "requires real actions on the device. Emit a structured tool "
-                    "call NOW, e.g. ui_app_open {}, then ui_dump {} to read the "
-                    "screen, then ui_tap/ui_swipe/ui_type to navigate toward the "
-                    "target, and ui_screenshot only after ui_dump confirms it. "
-                    "Never just narrate the plan."})
-                active = None
-                continue
-            return text
-        batch = tcs[:_BATCH_MAX]
-        tids = [{"id": "chat_t%d_%d" % (rnd, j), "type": "function",
-                 "function": {"name": nm, "arguments": json.dumps(a)}}
-                for j, (nm, a) in enumerate(batch)]
-        llm_messages.append({"role": "assistant", "content": text or "",
-                             "tool_calls": tids})
-        for j, (name, args) in enumerate(batch):
-            ok, result = _call_tool(name, args)
-            names.append(name)
-            tcid = "chat_t%d_%d" % (rnd, j)
-            print(f"🔧 /chat executed {name} ok={ok}")
-            llm_messages.append({"role": "tool", "tool_call_id": tcid,
-                                 "name": name, "content": str(result)})
-            if ok and name in _UI_SCREEN_TOOLS:
-                _dok, _dtxt = _ui_auto_dump()
-                if _dok:
-                    last_screen = str(_dtxt)[:2000]
+            if _AGENT.get("abort"):
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "stopped by user"
+                    _AGENT["last_reply"] = "Stopped by user."
+                return "Stopped by user."
+            if active is None:
+                got = None
+                for p in _chat_providers():
+                    got = _chat_one(p[0], p[1], p[2], p[3], llm_messages)
+                    if got is not None:
+                        active = p
+                        break
+                if got is None:
+                    for model in OPENROUTER_FALLBACKS:
+                        got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
+                                        OPENROUTER_API_KEY, model, llm_messages)
+                        if got is not None:
+                            active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
+                                      OPENROUTER_API_KEY, model)
+                            break
+                if got is None:
+                    # Ollama warm-up probe first: cheap tiny call that forces the
+                    # model to LOAD (with keep_alive persisted in Ollama) so the
+                    # heavy first round reuses the loaded model instead of eating
+                    # the whole timeout on a cold swap. MUST use the same /v1
+                    # endpoint with the same options as the real call — changing
+                    # num_ctx across calls reloads the model every round.
+                    try:
+                        _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
+                                  OLLAMA_CHAT_MODEL,
+                                  [{"role": "user", "content": "ok"}],
+                                  timeout=(15, 120),
+                                  tools_schema=OLLAMA_TOOLS_SCHEMA)
+                    except Exception:
+                        pass
+                    got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
+                                    OLLAMA_CHAT_MODEL, _ollama_local_messages(llm_messages),
+                                    timeout=(15, 180),
+                                    tools_schema=OLLAMA_TOOLS_SCHEMA)
+                    # Apply the same compact schema/messages to FOLLOW-UP rounds
+                    # (active[3]==OLLAMA_CHAT_MODEL identifies the local model).
+                    if got is not None:
+                        active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
+                                  "compact")
+                if got is None:
+                    break
+            else:
+                if len(active) > 4 and active[4] == "compact":
+                    got = _chat_one(active[0], active[1], active[2], active[3],
+                                    _ollama_local_messages(llm_messages), timeout=(15, 180),
+                                    tools_schema=OLLAMA_TOOLS_SCHEMA)
+                else:
+                    got = _chat_one(active[0], active[1], active[2], active[3], llm_messages)
+                if got is None:
+                    active = None
+                    continue
+            with _AGENT_LOCK:
+                _AGENT["activity"] = "thinking (%d/%d)" % (rnd + 1, max_rounds)
+            text, tcs = got
+            if text and text.strip():
+                last_text = text.strip()[:2000]
+            # Small/prose-capable providers (Ollama qwen2.5) sometimes write the tool
+            # call in prose ("CALL: ui_tap {...}" / fenced JSON) instead of native
+            # tool_calls. Accept those too, exactly like run_agent's _extract_calls.
+            if not tcs:
+                tcs = _extract_calls(text)
+            if not tcs:
+                nav_push = _nav_gate(user_message, names)
+                if nav_push:
+                    llm_messages.append({"role": "user", "content": nav_push})
+                    active = None
+                    dead_rounds += 1
+                    if dead_rounds >= 3:
+                        with _AGENT_LOCK:
+                            _AGENT["activity"] = "stopped (no tool calls)"
+                        break
+                    continue
+                if _nav_task(user_message) and not names:
                     llm_messages.append({"role": "user", "content":
-                        "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
-                            name, last_screen, _cert_warning_directive(_dtxt))})
-                    llm_messages.extend(_auto_bypass_cert_warning(_dtxt))
+                        "You only described a plan but did NOT call any tool. This task "
+                        "requires real actions on the device. Emit a structured tool "
+                        "call NOW, e.g. ui_app_open {}, then ui_dump {} to read the "
+                        "screen, then ui_tap/ui_swipe/ui_type to navigate toward the "
+                        "target, and ui_screenshot only after ui_dump confirms it. "
+                        "Never just narrate the plan."})
+                    active = None
+                    dead_rounds += 1
+                    if dead_rounds >= 3:
+                        with _AGENT_LOCK:
+                            _AGENT["activity"] = "stopped (no tool calls)"
+                        break
+                    continue
+                if text and text.strip():
+                    # If Chris asked for a screenshot but the model finished with
+                    # a text-only reply (never called ui_screenshot), capture it
+                    # server-side so the popup still shows the target screen.
+                    if not tcs and "ui_screenshot" not in names and \
+                       re.search(r'\b(screenshot|show me|show what|snapshot|capture|look at)\b',
+                                 user_message, re.IGNORECASE):
+                        try:
+                            _sok, _stxt = _call_tool("ui_screenshot", {})
+                            if _sok:
+                                names.append("ui_screenshot")
+                                print("📷 /chat auto-captured screenshot on text-only final reply")
+                        except Exception:
+                            pass
+                    with _AGENT_LOCK:
+                        _AGENT["last_reply"] = text or ""
+                    return text
+                break
+            dead_rounds = 0
+            batch = tcs[:_BATCH_MAX]
+            tids = [{"id": "chat_t%d_%d" % (rnd, j), "type": "function",
+                     "function": {"name": nm, "arguments": json.dumps(a)}}
+                    for j, (nm, a) in enumerate(batch)]
+            # Guard against degenerate loops (e.g. ui_type repeating the same
+            # call dozens of times): bail when the same (tool,args) repeats 3+.
+            sig = tuple((nm, json.dumps(a or {}, sort_keys=True)) for nm, a in batch)
+            if last_batch_sig == sig:
+                repeat_count += 1
+            else:
+                repeat_count = 0
+            last_batch_sig = sig
+            if repeat_count >= 3:
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "stopped (repeated loop)"
+                print("🛑 /chat stop: repeated identical batch %s" % sig[:1])
+                break
+            llm_messages.append({"role": "assistant", "content": text or "",
+                                 "tool_calls": tids})
+            for j, (name, args) in enumerate(batch):
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "executing %s" % name
+                sid = _agent_next_id()
+                icon = _tool_icon(name)
+                desc = _tool_desc(name, args)
+                with _AGENT_LOCK:
+                    _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
+                                            "state": "running", "icon": icon})
+                ok, result = _call_tool(name, args)
+                names.append(name)
+                tcid = "chat_t%d_%d" % (rnd, j)
+                print(f"🔧 /chat executed {name} ok={ok}")
+                with _AGENT_LOCK:
+                    _AGENT["tools_used"] += 1
+                    if not ok:
+                        _AGENT["last_error"] = "%s: %s" % (name, str(result)[:300])
+                    for s in _AGENT["steps"]:
+                        if s["id"] == sid:
+                            s["state"] = "done" if ok else "error"
+                            s["error"] = "" if ok else result
+                llm_messages.append({"role": "tool", "tool_call_id": tcid,
+                                     "name": name, "content": str(result)[:1200]})
+                if ok and name in _UI_SCREEN_TOOLS:
+                    _dok, _dtxt = _ui_auto_dump()
+                    if _dok:
+                        last_screen = str(_dtxt)[:1500]
+                        llm_messages.append({"role": "user", "content":
+                            "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
+                                name, last_screen, _cert_warning_directive(_dtxt))})
+                        llm_messages.extend(_auto_bypass_cert_warning(_dtxt))
+    finally:
+        with _AGENT_LOCK:
+            _AGENT["running"] = False
+            _AGENT["activity"] = "done"
     # Rounds exhausted (or all providers returned None). If we actually did real
     # work, report it honestly instead of the misleading "no models available".
     if names:
+        wants_shot = bool(re.search(r'\b(screenshot|show me|show what|snapshot|capture)\b',
+                                    user_message, re.IGNORECASE))
+        if wants_shot and "ui_screenshot" not in names:
+            try:
+                _sok, _stxt = _call_tool("ui_screenshot", {})
+                if _sok:
+                    names.append("ui_screenshot")
+            except Exception:
+                pass
         acts = ", ".join(n for n in names if n in
                          ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
                           "ui_dump", "ui_screenshot", "ui_device"))
@@ -587,11 +780,19 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
         if last_text and "FINAL" in last_text.upper():
             summary = last_text
         else:
-            summary += " The model didn't produce a final summary before the action cap."
+            recap = _final_summary_call(active, llm_messages, names, last_screen)
+            if recap:
+                summary = recap
+            else:
+                summary += " The model didn't produce a final summary before the action cap."
         if last_screen and "ui_screenshot" not in names:
             snippet = last_screen.split("\n", 1)[1] if "\n" in last_screen else last_screen
             summary += "\nHere is what I last saw on screen:\n%s" % snippet[:600]
+        with _AGENT_LOCK:
+            _AGENT["last_reply"] = summary
         return summary
+    with _AGENT_LOCK:
+        _AGENT["last_reply"] = last_text or ""
     return last_text
 
 
@@ -1277,7 +1478,8 @@ def tool_ui_app_open():
 
 def tool_ui_tap(x, y):
     try:
-        x, y = int(x), int(y)
+        x = int(float(str(x).replace(",", "")))
+        y = int(float(str(y).replace(",", "")))
     except Exception:
         return False, "usage: ui_tap x=<int> y=<int>"
     return _ui_adb(["shell", "input", "tap", str(x), str(y)])
@@ -1285,8 +1487,11 @@ def tool_ui_tap(x, y):
 
 def tool_ui_swipe(x1, y1, x2, y2, duration=200):
     try:
-        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-        duration = int(duration)
+        x1 = int(float(str(x1).replace(",", "")))
+        y1 = int(float(str(y1).replace(",", "")))
+        x2 = int(float(str(x2).replace(",", "")))
+        y2 = int(float(str(y2).replace(",", "")))
+        duration = int(float(str(duration).replace(",", "")))
     except Exception:
         return False, "usage: ui_swipe x1 y1 x2 y2 [duration=200]"
     return _ui_adb(["shell", "input", "swipe", str(x1), str(y1),
@@ -1610,6 +1815,58 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
 ]
 
+# Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
+# /chat dispatch. This PC (i7-3770, no GPU) prefills at ~10 tok/s, so the full
+# 30-tool schema (~2.7k tok) + persona (~3.5k tok) = ~6k tokens = 10+ MINUTES of
+# prefill on a cold model — that's the 8-minute timeout Chris keeps hitting.
+# Sending only the device/navigation tools with terse descriptions keeps each
+# round's prefill under ~150s; Ollama's KV cache then makes rounds 2+ cheap.
+# Tool names MUST match TOOLS keys (the executor only accepts those).
+OLLAMA_TOOLS_SCHEMA = [
+    {"type": "function", "function": {"name": "ui_device",
+        "description": "List connected Android devices + screen size/density.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_app_open",
+        "description": "Launch StudentSyncSA on the device. No args.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_tap",
+        "description": "Tap at pixel (x,y). Get screen size first via ui_device. x,y integer pixels.",
+        "parameters": {"type": "object", "properties": {
+            "x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}}},
+    {"type": "function", "function": {"name": "ui_swipe",
+        "description": "Swipe/scroll from (x1,y1) to (x2,y2). duration ms optional.",
+        "parameters": {"type": "object", "properties": {
+            "x1": {"type": "integer"}, "y1": {"type": "integer"},
+            "x2": {"type": "integer"}, "y2": {"type": "integer"},
+            "duration": {"type": "integer"}}, "required": ["x1", "y1", "x2", "y2"]}}},
+    {"type": "function", "function": {"name": "ui_type",
+        "description": "Type text into the focused field. Args: text (string).",
+        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "ui_key",
+        "description": "Press a key: back, home, enter, tab, up, down, left, right, esc.",
+        "parameters": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}}},
+    {"type": "function", "function": {"name": "ui_dump",
+        "description": "Read on-screen UI hierarchy text (verify where you are). No args.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_screenshot",
+        "description": "Capture screen (shown to Chris in a popup; not saved unless save=true).",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string"}, "save": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "run_command",
+        "description": "Run a shell command and return stdout/stderr. Args: command.",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
+]
+
+OLLAMA_SYS_PROMPT = (
+    "You are ACEsi driving an Android device. ACT, don't ask. For navigation: "
+    "ui_app_open, ui_dump to read the screen, ui_tap/ui_swipe/ui_type/ui_key to "
+    "move toward the target, ui_dump to verify each step, and ui_screenshot only "
+    "after a ui_dump confirms the target screen is visible. To type a URL press "
+    "enter after with ui_key enter. If ui_dump shows Chrome's 'Your connection "
+    "is not private' or HSTS/ERR_CERT warning, type 'thisisunsafe' and continue. "
+    "In your final reply, cite real text from the last ui_dump. Be brief.\n"
+)
+
 def _tool_icon(name):
     return {"list_files": "📂", "read_file": "📄", "grep": "🔍",
             "write_file": "✏️", "edit_file": "✏️",     "run_command": "▶"}.get(name, "🔧")
@@ -1624,7 +1881,7 @@ def _tool_icon(name):
             "restart": "🔄"}.get(name, "🔧")
 
 def _tool_desc(name, args):
-    a = {k: v for k, v in args.items() if k in (TOOLS.get(name, (None, ()))[1] or ())}
+    a = {k: v for k, v in (args or {}).items() if k in (TOOLS.get(name, (None, ()))[1] or ())}
     if name not in TOOLS:
         return name
     if name in ("list_files", "read_file", "grep"):
@@ -1998,6 +2255,7 @@ def _extract_calls(reply):
                 out.append(hit)
     seen, uniq = set(), []
     for name, args in out:
+        args = args if isinstance(args, dict) else {}
         key = (name, json.dumps(args, sort_keys=True))
         if key not in seen:
             seen.add(key)
