@@ -2407,23 +2407,46 @@ def _classify_message(user_message):
     """Decide which tool domain(s) a user message is asking about, so we can
     (a) surface the right context to the model and (b) refuse tools from a
     domain the user did not ask for instead of silently doing two unrelated
-    things at once."""
+    things at once. A request that EXPLICITLY names a tool (e.g. 'use the curl
+    tool on this URL') wins and is NOT treated as ambiguous just because a URL
+    host name happens to contain a UI word like 'portal'."""
     m = (user_message or "").lower()
+    has_url = ("https://" in m) or ("http://" in m)
+    _reach_re = re.compile(r"\b(is\s+(it|the)\s+|check\s+if\s+).*\b(up|down)\b")
+    # Strong, unambiguous network intent: "curl <url>", "use the curl tool on
+    # <url>", "is <host> up/down", "reachability", "status code of", "port 443",
+    # "no web service". NOTE: 'up'/'down' only count as net when paired with a
+    # probe verb, so a UI request like 'screenshot' never flips to network.
+    net_strong = ("curl" in m and (has_url or "url" in m or "reachab" in m
+                                     or "status code" in m or "port " in m or "443" in m)) or \
+                 bool(_reach_re.search(m)) or \
+                 any(k in m for k in ("reachab", "is up", "is down", "status code",
+                     "no ports", "no web service", "up?", "down?", "port ", "443", "8080", "dns"))
+    # Real on-device UI ACTION intent only (NOT incidental host mentions like
+    # 'univenierp'/'portal'/'screen'). This is what stops 'curl
+    # https://univenierp01.univen.ac.za/.../portal/...' being misread as a UI
+    # request, and what keeps nav intent in the ui bucket.
+    ui_action = any(k in m for k in (
+        "ui_tap", "ui_swipe", "ui_type", "ui_key", "ui_dump", "ui_screenshot",
+        "ui_app_open", "ui_assert", "ui_expect", "ui_test_run",
+        "emulator", "open the app", "go to", "navigate", "navigation",
+        "tap ", "swipe ", "cdp_", "webview", "show me", "take a", "screenshot")) \
+        or _test_task(m)
     domains = set()
-    if any(k in m for k in ("emulator", "device", "ui_assert", "ui_dump", "ui_tap",
-                            "ui_type", "ui_swipe", "ui_key", "ui_screenshot",
-                            "ui_app_open", "univenierp", "portal", "navigate",
-                            "screen", "android", "cdp", "webview")):
+    # A strong net request with no device ACTION is purely network work, even if
+    # the URL hostname contains UI-ish words (e.g. ...univenierp...portal/...).
+    if net_strong and not ui_action:
+        return {"net"}
+    if ui_action or any(k in m for k in ("emulator", "cdp_", "webview")):
         domains.add("ui")
-    if any(k in m for k in ("curl", "url", "domain", "offline", "reachable",
-                            "no ports", "443", "no web service", "status code",
-                            "http")):
+    if net_strong or ("curl" in m) or any(k in m for k in (
+            "url", "domain", "offline", "reachab", "is up", "is down",
+            "status code", "port ", "443", "8080", "dns", "no ports", "no web service")):
         domains.add("net")
     if any(k in m for k in ("edit", "read", "file", "write", "code", "build",
-                            "apk", "flutter", "git", "commit", "analyze")):
+                            "apk", "flutter", "git ", "commit", "analyze")):
         domains.add("code")
-    if any(k in m for k in ("restart", "relaunch", "heal", "self-host", "server",
-                            "ollama")):
+    if any(k in m for k in ("restart", "relaunch", "heal", "self-host", "ollama")):
         domains.add("ctrl")
     return domains or {"general"}
 

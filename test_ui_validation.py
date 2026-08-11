@@ -321,6 +321,40 @@ class DomainGateTest(unittest.TestCase):
         self.assertIn("run_command", names)
         self.assertNotIn("ui_tap", names)
 
+    def test_explicit_curl_with_portal_host_is_not_ambiguous(self):
+        # Regression for the reported bug: "use the curl tool on this URL"
+        # must classify as a single net domain and NOT trip the clarification
+        # gate, even though the URL hostname contains 'portal'.
+        msg = ("use the curl tool on this URL: "
+               "https://univenierp01.univen.ac.za/pls/prodi41/w99pkg.mi_login")
+        self.assertEqual(server._classify_message(msg), {"net"})
+
+    def test_net_request_runs_curl_not_clarification(self):
+        # Full-loop regression: a net-only request gets the net schema and the
+        # model's curl tool_call is executed, NOT the clarification message.
+        executed = []
+
+        def fake_chat_one(*a, **k):
+            return ("", [("curl", {"url": "https://example.com"})])
+
+        call_orig = server._call_tool
+        po_orig = server._chat_providers
+        server._chat_one = fake_chat_one
+        server._call_tool = lambda name, args: (executed.append(name), True, "HTTP 200")[1:]
+        server._chat_providers = lambda: [("Ollama", server.OLLAMA_ENDPOINT,
+                                           "local", server.OLLAMA_CHAT_MODEL, "compact")]
+        server._ui_auto_dump = lambda: (True, "mock")
+        msgs = [{"role": "user", "content": "use the curl tool on https://example.com"}]
+        reply = server._chat_dispatch(msgs, max_rounds=5,
+                                      user_message="use the curl tool on https://example.com")
+        server._call_tool = call_orig
+        server._chat_providers = po_orig
+        # The fix: a net-only request runs curl directly and NEVER returns the
+        # ambiguous clarification prompt.
+        self.assertNotIn("which would you like", reply.lower())
+        self.assertIn("curl", executed)
+        self.assertEqual(executed[0], "curl")
+
     def test_assert_tool_domains_registered(self):
         for n in ("ui_assert_text", "ui_assert_element", "ui_assert_visible",
                   "ui_expect", "ui_test_run", "curl"):
