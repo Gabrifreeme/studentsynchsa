@@ -1459,6 +1459,11 @@ def tool_flutter_analyze():
 
 ACE_PACKAGE = "com.studentsyncsa.studentsyncsa"
 ACE_UI_SHOTS = os.path.join(PROJECT_ROOT, "ui_screenshots")
+# University of Venda ITS / iEnabler portal (prodi41 startup URL). Used by the
+# /check-portal health route and by ACEsi's network diagnostics. The public
+# university site (www.univen.ac.za) links to this exact host.
+UNIVEN_ITS_STARTUP_URL = ("https://univenierp01.univen.ac.za/pls/prodi41/"
+                           "gen.gw1pkg.gw1startup?x_processcode=ITS_OAP")
 # Last captured screenshot lives in memory (NOT on disk by default) so it can be
 # served to the frontend popup without cluttering ui_screenshots/. ts increments
 # every capture so clients can detect a NEW screenshot after a run.
@@ -3862,6 +3867,42 @@ threading.Thread(target=summary_scheduler, daemon=True).start()
 def test_ping():
     send_test_ping()
     return "Test ping sent! Check your phone."
+
+
+@app.route('/check-portal')
+def check_portal():
+    """One-click health check for the Venda ITS portal. Reuses the same `curl`
+    tool ACEsi uses so the diagnosis is identical to what the model reports.
+    Returns JSON: {url, reachable, status, detail}."""
+    url = request.args.get("url") or UNIVEN_ITS_STARTUP_URL
+    ok, detail = tool_curl(url, timeout=15, allow_redirects=True)
+    # A 4xx/5xx (server responded) means the portal's web service IS running,
+    # just returning an error — reachable in the sense 'a port answered'.
+    reachable = bool(ok)
+    status = "up" if ok else "down"
+    # Distinguish 'no service' from 'service answered with an HTTP error'.
+    answered = ("HTTP" in detail)
+    result = {
+        "url": url,
+        "reachable": reachable and (answered or "HTTP" not in detail[:20]),
+        "service_answered": answered,
+        "status": "up" if answered else ("down" if not ok else "unknown"),
+        "detail": detail,
+    }
+    if ok and not answered:
+        result["status"] = "timeout"
+    return jsonify(result)
+
+
+@app.route('/portal')
+def portal_redirect():
+    """Convenience: open the StudentSyncSA ITS portal in a new tab, and probe it
+    in the same request so the dashboard can show live status before navigating."""
+    url = request.args.get("url") or UNIVEN_ITS_STARTUP_URL
+    ok, detail = tool_curl(url, timeout=12, allow_redirects=True)
+    return jsonify({"url": url, "portal_up": ok and "HTTP" in detail,
+                    "detail": detail})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

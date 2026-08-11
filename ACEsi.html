@@ -474,12 +474,6 @@
   .cal-add { display: flex; gap: 8px; margin-top: 10px; }
   .time-tab { padding: 6px 14px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .time-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
-
-  /* ACEsi working indicator — pulsing dots */
-  .ace-working { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; font-size: 12px; color: var(--accent); font-weight: 600; }
-  .ace-working::after { content: ""; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: acePulse 1s ease-in-out infinite; }
-  @keyframes acePulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
-  #aceWorkingTime { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 11px; color: var(--text-mute); margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -510,6 +504,7 @@
       </div>
     </div>
     <button class="btn" id="aceInspectBtn" title="Inspect ITS WebView / local Chrome via CDP">🔍 Inspect</button>
+    <button class="btn" id="acePortalBtn" title="Health-check the Venda ITS portal (curl)" onclick="checkPortal()">🌐 Portal</button>
   </div>
   <div class="toolbar-group">
     <button class="btn" onclick="runCommand('adb devices')" title="List connected devices">📱 adb</button>
@@ -536,10 +531,11 @@
   </div>
   <div class="header-spacer"></div>
   <button class="icon-btn" onclick="location.reload()" title="Reload">⟳</button>
+  <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
 </div>
 <div id="main">
   <div id="chat-panel">
-    <div class="panel-title"><span>Conversation</span> <span style="display:flex;align-items:center;gap:10px;"><span id="aceWorking" class="ace-working" style="display:none;">● ACEsi working… <span id="aceWorkingTime">0s</span></span><button class="min-btn" onclick="minPanel('chat-panel')" title="Minimize panel">-</button></span></div>
+    <div class="panel-title"><span>Conversation</span> <span style="display:flex;align-items:center;gap:10px;"><button class="min-btn" onclick="minPanel('chat-panel')" title="Minimize panel">-</button></span></div>
     <div id="chat"><div class="msg ace">Hi, Chris. I'm here.</div></div>
     <div id="input-area">
       <div id="attach-preview"></div>
@@ -562,7 +558,6 @@
         <button class="btn btn-icon" onclick="clearCode()" title="Clear editor">🗑</button>
         <button class="btn btn-icon" onclick="copyCode()" title="Copy code">⧉</button>
         <button class="btn btn-icon" onclick="saveCode()" title="Save code">💾</button>
-        <button class="btn btn-icon" onclick="openSettings()" title="Settings">⚙</button>
       </div>
       <div class="toolbar-spacer"></div>
       <button class="min-btn" onclick="minPanel('code-panel')" title="Minimize panel">-</button>
@@ -1056,25 +1051,6 @@
     stopButtonEl = null;
   }
 
-  // ACEsi working indicator — shows "ACEsi working… Ns" in the panel title
-  let workingTimer = null;
-  let workingStart = 0;
-  function showWorking() {
-    const el = document.getElementById('aceWorking');
-    const timeEl = document.getElementById('aceWorkingTime');
-    if (!el) return;
-    workingStart = Date.now();
-    el.style.display = 'inline-flex';
-    workingTimer = setInterval(() => {
-      if (timeEl) timeEl.textContent = Math.floor((Date.now() - workingStart) / 1000) + 's';
-    }, 1000);
-  }
-  function hideWorking() {
-    if (workingTimer) { clearInterval(workingTimer); workingTimer = null; }
-    const el = document.getElementById('aceWorking');
-    if (el) el.style.display = 'none';
-  }
-
   // Inline work-step rendering: shows ACEsi's tool steps (grey) and reply
   // writing (white) directly in the chat thread, keyed by step id.
   const workStepEls = {};
@@ -1265,7 +1241,7 @@
   ];
   function isDestructive(cmd) { return DESTRUCTIVE_PATTERNS.some(p => p.test(cmd)); }
 
-  async function executeCommand(cmd) {
+   async function executeCommand(cmd) {
     try {
       const res = await fetch('/run', {
         method: 'POST',
@@ -1276,6 +1252,30 @@
       addOutput(d.output || d.error || 'Done');
     } catch { addOutput('❌ Server error'); }
   }
+
+  async function checkPortal() {
+    const btn = document.getElementById('acePortalBtn');
+    if (btn) btn.disabled = true;
+    const prev = btn ? btn.textContent : '🌐 Portal';
+    if (btn) btn.textContent = '⏳';
+    addMessage('Checking Venda ITS portal (univenierp01.univen.ac.za)…', 'ace');
+    try {
+      const res = await fetch('/check-portal');
+      const d = await res.json();
+      if (d.status === 'up') {
+        addMessage('✅ Portal is UP — HTTP ' + (d.detail || ''), 'ace');
+      } else if (d.service_answered) {
+        addMessage('⚠️ Portal answered but ' + (d.detail || ''), 'ace');
+      } else {
+        addMessage('❌ Portal is DOWN — ' + (d.detail || 'no service / port refused').slice(0, 160), 'ace');
+      }
+    } catch {
+      addMessage('❌ Could not reach the server to check the portal.', 'ace');
+    } finally {
+      if (btn) { btn.textContent = prev; btn.disabled = false; }
+    }
+  }
+
 
   function confirmCommand(cmd) {
     const esc = cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1369,7 +1369,6 @@
     }
 
     showThinking(text);
-    showWorking();
     try {
       const savedModel = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
       let model = savedModel;
@@ -1430,11 +1429,9 @@
         } catch (err) {
           if (err && err.name === 'AbortError') {
             hideThinking();
-            hideWorking();
             addMessage('⏹ Stopped the last request.', 'ace');
           } else {
             hideThinking();
-            hideWorking();
             addMessage('Server error.', 'ace');
           }
         } finally {
