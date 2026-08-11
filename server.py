@@ -569,6 +569,25 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     Rounds cap so a stuck model still terminates.
     Publishes live work-steps to _AGENT so the frontend (which polls
     /opencode/status) renders progress inline, exactly like run_agent does."""
+    # --- Domain separation (checked BEFORE marking the agent running): keep UI /
+    # code / network work in distinct contexts so ACEsi stops mixing them. One
+    # concrete domain wins; more than one is ambiguous -> ASK FOR CLARIFICATION. ---
+    domains = _classify_message(user_message)
+    concrete = domains - {"general"}
+    if len(concrete) >= 2:
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "needs clarification"
+            _AGENT["last_reply"] = ("I can help with: (UI) navigating the Android app on the "
+                                    "device, (NETWORK) checking whether a URL/port is up, or "
+                                    "(CODE) reading/editing files. Which would you like?\n"
+                                    "E.g. \"navigate StudentSyncSA to the Venda ITS portal\", "
+                                    "\"curl https://univenierp01.univen.ac.za\", or "
+                                    "\"read lib/screens/...\".")
+        return _AGENT["last_reply"]
+    active_domain = next(iter(concrete)) if concrete else "general"
+    allowed_names = _domain_tool_names(active_domain)
+    ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
+
     with _AGENT_LOCK:
         _AGENT["running"] = True
         _AGENT["abort"] = False
@@ -611,14 +630,16 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
             if active is None:
                 got = None
                 for p in _chat_providers():
-                    got = _chat_one(p[0], p[1], p[2], p[3], llm_messages)
+                    got = _chat_one(p[0], p[1], p[2], p[3], llm_messages,
+                                    tools_schema=ollama_domain_schema)
                     if got is not None:
                         active = p
                         break
                 if got is None:
                     for model in OPENROUTER_FALLBACKS:
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                        OPENROUTER_API_KEY, model, llm_messages)
+                                        OPENROUTER_API_KEY, model, llm_messages,
+                                        tools_schema=ollama_domain_schema)
                         if got is not None:
                             active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                       OPENROUTER_API_KEY, model)
@@ -641,7 +662,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                     got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
                                     OLLAMA_CHAT_MODEL, _ollama_local_messages(llm_messages),
                                     timeout=(15, 180),
-                                    tools_schema=OLLAMA_TOOLS_SCHEMA)
+                                    tools_schema=ollama_domain_schema)
                     # Apply the same compact schema/messages to FOLLOW-UP rounds
                     # (active[3]==OLLAMA_CHAT_MODEL identifies the local model).
                     if got is not None:
@@ -653,9 +674,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                 if len(active) > 4 and active[4] == "compact":
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     _ollama_local_messages(llm_messages), timeout=(15, 180),
-                                    tools_schema=OLLAMA_TOOLS_SCHEMA)
+                                    tools_schema=ollama_domain_schema)
                 else:
-                    got = _chat_one(active[0], active[1], active[2], active[3], llm_messages)
+                    got = _chat_one(active[0], active[1], active[2], active[3],
+                                    llm_messages, tools_schema=ollama_domain_schema)
                 if got is None:
                     active = None
                     continue
@@ -1940,6 +1962,66 @@ def tool_cdp_status():
     return True, d.status()
 
 
+import urllib.request as _urlreq
+import urllib.error as _urlerr
+import socket as _socket
+
+
+class _NoRedirectHandler(_urlreq.HTTPRedirectHandler):
+    """Used when allow_redirects=False: stop following 3xx redirects."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _body_snippet(data, ctype=""):
+    if not data:
+        return "(empty body)"
+    try:
+        text = data.decode("utf-8", "replace")
+    except Exception:
+        text = ""
+    text = text.strip().replace("\n", " ")
+    if len(text) > 240:
+        text = text[:240] + "…"
+    return text
+
+
+def tool_curl(url, method="GET", timeout=20, verify=True, allow_redirects=True):
+    """Hit a URL the way a browser would and return status + a short body slice.
+    ACEsi uses this to confirm whether a network service (e.g. an ITS portal) is
+    actually up, separate from the on-device / file-system work. Returns
+    (ok, string): ok=True when the HTTP request completed (even on 4xx/5xx, so the
+    caller can read the status code), ok=False only on DNS failure / connection
+    refused / timeout — which is the 'server reachable but no web service / port
+    closed' signal ACEsi couldn't get from uiautomator alone."""
+    if not url or not str(url).startswith(("http://", "https://")):
+        return False, "curl usage: url=<http://host or https://host/path> [method] [timeout]"
+    try:
+        req = _urlreq.Request(str(url), method=str(method).upper(),
+                              headers={"User-Agent": "Mozilla/5.0 (ACEsi curl)"})
+        try:
+            ctx = ssl.create_default_context() if verify else ssl._create_unverified_context()
+            handler = _urlreq.HTTPSHandler(context=ctx)
+        except Exception:
+            handler = _urlreq.HTTPSHandler()
+        opener = _urlreq.build_opener(
+            handler, _urlreq.HTTPRedirectHandler() if allow_redirects else _NoRedirectHandler())
+        with opener.open(req, timeout=float(timeout)) as resp:
+            data = resp.read(6000)
+            ctype = resp.headers.get("Content-Type", "")
+            return True, "HTTP %d | %s | %s" % (
+                resp.status, ctype.split(";")[0], _body_snippet(data, ctype))
+    except _urlerr.HTTPError as e:
+        return True, "HTTP %d (server responded) | %s" % (e.code, str(e)[:200])
+    except _urlerr.URLError as e:
+        reason = str(getattr(e, "reason", e))
+        return False, "curl FAIL (network) — %s: %s" % (reason, url)
+    except _socket.timeout:
+        return False, "curl FAIL (timeout %ss) — %s" % (timeout, url)
+    except Exception as e:
+        return False, "curl error: %s" % str(e)[:200]
+
+
 TOOLS = {
     "list_files": (tool_list_files, ("path",)),
     "read_file": (tool_read_file, ("path",)),
@@ -1978,6 +2060,7 @@ TOOLS = {
     "cdp_dom_state": (tool_cdp_dom_state, ()),
     "cdp_network_requests": (tool_cdp_network_requests, ()),
     "cdp_status": (tool_cdp_status, ()),
+    "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
 }
 
 # Native OpenAI-compatible tool schema. Sent to the provider so the model can
@@ -2130,6 +2213,15 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "cdp_status",
         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "curl",
+        "description": "Hit a URL like a browser and return the HTTP status + a body snippet. Use this to confirm whether a network service (e.g. an ITS portal) is UP before blaming on-device code. Args: url (REQUIRED, http(s)://...), method (optional, default GET), timeout (optional int seconds, default 20), verify (optional bool, default true), allow_redirects (optional bool, default true). Returns ok=True even on 4xx/5xx (a server responded); ok=False only on DNS failure / connection refused / timeout = the 'no web service / port closed' signal.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL starting with http:// or https://."},
+            "method": {"type": "string", "title": "method", "description": "Optional. HTTP method, default GET.", "default": "GET"},
+            "timeout": {"type": "number", "title": "timeout", "description": "Optional. Seconds to wait, default 20.", "default": 20},
+            "verify": {"type": "boolean", "title": "verify", "description": "Optional. Verify TLS cert, default true.", "default": True},
+            "allow_redirects": {"type": "boolean", "title": "allow_redirects", "description": "Optional. Follow 3xx redirects, default true.", "default": True}},
+            "required": ["url"]}}},
 ]
 
 # Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
@@ -2191,7 +2283,11 @@ OLLAMA_TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "ui_test_run",
         "description": "Run scripted UI actions+assertions. Args: steps = JSON list of {tool,args}, name optional.",
         "parameters": {"type": "object", "properties": {
-            "steps": {"type": "string"}, "name": {"type": "string"}}, "required": ["steps"]}}},
+            "steps": {"type": "string"},             "name": {"type": "string"}}, "required": ["steps"]}}},
+    {"type": "function", "function": {"name": "curl",
+        "description": "Hit a URL and return HTTP status + body snippet. ok=False = no service/port closed. Args: url (https), timeout optional.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
     {"type": "function", "function": {"name": "run_command",
         "description": "Run a shell command and return stdout/stderr. Args: command.",
         "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
@@ -2212,6 +2308,7 @@ def _tool_icon(name):
             "write_file": "✏️", "edit_file": "✏️",     "run_command": "▶"}.get(name, "🔧")
     return {"cdp_connect": "🔌", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
             "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊",
+            "curl": "🔗",
             "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
             "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
             "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
@@ -2262,6 +2359,8 @@ def _tool_desc(name, args):
         return "%s `%s`" % (name, str(a.get("name") or "scenario")[:40])
     if name == "restart":
         return "%s `%s`" % (name, a.get("what") or "cdp")
+    if name == "curl":
+        return "%s `%s`" % (name, str(a.get("url", ""))[:60])
     return name
 
 _REQUIRED_ARGS = {}
@@ -2270,6 +2369,74 @@ for _t in TOOLS_SCHEMA:
     _name = (_t.get("function") or {}).get("name")
     if _name:
         _REQUIRED_ARGS[_name] = [r for r in (_req.get("required") or []) if r]
+
+# Tool domain / context separation (ACEsi mixes UI, code, and network work, so
+# we keep them in distinct buckets and can restrict which domain a request is
+# allowed to touch). A tool lives in exactly one domain; the dispatch loop
+# consults ALLOWED_DOMAINS per request.
+_TOOL_DOMAINS = {
+    # device UI work
+    "ui_device": "ui", "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
+    "ui_type": "ui", "ui_key": "ui", "ui_dump": "ui", "ui_screenshot": "ui",
+    "ui_assert_text": "ui", "ui_assert_element": "ui", "ui_assert_visible": "ui",
+    "ui_expect": "ui", "ui_test_run": "ui",
+    # on-device Chrome/WebView (still UI-side, but via CDP)
+    "cdp_connect": "ui", "cdp_evaluate": "ui", "cdp_console_logs": "ui",
+    "cdp_dom_state": "ui", "cdp_network_requests": "ui", "cdp_status": "ui",
+    # network / URL probes — the new curl tool isolates "is this URL up?" from
+    # both code edits and on-device taps
+    "curl": "net",
+    # file-system / code tools
+    "list_files": "code", "read_file": "code", "grep": "code",
+    "write_file": "code", "edit_file": "code", "run_command": "code",
+    "git_status": "code", "git_log": "code", "git_commit": "code",
+    "git_branch": "code", "git_merge": "code",
+    "build_apk": "code", "pub_add": "code", "pub_remove": "code",
+    "pub_upgrade": "code", "flutter_test": "code", "flutter_analyze": "code",
+    # runtime controls
+    "restart": "ctrl",
+}
+
+
+def _classify_message(user_message):
+    """Decide which tool domain(s) a user message is asking about, so we can
+    (a) surface the right context to the model and (b) refuse tools from a
+    domain the user did not ask for instead of silently doing two unrelated
+    things at once."""
+    m = (user_message or "").lower()
+    domains = set()
+    if any(k in m for k in ("emulator", "device", "ui_assert", "ui_dump", "ui_tap",
+                            "ui_type", "ui_swipe", "ui_key", "ui_screenshot",
+                            "ui_app_open", "univenierp", "portal", "navigate",
+                            "screen", "android", "cdp", "webview")):
+        domains.add("ui")
+    if any(k in m for k in ("curl", "url", "domain", "offline", "reachable",
+                            "no ports", "443", "no web service", "status code",
+                            "http")):
+        domains.add("net")
+    if any(k in m for k in ("edit", "read", "file", "write", "code", "build",
+                            "apk", "flutter", "git", "commit", "analyze")):
+        domains.add("code")
+    if any(k in m for k in ("restart", "relaunch", "heal", "self-host", "server",
+                            "ollama")):
+        domains.add("ctrl")
+    return domains or {"general"}
+
+
+def _domain_tool_names(domain):
+    """Tool names allowed for a given domain (general = code + net + ctrl, i.e. the
+    file/shell/web toolset but NOT on-device UI work)."""
+    if domain == "general":
+        return {n for n, d in _TOOL_DOMAINS.items() if d in ("code", "net", "ctrl")}
+    return {n for n, d in _TOOL_DOMAINS.items() if d == domain}
+
+
+def _filter_tools_schema(schema, allowed_names):
+    return [t for t in schema if t["function"]["name"] in allowed_names]
+
+
+class _DomainGate(Exception):
+    pass
 
 
 def _call_tool(name, args):

@@ -23,7 +23,7 @@ class ChatDispatchTest(unittest.TestCase):
             ("Opened the app and captured ui_screenshots/navigation.png.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):
@@ -34,6 +34,8 @@ class ChatDispatchTest(unittest.TestCase):
                 return True, "tap sent (monkey)"
             if name == "ui_dump":
                 return True, "mock screen dump"
+            if name == "ui_assert_text":
+                return True, "PASS: found mock label"
             return True, "saved ui_screenshots/navigation.png (monkey)"
 
         def fake_auto_dump():
@@ -231,7 +233,7 @@ class ChatDispatchProseCallTest(unittest.TestCase):
             ("Done, I reached the portal.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):

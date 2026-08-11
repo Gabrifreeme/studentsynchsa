@@ -234,5 +234,99 @@ class TestBudgetTest(unittest.TestCase):
         self.assertEqual(reply, "FINAL: tests passed")
 
 
+class CurlTest(unittest.TestCase):
+    def test_usage_when_no_url(self):
+        ok, out = server.tool_curl("")
+        self.assertFalse(ok)
+        self.assertIn("usage", out)
+
+    def test_up_site_returns_2xx(self):
+        ok, out = server.tool_curl("https://www.univen.ac.za", timeout=15)
+        self.assertTrue(ok)
+        self.assertIn("HTTP 200", out)
+
+    def test_down_service_returns_false(self):
+        # The ITS portal is currently refusing connections — curl should surface
+        # ok=False with a network-level failure (this is the exact 'no web
+        # service' signal ACEsi uses to tell Chris the domain is right but the
+        # service is down).
+        ok, out = server.tool_curl("https://univenierp01.univen.ac.za/pls/prodi41/w99pkg.mi_login",
+                                   timeout=15)
+        self.assertFalse(ok)
+        self.assertIn("curl FAIL", out)
+
+    def test_4xx_is_success_for_caller(self):
+        # A server *responding* with 404 still means a web service is up; only
+        # transport failures return ok=False.
+        ok, out = server.tool_curl("https://www.univen.ac.za/does-not-exist-zzz",
+                                   timeout=15, allow_redirects=True)
+        self.assertTrue(ok)
+        self.assertIn("HTTP", out)
+
+    def test_redirect_off(self):
+        ok, out = server.tool_curl("https://www.univen.ac.za", timeout=15,
+                                   allow_redirects=False)
+        self.assertTrue(ok)
+        self.assertIn("HTTP", out)
+
+
+class DomainGateTest(unittest.TestCase):
+    def test_classify_single_domains(self):
+        self.assertEqual(server._classify_message("open the app, screenshot it"), {"ui"})
+        self.assertEqual(server._classify_message("curl https://x.com"), {"net"})
+        self.assertEqual(server._classify_message("read lib/main.dart"), {"code"})
+        self.assertEqual(server._classify_message("hello how are you"), {"general"})
+
+    def test_classify_ambiguous_two_domains(self):
+        # Asking for BOTH device and URL probe at once is ambiguous
+        self.assertGreaterEqual(
+            len(server._classify_message("navigate the app to the ITS portal and curl https://univenierp01.univen.ac.za")),
+            2)
+
+    def test_domain_tool_names_general_excludes_ui(self):
+        names = server._domain_tool_names("general")
+        self.assertIn("read_file", names)
+        self.assertIn("curl", names)
+        self.assertNotIn("ui_tap", names)
+        self.assertNotIn("ui_app_open", names)
+
+    def test_domain_tool_names_ui_includes_assertions(self):
+        names = server._domain_tool_names("ui")
+        self.assertIn("ui_assert_text", names)
+        self.assertIn("ui_test_run", names)
+        self.assertIn("ui_tap", names)
+
+    def test_ambiguous_request_returns_clarification(self):
+        msgs = [{"role": "system", "content": "test"},
+                {"role": "user", "content": "curl https://example.com and tap the login button on the emulator"}]
+        reply = server._chat_dispatch(msgs, max_rounds=5,
+                                      user_message="curl https://example.com and tap the login button on the emulator")
+        self.assertIn("which would you like", reply.lower())
+
+    def test_filter_schema(self):
+        ui_only = server._filter_tools_schema(server.OLLAMA_TOOLS_SCHEMA,
+                                              server._domain_tool_names("ui"))
+        names = [t["function"]["name"] for t in ui_only]
+        self.assertIn("ui_dump", names)
+        self.assertIn("ui_assert_text", names)
+        # ui domain excludes network/code tools
+        self.assertNotIn("curl", names)
+        self.assertNotIn("run_command", names)
+
+    def test_general_schema_includes_net_and_code(self):
+        gen = server._filter_tools_schema(server.OLLAMA_TOOLS_SCHEMA,
+                                          server._domain_tool_names("general"))
+        names = {t["function"]["name"] for t in gen}
+        self.assertIn("curl", names)
+        self.assertIn("run_command", names)
+        self.assertNotIn("ui_tap", names)
+
+    def test_assert_tool_domains_registered(self):
+        for n in ("ui_assert_text", "ui_assert_element", "ui_assert_visible",
+                  "ui_expect", "ui_test_run", "curl"):
+            self.assertEqual(server._TOOL_DOMAINS[n],
+                             "ui" if n.startswith("ui_") else "net")
+
+
 if __name__ == "__main__":
     unittest.main()
