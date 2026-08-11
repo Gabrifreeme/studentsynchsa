@@ -62,7 +62,7 @@ CEREBRAS_MODEL = "gpt-oss-120b"
 # Model is tool-capable (cdp_*/edit_file/run_command callable). qwen2.5-coder:1.5b
 # is tiny + fast on CPU; swap to a bigger pulled tool model if you want more quality.
 OLLAMA_ENDPOINT = "http://localhost:11434/v1"
-OLLAMA_MODEL = "qwen2.5-coder:1.5b"
+OLLAMA_MODEL = "qwen2.5:7b"
 
 NTFY_TOPIC = "ace_alerts"
 NTFY_SERVER = "https://ntfy.sh"
@@ -492,13 +492,15 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90)):
     return None
 
 
-def _chat_dispatch(llm_messages, max_rounds=8):
+def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     """Agent-style tool loop for /chat. Passes the tool schema to the model; when
     it emits a tool call (ui_*, git_*, flutter_*, cdp_*, ...) EXECUTE it via
     _call_tool and feed the result back, so ACEsi performs actions instead of
     replying 'please provide the commands'. Returns the final text reply or None.
     Rounds cap so a stuck model still terminates."""
     active = None
+    names = []
+    last_text = None
     for rnd in range(max_rounds):
         if active is None:
             got = None
@@ -517,7 +519,7 @@ def _chat_dispatch(llm_messages, max_rounds=8):
                         break
             if got is None:
                 got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                OLLAMA_MODEL, llm_messages, timeout=(15, 280))
+                                OLLAMA_MODEL, llm_messages, timeout=(15, 420))
                 if got is not None:
                     active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_MODEL)
             if got is None:
@@ -528,19 +530,57 @@ def _chat_dispatch(llm_messages, max_rounds=8):
                 active = None
                 continue
         text, tcs = got
+        if text and text.strip():
+            last_text = text.strip()[:2000]
         if not tcs:
+            nav_push = _nav_gate(user_message, names)
+            if nav_push:
+                llm_messages.append({"role": "user", "content": nav_push})
+                active = None
+                continue
+            if _nav_task(user_message) and not names:
+                llm_messages.append({"role": "user", "content":
+                    "You only described a plan but did NOT call any tool. This task "
+                    "requires real actions on the device. Emit a structured tool "
+                    "call NOW, e.g. ui_app_open {}, then ui_dump {} to read the "
+                    "screen, then ui_tap/ui_swipe/ui_type to navigate toward the "
+                    "target, and ui_screenshot only after ui_dump confirms it. "
+                    "Never just narrate the plan."})
+                active = None
+                continue
             return text
-        name, args = tcs[0]
-        ok, result = _call_tool(name, args)
-        tcid = "chat_t%d" % rnd
-        print(f"🔧 /chat executed {name} ok={ok}")
+        batch = tcs[:_BATCH_MAX]
+        tids = [{"id": "chat_t%d_%d" % (rnd, j), "type": "function",
+                 "function": {"name": nm, "arguments": json.dumps(a)}}
+                for j, (nm, a) in enumerate(batch)]
         llm_messages.append({"role": "assistant", "content": text or "",
-            "tool_calls": [{"id": tcid, "type": "function",
-                            "function": {"name": name,
-                                         "arguments": json.dumps(args)}}]})
-        llm_messages.append({"role": "tool", "tool_call_id": tcid,
-                             "name": name, "content": str(result)})
-    return None
+                             "tool_calls": tids})
+        for j, (name, args) in enumerate(batch):
+            ok, result = _call_tool(name, args)
+            names.append(name)
+            tcid = "chat_t%d_%d" % (rnd, j)
+            print(f"🔧 /chat executed {name} ok={ok}")
+            llm_messages.append({"role": "tool", "tool_call_id": tcid,
+                                 "name": name, "content": str(result)})
+            if ok and name in _UI_SCREEN_TOOLS:
+                _dok, _dtxt = _ui_auto_dump()
+                if _dok:
+                    llm_messages.append({"role": "user", "content":
+                        "SCREEN STATE after your %s action (auto ui_dump):\n%s" % (name, str(_dtxt)[:2000])})
+    # Rounds exhausted (or all providers returned None). If we actually did real
+    # work, report it honestly instead of the misleading "no models available".
+    if names:
+        acts = ", ".join(n for n in names if n in
+                         ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
+                          "ui_dump", "ui_screenshot", "ui_device"))
+        sshot = "Captured screenshot (shown to you in a popup; not saved to disk)." if "ui_screenshot" in names else ""
+        summary = ("I performed %d device actions (%s). %s" % (len(names), acts, sshot))
+        if last_text and "FINAL" in last_text.upper():
+            summary = last_text
+        else:
+            summary += " The model didn't produce a final summary before the action cap."
+        return summary
+    return last_text
 
 
 @app.route('/chat', methods=['POST'])
@@ -718,7 +758,17 @@ def chat():
             "(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot). For code work you "
             "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
             "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
-            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n\n"
+            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
+            "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
+            "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
+            "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
+            "confirm each screen change, and only ui_screenshot AFTER the last ui_dump proves the target is "
+            "visible. A screenshot of the launch screen is NOT reaching the target — never finish a "
+            "navigation after just opening the app. Use ui_dump (text hierarchy) to know where you are; you "
+            "cannot see images. Screenshots are shown to Chris in a popup and are NOT saved to disk unless "
+            "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
+            "page content from the last ui_dump and what you actually did — never invent a screenshot "
+            "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
             + build_context_block()
         )
 
@@ -733,15 +783,15 @@ def chat():
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
-        reply = _chat_dispatch(llm_messages)
+        reply = _chat_dispatch(llm_messages, user_message=user_message)
         if reply:
             save_conversation("assistant", reply)
             # Journal the session close when Chris signs off for the day
             if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
                 add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
-            return jsonify({"reply": reply})
-        return jsonify({"reply": "Error: no models available"})
+            return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
+        return jsonify({"reply": "Error: no models available", "shot_ts": _LAST_SHOT["ts"]})
     except Exception as e:
         print(f"💥 Exception in /chat: {type(e).__name__}: {e}")
         import traceback
@@ -1162,6 +1212,10 @@ def tool_flutter_analyze():
 
 ACE_PACKAGE = "com.studentsyncsa.studentsyncsa"
 ACE_UI_SHOTS = os.path.join(PROJECT_ROOT, "ui_screenshots")
+# Last captured screenshot lives in memory (NOT on disk by default) so it can be
+# served to the frontend popup without cluttering ui_screenshots/. ts increments
+# every capture so clients can detect a NEW screenshot after a run.
+_LAST_SHOT = {"png": b"", "ts": 0}
 _UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
             "up": "19", "down": "20", "left": "21", "right": "22",
             "esc": "111", "power": "26", "recents": "187"}
@@ -1170,14 +1224,24 @@ _UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
 def _ui_adb(args, timeout=120, cap=3000):
     cmd = subprocess.list2cmdline(["adb"] + args)
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                           timeout=timeout, env=os.environ.copy())
-        out = ((r.stdout or '') + (r.stderr or '')).strip()
-        if cap and len(out) > cap:
-            out = out[-cap:] + "\n...[truncated]"
-        return r.returncode == 0, out
-    except subprocess.TimeoutExpired:
-        return False, "timed out after %ds" % timeout
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, env=os.environ.copy())
+        try:
+            r_out, r_err = proc.communicate(timeout=timeout)
+            out = (r_out.decode('utf-8', 'replace') + r_err.decode('utf-8', 'replace')).strip()
+            if cap and len(out) > cap:
+                out = out[-cap:] + "\n...[truncated]"
+            return proc.returncode == 0, out
+        except subprocess.TimeoutExpired:
+            # Kill the whole tree (shell=True spawns cmd.exe -> adb.exe); an
+            # orphaned adb.exe would otherwise hold the device and stall every
+            # later adb call in the run.
+            try:
+                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                               capture_output=True, timeout=10)
+            except Exception:
+                pass
+            return False, "timed out after %ds" % timeout
     except Exception as e:
         return False, str(e)
 
@@ -1229,31 +1293,72 @@ def tool_ui_key(key):
     return False, "usage: ui_key key=%s" % "/".join(sorted(_UI_KEYS))
 
 
+def _ui_dump_compact(xml, cap=3000):
+    """Extract only the labeled nodes (text/content-desc) with their bounds, so
+    the model sees a compact actionable list (label + tap center) instead of raw
+    XML full of empty text=\"\" attributes. Returns the compact string."""
+    import xml.etree.ElementTree as ET
+    lines = []
+    for n in ET.fromstring(xml).iter("node"):
+        t = (n.get("text") or "").strip()
+        d = (n.get("content-desc") or "").strip()
+        label = t or d
+        if not label:
+            continue
+        b = n.get("bounds", "")
+        import re as _re
+        m = _re.findall(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b)
+        cx = cy = ""
+        if m:
+            x1, y1, x2, y2 = (int(v) for v in m[0])
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        lines.append('%s @ tap(%s,%s)%s' % (label, cx, cy,
+                     " [CLICKABLE]" if n.get("clickable") == "true" else ""))
+    total = len(lines)
+    joined = "\n".join(lines)
+    if len(joined) > cap:
+        joined = joined[:cap] + "\n...[truncated]"
+    return "%d labeled nodes\n%s" % (total, joined)
+
+
 def tool_ui_dump():
     _ui_adb(["shell", "uiautomator", "dump", "/sdcard/ui.xml"])
     ok, out = _ui_adb(["shell", "cat", "/sdcard/ui.xml"], cap=None)
     if not ok or "<hierarchy" not in out:
         return False, "ui dump failed: %s" % out[:500]
-    nodes = out.count("<node")
-    trimmed = out[:3000] + ("\n..." if len(out) > 3000 else "")
-    return True, "%d visible nodes\n%s" % (nodes, trimmed)
-
-
-def tool_ui_screenshot(name=None):
     try:
-        os.makedirs(ACE_UI_SHOTS, exist_ok=True)
-        fname = "%s_%s.png" % (name or "ui", datetime.now().strftime("%H%M%S"))
-        path = os.path.join(ACE_UI_SHOTS, fname)
+        return True, _ui_dump_compact(out)
+    except Exception as e:
+        nodes = out.count("<node")
+        trimmed = out[:3000] + ("\n..." if len(out) > 3000 else "")
+        return True, "%d visible nodes (compact parse failed: %s)\n%s" % (nodes, e, trimmed)
+
+
+def tool_ui_screenshot(name=None, save=False):
+    try:
         r = subprocess.run(
             subprocess.list2cmdline(["adb", "exec-out", "screencap", "-p"]),
             shell=True, capture_output=True, timeout=60, env=os.environ.copy())
         data = r.stdout if isinstance(r.stdout, bytes) else r.stdout.encode()
         if not data.startswith(b"\x89PNG"):
             return False, "screencap failed: %s" % r.stderr[:300]
-        with open(path, "wb") as f:
-            f.write(data)
-        return True, "%s (%d KB) -- NOTE: you cannot view images; the user can via the Inspect panel." % (
-            path, len(data) // 1024)
+        # Buffer in memory so /screenshot/latest can show it in a popup; only
+        # write to disk when Chris explicitly asked to save it.
+        _LAST_SHOT["png"] = data
+        _LAST_SHOT["ts"] += 1
+        if save:
+            os.makedirs(ACE_UI_SHOTS, exist_ok=True)
+            fname = "%s_%s.png" % (name or "ui", datetime.now().strftime("%H%M%S"))
+            path = os.path.join(ACE_UI_SHOTS, fname)
+            with open(path, "wb") as f:
+                f.write(data)
+            return True, ("%s (%d KB) -- SAVED to disk at Chris's request. Shown in a popup too. "
+                          "NOTE: you cannot view images; the user can in the screenshot popup." %
+                          (path, len(data) // 1024))
+        return True, ("Screenshot captured (%d KB) and shown to Chris in a popup -- NOT saved to disk. "
+                      "If you or Chris later want it as a file, call ui_screenshot with {\"save\": true}. "
+                      "You cannot view images; describe the screen from ui_dump labels, never the image." %
+                      (len(data) // 1024))
     except subprocess.TimeoutExpired:
         return False, "screencap timed out"
     except Exception as e:
@@ -1361,7 +1466,7 @@ TOOLS = {
     "ui_type": (tool_ui_type, ("text",)),
     "ui_key": (tool_ui_key, ("key",)),
     "ui_dump": (tool_ui_dump, ()),
-    "ui_screenshot": (tool_ui_screenshot, ("name",)),
+    "ui_screenshot": (tool_ui_screenshot, ("name", "save")),
     "restart": (tool_restart, ("what",)),
     "cdp_connect": (tool_cdp_connect, ()),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
@@ -1461,9 +1566,10 @@ TOOLS_SCHEMA = [
         "description": "Dump the on-screen UI accessibility hierarchy (all visible text, buttons, bounds). Use this to VERIFY what is actually on screen after taps/navigation. No arguments required.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "ui_screenshot",
-        "description": "Capture the screen to ui_screenshots/*.png and return the saved path. NOTE: the AI cannot view images — use ui_dump to read the screen. OPTIONAL argument: name (string used in the filename).",
+        "description": "Capture the current screen. By DEFAULT the image is NOT written to disk — it is buffered in memory and shown to Chris in a popup. Only set save=true when Chris explicitly asks to save/keep the screenshot as a file. If you later want it saved, call again with save=true. NOTE: you cannot view images — use ui_dump to read the screen. OPTIONAL arguments: name (string used in the filename when saved), save (boolean).",
         "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot, e.g. \"login\". Omit or set to null to auto-name."}},
+            "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot when save=true, e.g. \"login\". Omit or null to auto-name."},
+            "save": {"type": "boolean", "title": "save", "description": "OPTIONAL. Defaults to false. Set true ONLY when Chris asked to keep the screenshot as a file. Must be boolean true, not a string."}},
             "required": []}}},
     {"type": "function", "function": {"name": "restart",
         "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
@@ -1567,6 +1673,66 @@ def _call_tool(name, args):
     except Exception as e:
         return False, "tool error: %s" % e
 
+
+_UI_SCREEN_TOOLS = {"ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key", "ui_screenshot"}
+_BATCH_MAX = 6
+
+
+def _ui_auto_dump():
+    """Best-effort, FAST screen snapshot injected after every screen-changing
+    ui_* tool, so the model always sees the real screen text between actions.
+    Fails fast (15s per adb call) so a busy screen right after app launch never
+    stalls an agent turn for minutes."""
+    try:
+        ok, _ = _ui_adb(["shell", "uiautomator", "dump", "/sdcard/ui.xml"], timeout=15)
+        if not ok:
+            return False, "auto ui_dump: screen busy (dump timed out/failed)"
+        ok, out = _ui_adb(["shell", "cat", "/sdcard/ui.xml"], timeout=15, cap=None)
+        if not ok or "<hierarchy" not in out:
+            return False, "auto ui_dump: no hierarchy captured"
+        return True, _ui_dump_compact(out, cap=5000)
+    except Exception as e:
+        return False, "auto ui_dump error: %s" % e
+
+
+def _nav_task(user_message):
+    m = (user_message or "").lower()
+    return any(k in m for k in (
+        "screenshot", "portal", "navigate", "navigation", "open the app",
+        "go to", "show me", "show us", "take a"))
+
+
+def _nav_gate(user_message, names):
+    """If a navigation/screenshot task ended with a screenshot but the model
+    never actually navigated AND read the screen, return a corrective message
+    so the loop pushes the model to keep going instead of accepting a fake
+    FINAL. 'Navigated' means it performed an action (tap/swipe/type/key or
+    read the WebView via cdp_*); 'verified' means it READ what is on screen
+    (ui_dump or cdp_*). A single blind tap plus a screenshot is NOT enough."""
+    if not _nav_task(user_message):
+        return None
+    if "ui_screenshot" not in names:
+        return None
+    navigated = any(n in names for n in ("ui_tap", "ui_swipe", "ui_type", "ui_key")) \
+        or any(n.startswith("cdp_") for n in names)
+    verified = "ui_dump" in names or any(n.startswith("cdp_") for n in names)
+    if not (navigated and verified):
+        if not verified:
+            hint = ("you never called ui_dump to READ what is on screen (and you "
+                    "cannot see images), so you don't know what the screenshot "
+                    "shows")
+        else:
+            hint = ("you never actually navigated — no ui_tap / ui_swipe / "
+                    "ui_type / ui_key (or cdp_* for the WebView), so the screen "
+                    "was never changed")
+        return ("You took a screenshot but %s. Work step by step: ui_app_open, "
+                "then ui_dump to READ the screen, then ui_tap/ui_swipe/ui_type/"
+                "ui_key to move toward the target, ui_dump after each action to "
+                "confirm progress, and only then ui_screenshot. Once the ITS "
+                "WebView is open, verify the URL/DOM with cdp_connect + "
+                "cdp_dom_state. Do NOT emit FINAL yet." % hint)
+    return None
+
 CODE_AGENT_PROMPT = """You are ACEsi, an autonomous coding agent for the StudentSyncSA Flutter project.
 You are on Windows; the project root is C:\\Users\\chris\\StudentSyncSA and `flutter`,
 `dart`, `git` are on PATH. You plan, use tools, and VERIFY your own work — read first,
@@ -1615,7 +1781,7 @@ Tool names and args:
    ui_type {"text": "hello"}    (type into focused field)
    ui_key {"key": "back"}       (back/home/enter/tab/menu/arrows/esc/power/recents)
    ui_dump {}                   (accessibility hierarchy of what's on screen)
-   ui_screenshot {"name": "login"}  (save png; you cannot view images)
+   ui_screenshot {"name": "login", "save": true}  (captures the screen; by DEFAULT it is NOT saved to disk — it appears in a popup for Chris. Only pass save=true when Chris asked to keep it. You cannot view images)
    restart {"what": "chrome"}   (self-host: server|chrome|cdp|ollama)
    cdp_connect {}              (1st — connects to the ITS WebView / local Chrome via DevTools)
    cdp_evaluate {"expr": "document.title"}   (run JS, returns JSON value)
@@ -1637,6 +1803,31 @@ tap, swipe, type, press a key, screenshot, check the UI): use the ui_* tools
 (ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot).
 read_file is ONLY for reading source/config files on disk — never feed a UI
 instruction into read_file, and never use a user instruction as a file path.
+
+UI NAVIGATION PROTOCOL (device/app tasks) — follow EVERY step:
+  1. ui_app_open {}                   launch the app
+  2. ui_dump {}                       see what is ACTUALLY on screen now
+  3. ui_tap / ui_swipe / ui_type / ui_key   take ONE action toward the target
+  4. ui_dump {} again                 VERIFY the screen changed as expected
+  5. Repeat 3-4 until ui_dump confirms the target is visible.
+  6. ui_screenshot {"name": "...", "save": true}    ONLY AFTER ui_dump proves the target screen.
+Screenshots are NOT saved to disk by default — they are shown to Chris in a popup. Only set
+save=true when Chris explicitly asked to keep the file. In your FINAL, cite the REAL page
+titles/buttons from the last ui_dump and the actual screenshot behavior — never invent a file
+path or claim to have opened Chrome/CDP when you did not.
+Never emit FINAL merely after opening the app + taking one screenshot — that is
+NOT navigation and the user will see a screenshot of the wrong screen. In your
+FINAL, report what the LAST ui_dump showed (the visible titles/buttons), proving
+you reached the target. If a tap did not change the screen, scroll (ui_swipe) or
+try a different control; never give up after one attempt.
+
+KNOWN APP STRUCTURE (StudentSyncSA): Landing → login → the bottom navigation bar
+has tabs like Home / Universities. The ITS portal is reached via: Universities tab
+→ tap a university card (e.g. "University of Venda", ITS host univenierp01) → its
+detail screen → tap the "↗ Online Portal" button → the ITS portal opens in an
+in-app WebView. Once the WebView is open, ui_dump shows only the app chrome — read
+the portal itself with the cdp_* tools (cdp_connect, then cdp_dom_state /
+cdp_evaluate to confirm the URL/title), then ui_screenshot.
 
 CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
 allowed to announce a fix you have not actually applied. If tool outputs show
@@ -1691,6 +1882,8 @@ def _extract_calls(reply):
       {"command": <name>, "args": {json}}  (single-line JSON object)
       ```json { "name":..., "arguments":{...} } ```   (Ollama prose-style)
     Returns a list of (name, args_dict)."""
+    if not reply:
+        return []
     out = []
     # 1) fenced JSON blocks describing a tool call (qwen2.5-coder:1.5b style)
     for m in re.finditer(r'```(?:json)?\s*\n?(.*?)```', reply, re.S):
@@ -1735,6 +1928,8 @@ def _extract_calls(reply):
     return uniq
 
 def _extract_final(reply):
+    if not reply:
+        return None
     for line in reply.splitlines():
         s = line.strip()
         if s.startswith("FINAL:"):
@@ -1749,6 +1944,7 @@ def run_agent(user_message):
     messages = [{"role": "system", "content": CODE_AGENT_PROMPT},
                 {"role": "user", "content": user_message}]
     max_iters = 30
+    calls_history = []
     try:
         corrective_max = 6
         for i in range(max_iters):
@@ -1779,69 +1975,64 @@ def run_agent(user_message):
             if calls:
                 with _AGENT_LOCK:
                     _AGENT["corrective"] = 0
-                deferred = len(calls) - 1
-                calls = [calls[0]]   # one tool call per turn: fresh file state each time
-                name, args = calls[0]
-                tcid = "call_%d" % i
+                # Execute the model's emitted tool-call plan IN ORDER (capped),
+                # feeding each result back. The model emits a full sequence like
+                # ui_app_open -> ui_tap -> ui_dump -> ui_screenshot; executing it
+                # as a batch is how tool-schema agents are meant to run and stops
+                # the model from re-planning/losing its steps every turn.
+                batch = calls[:_BATCH_MAX]
                 asst = {"role": "assistant", "content": reply or ""}
-                asst["tool_calls"] = [{"id": tcid, "type": "function",
-                                       "function": {"name": name, "arguments": json.dumps(args)}}]
+                asst["tool_calls"] = [{"id": "call_%d_%d" % (i, j), "type": "function",
+                                       "function": {"name": nm, "arguments": json.dumps(a)}}
+                                      for j, (nm, a) in enumerate(batch)]
                 messages.append(asst)
                 if _AGENT.get("abort"):
                     with _AGENT_LOCK:
                         _AGENT["activity"] = "stopped by user"
                         _AGENT["last_reply"] = "Stopped by user."
                     return
-                sid = _agent_next_id()
-                if name not in TOOLS:
-                    with _AGENT_LOCK:
-                        _AGENT["steps"].append({"id": sid, "kind": "work",
-                                                "text": name, "state": "error",
-                                                "error": "unknown tool", "icon": "🔧"})
-                    made_calls += 1
-                    with _AGENT_LOCK:
-                        _AGENT["tools_used"] += 1
-                        _AGENT["last_call_sig"] = (name, json.dumps(args, sort_keys=True))
-                        _AGENT["last_call_ok"] = False
-                        _AGENT["last_error"] = "unknown tool: %s" % name
-                    messages.append({"role": "tool", "tool_call_id": tcid,
-                                     "name": name, "content": "unknown tool: %s" % name})
-                    messages.append({"role": "user", "content":
-                        "Tool '%s' is not available. Check the tool list in the system prompt and "
-                        "use one of the real tools (read_file, edit_file, run_command, git_*, "
-                        "build_apk, pub_*, flutter_test, flutter_analyze, ui_*, cdp_*, restart)." % name})
-                    if deferred > 0:
-                        messages.append({"role": "user", "content":
-                            "You emitted %d additional tool call(s) this turn. Continue with the next one." % deferred})
-                    if _AGENT.get("abort"):
+                executed_any = False
+                for j, (name, args) in enumerate(batch):
+                    tcid = "call_%d_%d" % (i, j)
+                    if name not in TOOLS:
+                        sid = _agent_next_id()
                         with _AGENT_LOCK:
-                            _AGENT["activity"] = "stopped by user"
-                            _AGENT["last_reply"] = "Stopped by user."
-                        return
-                    continue
-                icon = _tool_icon(name)
-                desc = _tool_desc(name, args)
-                sig = (name, json.dumps(args, sort_keys=True))
-                with _AGENT_LOCK:
-                    prev_sig = _AGENT.get("last_call_sig")
-                    prev_ok = _AGENT.get("last_call_ok", False)
-                if sig == prev_sig and prev_ok:
+                            _AGENT["steps"].append({"id": sid, "kind": "work",
+                                                    "text": name, "state": "error",
+                                                    "error": "unknown tool", "icon": "🔧"})
+                            _AGENT["tools_used"] += 1
+                            _AGENT["last_call_sig"] = (name, json.dumps(args, sort_keys=True))
+                            _AGENT["last_call_ok"] = False
+                            _AGENT["last_error"] = "unknown tool: %s" % name
+                        messages.append({"role": "tool", "tool_call_id": tcid,
+                                         "name": name, "content": "unknown tool: %s" % name})
+                        messages.append({"role": "user", "content":
+                            "Tool '%s' is not available. Check the tool list in the system prompt and "
+                            "use one of the real tools (read_file, edit_file, run_command, git_*, "
+                            "build_apk, pub_*, flutter_test, flutter_analyze, ui_*, cdp_*, restart)." % name})
+                        executed_any = True
+                        continue
+                    sid = _agent_next_id()
+                    icon = _tool_icon(name)
+                    desc = _tool_desc(name, args)
+                    sig = (name, json.dumps(args, sort_keys=True))
                     with _AGENT_LOCK:
-                        _AGENT["activity"] = "repeating a tool call"
-                    messages.append({"role": "user", "content":
-                        "You already called %s with identical arguments and received its result "
-                        "above. Repeating it will not help. State the NEXT distinct action "
-                        "(edit_file / run_command) instead of re-calling the same tool." % name})
-                    made_calls = -1
-                else:
+                        prev_sig = _AGENT.get("last_call_sig")
+                        prev_ok = _AGENT.get("last_call_ok", False)
+                    if sig == prev_sig and prev_ok:
+                        with _AGENT_LOCK:
+                            _AGENT["activity"] = "repeating a tool call"
+                        messages.append({"role": "user", "content":
+                            "You already called %s with identical arguments and received its result "
+                            "above. Repeating it will not help. State the NEXT distinct action "
+                            "(edit_file / run_command) instead of re-calling the same tool." % name})
+                        continue
                     with _AGENT_LOCK:
                         _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
                                                 "state": "running", "icon": icon})
-                    if name not in TOOLS:
-                        ok, result = False, "unknown tool: %s" % name
-                    else:
-                        ok, result = _call_tool(name, args)
-                    made_calls += 1
+                    ok, result = _call_tool(name, args)
+                    executed_any = True
+                    calls_history.append(name)
                     with _AGENT_LOCK:
                         _AGENT["tools_used"] += 1
                         _AGENT["last_call_sig"] = sig
@@ -1854,26 +2045,34 @@ def run_agent(user_message):
                                 s["error"] = "" if ok else result
                     messages.append({"role": "tool", "tool_call_id": tcid,
                                      "name": name, "content": str(result)})
+                    if ok and name in _UI_SCREEN_TOOLS:
+                        _dok, _dtxt = _ui_auto_dump()
+                        if _dok:
+                            messages.append({"role": "user", "content":
+                                "SCREEN STATE after your %s action (auto ui_dump):\n%s" % (name, str(_dtxt)[:2000])})
                     if not ok:
                         messages.append({"role": "user", "content":
                             "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
                             "root cause first (read the file / inspect the state), then take a "
                             "corrective action. This is self-healing: fix the actual problem."})
-                if deferred > 0:
-                    messages.append({"role": "user", "content":
-                        "You emitted %d additional tool call(s) this turn. They will be processed one "
-                        "at a time on following turns after you see each result. Continue with the next." % deferred})
                 if _AGENT.get("abort"):
                     with _AGENT_LOCK:
                         _AGENT["activity"] = "stopped by user"
                         _AGENT["last_reply"] = "Stopped by user."
                     return
-                if made_calls:
+                if executed_any:
                     continue
 
             with _AGENT_LOCK:
                 used = _AGENT["tools_used"]
             if final:
+                nav_push = _nav_gate(user_message, calls_history)
+                if nav_push and _AGENT["corrective"] < corrective_max:
+                    with _AGENT_LOCK:
+                        _AGENT["corrective"] += 1
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "user", "content": nav_push})
+                    continue
                 if used == 0 and _AGENT["corrective"] < corrective_max:
                     with _AGENT_LOCK:
                         _AGENT["corrective"] += 1
@@ -1892,6 +2091,13 @@ def run_agent(user_message):
                 messages.append({"role": "assistant", "content": reply})
                 return
             # No CALL and no FINAL — push the model toward tools.
+            nav_push = _nav_gate(user_message, calls_history) if (not calls and not final) else None
+            if nav_push and _AGENT["corrective"] < corrective_max:
+                with _AGENT_LOCK:
+                    _AGENT["corrective"] += 1
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({"role": "user", "content": nav_push})
+                continue
             if _AGENT["corrective"] < corrective_max:
                 with _AGENT_LOCK:
                     _AGENT["corrective"] += 1
@@ -1982,7 +2188,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3):
                    "max_tokens": min(max_tokens, 512), "temperature": temperature,
                    "tools": TOOLS_SCHEMA, "tool_choice": "auto"}
         r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions", json=payload,
-                         timeout=(15, 280))
+                         timeout=(15, 420))
         if r.status_code == 200:
             msg = r.json()["choices"][0]["message"]
             t = (msg.get("content") or "").strip()
@@ -2046,6 +2252,31 @@ def cdp_route_network():
 def cdp_route_status():
     return jsonify({"ok": True, "result": d.status()})
 
+@app.route('/screenshot/latest', methods=['GET'])
+def screenshot_latest():
+    """Serve the most recent in-memory screenshot (the popup image). No PNG
+    buffered -> tell the caller there is nothing to show yet."""
+    if not _LAST_SHOT["png"]:
+        return jsonify({"ok": False, "result": "no screenshot captured yet"}), 404
+    return Response(_LAST_SHOT["png"], mimetype="image/png")
+
+@app.route('/screenshot/save', methods=['POST'])
+def screenshot_save():
+    """Write the buffered screenshot to ui_screenshots/ (Chris clicked Save in
+    the popup). Returns the real on-disk path so nothing is ever fabricated."""
+    if not _LAST_SHOT["png"]:
+        return jsonify({"ok": False, "error": "no screenshot in memory"}), 404
+    os.makedirs(ACE_UI_SHOTS, exist_ok=True)
+    fname = "ui_%s.png" % datetime.now().strftime("%H%M%S")
+    path = os.path.join(ACE_UI_SHOTS, fname)
+    try:
+        with open(path, "wb") as f:
+            f.write(_LAST_SHOT["png"])
+        print("🖼️ Popup screenshot saved to disk: %s" % path)
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route('/opencode', methods=['POST'])
 def opencode():
     data = request.json or {}
@@ -2074,6 +2305,7 @@ def opencode_status():
             "tools_used": _AGENT["tools_used"],
             "corrective": _AGENT["corrective"],
             "last_error": _AGENT["last_error"],
+            "shot_ts": _LAST_SHOT["ts"],
         })
 
 @app.route('/opencode/heal', methods=['POST', 'GET'])

@@ -509,6 +509,7 @@
         <button class="run-selected" onclick="runSelected();closeDropdown();">▶ Run selected</button>
       </div>
     </div>
+    <button class="btn" id="aceInspectBtn" title="Inspect ITS WebView / local Chrome via CDP">🔍 Inspect</button>
   </div>
   <div class="toolbar-group">
     <button class="btn" onclick="runCommand('adb devices')" title="List connected devices">📱 adb</button>
@@ -1012,9 +1013,43 @@
         }
       }
       lastPollStatus = st;
+      maybeShowShotPopup(d.shot_ts);
     } catch (e) {}
   }
   setInterval(pollActivity, 1000);
+  let lastSeenShotTs = 0;
+  function maybeShowShotPopup(ts) {
+    // Show the latest in-memory screenshot once per capture: whenever the
+    // server's shot counter advances, the popup opens with the new image.
+    const n = Number(ts || 0);
+    if (n > lastSeenShotTs && document.getElementById('shotOverlay')) {
+      lastSeenShotTs = n;
+      const img = document.getElementById('shotImg');
+      if (img) img.src = '/screenshot/latest?ts=' + n;
+      document.getElementById('shotOverlay').style.display = 'flex';
+    }
+  }
+  function closeShotPopup() {
+    const ov = document.getElementById('shotOverlay');
+    if (ov) ov.style.display = 'none';
+  }
+  async function saveShotToDisk() {
+    try {
+      const r = await fetch('/screenshot/save', { method: 'POST' });
+      const d = await r.json();
+      const st = document.getElementById('shotStatus');
+      if (d.ok && d.path) {
+        if (st) st.textContent = 'Saved: ' + d.path;
+        mergeStatus({ 'Last file edited': d.path }, 'global');
+        addMessage('💾 Screenshot saved to <code>' + d.path + '</code>', 'ace');
+      } else if (st) {
+        st.textContent = 'Save failed: ' + (d.error || 'unknown');
+      }
+    } catch (e) {
+      const st = document.getElementById('shotStatus');
+      if (st) st.textContent = 'Save failed: ' + e.message;
+    }
+  }
   function hideThinking() {
     if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
     thinkingEl = null;
@@ -1425,7 +1460,7 @@
         payload.functions = (cm.functionsEnabled && Array.isArray(cm.functions)) ? cm.functions : [];
       }
       const ac2 = new AbortController();
-      const waitTimer = setTimeout(() => ac2.abort('timeout'), 150000);
+      const waitTimer = setTimeout(() => ac2.abort('timeout'), 600000);
       let res, d;
       try {
         res = await fetch('/chat', {
@@ -1455,6 +1490,7 @@
         addAceReply(d.reply);
         hideThinking();
         speakReply(d.reply.replace(/^\s*\\[(PLAN|BUILD|REPLY)\\]\s*/i, ''));
+        maybeShowShotPopup(d.shot_ts);
       }
     } catch (err) {
       hideThinking();
@@ -1930,6 +1966,25 @@
     <div class="settings-dialog-foot">
       <button onclick="closeSettings()" class="settings-cancel">Cancel</button>
       <button onclick="saveSettings()" class="settings-save">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="shotOverlay" class="settings-overlay" style="z-index:2000;">
+  <div class="settings-dialog" style="width:440px;max-width:94vw;max-height:86vh;height:auto;">
+    <div class="settings-dialog-head">
+      <div class="settings-head-left"><span style="font-size:16px;">📷</span>
+        <h2 style="margin:0;font-size:16px;font-weight:700;">Screenshot</h2></div>
+      <button onclick="closeShotPopup()" class="settings-close">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow:auto;flex:1;text-align:center;background:#000;">
+      <img id="shotImg" src="/screenshot/latest" alt="screenshot"
+           style="max-width:100%;max-height:56vh;border-radius:8px;display:inline-block;">
+    </div>
+    <div class="settings-dialog-foot" style="align-items:center;">
+      <span id="shotStatus" style="margin-right:auto;font-size:12px;color:var(--text-dim);">
+        Captured from the device.</span>
+      <button onclick="saveShotToDisk()" class="settings-cancel">💾 Save to disk</button>
     </div>
   </div>
 </div>
@@ -3428,8 +3483,6 @@
 </script>
 
 <style>
-#aceInspectBtn{position:fixed;right:14px;bottom:14px;z-index:100001;display:flex;align-items:center;gap:8px;background:#1e293b;color:#fff;border:1px solid #334159;border-radius:12px;padding:8px 12px;font-size:13px;cursor:pointer;backdrop-filter:blur(2px)}
-#aceInspectBtn:hover{background:#303950}
 #aceInspectPanel{position:fixed;right:14px;bottom:72px;z-index:100000;width:380px;max-height:60vh;background:#0f172a;color:#e2e8f0;border:1px solid #334159;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 #aceInspectPanel.expanded{max-height:70vh}
 #aceInspectHead{padding:8px 12px;cursor:pointer;font-weight:700;border-bottom:1px solid #1f2938;display:flex;justify-content:space-between;align-items:center}
@@ -3443,10 +3496,7 @@
 <script>
 (function(){
   if (document.getElementById('aceInspectPanel')) return;
-  const btn = document.createElement('button');
-  btn.id = 'aceInspectBtn'; btn.title = 'Inspect ITS WebView / local Chrome via CDP';
-  btn.innerHTML = '🔍 Inspect';
-  document.body.appendChild(btn);
+  const btn = document.getElementById('aceInspectBtn');
   const panel = document.createElement('div');
   panel.id = 'aceInspectPanel';
   panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:#f87171;color:#f87171">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
