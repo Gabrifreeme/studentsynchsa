@@ -204,5 +204,35 @@ class ToolsRegisteredTest(unittest.TestCase):
         self.assertIn("missing REQUIRED argument", out)
 
 
+class TestBudgetTest(unittest.TestCase):
+    def test_test_task_detected(self):
+        self.assertTrue(server._test_task("Run the ui_test_run harness and validate the UI"))
+        self.assertTrue(server._test_task("assert the login button is visible"))
+        self.assertFalse(server._test_task("hello there"))
+
+    def test_test_task_not_nav(self):
+        # A validation run is different from a quick screenshot request
+        self.assertFalse(server._test_task("open the app and screenshot it"))
+        self.assertTrue(server._nav_task("open the app and screenshot it"))
+
+    def test_test_budget_boost_rounds(self):
+        # A test task should get a larger max_rounds than the default 20
+        result = {}
+        import types
+
+        def fake_chat_one(*a, **k):
+            return ("FINAL: tests passed", [])
+
+        call_tool_orig = server._call_tool
+        server._chat_one = fake_chat_one
+        server._call_tool = lambda name, args: (True, "mock")
+        server._ui_auto_dump = lambda: (True, "mock")
+        msgs = [{"role": "user", "content": "run a ui test run to validate the login screen"}]
+        reply = server._chat_dispatch(msgs, max_rounds=20,
+                                      user_message="ui_test_run validate login screen")
+        server._call_tool = call_tool_orig
+        self.assertEqual(reply, "FINAL: tests passed")
+
+
 if __name__ == "__main__":
     unittest.main()

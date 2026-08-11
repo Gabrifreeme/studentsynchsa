@@ -584,7 +584,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     last_batch_sig = None
     repeat_count = 0
     dispatch_start = time.time()
-    time_budget = 300 if _nav_task(user_message) else 240
+    # Test/validation runs stack many read-only steps (ui_assert_*, ui_expect,
+    # ui_test_run) plus the navigation to reach each screen. Each step does a
+    # uiautomator dump — ~10-40s on this slow CPU — so a full test run needs a
+    # bigger budget and more rounds than a quick screenshot task.
+    if _test_task(user_message):
+        max_rounds = max(max_rounds, 40)
+        time_budget = 600
+    else:
+        time_budget = 300 if _nav_task(user_message) else 240
     try:
         for rnd in range(max_rounds):
             # Hard time budget: on these slow CPUs a stuck model otherwise burns
@@ -2371,6 +2379,17 @@ def _nav_task(user_message):
     return any(k in m for k in (
         "screenshot", "portal", "navigate", "navigation", "open the app",
         "go to", "show me", "show us", "take a"))
+
+
+def _test_task(user_message):
+    """True when the request is a UI validation/test run (assertions, ui_expect,
+    ui_test_run, 'validate', 'test the', 'check the ui', 'verify'). These need
+    more rounds/time than a quick navigation+screenshot."""
+    m = (user_message or "").lower()
+    return any(k in m for k in (
+        "ui_test_run", "test run", "run the test", "run a test", "ui test",
+        "validate", "validation", "verif", "assert", "check the ui",
+        "test the ui", "assertion", "expected", "ui_expect"))
 
 
 def _nav_gate(user_message, names):
