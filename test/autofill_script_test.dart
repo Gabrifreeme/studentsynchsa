@@ -20,6 +20,15 @@ void main() {
       expect(s, contains('(gen.gw1pkg.gw1)view'));
       expect(s, contains("method === 'POST'"));
     });
+
+    test('submitViaFetch handles redirects natively and avoids white pages', () {
+      final s = star.buildNavigationFixScript();
+      expect(s, contains("redirect: 'manual'"));
+      expect(s, contains('opaqueredirect'));
+      expect(s, contains("res.headers.get('Location')"));
+      expect(s, contains('blank POST response, navigating natively'));
+      expect(s, contains('window.__ssaRealSubmit'));
+    });
   });
 
   group('buildAutofillOnlyScript', () {

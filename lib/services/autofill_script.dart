@@ -1420,12 +1420,33 @@ var __ssaNavfix = function() {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body: body,
-        redirect: 'follow',
+        redirect: 'manual',
         credentials: 'same-origin'
       }).then(function(res) {
+        // ITS uses Post/Redirect/Get: a 3xx means "next page", which the
+        // WebView must follow NATIVELY — a fetch-followed GET of the redirect
+        // target loses the POST context and renders a blank white page.
+        if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          var loc = null;
+          try { loc = res.headers.get('Location'); } catch (e) {}
+          if (loc) {
+            console.log('[navfix] fetch POST redirect -> ' + loc);
+            window.location.assign(resolveUrl(loc));
+          } else {
+            try { realSubmit.call(f); } catch (e2) {}
+          }
+          return;
+        }
         return res.text().then(function(html) {
           console.log('[navfix] fetch POST done: HTTP ' + res.status + ' len ' + html.length);
           diag('POST back HTTP ' + res.status + ' (' + html.length + ' chars)');
+          // A blank/empty body would document.write into a white page —
+          // navigate natively so the real ITS response shows instead.
+          if (!html || html.replace(/\s+/g, '').length === 0) {
+            console.log('[navfix] blank POST response, navigating natively to ' + target);
+            window.location.assign(target);
+            return;
+          }
           document.open();
           document.write(html);
           document.close();
@@ -1437,7 +1458,7 @@ var __ssaNavfix = function() {
         });
       }).catch(function(err) {
         console.log('[navfix] fetch POST failed, falling back to native submit: ' + err);
-        try { origSubmit.call(f); } catch (e2) {}
+        try { realSubmit.call(f); } catch (e2) {}
       });
       return true;
     } catch (e) {
@@ -1451,19 +1472,23 @@ var __ssaNavfix = function() {
     fixAction(f, true);
     if (isItsPostForm(f)) {
       e.preventDefault();
-      if (!submitViaFetch(f)) { try { origSubmit.call(f); } catch (err) {} }
+      if (!submitViaFetch(f)) { try { realSubmit.call(f); } catch (err) {} }
     }
   }, true);
 
   // Direct form.submit() calls fire NO 'submit' event — patch the prototype
   // so the POST is hijacked (and the action corrected) before it goes out.
-  var origSubmit = HTMLFormElement.prototype.submit;
-  if (origSubmit && !origSubmit.__ssaPatched) {
+  // Use a window-level copy of the TRUE original so a re-run (after a
+  // document.write-rendered page) never captures the already-wrapped submit —
+  // that would recurse forever in the fetch-failure fallback.
+  var realSubmit = window.__ssaRealSubmit || HTMLFormElement.prototype.submit;
+  window.__ssaRealSubmit = realSubmit;
+  if (realSubmit && !realSubmit.__ssaPatched) {
     var submitWrapper = function() {
       var f = this;
       fixAction(f, true);
       if (isItsPostForm(f) && submitViaFetch(f)) return;
-      return origSubmit.apply(this, arguments);
+      return realSubmit.apply(this, arguments);
     };
     submitWrapper.__ssaPatched = true;
     HTMLFormElement.prototype.submit = submitWrapper;
@@ -2144,7 +2169,8 @@ String buildPostalCodePickerScript(String profileJson) {
     // Wrapper
     var w = document.createElement('div');
     w.id = 'ssa-pc-' + targetId;
-    w.style.cssText = 'position:relative;display:block;margin:8px 0;font-family:Arial,sans-serif;';
+    w.style.cssText = 'position:relative;display:block;margin:8px 0;'
+      + 'font-family:Arial,sans-serif;z-index:2147483647;';
 
     // Search input
     var input = document.createElement('input');
@@ -2155,7 +2181,23 @@ String buildPostalCodePickerScript(String profileJson) {
     input.style.cssText = 'width:100%;padding:12px 16px;font-size:16px;'
       + 'border:2px solid #7C3AED;border-radius:8px;box-sizing:border-box;'
       + 'outline:none;background:#fff;color:#0F1624;';
-    w.appendChild(input);
+
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.textContent = '✕';
+    closeBtn.title = 'Close postal picker';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:18px;'
+      + 'color:#888;cursor:pointer;padding:6px 10px;flex:0 0 auto;';
+    closeBtn.addEventListener('click', function() {
+      closeDrop();
+      input.blur();
+    });
+    row.appendChild(input);
+    row.appendChild(closeBtn);
+    w.appendChild(row);
 
     // Dropdown
     var drop = document.createElement('div');
@@ -2163,8 +2205,26 @@ String buildPostalCodePickerScript(String profileJson) {
       + 'max-height:280px;overflow-y:auto;background:#fff;'
       + 'border:2px solid #7C3AED;border-top:none;'
       + 'border-radius:0 0 8px 8px;box-shadow:0 4px 14px rgba(0,0,0,0.15);'
-      + 'z-index:9999;display:none;';
+      + 'z-index:2147483647;display:none;';
     w.appendChild(drop);
+
+    // Full-screen transparent backdrop: tapping anywhere outside the picker
+    // closes the dropdown — a reliable "exit" on touch devices.
+    var backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;'
+      + 'z-index:2147483646;display:none;background:transparent;';
+    backdrop.addEventListener('click', function() { closeDrop(); input.blur(); });
+    document.body.appendChild(backdrop);
+
+    function closeDrop() {
+      drop.style.display = 'none';
+      backdrop.style.display = 'none';
+    }
+
+    document.addEventListener('click', function(e) {
+      if (w.contains(e.target)) return;
+      closeDrop();
+    });
 
     function show(q) {
       q = (q || '').toLowerCase().trim();
@@ -2207,9 +2267,11 @@ String buildPostalCodePickerScript(String profileJson) {
         });
       }
       drop.style.display = 'block';
+      backdrop.style.display = 'block';
     }
 
     function pick(code, loc) {
+      var desc = document.getElementById(targetId + '_desc');
       input.value = code + ' — ' + loc;
       v.value = code;
       v.removeAttribute('readonly'); v.removeAttribute('disabled');
@@ -2219,10 +2281,18 @@ String buildPostalCodePickerScript(String profileJson) {
         d.removeAttribute('readonly'); d.removeAttribute('disabled');
       }
 
+      // ITS stores the LOV code in the main field and its description in the
+      // *_desc sibling; leaving *_desc empty makes ITS reject the code.
+      if (desc) {
+        desc.value = code;
+        desc.removeAttribute('readonly'); desc.removeAttribute('disabled');
+      }
+
       // ITS / APEX expects all of these events to fire validation
       ['input','change','blur','focus'].forEach(function(evt) {
         v.dispatchEvent(new Event(evt, { bubbles: true }));
         if (d) d.dispatchEvent(new Event(evt, { bubbles: true }));
+        if (desc) desc.dispatchEvent(new Event(evt, { bubbles: true }));
       });
 
       // jQuery / Select2 glue
@@ -2230,12 +2300,14 @@ String buildPostalCodePickerScript(String profileJson) {
         try {
           jQuery(v).trigger('change');
           if (d) jQuery(d).trigger('change');
+          if (desc) jQuery(desc).trigger('change');
           jQuery(v).trigger('select2:select');
           if (d) jQuery(d).trigger('select2:select');
         } catch (e) {}
       }
 
-      drop.style.display = 'none';
+      closeDrop();
+      input.blur();
       console.log('✅ Postal code selected:', code, '→', loc);
 
       // Trigger APEX event chain if available
@@ -2250,14 +2322,15 @@ String buildPostalCodePickerScript(String profileJson) {
 
     input.addEventListener('focus', function() { show(input.value); });
     input.addEventListener('input',  function() { show(input.value); });
-    input.addEventListener('blur',   function() { setTimeout(function() { drop.style.display = 'none'; }, 200); });
+    input.addEventListener('blur',   function() { setTimeout(function() { closeDrop(); }, 200); });
     input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         var first = drop.querySelector('div[style*="cursor:pointer"]');
         if (first) first.click();
       } else if (e.key === 'Escape') {
-        drop.style.display = 'none';
+        closeDrop();
+        input.blur();
       }
     });
 
