@@ -1052,9 +1052,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   }
 
   function findIdFieldIn(doc) {
-    return doc.getElementById('oapIdNumber')
+    return doc.getElementById('oapIDnumber')
       || doc.querySelector('input[name="OAPIDNUMBER"]')
-      || doc.querySelector('input[name="oapIdNumber"]')
+      || doc.querySelector('input[name="oapIDnumber"]')
       || doc.querySelector('input[id*="idNumber" i]')
       || doc.querySelector('input[name*="IDNUMBER" i]');
   }
@@ -1164,9 +1164,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     var idEl = null;
     for (var w = 0; w < wins.length; w++) {
       var doc = wins[w].document;
-      idEl = doc.getElementById('oapIdNumber')
+      idEl = doc.getElementById('oapIDnumber')
         || doc.querySelector('input[name="OAPIDNUMBER"]')
-        || doc.querySelector('input[name="oapIdNumber"]')
+        || doc.querySelector('input[name="oapIDnumber"]')
         || doc.querySelector('input[id*="id" i]');
       if (idEl) break;
     }
