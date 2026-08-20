@@ -527,6 +527,9 @@
       <button class="u-item" onclick="openTimeModal();closeUniversalMenu();">⏱️ Timers & Alarms</button>
       <button class="u-item" onclick="openSummaryModal();closeUniversalMenu();">🌅 Daily summary</button>
       <button class="u-item" onclick="openMemModal();closeUniversalMenu();">🧠 Memory</button>
+      <hr style="margin:4px 0;">
+      <button class="u-item" onclick="openSkillsModal();closeUniversalMenu();">⚡ Skills</button>
+      <button class="u-item" onclick="killCurrentProcess();closeUniversalMenu();">💀 Kill</button>
     </div>
   </div>
   <div class="header-spacer"></div>
@@ -3080,6 +3083,20 @@
     loadMemories();
   }
   function closeMemModal() { document.getElementById('memOverlay').style.display = 'none'; }
+  function openSkillsModal() {
+    const overlay = document.createElement('div');
+    overlay.id = 'skillsOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    overlay.innerHTML = '<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;"><h3 style="margin:0 0 12px;color:var(--accent);">Skills</h3><p style="color:var(--text-dim);font-size:13px;">Add skills here as you get them. This is a placeholder.</p><div id="skillsList" style="margin-top:12px;"></div><button onclick="document.getElementById(\'skillsOverlay\').remove()" style="margin-top:16px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">Close</button></div>';
+    document.body.appendChild(overlay);
+  }
+  function killCurrentProcess() {
+    if (!confirm('Kill the currently running process?')) return;
+    fetch('/opencode/stop', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => alert(d.message || 'Stopped.'))
+      .catch(err => alert('Error: ' + err));
+  }
   function loadMemories() {
     fetch('/memory/all')
       .then(r => r.json())

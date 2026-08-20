@@ -5,7 +5,6 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/university.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/its_url_fixer.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -255,59 +254,15 @@ class _UniversityCard extends StatefulWidget {
   State<_UniversityCard> createState() => _UniversityCardState();
 }
 
-class _UniversityCardState extends State<_UniversityCard>
-    with TickerProviderStateMixin {
-  late final AnimationController _pulseCtrl;
-  late final AnimationController _spinCtrl;
-  late final Animation<double> _pulse;
-  late final Animation<double> _spin;
-
+class _UniversityCardState extends State<_UniversityCard> {
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _spinCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _pulse = Tween<double>(begin: 0.6, end: 1.4).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
-    _spin = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _spinCtrl, curve: Curves.easeOutCubic),
-    );
-    _pulseCtrl.addListener(() => setState(() {}));
-    _spinCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _pulseCtrl.dispose();
-    _spinCtrl.dispose();
     super.dispose();
-  }
-
-  void _handleApplyNow(BuildContext context, University uni) async {
-    if (uni.applicationUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No online portal available'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    if (_spinCtrl.isCompleted || _spinCtrl.status == AnimationStatus.dismissed) {
-      await _spinCtrl.forward(from: 0.0);
-    }
-    if (!context.mounted) return;
-    final url = Uri.encodeComponent(ItsUrl.normalize(uni.applicationUrl));
-    final name = Uri.encodeComponent(uni.shortName);
-    context.push('/universities/${uni.id}/webview?url=$url&name=$name');
   }
 
   @override
@@ -434,88 +389,6 @@ class _UniversityCardState extends State<_UniversityCard>
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Apply [Star] Now – star pulsates, button spins & shrinks on tap
-                Opacity(
-                  opacity: 1.0 - _spin.value,
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..rotateZ(_spin.value * 4 * 6.2832),
-                    child: Transform.scale(
-                      scale: 1.0 - _spin.value,
-                      child: InkWell(
-                      onTap: () => _handleApplyNow(context, uni),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.primary.withValues(alpha: 0.2),
-                              AppColors.primary.withValues(alpha: 0.08),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'Apply',
-                              style: TextStyle(
-                                color: AppColors.primaryLight,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Transform.scale(
-                              scale: _pulse.value,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.primary
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                child: Image.asset(
-                                  'assets/images/star_avatar.png',
-                                  width: 22,
-                                  height: 22,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Now',
-                              style: TextStyle(
-                                color: AppColors.primaryLight,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

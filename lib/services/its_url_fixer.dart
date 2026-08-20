@@ -32,8 +32,12 @@ class ItsUrl {
   static bool hasProcedure(String url) => url.contains(procedureMarker);
 
   /// Expand a truncated ITS procedure name. Known truncations:
-  /// `gw1v -> gw1view`, `gw1p -> gw1proc`. Idempotent — returns [url]
-  /// unchanged when there is nothing to fix or the name is already whole.
+  /// `gw1v` -> `gw1view`, `gw1p` -> `gw1proc`.
+  /// Aggressive truncations from 64-char URL limits:
+  /// `gwa`/`gwas`/`gwav`/`gwavs` -> `gw1view`
+  /// `gw1p`/`gw1pr`/`gw1pro` -> `gw1proc`
+  /// Idempotent — returns [url] unchanged when there is nothing to fix
+  /// or the name is already whole.
   static String expandProcedure(String url) {
     final i = url.indexOf(procedureMarker);
     if (i == -1) return url;
@@ -46,7 +50,6 @@ class ItsUrl {
     if (q == -1 && sl == -1 && hash == -1) {
       cut = rest.length;
     } else {
-      // choose the smallest non-negative index among q, sl, hash
       cut = rest.length;
       if (q != -1 && q < cut) cut = q;
       if (sl != -1 && sl < cut) cut = sl;
@@ -54,14 +57,27 @@ class ItsUrl {
     }
     final proc = rest.substring(0, cut);
     final tail = rest.substring(cut);
-    switch (proc) {
-      case 'v':
-        return url.substring(0, restStart) + 'view' + tail;
-      case 'p':
-        return url.substring(0, restStart) + 'proc' + tail;
-      default:
-        return url;
+    
+    String target;
+    // Full procedure name is already correct
+    if (proc == 'view' || proc == 'proc') {
+      target = proc;
     }
+    // Truncated view variants: gw1v, gw1vi, gw1vie, gwa, gwas, gwav, gwavs, gw1v, gw1vi, gw1vie, gwa, gwas, gwav, gwavs
+    else if (proc == 'view' || proc == 'v' || proc == 'vi' || proc == 'vie' ||
+        proc == 'gwa' || proc == 'gwas' || proc == 'gwav' || proc == 'gwavs' ||
+        proc == 'gw1v' || proc == 'gw1vi' || proc == 'gw1vie' ||
+        proc == 'gwa' || proc == 'gwas' || proc == 'gwav' || proc == 'gwavs') {
+      target = 'view';
+    }
+    // Truncated proc variants: p, pr, pro, proc, gw1p, gw1pr, gw1pro
+    else if (proc == 'proc' || proc == 'p' || proc == 'pr' || proc == 'pro' ||
+        proc == 'gw1p' || proc == 'gw1pr' || proc == 'gw1pro') {
+      target = 'proc';
+    } else {
+      return url;
+    }
+    return url.substring(0, restStart) + target + tail;
   }
 
   /// Normalize a malformed ITS URL. Idempotent; returns [url] unchanged when

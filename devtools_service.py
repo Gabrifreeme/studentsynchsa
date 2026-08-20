@@ -39,7 +39,8 @@ def _device_serial():
     if s:
         return s
     try:
-        out = subprocess.run(["adb", "devices"], capture_output=True, text=True, timeout=10).stdout
+        out = subprocess.run(["adb", "devices"], capture_output=True, text=True,
+                             timeout=10, creationflags=_NO_WINDOW).stdout
         for line in out.splitlines()[1:]:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "device":
@@ -49,10 +50,14 @@ def _device_serial():
     return "A6FF6R5527000712"  # fallback to known device
 
 
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
 def _adb(*args, timeout=15):
     try:
         r = subprocess.run(["adb", "-s", _device_serial(), *args],
-                           capture_output=True, text=True, timeout=timeout)
+                           capture_output=True, text=True, timeout=timeout,
+                           creationflags=_NO_WINDOW)
         return r.stdout
     except Exception as e:
         return ""
@@ -84,9 +89,12 @@ def _discover_socket_names():
 
 
 def _adb_forward(name, port):
-    """Forward tcp:port -> local:<name>, trying plain and @ (abstract) forms."""
+    """Forward tcp:port -> local:<name>, trying plain, @ (abstract) and
+    localabstract: forms. Android WebView devtools sockets are abstract unix
+    sockets and REQUIRE the localabstract: prefix."""
     _adb("forward", "--remove", f"tcp:{port}")
-    for form in (f"local:{name}", f"local:@{name}"):
+    for form in (f"local:{name}", f"local:@{name}",
+                 f"localabstract:{name}", f"localabstract:@{name}"):
         _adb("forward", f"tcp:{port}", form)
         t = _list_targets(port)
         if t is not None:
@@ -122,7 +130,7 @@ def restart_local_chrome():
     try:
         _session = None
         r = subprocess.run("netstat -ano", shell=True, capture_output=True,
-                           text=True, timeout=30)
+                           text=True, timeout=30, creationflags=_NO_WINDOW)
         pids = set()
         for line in r.stdout.splitlines():
             if "127.0.0.1:9230" in line and "LISTENING" in line:
@@ -132,7 +140,8 @@ def restart_local_chrome():
         for p in pids:
             try:
                 subprocess.run("taskkill /F /PID %s" % p, shell=True,
-                               capture_output=True, text=True, timeout=30)
+                               capture_output=True, text=True, timeout=30,
+                               creationflags=_NO_WINDOW)
             except Exception:
                 pass
         time.sleep(1)
@@ -168,7 +177,7 @@ def _ensure_local_browser():
                           "--no-first-run", f"--user-data-dir={profile}",
                           "data:text/html,<script>console.log('ACE browser ready')</script>"],
                          stdout=logf, stderr=subprocess.STDOUT,
-                         creationflags=subprocess.DETACHED_PROCESS)
+                         creationflags=subprocess.DETACHED_PROCESS | _NO_WINDOW)
         for _ in range(8):
             time.sleep(0.5)
             try:
@@ -186,6 +195,12 @@ def _discover_target():
     ws = _env("ACE_CDP_BROWSER_WS")
     if ws:
         return {"webSocketDebugUrl": ws, "url": "", "title": "(override)"}
+    # 1a) Android app WebView is the PRIMARY target for ACEsi (the ITS OAP form
+    #      lives there). Try it FIRST so a local headless Chrome on a scanned
+    #      port can never shadow the phone's WebView.
+    tgt = _discover_device_webview()
+    if tgt:
+        return tgt
     # 1b) auto-launch a local headless Chrome (with --remote-allow-origins=*) if none
     #      is already serving on the devtools port. Skipped when the user explicitly
     #      targets a device (ACE_DEVICE_SERIAL set) so device WebViews stay inspectable.
@@ -204,7 +219,13 @@ def _discover_target():
             t = _list_targets(port)
             if t:
                 return _select_target(t)
-    # 3) Android app WebView via adb forward
+    return None
+
+
+def _discover_device_webview():
+    """Try to reach the Android app's WebView devtools socket via adb forward.
+    Returns a target dict or None. Uses the abstract-socket localabstract: form
+    which Android WebView requires."""
     pid = _app_pid()
     candidates = [f"webview_devtools_remote_{pid}", "webview_devtools_remote_0",
                   "chrome_devtools_remote"]
@@ -296,7 +317,11 @@ class CdpSession:
                 self.network_reqs[rid]["mimeType"] = params.get("response", {}).get("mimeType")
 
     def connect(self):
-        self.ws = websocket.create_connection(self.ws_url, timeout=10)
+        # suppress_origin=True: the Android WebView devtools server rejects the
+        # WebSocket handshake unless the Origin header matches its allow-list,
+        # and it has no --remote-allow-origins flag. Omitting Origin bypasses it.
+        self.ws = websocket.create_connection(self.ws_url, timeout=10,
+                                              suppress_origin=True)
         t = threading.Thread(target=self._recv_loop, daemon=True)
         t.start()
         for m in ("Runtime.enable", "Log.enable", "Network.enable", "Page.enable", "DOM.enable"):

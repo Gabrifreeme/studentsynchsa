@@ -11,7 +11,8 @@ import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/presentation/widgets/postal_code_picker.dart';
+import 'package:studentsyncsa/models/postal_code.dart';
+import 'package:studentsyncsa/widgets/postal_code_picker.dart';
 import 'package:uuid/uuid.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
@@ -2954,10 +2955,8 @@ class _ProfileOnboardingScreenState
               items: const [
                 DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
                 DropdownMenuItem(value: 'Mr', child: Text('Mr')),
+                DropdownMenuItem(value: 'Mrs', child: Text('Mrs')),
                 DropdownMenuItem(value: 'Ms', child: Text('Ms')),
-                DropdownMenuItem(value: 'Mx', child: Text('Mx')),
-                DropdownMenuItem(value: 'Dr', child: Text('Dr')),
-                DropdownMenuItem(value: 'Prof', child: Text('Prof')),
               ],
               onChanged: (v) => setState(() => _title = v ?? ''),
               validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
@@ -3074,12 +3073,17 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await PostalCodePicker.show(
-                  context,
-                  initialCode: _streetPostalCodeCtrl.text,
+                final result = await showPostalCodePicker(
+                  context: context,
+                  initial: _streetPostalCodeCtrl.text.isEmpty
+                      ? null
+                      : PostalCode(
+                          code: _streetPostalCodeCtrl.text,
+                          description: _streetPostalCodeCtrl.text,
+                        ),
                 );
                 if (result != null) {
-                  setState(() => _streetPostalCodeCtrl.text = result);
+                  setState(() => _streetPostalCodeCtrl.text = result.code);
                 }
               },
             ),
@@ -3125,13 +3129,18 @@ class _ProfileOnboardingScreenState
                 readOnly: true,
                 validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null,
                 onTap: () async {
-                  final result = await PostalCodePicker.show(
-                    context,
-                    initialCode: _postalPostalCodeCtrl.text,
-                  );
-                  if (result != null) {
-                    setState(() => _postalPostalCodeCtrl.text = result);
-                  }
+                final result = await showPostalCodePicker(
+                  context: context,
+                  initial: _postalPostalCodeCtrl.text.isEmpty
+                      ? null
+                      : PostalCode(
+                          code: _postalPostalCodeCtrl.text,
+                          description: _postalPostalCodeCtrl.text,
+                        ),
+                );
+                if (result != null) {
+                  setState(() => _postalPostalCodeCtrl.text = result.code);
+                }
                 },
               ),
             ],

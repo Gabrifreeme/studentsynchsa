@@ -23,7 +23,7 @@ class ChatDispatchTest(unittest.TestCase):
             ("Opened the app and captured ui_screenshots/navigation.png.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None, tool_choice="auto"):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):
@@ -233,7 +233,7 @@ class ChatDispatchProseCallTest(unittest.TestCase):
             ("Done, I reached the portal.", []),
         ]
 
-        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None):
+        def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None, tool_choice="auto"):
             return self.script.pop(0)
 
         def fake_call_tool(name, args):

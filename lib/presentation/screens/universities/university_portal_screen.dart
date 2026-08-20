@@ -78,9 +78,13 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
       final androidController =
           _controller.platform as AndroidWebViewController;
       androidController.setTextZoom(150);
-      // Keep popups (target=_blank) inside this webview so every navigation
-      // funnels through onNavigationRequest where ITS URLs get normalized.
-      androidController.setSupportMultipleWindows(false);
+      // NOTE: webview_flutter 4.13+ hardcodes `setSupportMultipleWindows(true)`
+      // internally on AndroidWebViewController and no longer exposes a Dart
+      // toggle for it (the old `setSupportMultipleWindows(false)` call no longer
+      // compiles). Keeping target=_blank popups in-window and routing every
+      // navigation through ITS-URL normalization is handled by
+      // `onNavigationRequest` below + the injected navigation-fix script
+      // (`buildNavigationFixScript`), so this toggle is not required.
     }
 
     _controller

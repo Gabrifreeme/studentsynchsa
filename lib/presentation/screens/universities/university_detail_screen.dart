@@ -8,7 +8,6 @@ import 'package:studentsyncsa/core/utils/pdf_download.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart';
-import 'package:studentsyncsa/presentation/screens/universities/application_form_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/pdf_generator.dart';
 import 'package:studentsyncsa/services/its_url_fixer.dart';
@@ -231,40 +230,21 @@ class UniversityDetailScreen extends ConsumerWidget {
 
                 const SizedBox(height: 24),
 
-                // ✨ Apply (in-app form)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ApplicationFormScreen(university: uni),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('✨ Apply'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
                     if (uni.applicationUrl.isNotEmpty)
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: FilledButton.icon(
                           onPressed: () {
                             final url = Uri.encodeComponent(ItsUrl.normalize(uni.applicationUrl));
                             final name = Uri.encodeComponent(uni.shortName);
                             context.push('/universities/${uni.id}/webview?url=$url&name=$name');
                           },
                           icon: const Icon(Icons.open_in_new, size: 18),
-                          label: const Text('↗ Online Portal'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          label: const Text('Online Portal'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: AppColors.primary,
                           ),
                         ),
                       ),
@@ -272,12 +252,13 @@ class UniversityDetailScreen extends ConsumerWidget {
                       const SizedBox(width: 8),
                     if (uni.website.isNotEmpty)
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: FilledButton.icon(
                           onPressed: () => _launchUrl(uni.website),
                           icon: const Icon(Icons.language, size: 18),
                           label: const Text('Website'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: AppColors.primary,
                           ),
                         ),
                       ),
@@ -461,14 +442,6 @@ class UniversityDetailScreen extends ConsumerWidget {
     }
     return profile != null;
   }
-
-  void _openPortalInChrome(String url) async {
-    final uri = Uri.parse(ItsUrl.normalize(url));
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
-  }
-
 
 }
 

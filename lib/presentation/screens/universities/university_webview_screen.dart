@@ -93,20 +93,17 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             var url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
 
-            // Normalize any malformed ITS URL before it reaches the portal:
-            //  - truncated procedure name: gen.gw1pkg.gw1v -> gen.gw1pkg.gw1view
-            //    (the truncated GET target 404s if it flows through)
-            //  - host typo: unlven -> univen, univenerp01 -> univenierp01
-            //  - plain http -> https
-            // The gw1proc/gw1p POST path is handled by the JS fetch hijack in
-            // buildNavigationFixScript — do NOT GET-reload it (that drops the
-            // POST body and the portal 404s). Just let it flow and surface the
-            // truncated form for diagnosis.
             if (ItsUrl.isItsHost(url)) {
               final fixed = ItsUrl.normalize(url);
               final isPostHandler =
                   url.contains('gw1proc') || url.contains('gen.gw1pkg.gw1p');
-              if (fixed != url && !isPostHandler) {
+              // Also catch aggressive truncation (gwa, gwas, gwav, etc.)
+              final isTruncated =
+                  url.contains('gen.gw1pkg.gw') &&
+                  !url.contains('gw1view') &&
+                  !url.contains('gw1proc') &&
+                  !url.contains('gw1startup');
+              if ((fixed != url || isTruncated) && !isPostHandler) {
                 debugPrint('🔧 Expanding ITS URL: $url -> $fixed');
                 _reportTruncatedUrl('EXPANDED $fixed');
                 _controller.loadRequest(Uri.parse(fixed));
@@ -123,6 +120,26 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
           onPageStarted: (url) {
             _currentUrl = url;
             setState(() => _loading = true);
+            // Last-line Dart-side guard: if a GET navigation starts with a
+            // truncated ITS procedure name (gw1v/gw1p/gwa/gwas/etc.), immediately
+            // load the expanded URL instead of letting the 404 commit.
+            if (ItsUrl.isItsHost(url) &&
+                url.contains('gen.gw1pkg.gw') &&
+                !url.contains('gw1proc') &&
+                !url.contains('gw1view') &&
+                !url.contains('gw1startup')) {
+              final fixed = ItsUrl.normalize(url);
+              if (fixed != url) {
+                debugPrint('🔧 onPageStarted guard: $url -> $fixed');
+                _controller.loadRequest(Uri.parse(fixed));
+                return;
+              }
+            }
+            // Inject the navigation fix script EARLY — before the portal's own
+            // JS runs. This intercepts truncated gw1v/gw1p URLs at the form
+            // submission layer so they never reach the server as 404s.
+            _controller.runJavaScript(star.buildNavigationFixScript())
+                .catchError((e) => debugPrint('❌ Early navfix error: $e'));
           },
           onPageFinished: (url) async {
             _currentUrl = url;
@@ -670,7 +687,14 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
   /// reload of the corrected URL was issued.
   bool _recoverTruncatedPage(String url) {
     if (!ItsUrl.isItsHost(url)) return false;
-    if (!url.contains('gen.gw1pkg.gw1v') || url.contains('gw1view')) return false;
+    // Detect aggressive truncation: gw1v, gwa, gwas, gwav, gwavs, etc.
+    // The marker 'gen.gw1pkg.gw1' gets partially eaten by 64-char limit.
+    final hasMarker = url.contains('gen.gw1pkg.gw');
+    final isTruncated = url.contains('gen.gw1pkg.gw') &&
+        !url.contains('gw1view') &&
+        !url.contains('gw1proc') &&
+        !url.contains('gw1startup');
+    if (!hasMarker || !isTruncated) return false;
     final fixed = ItsUrl.normalize(url);
     if (fixed == url) return false;
     final now = DateTime.now();

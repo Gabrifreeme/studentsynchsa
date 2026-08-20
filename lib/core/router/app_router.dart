@@ -12,6 +12,7 @@ import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.da
 import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
 import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.dart';
 import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
+import 'package:studentsyncsa/presentation/screens/share_video_screen.dart';
 import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
@@ -161,11 +162,18 @@ final appRouter = GoRouter(
         ),
       ],
     ),
-    GoRoute(
-      path: '/aps-calculator',
-      name: 'aps-calculator',
-      builder: (context, state) => const ApsCalculatorScreen(),
-    ),
+     GoRoute(
+       path: '/share/v/:videoId',
+       name: 'share-video',
+       builder: (context, state) => ShareVideoScreen(
+         videoId: state.pathParameters['videoId']!,
+       ),
+     ),
+     GoRoute(
+       path: '/aps-calculator',
+       name: 'aps-calculator',
+       builder: (context, state) => const ApsCalculatorScreen(),
+     ),
     GoRoute(
       path: '/ai-recommendations',
       name: 'ai-recommendations',

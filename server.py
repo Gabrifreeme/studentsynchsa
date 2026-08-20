@@ -87,8 +87,30 @@ init_db()
 
 OCR_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ocr.ps1')
 
+# This server runs DETACHED (no console window) under the ace_host watchdog.
+# Any child subprocess that doesn't get CREATE_NO_WINDOW spawns a NEW visible
+# console — a black window that flashes and vanishes, seen every time ACEsi
+# loads a page that runs /devices or /agents. All subprocess calls go through
+# these helpers so children never pop a window.
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def _run(*args, **kw):
+    kw.setdefault("creationflags", _NO_WINDOW)
+    return subprocess.run(*args, **kw)
+
+
+def _popen(*args, **kw):
+    kw.setdefault("creationflags", _NO_WINDOW)
+    return subprocess.Popen(*args, **kw)
+
+
+def _check_output(*args, **kw):
+    kw.setdefault("creationflags", _NO_WINDOW)
+    return subprocess.check_output(*args, **kw)
+
 def ocr_image(img_path):
-    result = subprocess.run(
+    result = _run(
         ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', OCR_SCRIPT, '-ImagePath', img_path],
         capture_output=True, timeout=120
     )
@@ -456,7 +478,7 @@ def _chat_providers():
     ]
 
 def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
-              tools_schema=None):
+              tools_schema=None, tool_choice="auto"):
     if not api_key:
         return None
     headers = {"Content-Type": "application/json"}
@@ -467,7 +489,7 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     if tools_schema is None:
         tools_schema = TOOLS_SCHEMA
     body = {"model": model, "messages": msgs, "temperature": 0.4,
-            "max_tokens": 500, "tools": tools_schema, "tool_choice": "auto"}
+            "max_tokens": 500, "tools": tools_schema, "tool_choice": tool_choice}
     try:
         r = requests.post(f"{endpoint}/chat/completions",
             headers=headers,
@@ -571,7 +593,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     /opencode/status) renders progress inline, exactly like run_agent does."""
     # --- Domain separation (checked BEFORE marking the agent running): keep UI /
     # code / network work in distinct contexts so ACEsi stops mixing them. One
-    # concrete domain wins; more than one is ambiguous -> ASK FOR CLARIFICATION. ---
+    # concrete domain wins; more than one is ambiguous -> ASK FOR CLARIFICATION.
+    # (If the user directly NAMES a tool, it only short-circuits the choice when
+    # the request is otherwise single-domain; a genuinely mixed ask still asks.) ---
     domains = _classify_message(user_message)
     concrete = domains - {"general"}
     if len(concrete) >= 2:
@@ -584,9 +608,20 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                                     "\"curl https://univenierp01.univen.ac.za\", or "
                                     "\"read lib/screens/...\".")
         return _AGENT["last_reply"]
-    active_domain = next(iter(concrete)) if concrete else "general"
+    explicit_dom = _explicit_tool_domain(user_message)
+    active_domain = explicit_dom or (next(iter(concrete)) if concrete else "general")
+    # Belt-and-suspenders: any navigation/portal/screenshot request that isn't an
+    # explicit code/net ask is device work. If the classifier left it 'general',
+    # the schema would strip ALL ui_* tools and the nav corrective below would
+    # demand tool calls the model cannot emit — the exact stall we saw ("You are
+    # on the ITS portal" -> monologue, no tools, dead after 3 rounds).
+    if active_domain == "general" and _nav_task(user_message):
+        active_domain = "ui"
     allowed_names = _domain_tool_names(active_domain)
+    # Ollama uses the COMPACT schema (prompt-size critical on this CPU); cloud
+    # providers get the FULL schema restricted to the active domain only.
     ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
+    full_domain_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names)
 
     with _AGENT_LOCK:
         _AGENT["running"] = True
@@ -595,6 +630,16 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
         _AGENT["steps"] = []
         _AGENT["tools_used"] = 0
         _AGENT["last_error"] = ""
+    # Deterministic step-list executor: if the user wrote an explicit numbered
+    # UI script (1. ui_app_open X 2. ui_dump 3. tap "Y"...), execute it directly
+    # with the real tools — no model needed. qwen2.5:3b stalls on these even
+    # when tool_choice is forced, so we bypass it entirely for step lists.
+    script_reply = _execute_ui_script(user_message)
+    if script_reply:
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "done"
+            _AGENT["last_reply"] = script_reply
+        return script_reply
     active = None
     names = []
     last_text = None
@@ -602,7 +647,38 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
     dead_rounds = 0
     last_batch_sig = None
     repeat_count = 0
+    # Explicit "ui_app_open <App>" (or "open the app") instructions are honored
+    # SERVER-SIDE before the model loop. qwen2.5:3b often skips ui_app_open and
+    # ui_dumps the home screen instead, wasting the whole run. If the user asked
+    # for the app, open it now and feed the resulting screen state back so the
+    # model's first ui_dump reads the real app screen.
+    opened_app = False
+    if _ui_task(user_message) and not _ui_situational_ask(user_message) and (
+            re.search(r'\bui_app_open\b', user_message, re.IGNORECASE)):
+        try:
+            _aok, _atxt = _call_tool("ui_app_open", {})
+            if _aok:
+                opened_app = True
+                names.append("ui_app_open")
+                _AGENT["tools_used"] += 1
+                print("🚀 /chat auto-opened app (user asked for it)")
+                _dok, _dtxt = _ui_auto_dump()
+                if _dok:
+                    last_screen = _dtxt
+                    seen_screen_hint = ("APP LAUNCHED. Here is what is now on screen:\n%s%s"
+                                        % (str(_dtxt)[:2000], _cert_warning_directive(_dtxt)))
+                else:
+                    seen_screen_hint = "APP LAUNCHED."
+                llm_messages = [{"role": "user", "content": seen_screen_hint}] + llm_messages
+        except Exception as e:
+            print("⚠️ /chat auto ui_app_open failed: %s" % e)
+    # Tracks whether the model has read the screen (ui_dump or an auto-dump fed
+    # back after a screen tool) since the last screen change. Reset by
+    # ui_app_open (which changes the app) so the model must re-read before
+    # tapping on a screen it has never seen.
+    seen_screen = bool(opened_app)
     dispatch_start = time.time()
+    last_had_tools = False
     # Test/validation runs stack many read-only steps (ui_assert_*, ui_expect,
     # ui_test_run) plus the navigation to reach each screen. Each step does a
     # uiautomator dump — ~10-40s on this slow CPU — so a full test run needs a
@@ -629,9 +705,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                 return "Stopped by user."
             if active is None:
                 got = None
+                tc = "required" if (_ui_task(user_message) and (not names or not last_had_tools)) else "auto"
                 for p in _chat_providers():
                     got = _chat_one(p[0], p[1], p[2], p[3], llm_messages,
-                                    tools_schema=ollama_domain_schema)
+                                     tools_schema=full_domain_schema, tool_choice=tc)
                     if got is not None:
                         active = p
                         break
@@ -639,7 +716,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                     for model in OPENROUTER_FALLBACKS:
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                         OPENROUTER_API_KEY, model, llm_messages,
-                                        tools_schema=ollama_domain_schema)
+                                        tools_schema=full_domain_schema, tool_choice=tc)
                         if got is not None:
                             active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                       OPENROUTER_API_KEY, model)
@@ -662,7 +739,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                     got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
                                     OLLAMA_CHAT_MODEL, _ollama_local_messages(llm_messages),
                                     timeout=(15, 180),
-                                    tools_schema=ollama_domain_schema)
+                                    tools_schema=ollama_domain_schema, tool_choice=tc)
                     # Apply the same compact schema/messages to FOLLOW-UP rounds
                     # (active[3]==OLLAMA_CHAT_MODEL identifies the local model).
                     if got is not None:
@@ -671,13 +748,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                 if got is None:
                     break
             else:
+                tc = "required" if (_ui_task(user_message) and (not names or not last_had_tools)) else "auto"
                 if len(active) > 4 and active[4] == "compact":
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     _ollama_local_messages(llm_messages), timeout=(15, 180),
-                                    tools_schema=ollama_domain_schema)
+                                    tools_schema=ollama_domain_schema, tool_choice=tc)
                 else:
                     got = _chat_one(active[0], active[1], active[2], active[3],
-                                    llm_messages, tools_schema=ollama_domain_schema)
+                                    llm_messages, tools_schema=ollama_domain_schema,
+                                    tool_choice=tc)
                 if got is None:
                     active = None
                     continue
@@ -692,27 +771,44 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
             if not tcs:
                 tcs = _extract_calls(text)
             if not tcs:
+                last_had_tools = False
                 nav_push = _nav_gate(user_message, names)
                 if nav_push:
                     llm_messages.append({"role": "user", "content": nav_push})
                     active = None
                     dead_rounds += 1
-                    if dead_rounds >= 3:
+                    if dead_rounds >= 4:
                         with _AGENT_LOCK:
                             _AGENT["activity"] = "stopped (no tool calls)"
                         break
                     continue
-                if _nav_task(user_message) and not names:
-                    llm_messages.append({"role": "user", "content":
-                        "You only described a plan but did NOT call any tool. This task "
-                        "requires real actions on the device. Emit a structured tool "
-                        "call NOW, e.g. ui_app_open {}, then ui_dump {} to read the "
-                        "screen, then ui_tap/ui_swipe/ui_type to navigate toward the "
-                        "target, and ui_screenshot only after ui_dump confirms it. "
-                        "Never just narrate the plan."})
+                if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
+                    # Pick the RIGHT first tool: a screen-read ask ("You are on
+                    # the ITS portal", "what does the screen show") means the app
+                    # is ALREADY open — the model must ui_dump, not re-launch.
+                    if _ui_situational_ask(user_message):
+                        first = ("ui_dump {} to READ the screen and report what is on "
+                                 "it right now")
+                    else:
+                        first = ("ui_app_open {} if the app is not running, then "
+                                 "ui_dump {} to READ the screen")
+                    if not names:
+                        msg = ("You only described a plan but did NOT call any tool. This task "
+                               "requires real actions on the device. Emit a structured tool "
+                               "call NOW, e.g. %s, then ui_tap/ui_swipe/ui_type to navigate "
+                               "toward the target, and ui_screenshot only after ui_dump "
+                               "confirms it. Never just narrate the plan." % first)
+                    else:
+                        msg = ("You stopped narrating without calling a tool, but the task is "
+                               "NOT finished — you have already performed: %s. Continue the "
+                               "task step by step: read the screen with ui_dump, then "
+                               "ui_tap/ui_swipe/ui_type toward the target, ui_dump after "
+                               "each action, and only report done when the target screen is "
+                               "confirmed. Emit a tool call NOW, do not narrate." % ", ".join(names))
+                    llm_messages.append({"role": "user", "content": msg})
                     active = None
                     dead_rounds += 1
-                    if dead_rounds >= 3:
+                    if dead_rounds >= 4:
                         with _AGENT_LOCK:
                             _AGENT["activity"] = "stopped (no tool calls)"
                         break
@@ -732,10 +828,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                         except Exception:
                             pass
                     with _AGENT_LOCK:
-                        _AGENT["last_reply"] = text or ""
-                    return text
+                        _AGENT["last_reply"] = _terse_reply(text or "")
+                    return _terse_reply(text or "")
                 break
             dead_rounds = 0
+            last_had_tools = True
             batch = tcs[:_BATCH_MAX]
             tids = [{"id": "chat_t%d_%d" % (rnd, j), "type": "function",
                      "function": {"name": nm, "arguments": json.dumps(a)}}
@@ -764,7 +861,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                 with _AGENT_LOCK:
                     _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
                                             "state": "running", "icon": icon})
-                ok, result = _call_tool(name, args)
+                # HARD GUARD: block ui_tap/ui_swipe unless the model has read
+                # the screen (ui_dump in this batch, or a successful ui_dump /
+                # auto-dump in a previous round) since the last screen change —
+                # forces the model to read before tapping, not tap blind.
+                if name in ("ui_tap", "ui_swipe") and not seen_screen:
+                    result = ("BLOCKED: You must run ui_dump in the same round "
+                              "before ui_tap/ui_swipe. Run ui_dump first to read "
+                              "the screen, then decide your tap coordinates from "
+                              "the screen state.")
+                    ok = False
+                else:
+                    ok, result = _call_tool(name, args)
+                if ok and name == "ui_dump":
+                    # An explicit ui_dump's result is fed straight back to the
+                    # model, so it now has real screen state to tap from.
+                    seen_screen = True
                 names.append(name)
                 tcid = "chat_t%d_%d" % (rnd, j)
                 print(f"🔧 /chat executed {name} ok={ok}")
@@ -780,18 +892,40 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message=""):
                                      "name": name, "content": str(result)[:1200]})
                 if ok and name in _UI_SCREEN_TOOLS:
                     _dok, _dtxt = _ui_auto_dump()
+                    seen_screen = _dok
                     if _dok:
                         last_screen = str(_dtxt)[:1500]
                         llm_messages.append({"role": "user", "content":
                             "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
                                 name, last_screen, _cert_warning_directive(_dtxt))})
                         llm_messages.extend(_auto_bypass_cert_warning(_dtxt))
+                        # Force the model to READ the screen state before its next
+                        # move — without this directive the 3B model ignores the
+                        # dumped screen and keeps guessing coordinates.
+                        if name in ("ui_tap", "ui_swipe", "ui_type", "ui_key"):
+                            llm_messages.append({"role": "user", "content":
+                                "STOP. Read the SCREEN STATE above carefully. "
+                                "Based on what you see, decide your NEXT action. "
+                                "Do NOT guess coordinates — use the text/bounds "
+                                "from the screen state above."})
     finally:
         with _AGENT_LOCK:
             _AGENT["running"] = False
             _AGENT["activity"] = "done"
     # Rounds exhausted (or all providers returned None). If we actually did real
     # work, report it honestly instead of the misleading "no models available".
+    if not names and _ui_task(user_message) and not (last_text and "FINAL" in last_text.upper()):
+        # The model stalled without a single tool call (narrated a plan). For a
+        # screen-read/nav ask, fall back to an automatic ui_dump so Chris still
+        # gets REAL on-device state instead of the monologue.
+        try:
+            _dok, _dtxt = _call_tool("ui_dump", {})
+            if _dok:
+                names.append("ui_dump")
+                last_screen = str(_dtxt)[:1500]
+                print("📱 /chat auto-dumped screen after nav-task stall (0 tool calls)")
+        except Exception:
+            pass
     if names:
         wants_shot = bool(re.search(r'\b(screenshot|show me|show what|snapshot|capture)\b',
                                     user_message, re.IGNORECASE))
@@ -1012,6 +1146,10 @@ def chat():
             "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
             "page content from the last ui_dump and what you actually did — never invent a screenshot "
             "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
+            "STYLE: never narrate your reasoning in prose — no 'I will', no 'The dump shows', no "
+            "commentary between actions. Output ONLY the tool call, then when the task is done give a "
+            "SHORT, plain report (a few lines, like a text message): what you did and the key on-screen "
+            "values. Do not lecture or recap the whole process.\n"
             "HTTPS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT / "
             "HSTS warning for the ITS portal, type thisisunsafe (ui_type {\"text\": \"thisisunsafe\"}) "
             "to bypass it and continue — the expired certificate is expected and safe. If ACEsi's "
@@ -1061,7 +1199,7 @@ def run_command():
     command = (request.json or {}).get('command', '')
     try:
         if "scrcpy" in command.lower():
-            subprocess.Popen('start cmd /k "scrcpy"', shell=True)
+            _popen('start cmd /k "scrcpy"', shell=True)
             return jsonify({'output': '✅ Scrcpy launched'})
         # `flutter run` / `dart run` are long-lived, attached dev sessions that
         # never exit on their own. subprocess.run would block this request
@@ -1072,13 +1210,13 @@ def run_command():
                 return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
             log_path = f'run_{uuid.uuid4().hex}.log'
             log = open(log_path, 'w', encoding='utf-8')
-            proc = subprocess.Popen(command, shell=True, stdout=log,
+            proc = _popen(command, shell=True, stdout=log,
                                     stderr=subprocess.STDOUT)
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
                 f'on the device. Logs: {log_path}')})
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result = _run(command, shell=True, capture_output=True, text=True)
         output = result.stdout if result.stdout else result.stderr
         return jsonify({'output': output})
     except Exception as e:
@@ -1087,7 +1225,7 @@ def run_command():
 def _android_device_id():
     """First connected Android serial in 'device' state, or None."""
     try:
-        out = subprocess.check_output(['adb', 'devices'], stderr=subprocess.STDOUT,
+        out = _check_output(['adb', 'devices'], stderr=subprocess.STDOUT,
                                       text=True, timeout=15)
         for line in out.splitlines():
             parts = line.split()
@@ -1313,7 +1451,19 @@ def tool_run_command(command, timeout=120):
     if _DESTRUCTIVE.search(command):
         return False, "blocked (safety): %s" % command
     try:
-        r = subprocess.run(command, shell=True, capture_output=True, text=True,
+        # `flutter run` / `dart run` are long-lived dev sessions — stream to a
+        # log file and return immediately instead of blocking forever.
+        if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+            command = _resolve_run_device(command)
+            if command is None:
+                return False, 'flutter run needs a connected Android device (none found or locked/offline).'
+            log_path = os.path.join(PROJECT_ROOT, 'run_%s.log' % uuid.uuid4().hex[:8])
+            log = open(log_path, 'w', encoding='utf-8')
+            proc = _popen(command, shell=True, stdout=log,
+                                    stderr=subprocess.STDOUT, cwd=PROJECT_ROOT)
+            return True, ('%s started (pid %d). Watch: Get-Content %s -Wait. '
+                          'Logs: %s') % (command, proc.pid, log_path, log_path)
+        r = _run(command, shell=True, capture_output=True, text=True,
                            timeout=timeout, cwd=PROJECT_ROOT, env=os.environ.copy())
         out = (r.stdout or '') + (r.stderr or '')
         out = out.strip()
@@ -1331,7 +1481,7 @@ def tool_run_command(command, timeout=120):
 
 def _run_shell(cmd, timeout=300, cwd=None):
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        r = _run(cmd, shell=True, capture_output=True, text=True,
                            timeout=timeout, cwd=cwd or PROJECT_ROOT,
                            env=os.environ.copy())
         out = ((r.stdout or '') + (r.stderr or '')).strip()
@@ -1348,7 +1498,7 @@ def _run_args(args, timeout=300):
     # Windows-safe: list2cmdline does proper quoting, shell=True resolves .bat
     cmdline = subprocess.list2cmdline(args)
     try:
-        r = subprocess.run(cmdline, shell=True, capture_output=True, text=True,
+        r = _run(cmdline, shell=True, capture_output=True, text=True,
                            timeout=timeout, cwd=PROJECT_ROOT,
                            env=os.environ.copy())
         out = ((r.stdout or '') + (r.stderr or '')).strip()
@@ -1476,7 +1626,7 @@ _UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
 def _ui_adb(args, timeout=120, cap=3000):
     cmd = subprocess.list2cmdline(["adb"] + args)
     try:
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+        proc = _popen(cmd, shell=True, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, env=os.environ.copy())
         try:
             r_out, r_err = proc.communicate(timeout=timeout)
@@ -1489,7 +1639,7 @@ def _ui_adb(args, timeout=120, cap=3000):
             # orphaned adb.exe would otherwise hold the device and stall every
             # later adb call in the run.
             try:
-                subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                _run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                                capture_output=True, timeout=10)
             except Exception:
                 pass
@@ -1507,8 +1657,37 @@ def tool_ui_device():
 
 
 def tool_ui_app_open():
-    return _ui_adb(["shell", "monkey", "-p", ACE_PACKAGE,
-                    "-c", "android.intent.category.LAUNCHER", "1"])
+    # Force the app to the foreground. `monkey -p ... 1` only launches the
+    # launcher activity; if the app is already running it may stay behind a
+    # fullscreen app (e.g. the Honor search screen) and every later tap fails.
+    # `am start` with FLAG_ACTIVITY_NEW_TASK|CLEAR_TOP brings the existing task
+    # forward, then we verify the resumed activity is ours and retry once.
+    launch = ["shell", "am", "start",
+              "-n", "%s/.MainActivity" % ACE_PACKAGE,
+              "-a", "android.intent.action.MAIN",
+              "-c", "android.intent.category.LAUNCHER"]
+    ok, out = _ui_adb(launch, timeout=60)
+    if not ok:
+        return ok, out
+    for attempt in (1, 2):
+        # Parse locally: dumpsys output is large and the ResumedActivity lines
+        # sit near the TOP, so cap must keep them (full output ~40KB).
+        fg = _ui_adb(["shell", "dumpsys", "activity", "activities"],
+                     timeout=60, cap=120000)
+        if not fg[0]:
+            continue
+        lines = [l for l in fg[1].splitlines()
+                 if "topResumedActivity" in l or "ResumedActivity:" in l]
+        if lines and ACE_PACKAGE in lines[-1]:
+            return True, "foreground: %s" % lines[-1].strip()
+        if attempt == 1:
+            # Second launch pass: NEW_TASK|CLEAR_TOP more aggressively resumes
+            # the running task instead of just scheduling a new activity.
+            _ui_adb(["shell", "am", "start", "--activity-brought-to-front",
+                     "-n", "%s/.MainActivity" % ACE_PACKAGE], timeout=60)
+            _ui_adb(["shell", "input", "keyevent", "3"], timeout=60)  # home
+            ok, out = _ui_adb(launch, timeout=60)
+    return True, "launched %s (foreground unverified)" % ACE_PACKAGE
 
 
 def tool_ui_tap(x, y):
@@ -1592,7 +1771,7 @@ def tool_ui_dump():
 
 def tool_ui_screenshot(name=None, save=False):
     try:
-        r = subprocess.run(
+        r = _run(
             subprocess.list2cmdline(["adb", "exec-out", "screencap", "-p"]),
             shell=True, capture_output=True, timeout=60, env=os.environ.copy())
         data = r.stdout if isinstance(r.stdout, bytes) else r.stdout.encode()
@@ -1902,7 +2081,7 @@ def _watchdog_alive():
         if not os.path.exists(ACE_HOST_PID):
             return False
         pid = int(open(ACE_HOST_PID).read().strip())
-        r = subprocess.run("tasklist /FI \"PID eq %d\"" % pid, shell=True,
+        r = _run("tasklist /FI \"PID eq %d\"" % pid, shell=True,
                            capture_output=True, text=True, timeout=30)
         return str(pid) in r.stdout
     except Exception:
@@ -1934,8 +2113,8 @@ def tool_restart(what="cdp"):
             return True, "ollama is already running (%d models)" % len(rr.json().get("models", []))
         except Exception:
             try:
-                subprocess.Popen(["ollama", "serve"],
-                                 creationflags=subprocess.DETACHED_PROCESS,
+                _popen(["ollama", "serve"],
+                                 creationflags=subprocess.DETACHED_PROCESS | _NO_WINDOW,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True, "ollama was down — started `ollama serve` detached. Wait ~5s then retry."
             except Exception as e:
@@ -2299,13 +2478,27 @@ OLLAMA_TOOLS_SCHEMA = [
 ]
 
 OLLAMA_SYS_PROMPT = (
-    "You are ACEsi driving an Android device. ACT, don't ask. For navigation: "
-    "ui_app_open, ui_dump to read the screen, ui_tap/ui_swipe/ui_type/ui_key to "
-    "move toward the target, ui_dump to verify each step, and ui_screenshot only "
-    "after a ui_dump confirms the target screen is visible. To type a URL press "
-    "enter after with ui_key enter. If ui_dump shows Chrome's 'Your connection "
-    "is not private' or HSTS/ERR_CERT warning, type 'thisisunsafe' and continue. "
-    "In your final reply, cite real text from the last ui_dump. Be brief.\n"
+    "You are ACEsi driving an Android device. ACT, don't ask.\n"
+    "NEVER reply with just a narrated plan — every turn must contain at least "
+    "one real tool call (ui_dump / ui_tap / ui_swipe / ui_type / ui_key / "
+    "ui_app_open / ui_screenshot) unless the screen is confirmed done.\n"
+    "NAVIGATION RULE — you MUST follow this for every UI interaction:\n"
+    "1. ui_app_open (once)\n"
+    "2. ui_dump — read the screen, identify what you see\n"
+    "3. Decide your next tap/swipe based on what ui_dump showed you\n"
+    "4. ui_tap or ui_swipe\n"
+    "5. ui_dump — verify the tap worked, see the new screen\n"
+    "6. Repeat from step 3\n"
+    "If Chris says you are on a screen (e.g. 'You are on the ITS portal'), the "
+    "app is already open: start with ui_dump to read it.\n"
+    "NEVER guess coordinates. NEVER tap without reading the screen first.\n"
+    "After every ui_tap or ui_swipe, you MUST run ui_dump before your next move.\n"
+    "STYLE: never narrate your reasoning in prose. Between tool calls output "
+    "ONLY the next tool call — no 'I will', no 'The dump shows', no summaries, "
+    "no commentary. All thinking is silent. When the screen is confirmed done, "
+    "finish with a SHORT final report: state plainly what you did and read the "
+    "key labels/values from the last ui_dump in a compact list. Keep it to 3-5 "
+    "lines max. No paragraphs of reasoning in the final either.\n"
 )
 
 def _tool_icon(name):
@@ -2403,6 +2596,22 @@ _TOOL_DOMAINS = {
 }
 
 
+def _explicit_tool_domain(user_message):
+    """If the user directly names a tool (e.g. 'use the curl tool', 'run ui_tap',
+    'call ui_assert_text'), return that tool's domain (net/ui/code) so the
+    dispatch loop skips the ambiguity gate and runs THAT tool directly. This is
+    the 'ignore the menu — this is a direct instruction' case."""
+    m = (user_message or "").lower()
+    best = None
+    for name, dom in _TOOL_DOMAINS.items():
+        if name in m:
+            # Prefer a concrete work domain (ui/net/code) over 'ctrl'.
+            if dom != "ctrl":
+                return dom
+            best = best or dom
+    return best
+
+
 def _classify_message(user_message):
     """Decide which tool domain(s) a user message is asking about, so we can
     (a) surface the right context to the model and (b) refuse tools from a
@@ -2420,6 +2629,7 @@ def _classify_message(user_message):
     net_strong = ("curl" in m and (has_url or "url" in m or "reachab" in m
                                      or "status code" in m or "port " in m or "443" in m)) or \
                  bool(_reach_re.search(m)) or \
+                 (has_url and bool(re.search(r'\b(up|down)\b', m))) or \
                  any(k in m for k in ("reachab", "is up", "is down", "status code",
                      "no ports", "no web service", "up?", "down?", "port ", "443", "8080", "dns"))
     # Real on-device UI ACTION intent only (NOT incidental host mentions like
@@ -2432,12 +2642,71 @@ def _classify_message(user_message):
         "emulator", "open the app", "go to", "navigate", "navigation",
         "tap ", "swipe ", "cdp_", "webview", "show me", "take a", "screenshot")) \
         or _test_task(m)
+    # Situational/ambient UI asks that don't name a tool but DO place the
+    # assistant on the device screen: "You are on the ITS portal", "what does
+    # the screen show", "what do you see", "read the screen". Without these, the
+    # classifier returns 'general' and the whole ui_* toolset vanishes from the
+    # schema — the 3B model then narrates a plan it cannot execute.
+    ui_situational = any(k in m for k in (
+        "you are on", "you're on", "we are on", "on the portal",
+        "on the its portal", "what does the screen show", "what do you see",
+        "read the screen", "look at the screen", "on the screen",
+        "see the screen", "the screen shows", "show the screen",
+        "what is on the screen", "what's on the screen", "screen state"))
+    # Strong code-edit signal: a filename with a code extension (e.g.
+    # "university_webview_screen.dart") should be treated as pure code work,
+    # even if the filename happens to contain a UI word like 'webview'.
+    # This prevents the domain gate from firing a clarification menu when the
+    # user asks ACEsi to edit/replace a specific code file.
+    _code_exts = ('.dart', '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css',
+                  '.json', '.yaml', '.yml', '.md', '.sh', '.bat', '.rs', '.go',
+                  '.java', '.kt', '.swift', '.c', '.cpp', '.h', '.hpp')
+    # Word-boundary anchored so ".c" in "example.com" is NOT a code file, but
+    # "file.c" / "main.dart" / "index.html" are.
+    _code_ext_re = r'\.(?:' + '|'.join(re.escape(ext[1:]) for ext in _code_exts) + r')\b'
+    code_strong = any(k in m for k in (
+        "edit ", "replace ", "write file", "open file", "read file",
+        "edit_file", "write_file", "read_file")) or \
+        bool(re.search(_code_ext_re, m)) or \
+        bool(re.search(r'\b(?:lib|src|test|assets)/[\w/]+\.\w+', m))
     domains = set()
     # A strong net request with no device ACTION is purely network work, even if
     # the URL hostname contains UI-ish words (e.g. ...univenierp...portal/...).
     if net_strong and not ui_action:
         return {"net"}
-    if ui_action or any(k in m for k in ("emulator", "cdp_", "webview")):
+    # A strong code-edit signal (filename with code extension, explicit edit
+    # commands) overrides false-positive UI matches from incidental keywords
+    # in filenames (e.g. "webview" in "university_webview_screen.dart").
+    if code_strong:
+        return {"code"}
+    # Situational UI ("You are on the ITS portal", "what does the screen show")
+    # with NO URL/curl and NO net probe is pure on-device work — the assistant
+    # must read the screen and report. Return {"ui"} directly so the ui_* tools
+    # stay in the schema (otherwise the 3B model narrates an unexecutable plan).
+    _has_url_or_curl = ("http" in m) or ("curl" in m) or ("//" in m)
+    if ui_situational and not net_strong and not _has_url_or_curl:
+        return {"ui"}
+    # Network probe intent (status-check patterns like "check if...up",
+    # "is the portal reachable") should override false-positive UI matches
+    # from navigation words ("navigate", "open the app") — but ONLY when the
+    # message also mentions a URL, hostname, or explicit network term. Bare
+    # "check if" about app behavior (e.g. "open the app, navigate to ITS,
+    # check if the 404 is gone") is a UI verification task, not a curl.
+    _status_re = re.compile(
+        r'(check\s+(?:if|whether)\s+(?:the\s+)?(?:url|host|server|site|portal|domain)\b|'
+        r'is\s+(?:it|the\s+(?:url|host|server|site|portal|domain))\s+(?:up|down|reachable|'
+        r'working|live|online|accessible)|reachab|status\s+(?:of|code))')
+    _has_net_term = any(k in m for k in (
+        "url", "host", "server", "site", "domain", "curl", "http",
+        "https", "port", "dns", "endpoint", "reachable", "response"))
+    if net_strong and ui_action and _status_re.search(m) and _has_net_term:
+        return {"net"}
+    # A strong on-device action ("open the app", "navigate to", "go to") with
+    # NO explicit URL or curl is purely a UI task — "portal" in the message is
+    # just the name of a page the user wants navigated TO, not a network probe.
+    if ui_action and not _has_url_or_curl:
+        return {"ui"}
+    if ui_action or ui_situational or any(k in m for k in ("emulator", "cdp_", "webview")):
         domains.add("ui")
     if net_strong or ("curl" in m) or any(k in m for k in (
             "url", "domain", "offline", "reachab", "is up", "is down",
@@ -2576,6 +2845,63 @@ def _nav_task(user_message):
         "go to", "show me", "show us", "take a"))
 
 
+def _ui_situational_ask(user_message):
+    """True when the request is a screen-read/situational ask: the app is
+    presumed already open and the model just needs to ui_dump + report (e.g.
+    'You are on the ITS portal', 'what does the screen show'). For these, the
+    right first tool is ui_dump, not ui_app_open."""
+    m = (user_message or "").lower()
+    return any(k in m for k in (
+        "you are on", "you're on", "we are on", "on the portal",
+        "on the its portal", "what does the screen show", "what do you see",
+        "read the screen", "look at the screen", "on the screen",
+        "see the screen", "the screen shows", "show the screen",
+        "what is on the screen", "what's on the screen", "screen state"))
+
+
+def _looks_like_plan_narration(text):
+    """True when the model's text is planning prose ("we need to...", "I'll
+    tap...") rather than a completed answer. Used to separate a genuine
+    text-only final reply from a stall where the model narrates instead of
+    calling tools."""
+    if not text:
+        return False
+    t = text.lower()
+    markers = ("we need to", "we should", "i need to", "i'm going to", "i am going to",
+               "i will", "i'll", "then tap", "then call", "then run", "next,", "next step",
+               "first i", "let me", "now we", "we have to", "the plan", "then we",
+               "i would", "let's", "lets ")
+    return any(m in t for m in markers)
+
+def _ui_task(user_message):
+    """Broad detector for ANY on-device UI work request: explicit ui_* tool
+    names, navigation/screen keywords, or references to on-screen elements to
+    tap ('tap My Profile', 'tap the Lets get Started button'). This is what the
+    stall-guard uses so a prose-only reply is NEVER accepted as final for a task
+    the user expects real device actions on. Distinct from _nav_task (narrower
+    keyword list used for time-budget sizing)."""
+    m = (user_message or "").lower()
+    if _nav_task(m) or _ui_situational_ask(m) or _test_task(m):
+        return True
+    if any(k in m for k in (
+            "ui_app_open", "ui_dump", "ui_tap", "ui_swipe", "ui_type",
+            "ui_key", "ui_screenshot", "ui_device", "ui_assert", "ui_expect",
+            "ui_test_run", "ui_fill", "fill the", "fill in", "fill up",
+            "fill the form", "fill the fields", "fill by himself",
+            "cdp_", "webview", "emulator",
+            "tap it", "tap on", "tap the", "tap ", "click on", "click the",
+            "press the", "tab on it", "in the dump")):
+        return True
+    # Element reference + action in the SAME message = a real tap target
+    # ("search for My Profile and tap it", "find the Lets get Started button").
+    if any(k in m for k in ("profile", "button")) and \
+       any(k in m for k in ("tap", "click", "press", "find", "search",
+                            "open", "go to", "navigate", "get started",
+                            "let's get started", "lets get started")):
+        return True
+    return False
+
+
 def _test_task(user_message):
     """True when the request is a UI validation/test run (assertions, ui_expect,
     ui_test_run, 'validate', 'test the', 'check the ui', 'verify'). These need
@@ -2628,6 +2954,13 @@ Per turn, emit lines using exactly one of these tags:
   THOUGHT: <1-2 sentence reasoning>
   CALL: <tool_name> <json-arg-object>     (you may emit several CALL lines per turn)
   FINAL: <your answer to Chris>          (ends the turn)
+
+STYLE — CRITICAL: THOUGHT must be at most ONE short sentence. Never narrate
+what a tool returned, never recap the whole plan in prose, never explain your
+reasoning out loud. Between CALL lines output ONLY the CALL lines — no extra
+commentary. When you finish, the FINAL is a short, plain report (3-5 lines max)
+like a text message: what you did and the key result. No paragraphs, no
+"First I ... then I ..." recaps.
 
 A tool call may also be written as a single-line JSON object on its own line,
 either form is accepted:
@@ -2826,15 +3159,1294 @@ def _extract_final(reply):
             return s[len("FINAL:"):].strip()
     return None
 
+def _terse_reply(text, max_len=500):
+    """Condense a long prose narration into a short, plain recap. qwen2.5 on
+    this box tends to narrate its whole reasoning chain instead of giving a
+    short answer; we keep a compact final statement and drop the paragraph
+    prose so Chris gets a text-message-style reply."""
+    if not text:
+        return text
+    t = text.strip()
+    for line in t.splitlines():
+        s = line.strip()
+        if s.startswith("FINAL:"):
+            return s[len("FINAL:"):].strip()[:max_len]
+    if len(t) <= max_len:
+        return t
+    # No FINAL: drop THOUGHT/CALL scaffolding, keep only the last sentence.
+    t = re.sub(r'\b(THOUGHT|CALL|OBSERVATION):?\s*', '', t)
+    t = re.sub(r'\{[^}]*\}', '', t)
+    t = re.sub(r'\s+', ' ', t).strip(' .')
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', t) if s.strip()]
+    if not sentences:
+        return "Done."
+    last = sentences[-1]
+    if len(last) < 30 and len(sentences) > 1:
+        last = (sentences[-2] + " " + last).strip()
+    if len(last) <= max_len:
+        return last
+    return last[:max_len].rstrip() + "…"
+
+# Shortcut phrases that map to the saved ITS application-form task. Chris reruns
+# the Univen ITS application flow repeatedly (hunting the 404 error), so a short
+# phrase should replay the full saved step list instead of the weak model trying
+# to reconstruct it from context each time.
+_ITS_TASK_KEY = "ui_task.its_application"
+_ITS_SHORTCUT_RE = re.compile(
+    r'\b(?:do|run|start|restart|open|again|re[- ]?run|repeat)\s+(?:the\s+)?'
+    r'(?:its|venda|univen)\s+(?:application|portal|form|app)\b'
+    r'|\b(?:again|re[- ]?run|repeat|restart)\b.*\b(?:its|venda|univen|application)\b',
+    re.IGNORECASE)
+# The actual "rerun the saved task" phrase inside a longer instruction list,
+# e.g. "do the ITS application again but this time ...". Its match span is
+# replaced by the saved task text so trailing new steps still parse.
+_ITS_RERUN_RE = re.compile(
+    r'\b(?:do\s+)?(?:the\s+)?(?:its|venda|univen)\s+(?:application|portal|form|app)'
+    r'\s+again\b', re.IGNORECASE)
+
+
+def _resolve_ui_task(user_message):
+    """If the message reruns the saved ITS task, splice the saved step list into
+    the message so the deterministic parser executes the full flow. Handles both
+    a bare shortcut ("do the ITS application again") and a longer instruction
+    list that starts by rerunning the saved task then adds new steps ("do the
+    ITS application again but this time ... after Next ..."). Returns the spliced
+    text or None."""
+    if not user_message:
+        return None
+    saved = get_memories().get(_ITS_TASK_KEY)
+    if not saved or not saved.get("value"):
+        return None
+    task_text = saved["value"]
+    m = _ITS_RERUN_RE.search(user_message)
+    if not m:
+        # A bare shortcut without the word "again" (e.g. "run the ITS app") is
+        # only honored for genuinely short messages.
+        if len(user_message.strip()) > 220:
+            return None
+        # A "fill the form myself / by himself" request must NOT be hijacked by the
+        # saved navigation task — it should parse into a ui_fill instead.
+        if not _ITS_SHORTCUT_RE.search(user_message):
+            return None
+        if re.search(r'\bfill', user_message, re.IGNORECASE) and \
+           re.search(r'\b(by\s+himself|by\s+herself|my\s+profile|use\s+my\s+profile|using\s+my\s+profile|fields?\s+by\s+himself|by\s+itself)\b',
+                    user_message, re.IGNORECASE):
+            return None
+        if any(k in user_message.lower() for k in ("how", "what", "why", "?")):
+            return None
+        return task_text
+    # Longer message: replace just the rerun phrase with the saved task, keeping
+    # the trailing instructions ("but this time ... after Next ...").
+    before = user_message[:m.start()].rstrip()
+    after = user_message[m.end():].strip()
+    head = task_text
+    if before:
+        head = before + "\n" + task_text
+    if after and after.lower() not in ("again", "."):
+        head = head + "\n" + after
+    return head
+
+
+def _ui_script_steps(user_message):
+    """Parse a user's explicit numbered UI step list into ordered actions.
+
+    The user (Chris) writes deterministic step lists like:
+      1. ui_app_open StudentSyncSA
+      2. ui_dump
+      3. Search for "My Profile" in the dump. tap it! then ui_dump.
+      4. find "Lets get Started" button. tap it. ui_dump. read the fields.
+    qwen2.5:3b is too weak to follow these even when forced, so we parse them
+    ourselves and execute each step deterministically with the real tools.
+
+    Handles prose too: "swipe left", "scroll down", "look for Online Portal
+    tab and tap it", "search for Universities tab on it", dropdown selections
+    ("On both fields select No!").
+
+    Returns a list of
+      ("ui_app_open"|"ui_dump"|"ui_swipe"|"ui_tap"|"ui_screenshot"|"ui_select"|"read", detail)
+    or None if the message is not a step list."""
+    if not user_message or not _ui_task(user_message):
+        return None
+    # Parenthetical asides ("(will be the first on on top)") are dropped so they
+    # never pollute unquoted target labels. Relative order is preserved.
+    text = re.sub(r'\([^)]*\)', ' ', user_message)
+    steps = []
+    last_targets = []
+    last_fields = []
+    tokens = []
+    for m in re.finditer(r'\bui_app_open\b(?:\s+([A-Za-z0-9._]+))?', text):
+        tokens.append((m.start(), "open", m.group(1) or "StudentSyncSA"))
+    for m in re.finditer(r'\bui_dump\b', text):
+        tokens.append((m.start(), "dump", ""))
+    for m in re.finditer(r'\bui_screenshot\b', text):
+        tokens.append((m.start(), "screenshot", ""))
+    # "fill in the ITS form / fill the fields by himself" -> ACEsi fills every
+    # field on the current ITS page from the device profile. Recognised when
+    # "fill" appears with a form/fields/page noun and an autonomous intent
+    # ("by himself / my profile / using my profile").
+    if 'ui_fill' not in [s[0] for s in steps]:
+        fpos = text.lower().find('fill')
+        if fpos >= 0 and re.search(r'\b(?:fields?|form|page\b)', text, re.IGNORECASE) and \
+           re.search(r'\b(by\s+himself|by\s+herself|by\s+itself|using\s+my\s+profile|my\s+profile|by\s+itself)\b',
+                     text, re.IGNORECASE):
+            tokens.append((fpos, "fill", ""))
+    # Explicit swipes: "swipe left", "swipe right", "swipe up/down"
+    for m in re.finditer(r'\bswipe\s+(left|right|up|down)\b', text, re.IGNORECASE):
+        tokens.append((m.start(), "swipe", m.group(1).lower()))
+    # Scrolls: "scroll down/up/to the bottom" → screen moves (finger opposite).
+    for m in re.finditer(r'\bscroll\s+(?:down|up|to\s+the\s+bottom)\b',
+                         text, re.IGNORECASE):
+        low = m.group(0).lower()
+        tokens.append((m.start(), "scroll",
+                       "down" if ("down" in low or "bottom" in low) else "up"))
+    # Quoted tap targets, both verb-prefixed ("search for "X"", 'find "X"',
+    # "look for "X"", 'tap the "X"', 'tap on "X"', 'tap "X"') and bare quotes
+    # ("...field "Do you already have a student number" and " Returning to
+    # complete an Application""). A target is a navigation tap when a
+    # tab/button/icon/tile word follows the closing quote; otherwise it is a
+    # plain label (dropdown field, checkbox, option) so "both fields select No"
+    # can resolve to the right two fields.
+    def _is_nav_target(end):
+        return bool(re.search(r'\b(?:tab|button|icon|tile|star)\b',
+                              text[end:end + 12], re.IGNORECASE))
+    # "find the line 'X'" / "find the "Y"" / "look for the line 'Z'" = verify a
+    # dialog/text line is present (ui_dump), NOT a tap target.
+    for m in re.finditer(r'\b(?:find|look\s+for|search\s+for)\s+(?:the\s+)?'
+                         r'(?:line\s+|page\s+|text\s+|option\s+)?'
+                         r'["\']\s*([^"\']{2,60}?)\s*["\']', text, re.IGNORECASE):
+        tokens.append((m.start(), "dump", ""))
+    # "the star top right" / "star icon" -> tap the star (dialog opener).
+    for m in re.finditer(
+            r'\b(?:the\s+)?(?:star|asterisk)\b(?:[^,;.\n]{0,25})', text, re.IGNORECASE):
+        label = re.sub(r'\s+', ' ', m.group(0)).strip()
+        tokens.append((m.start(), "target", ("star", True)))
+    for m in re.finditer(r'(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+)?'
+                         r'(?:on\s+|the\s+)?|click\s+(?:on\s+)?)'
+                         r'\s*["\']\s*([^"\']{2,60}?)\s*["\']', text, re.IGNORECASE):
+        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        tokens.append((m.start(), "target", (label, _is_nav_target(m.end()))))
+    # Bare quoted labels (no verb prefix), e.g. dropdown field names. Skip
+    # quotes already consumed by "find the line 'X'" / "find the "Y"" (a
+    # verify-dump, not a tap).
+    for m in re.finditer(r'["\']\s*([^"\']{2,60}?)\s*["\']', text):
+        before = text[max(0, m.start() - 40):m.start()].lower()
+        if re.search(r'\b(?:find|look\s+for|search\s+for)\s+the\s+'
+                     r'(?:line\s+|page\s+|text\s+|option\s+)?$', before):
+            continue
+        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        tokens.append((m.start(), "target", (label, _is_nav_target(m.end()))))
+    # Unquoted tap targets: "search for Universities tab on it",
+    # "look for Online Portal tab", "find the Lets get Started button".
+    for m in re.finditer(
+            r'(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+|on\s+|the\s+)?|'
+            r'click\s+(?:on\s+)?)\s*([A-Za-z][A-Za-z0-9\'&., -]{2,50}?)\s+'
+            r'(?:tab|button|icon|tile)\b', text, re.IGNORECASE):
+        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        # "click on the Yes button" -> label "Yes", not "the Yes".
+        label = re.sub(r'^(?:the|a|an)\s+', '', label)
+        tokens.append((m.start(), "target", (label, True)))
+    # Dropdown selections: "On both fields select No!", "select No",
+    # "select Yes on both fields", "On both fields select No! The third one will
+    # automatically select a No."  (the third one needs no explicit step)
+    for m in re.finditer(r'\bselect\s+(No|Yes)\b', text, re.IGNORECASE):
+        option = m.group(1).capitalize()
+        tokens.append((m.start(), "select", option))
+    # standalone "tap it" / "click it" / "tap on it" / "tap that"
+    for m in re.finditer(r'\b(?:tap|click|tab)\s+(?:on\s+)?(it|that|this)\b',
+                         text, re.IGNORECASE):
+        tokens.append((m.start(), "tap_last", ""))
+    tokens.sort(key=lambda t: t[0])
+    for pos, kind, detail in tokens:
+        if kind == "open":
+            if not any(s[0] == "ui_app_open" for s in steps):
+                steps.append(("ui_app_open", detail))
+        elif kind == "dump":
+            steps.append(("ui_dump", ""))
+        elif kind == "screenshot":
+            steps.append(("ui_screenshot", ""))
+        elif kind == "fill":
+            if not any(s[0] == "ui_fill" for s in steps):
+                steps.append(("ui_fill", ""))
+        elif kind == "swipe":
+            steps.append(("ui_swipe", detail))
+        elif kind == "scroll":
+            steps.append(("ui_scroll", detail))
+        elif kind == "target":
+            label, is_nav = detail
+            last_targets.append(label)
+            if not is_nav:
+                last_fields.append(label)
+            if not any(s == ("ui_tap", label) for s in steps):
+                steps.append(("ui_tap", label))
+        elif kind == "select":
+            # "select No/Yes" refers to the most recent non-navigation field
+            # target(s); when the message says "both fields", select on the last
+            # two field targets.
+            both = bool(re.search(r'\bboth\s+fields?\b', text, re.IGNORECASE))
+            fields = last_fields[-2:] if both else last_fields[-1:]
+            for f in fields:
+                # Convert the field's plain ui_tap into a ui_select(field, option)
+                # (tap field → dump → tap option). If it was already selected,
+                # don't duplicate.
+                replaced = False
+                for i, s in enumerate(steps):
+                    if s == ("ui_tap", f):
+                        steps[i] = ("ui_select", (f, detail))
+                        replaced = True
+                        break
+                if not replaced and not any(
+                        s[0] == "ui_select" and s[1][0] == f for s in steps):
+                    steps.append(("ui_select", (f, detail)))
+        elif kind == "tap_last":
+            if last_targets:
+                tgt = last_targets[-1]
+                already = any(s == ("ui_tap", tgt) for s in steps) or any(
+                    s[0] == "ui_select" and s[1][0] == tgt for s in steps)
+                if not already:
+                    steps.append(("ui_tap", tgt))
+    if not steps:
+        return None
+    return steps
+
+
+def _dump_tap_point(screen, target):
+    """Find the tap coordinates for a target label in a ui_dump compact string.
+    Returns (x, y) or None. Handles Flutter's two-line rows where the label is on
+    its own line and the clickable row's tap coords are on the NEXT line
+    ("My Profile" / "View and edit your profile @ tap(540,1330)"). Also matches
+    punctuation-insensitively so "Let's" matches "Lets".
+
+    Prefers an EXACT label match over a substring match so a short option like
+    "No" hits the "No" row and not "No NBT". Returns (x, y, matched_text) so the
+    caller knows whether the match was exact."""
+    target = re.sub(r'[^A-Za-z0-9 ]', '', target).strip().lower()
+    if not target:
+        return None
+
+    def _coords(lines, i):
+        # Scan up to 6 lines ahead for a line holding tap coords. Card lists put
+        # the label on one line and the clickable's coords several lines below
+        # ("University of Pretoria" ... "NBT Required @ tap(540,1216)").
+        for j in range(i, min(i + 6, len(lines))):
+            m = re.search(r'tap\((\d+),(\d+)\)', lines[j])
+            if m:
+                return int(m.group(1)), int(m.group(2))
+        return None
+
+    lines = screen.splitlines()
+    exact_hit = None
+    sub_hit = None
+    for i, line in enumerate(lines):
+        # "label @ tap(x,y) [CLICKABLE]": the label is everything before " @ "
+        # (split BEFORE normalizing, since normalization strips the "@").
+        raw_label = line.split(' @ ')[0].strip()
+        norm = re.sub(r'[^A-Za-z0-9 ]', '', line).lower()
+        label = re.sub(r'[^A-Za-z0-9 ]', '', raw_label).strip().lower()
+        if not label or "labeled nodes" in label:
+            continue
+        if label == target:
+            c = _coords(lines, i)
+            if c:
+                return c[0], c[1], True
+            exact_hit = i
+        elif target in norm and sub_hit is None:
+            c = _coords(lines, i)
+            if c:
+                sub_hit = (c[0], c[1])
+    # Prefer an exact match; the coords may be on a line without an " @ " (a
+    # two-line row where the second line holds the tap). Fall back to substring.
+    if exact_hit is not None:
+        c = _coords(lines, exact_hit)
+        if c:
+            return c[0], c[1], True
+    if sub_hit:
+        return sub_hit[0], sub_hit[1], False
+    return None
+
+
+def _scroll_search(screen, target, direction="down", max_scrolls=8):
+    """Scroll the screen until a target appears, returning (screen, (x, y)) or
+    (screen, None). Direction is the SCREEN direction ("down" scrolls content
+    down, finger moves up). Used when a tap target is not yet on screen."""
+    for _ in range(max_scrolls):
+        if direction == "down":
+            x1, y1, x2, y2 = 540, 2100, 540, 300
+        else:
+            x1, y1, x2, y2 = 540, 300, 540, 2100
+        ok, out = _call_tool("ui_swipe",
+                             {"x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                              "duration": 250})
+        _ok, _d = _ui_auto_dump()
+        if _ok:
+            screen = _d
+        pt = _dump_tap_point(screen, target)
+        if pt:
+            return screen, (pt[0], pt[1])
+    return screen, None
+
+
+# ── WebView (CDP) helpers ────────────────────────────────────────────────
+# The ITS portal is a WebView. `adb uiautomator dump` is blind to WebView HTML,
+# so ACEsi's swipes scroll the page but the form fields never appear in the
+# dump. These helpers drive the page's DOM directly via Chrome DevTools
+# Protocol (devtools_service.py), which connects to the app's WebView through
+# an adb forward to its webview_devtools_remote_<pid> socket.
+
+_ITS_GROUP_JS = r'''(function(){
+  var out = [];
+  var ctrls = document.querySelectorAll('select, input[type=checkbox], input[type=radio], input[type=text], input[type=password], input[type=button], input[type=submit], button, textarea, a');
+  for (var i=0;i<ctrls.length;i++){
+    var el = ctrls[i];
+    if (el.type === 'hidden') continue;
+    if (el.tagName === 'A' && !(el.getAttribute('href') || '').trim()) continue;
+    var anc = el, grp = '';
+    while (anc){
+      var id = anc.id || '';
+      if (id.indexOf('Grp') !== -1 || anc.tagName === 'FORM'){
+        grp = (anc.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 300);
+        break;
+      }
+      anc = anc.parentElement;
+    }
+    var opts = [];
+    if (el.tagName === 'SELECT'){
+      for (var j=0;j<el.options.length;j++){ opts.push(el.options[j].text); }
+    }
+    var txt = '';
+    if (el.tagName === 'INPUT'){ txt = el.value || ''; }
+    else { txt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120); }
+    out.push({tag: el.tagName, name: el.name, id: el.id || '', type: el.type || '',
+              grp: grp, opts: opts, checked: el.checked === true, txt: txt});
+  }
+  return JSON.stringify(out);
+})()'''
+
+
+_WEBVIEW_PROBE_CACHE = {"ts": 0.0, "val": None}
+
+
+def _webview_controls():
+    """Return the ITS WebView's form controls (name, group label, options) or
+    None if no WebView is reachable. Each item: {tag, name, type, grp, opts,
+    checked}. Cached for a short window so repeated probes (one per executor
+    step) can't stall on the slow fallback (headless-Chrome launch + port
+    scan) when the WebView socket momentarily disappears."""
+    now = time.time()
+    if now - _WEBVIEW_PROBE_CACHE["ts"] < 3.0:
+        return _WEBVIEW_PROBE_CACHE["val"]
+    try:
+        ok, _m = d.connect_cmd()
+        if not ok:
+            _WEBVIEW_PROBE_CACHE["ts"] = now
+            _WEBVIEW_PROBE_CACHE["val"] = None
+            return None
+        ok, out = d.evaluate_js(_ITS_GROUP_JS)
+        if not ok:
+            _WEBVIEW_PROBE_CACHE["ts"] = now
+            _WEBVIEW_PROBE_CACHE["val"] = None
+            return None
+        # evaluate_js returns a JSON-encoded string value.
+        try:
+            val = json.loads(json.loads(out))
+        except Exception:
+            try:
+                val = json.loads(out)
+            except Exception:
+                val = None
+        _WEBVIEW_PROBE_CACHE["ts"] = now
+        _WEBVIEW_PROBE_CACHE["val"] = val
+        return val
+    except Exception:
+        _WEBVIEW_PROBE_CACHE["ts"] = now
+        _WEBVIEW_PROBE_CACHE["val"] = None
+        return None
+
+
+def _norm_label(s):
+    return re.sub(r'[^A-Za-z0-9 ]', ' ', (s or '').lower()).strip()
+
+
+def _webview_find(controls, label):
+    """Match a human label ("Do you already have a student number", "I accept",
+    "Next") against a control's group text OR its own button/link text.
+    Returns the control or None. Exact match first, then substring, then fuzzy
+    word-overlap."""
+    target = _norm_label(label)
+    if not target:
+        return None
+    exact = None
+    sub = None
+    fuzzy_best = None
+    fuzzy_score = 0
+    for c in controls:
+        # The control's own name/id are the strongest signal for programmatic
+        # fills ("oapCitzCode", "custom-citz-code"); a human label matters for
+        # buttons/links and for selects/inputs reached through their label.
+        name = _norm_label(c.get('name'))
+        cid = _norm_label(c.get('id'))
+        if name and (name == target or (target in name and sub is None)):
+            if name == target:
+                exact = c
+                break
+            if sub is None:
+                sub = c
+            continue
+        if cid and (cid == target or (target in cid and sub is None)):
+            if cid == target:
+                exact = c
+                break
+            if sub is None:
+                sub = c
+            continue
+        # The button's own text (value/textContent) is the strongest signal
+        # for buttons/links; the group label matters for selects/inputs.
+        own = _norm_label(c.get('txt'))
+        g = _norm_label(c.get('grp'))
+        if own and (own == target or (target in own and sub is None)):
+            if own == target:
+                exact = c
+                break
+            if sub is None:
+                sub = c
+            continue
+        if not g:
+            continue
+        if g == target:
+            exact = c
+            break
+        if target in g and sub is None:
+            sub = c
+        tw = set(target.split())
+        gw = set(g.split())
+        if tw:
+            score = len(tw & gw) / float(len(tw))
+            # Form controls (select/input/button) outrank links (<a>) on ties:
+            # an <a>'s group text is surrounding content, not its own label.
+            def _rank(ctrl):
+                return 0 if ctrl.get('tag') in ('SELECT', 'INPUT', 'BUTTON') else 1
+            if score >= 0.6 and (
+                score > fuzzy_score or
+                (score == fuzzy_score and (not fuzzy_best or _rank(c) < _rank(fuzzy_best)))
+            ):
+                fuzzy_score = score
+                fuzzy_best = c
+    return exact or sub or fuzzy_best
+
+
+def _webview_select(field, option):
+    """Set a WebView <select> to the option whose text contains `option`
+    (case-insensitive), then dispatch change. Returns (ok, message)."""
+    controls = _webview_controls()
+    if not controls:
+        return False, "no WebView reachable (cdp connect failed)"
+    c = _webview_find(controls, field)
+    if not c or c.get('tag') != 'SELECT':
+        return False, "WebView field %r not found" % field
+    name = c['name']
+    # Some injected selects (custom citizenship code, "heard about us") carry
+    # no name attribute — fall back to their id.
+    sel = 'select[name="%s"]' % name if name else 'select[id="%s"]' % c['id']
+    opt = option.lower()
+    expr = r'''(function(){
+      var sel = document.querySelector(%r);
+      if (!sel) return 'NO_SELECT';
+      var target = %r;
+      // 1) exact option-text match (avoids "ENGLISH" matching "AFRIKAANS/ENGLISH").
+      for (var i=0;i<sel.options.length;i++){
+        if (sel.options[i].text.toLowerCase().trim() === target){
+          sel.selectedIndex = i; sel.value = sel.options[i].value;
+          sel.dispatchEvent(new Event('change', {bubbles:true}));
+          sel.dispatchEvent(new Event('blur', {bubbles:true}));
+          return 'exact:'+sel.options[i].text;
+        }
+      }
+      // 2) exact option-value match (short codes like Y/N/F/M/1/4/D).
+      for (var i=0;i<sel.options.length;i++){
+        if ((sel.options[i].value||'').toLowerCase() === target){
+          sel.selectedIndex = i; sel.value = sel.options[i].value;
+          sel.dispatchEvent(new Event('change', {bubbles:true}));
+          sel.dispatchEvent(new Event('blur', {bubbles:true}));
+          return 'val:'+sel.options[i].text;
+        }
+      }
+      // 3) substring fallback ("Female" matches "F Female").
+      for (var i=0;i<sel.options.length;i++){
+        if ((sel.options[i].text||'').toLowerCase().indexOf(target) !== -1){
+          sel.selectedIndex = i; sel.value = sel.options[i].value;
+          sel.dispatchEvent(new Event('change', {bubbles:true}));
+          sel.dispatchEvent(new Event('blur', {bubbles:true}));
+          return 'sub:'+sel.options[i].text;
+        }
+      }
+      return 'NO_OPTION';
+    })()''' % (sel, opt)
+    ok, out = d.evaluate_js(expr)
+    if not ok:
+        return False, "webview evaluate failed: %s" % str(out)[:150]
+    try:
+        out = json.loads(out)
+    except Exception:
+        pass
+    if out == "NO_OPTION":
+        return False, "option %r not in %r" % (option, c.get('opts'))
+    if out == "NO_SELECT":
+        return False, "select %r vanished" % name
+    return True, "webview select %s=%s (%s)" % (field, option, out)
+
+
+def _webview_type(field, value):
+    """Type text into a WebView text input matched by name/id/label.
+    Clears read-only flags, sets the value, then dispatches input/change/blur
+    so the ITS portal's validators run. Returns (ok, message)."""
+    controls = _webview_controls()
+    if not controls:
+        return False, "no WebView reachable (cdp connect failed)"
+    c = _webview_find(controls, field)
+    if not c or c.get('tag') not in ('INPUT', 'TEXTAREA'):
+        return False, "WebView field %r not found (tag=%r)" % (field, c and c.get('tag'))
+    if c.get('type') in ('checkbox', 'radio', 'button', 'submit'):
+        return False, "WebView field %r is a %s, not a text field" % (field, c.get('type'))
+    name = c['name']
+    # Prefer the real name; fall back to id for injected (un-named) fields.
+    sel = '[name="%s"]' % name if name else '[id="%s"]' % c['id']
+    expr = r'''(function(){
+      var el = document.querySelector(%r);
+      if (!el) return 'NO_EL';
+      try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e){}
+      var proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype
+                                            : window.HTMLInputElement.prototype;
+      var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      setter.call(el, %r);
+      el.dispatchEvent(new Event('input',  {bubbles:true}));
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+      el.dispatchEvent(new Event('blur',   {bubbles:true}));
+      return 'set:' + el.value;
+    })()''' % (sel, value)
+    ok, out = d.evaluate_js(expr)
+    if not ok:
+        return False, "webview evaluate failed: %s" % str(out)[:150]
+    try:
+        out = json.loads(out)
+    except Exception:
+        pass
+    if out == "NO_EL":
+        return False, "input %r vanished" % field
+    return True, "webview type %s=%r (%s)" % (field, value, out)
+
+
+def _webview_click(label):
+    """Click a WebView control (checkbox/button/input/link) matched by label.
+    Returns (ok, message)."""
+    controls = _webview_controls()
+    if not controls:
+        return False, "no WebView reachable (cdp connect failed)"
+    c = _webview_find(controls, label)
+    if not c:
+        return False, "WebView control %r not found" % label
+    name = c.get('name')
+    if not name:
+        # Buttons/links carry no name attribute: click by visible text.
+        txt = (c.get('txt') or '').strip()
+        if not txt:
+            return False, "control for %r has no name and no text" % label
+        expr = r'''(function(){
+          var els = Array.prototype.slice.call(document.querySelectorAll('button, input[type=button], input[type=submit], a'));
+          for (var i=0;i<els.length;i++){
+            var t = els[i].value || els[i].textContent || '';
+            t = t.replace(/\s+/g, ' ').trim();
+            if (t.toLowerCase().indexOf(%r.toLowerCase()) !== -1){
+              els[i].scrollIntoView({block:'center'});
+              els[i].click();
+              return 'clicked:'+els[i].tagName+':'+t;
+            }
+          }
+          return 'NO_EL';
+        })()''' % txt[:60]
+        ok, out = d.evaluate_js(expr)
+        if not ok:
+            return False, "webview evaluate failed: %s" % str(out)[:150]
+        if out == "NO_EL":
+            return False, "button/link %r vanished" % label
+        return True, "webview click %s (%s)" % (label, out)
+    expr = r'''(function(){
+      var el = document.querySelector('[name="%s"]');
+      if (!el) return 'NO_EL';
+      el.scrollIntoView({block:'center'});
+      el.click();
+      return 'clicked:'+el.tagName+':'+(el.checked!==undefined?el.checked:'');
+    })()''' % name
+    ok, out = d.evaluate_js(expr)
+    if not ok:
+        return False, "webview evaluate failed: %s" % str(out)[:150]
+    return True, "webview click %s (%s)" % (label, out)
+
+
+def _webview_dump():
+    """Compact text dump of the WebView form (like ui_dump) so the executor can
+    list what is on the page. Returns "" if no WebView is reachable."""
+    controls = _webview_controls()
+    if not controls:
+        return ""
+    lines = []
+    for c in controls:
+        g = re.sub(r'\s+', ' ', (c.get('grp') or '')).strip()
+        head = "%s %s name=%s" % (c.get('tag', ''), c.get('type', ''),
+                                  c.get('name', ''))
+        if c.get('tag') == 'SELECT':
+            head += " opts=[%s]" % ", ".join(c.get('opts', []))
+        if c.get('txt'):
+            head += " txt=%r" % c.get('txt')[:40]
+        lines.append("%s | %s" % (head, g[:140]))
+    return "\n".join(lines)
+
+
+# Text markers that only appear once the ITS WebView page is showing. Cheap
+# gate so we don't run an adb/CDP probe on every native step (Universities
+# tab, app open, etc.) — the probe only fires when the screen looks like ITS.
+_ITS_SCREEN_MARKERS = ("comprehensive web application", "do you already have a student number",
+                       "--- please select ---", "qualification specific token",
+                       "application process", "wizardimg", "oapoldnew")
+
+
+def _webview_active_screen(screen):
+    s = (screen or "").lower()
+    return any(m in s for m in _ITS_SCREEN_MARKERS)
+
+
+# ── Device profile (Hive box) reader ──────────────────────────────────────
+# The app stores the student profile in a Hive box (UTF-16LE JSON) at
+# /data/data/com.studentsyncsa.studentsyncsa/app_flutter/student_profile.hive.
+# ACEsi reads it directly so it can fill the ITS form with the SAME data the
+# app's own (broken) Star autofill would use.
+
+_DEVICE_PROFILE_CACHE = {"ts": 0.0, "val": None}
+
+
+def _device_profile():
+    """Pull the app's StudentProfile JSON from the phone's Hive box
+    (com.studentsyncsa.studentsyncsa app_flutter/student_profile.hive).
+    The box is binary Hive; the profile value is a JSON string embedded as
+    ASCII bytes, so we locate `{"id"` and brace-match to extract it. Returns
+    a dict (profile.toJson()) or None. Cached ~20s."""
+    now = time.time()
+    if now - _DEVICE_PROFILE_CACHE["ts"] < 20.0:
+        return _DEVICE_PROFILE_CACHE["val"]
+    raw = None
+    try:
+        proc = subprocess.run(
+            ["adb", "exec-out", "run-as", "com.studentsyncsa.studentsyncsa",
+             "cat", "app_flutter/student_profile.hive"],
+            capture_output=True, timeout=20)
+        if proc.returncode == 0 and proc.stdout:
+            raw = proc.stdout
+    except Exception as e:
+        print("?? profile pull failed: %s" % e)
+    prof = None
+    if raw:
+        i = raw.find(b'{"id"')
+        if i < 0:
+            # fall back to first '{'
+            i = raw.find(b'{')
+        if i >= 0:
+            depth = 0
+            end = None
+            in_str = False
+            esc = False
+            for k in range(i, len(raw)):
+                ch = raw[k:k+1]  # work on bytes
+                cb = raw[k]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif cb == 0x5C:
+                        esc = True
+                    elif cb == 0x22:
+                        in_str = False
+                    continue
+                if cb == 0x22:
+                    in_str = True
+                elif cb == 0x7B:  # {
+                    depth += 1
+                elif cb == 0x7D:  # }
+                    depth -= 1
+                    if depth == 0:
+                        end = k + 1
+                        break
+            if end:
+                try:
+                    prof = json.loads(raw[i:end].decode("utf-8", errors="replace"))
+                except Exception as e:
+                    print("?? profile json parse failed: %s (%d bytes)" % (e, end - i))
+                    prof = None
+    _DEVICE_PROFILE_CACHE["ts"] = now
+    _DEVICE_PROFILE_CACHE["val"] = prof
+    return prof
+
+
+def _dob_dashy(dob_str):
+    """'1963-03-16T00:00:00.000' -> '1963-03-16' (or passthrough)."""
+    if not dob_str:
+        return ""
+    return (dob_str or "").split("T")[0][:10]
+
+
+def _fill_its_page(profile):
+    """Deterministically fill the ITS application form (page one: biographical
+    details) from the profile, using the REAL DOM field names discovered live
+    (oapIDnumber, oapPPnumber, oapCitizenType, oapGender, oapBirthdate, ...).
+    Returns (ok, message)."""
+    if not profile:
+        return False, "no profile (pull Hive box failed)"
+    # Build the full field plan, then apply it with a SINGLE CDP injection.
+    # Doing one evaluate_js for all 30 fields (instead of 30 round-trips) avoids
+    # stalling: the ITS Oracle JS fires async callDynBGproc validations on each
+    # change event, and 30 sequential Runtime.evaluate calls race those XHRs and
+    # each can approach its 10s timeout, making an otherwise-completed fill look
+    # like a hang. One batch sets every value + dispatches every event in a single
+    # synchronous JS turn, then returns a JSON report.
+    plan = _its_field_plan(profile)
+    if not plan:
+        return False, "no profile-derived fields to fill"
+    report = _its_fill_batch(plan)
+    return ("filled" in report and "filled 0/" not in report), report
+
+
+def _its_field_plan(profile):
+    """Return [(field_id_or_name, value, 'select'|'text'), ...] for the ITS page
+    one form fields, derived from the app's StudentProfile (Hive box)."""
+    if not profile:
+        return []
+    p = profile.get("personal", {})
+    c = profile.get("contact", {})
+    a = profile.get("address", {})
+    dm = profile.get("demographic", {})
+    st = profile.get("status", {})
+    id_no = (p.get("idNumber") or "").strip()
+    is_sa = bool(re.match(r'^\d{13}$', id_no))
+    dob_its = ""
+    dob = (p.get("dateOfBirth") or "").split("T")[0][:10]
+    if dob:
+        try:
+            dob_its = datetime.strptime(dob, "%Y-%m-%d").strftime("%d-%b-%Y").upper()
+        except Exception:
+            dob_its = ""
+    gender = (p.get("gender") or "").lower()
+    gval = "Female" if gender.startswith("f") else ("Male" if gender.startswith("m") else "")
+    title_code = ""
+    tup = (p.get("title") or "").upper()
+    for code in ("MR", "MRS", "MS"):
+        if tup.startswith(code):
+            title_code = code
+            break
+    marital_map = {"single": "Single", "married": "Married", "divorced": "Divorced",
+                   "widow": "Widow", "widowed": "Widow", "widower": "Widow"}
+    mval = marital_map.get((dm.get("maritalStatus") or "").lower(), "")
+    homelang = (dm.get("homeLanguage") or "").strip()
+    homelang = homelang.upper() if homelang else ""
+    eth_map = {"white": "WHITE", "black": "BLACK", "coloured": "Coloured",
+               "colored": "Coloured", "indian": "INDIAN", "african": "BLACK"}
+    ecode = eth_map.get((dm.get("populationGroup") or "").lower(), "")
+    emp = (st.get("employmentStatus") or "").lower()
+    empval = ("No" if ("un" in emp or "none" in emp) else "Yes") if emp else ""
+    burs = (st.get("bursaryRequired") or "").lower()
+    bursval = ("Yes" if burs.startswith("y") else "No") if burs else ""
+    phone = (c.get("phone") or "").strip()
+    work = (c.get("workPhone") or "").strip()
+    email = (c.get("email") or "").strip()
+    res = (st.get("wantsResidence") or "").lower()
+    resval = ("Yes" if res.startswith("y") else "No") if res else ""
+    heard = (dm.get("heardAboutUs") or "").replace("/", " ").strip() or ""
+
+    def prov_code(prov):
+        pv = (prov or "").lower()
+        for tok, code in (("gauteng","Gauteng"),("western","Western Cape"),
+                          ("eastern","Eastern Cape"),("north west","North West"),
+                          ("northwest","North West"),("kwazulu","KwaZulu-Natal"),
+                          ("limpopo","Limpopo"),("mpumalanga","Mpumalanga"),
+                          ("northern cape","Northern Cape"),
+                          ("free state","Free State"),("freestate","Free State")):
+            if tok in pv:
+                return code
+        return (prov or "").strip()
+
+    plan = []
+    plan.append(("oapCitizenType", "Yes" if is_sa else "No", "select"))
+    if id_no:
+        plan.append(("oapIDnumber", id_no, "text") if is_sa else
+                    ("oapPPnumber", id_no, "text"))
+    if is_sa:
+        plan.append(("custom-citz-code", "R.S.A", "select"))
+        plan.append(("oapCitzCode", "RSA", "text"))
+        plan.append(("oapCitzCode_desc", "R.S.A", "text"))
+    if gval:
+        plan.append(("oapGender", gval, "select"))
+    if dob_its:
+        plan.append(("oapBirthdate", dob_its, "text"))
+        plan.append(("ssa-date-display", dob_its, "text"))
+    if title_code:
+        plan.append(("oapTitle", title_code, "select"))
+    if (p.get("initials") or "").strip():
+        plan.append(("oapInitials", p.get("initials").strip().upper(), "text"))
+    if (p.get("lastName") or "").strip():
+        plan.append(("oapSurname", p.get("lastName").strip().upper(), "text"))
+    if (p.get("firstName") or "").strip():
+        plan.append(("oapFirstNames", p.get("firstName").strip().upper(), "text"))
+    if (p.get("maidenName") or "").strip():
+        plan.append(("oapMaiden", p.get("maidenName").strip().upper(), "text"))
+    if mval:
+        plan.append(("oapMaritalStatus", mval, "select"))
+    if homelang:
+        plan.append(("oapHomeLang", homelang, "select"))
+    if ecode:
+        plan.append(("oapEthnic", ecode, "select"))
+    if empval:
+        plan.append(("oapEmployed", empval, "select"))
+    if bursval:
+        plan.append(("oapBursaryReq", bursval, "select"))
+    if (a.get("address") or "").strip():
+        plan.append(("oapStreetAddr1", a.get("address").strip(), "text"))
+    if (a.get("addressLine2") or "").strip():
+        plan.append(("oapStreetAddr2", a.get("addressLine2").strip(), "text"))
+    if (a.get("addressLine3") or "").strip():
+        plan.append(("oapStreetAddr3", a.get("addressLine3").strip(), "text"))
+    prov = prov_code(a.get("province"))
+    if prov:
+        plan.append(("oapStreetAddr4", prov, "text"))
+    if (a.get("postalCode") or "").strip():
+        pc = a.get("postalCode").strip()
+        plan.append(("oapStreetAddrPCodeRq", pc, "text"))
+        plan.append(("oapStreetAddrPCodeRq_desc", pc, "text"))
+    if phone:
+        plan.append(("oapCellInd", "Yes", "select"))
+        plan.append(("oapSACell", phone, "text"))
+    if work:
+        plan.append(("oapWorkPhone", work, "text"))
+    if email:
+        plan.append(("itsEmail", email, "text"))
+        plan.append(("verifyEmail", email, "text"))
+    if resval:
+        plan.append(("oapResReq", resval, "select"))
+    if heard:
+        plan.append(("ssa-heard-select", heard, "select"))
+    return plan
+
+
+def _its_fill_batch(plan):
+    """Apply a full field plan in a SINGLE CDP evaluate_js call.
+    Each setter runs in try/catch so one sticky field can't abort the batch.
+    Returns a human-readable report string."""
+    # Build a JS object literal of name -> {v, t} (type). Use a JSON map so
+    # values are safely escaped; the field identifier is matched in JS by
+    # name first, then by id (covers custom-citz-code / ssa-heard-select).
+    import json as _json
+    rows = []
+    for fid, value, kind in plan:
+        rows.append({"f": fid, "v": value, "t": kind})
+    payload = _json.dumps(rows)
+    expr = r'''(function(){
+      var plan = %s;
+      var res = [];
+      function findEl(name){
+        return document.querySelector('[name="'+name+'"]')
+            || document.getElementById(name)
+            || document.querySelector('label') && (function(lbl){
+                for(var i=0;i<lbl.length;i++){ if((lbl[i].htmlFor||'')===name){var e=document.getElementById(lbl[i].htmlFor); if(e)return e;} }
+                return null;
+              })(document.getElementsByTagName('label'));
+      }
+      function setSelect(el, target){
+        var t = target.toLowerCase().trim();
+        var picks = [];
+        for(var i=0;i<el.options.length;i++){ picks.push(i); }
+        // 1) exact option-text
+        for(var i=0;i<picks.length;i++){ if(el.options[i].text.toLowerCase().trim()===t){return i;} }
+        // 2) exact option-value
+        for(var i=0;i<picks.length;i++){ if((el.options[i].value||'').toLowerCase()===t){return i;} }
+        // 3) substring on text
+        for(var i=0;i<picks.length;i++){ if((el.options[i].text||'').toLowerCase().indexOf(t)!==-1){return i;} }
+        return -1;
+      }
+      function setVal(name, val, isSelect){
+        var el = findEl(name);
+        if(!el){ res.push({name:name, ok:false, msg:'NO_EL'}); return; }
+        try{
+          if(el.tagName === 'SELECT'){
+            var idx = setSelect(el, val);
+            if(idx < 0){ res.push({name:name, ok:false, msg:'NO_OPT:'+(val)}); return; }
+            el.selectedIndex = idx; el.value = el.options[idx].value;
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            el.dispatchEvent(new Event('blur', {bubbles:true}));
+          } else {
+            try{ el.removeAttribute('readonly'); el.removeAttribute('disabled'); }catch(e){}
+            var proto = (el.tagName==='TEXTAREA') ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+            var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+            setter.call(el, val);
+            el.dispatchEvent(new Event('input',  {bubbles:true}));
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            el.dispatchEvent(new Event('blur',   {bubbles:true}));
+          }
+          res.push({name:name, ok:true, val:(el.value||'')});
+        }catch(e){ res.push({name:name, ok:false, msg:'ERR:'+e.message}); }
+      }
+      for(var i=0;i<plan.length;i++){ try{ setVal(plan[i].f, plan[i].v, plan[i].t==='select'); }catch(e){ res.push({name:plan[i].f, ok:false, msg:'THROW:'+e.message}); } }
+      return JSON.stringify(res);
+    })()''' % payload
+    ok, out = d.evaluate_js(expr)
+    if not ok:
+        return "webview evaluate failed: %s" % str(out)[:200]
+    try:
+        results = json.loads(json.loads(out))
+    except Exception:
+        try:
+            results = json.loads(out)
+        except Exception:
+            return "could not parse fill report: %s" % str(out)[:200]
+    ok_n = sum(1 for r in results if r.get("ok"))
+    filled = ["%s=%r" % (r.get("name"), r.get("val")) for r in results if r.get("ok")]
+    report = "filled %d/%d fields: %s" % (ok_n, len(results), ", ".join(filled))
+    bad = [r for r in results if not r.get("ok")]
+    if bad:
+        report += " | failed: %s" % ", ".join("%s" % r.get("msg") for r in bad)
+    return report
+
+
+def _is_select_field(field):
+    return bool(re.search(r'citizen|gender|title|marital|homelang|ethn|employ|bursary|'
+                          r'resreq|cellind|heard|custom-citz|citizen', field, re.IGNORECASE))
+
+
+def _execute_ui_script(user_message):
+    """Deterministic executor for explicit UI step lists. Returns a reply string
+    if the message was handled (steps executed on the device), else None."""
+    # Expand a saved-task shortcut ("do the ITS application again") into the
+    # stored step list BEFORE parsing. ALWAYS try the shortcut first: the user's
+    # message ("do the ITS application again but this time ...") also parses as
+    # steps on its own (just the tail), which would run the tail WITHOUT the
+    # navigation to the app. The shortcut wins whenever it matches.
+    expanded = _resolve_ui_task(user_message)
+    is_rerun = bool(expanded)
+    orig_message = user_message
+    if expanded:
+        print("🔄 expanded saved ITS task shortcut")
+        user_message = expanded
+    steps = _ui_script_steps(user_message)
+    if not steps:
+        return None
+    print("🛠 /chat deterministic ui_script steps: %s" % steps)
+    screen = ""
+    done = []
+    read_called = False
+    # Track whether we've seen the screen (ui_dump performed) to allow ui_tap/ui_swipe
+    seen_screen = False
+    for action, detail in steps:
+        if action == "ui_app_open":
+            ok, out = _call_tool("ui_app_open", {})
+            done.append("ui_app_open")
+            print("  ui_app_open -> %s" % (ok,))
+            _ok, _d = _ui_auto_dump()
+            if _ok:
+                screen = _d
+        elif action == "ui_dump":
+            ok, out = _call_tool("ui_dump", {})
+            if ok:
+                screen = out
+                seen_screen = True
+            done.append("ui_dump")
+            # If the native dump is sparse (a WebView shows as a single node),
+            # enrich it with the WebView form so dropdowns/checkboxes are visible.
+            if screen.count("tap(") <= 2:
+                wv = _webview_dump()
+                if wv:
+                    screen = wv
+                    print("  ui_dump: WebView form detected (%d lines)" % len(wv.splitlines()))
+        elif action == "ui_screenshot":
+            ok, out = _call_tool("ui_screenshot", {})
+            done.append("ui_screenshot")
+        elif action == "ui_tap":
+            if not seen_screen:
+                done.append("ui_tap(%s:BLOCKED - ui_dump required first)" % detail)
+                print("  ui_tap %r BLOCKED: ui_dump required first" % detail)
+                continue
+            if _webview_active_screen(screen) and _webview_controls():
+                ok, out = _webview_click(detail)
+                if ok:
+                    done.append("ui_tap(%s@webview)" % detail)
+                    print("  ui_tap %r via webview -> %s" % (detail, out))
+                    _ok, _d = _ui_auto_dump()
+                    if _ok:
+                        screen = _d
+                    wv = _webview_dump()
+                    if wv:
+                        screen = wv
+                    continue
+            found = _dump_tap_point(screen, detail)
+            pt = (found[0], found[1]) if found else None
+            if pt is None:
+                # Screen may be stale; re-dump to find it.
+                ok, out = _call_tool("ui_dump", {})
+                if ok:
+                    screen = out
+                found = _dump_tap_point(screen, detail)
+                pt = (found[0], found[1]) if found else None
+            if pt is None and _webview_active_screen(screen) and _webview_controls():
+                # We're in a WebView: tap the control's DOM element via CDP
+                # instead of a coordinate tap.
+                ok, out = _webview_click(detail)
+                if ok:
+                    done.append("ui_tap(%s@webview)" % detail)
+                    print("  ui_tap %r via webview -> %s" % (detail, out))
+                    _ok, _d = _ui_auto_dump()
+                    if _ok:
+                        screen = _d
+                    wv = _webview_dump()
+                    if wv:
+                        screen = wv
+                    continue
+            if pt is None:
+                # Target is off-screen: scroll to find it (search down, then up).
+                print("  tap %r: not on screen, scrolling to find it" % detail)
+                screen, pt = _scroll_search(screen, detail, "down")
+                if pt is None:
+                    screen, pt = _scroll_search(screen, detail, "up")
+            if pt is None:
+                print("  tap %r NOT FOUND on screen" % detail)
+                done.append("ui_tap(%s:NOT FOUND)" % detail)
+                continue
+            ok, out = _call_tool("ui_tap", {"x": pt[0], "y": pt[1]})
+            done.append("ui_tap(%s@%d,%d)" % (detail, pt[0], pt[1]))
+            print("  ui_tap %r @ %s -> %s" % (detail, pt, ok))
+            _ok, _d = _ui_auto_dump()
+            if _ok:
+                screen = _d
+        elif action in ("ui_swipe", "ui_scroll"):
+            if not seen_screen:
+                done.append("%s(%s:BLOCKED - ui_dump required first)" % (action, detail))
+                print("  %s %r BLOCKED: ui_dump required first" % (action, detail))
+                continue
+            dirn = detail
+            # Screen is 1080x2412. Swipe gestures across it; "scroll down"
+            # means finger moves UP (content moves down).
+            x1, y1, x2, y2 = 540, 1200, 540, 1200
+            if dirn == "left":
+                x1, y1, x2, y2 = 900, 1200, 180, 1200
+            elif dirn == "right":
+                x1, y1, x2, y2 = 180, 1200, 900, 1200
+            elif dirn == "down":
+                x1, y1, x2, y2 = 540, 2100, 540, 300
+            elif dirn == "up":
+                x1, y1, x2, y2 = 540, 300, 540, 2100
+            ok, out = _call_tool("ui_swipe",
+                                 {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": 250})
+            done.append("%s(%s)" % (action, dirn))
+            print("  %s %s -> %s" % (action, dirn, ok))
+            _ok, _d = _ui_auto_dump()
+            if _ok:
+                screen = _d
+        elif action == "ui_select":
+            field, option = detail
+            # If a WebView form is present, set the select's value via CDP FIRST.
+            # The native dump exposes the field LABEL text; tapping that label's
+            # coordinates does not open the <select> dropdown, so the option is
+            # never found. CDP sets the value directly in the DOM.
+            if _webview_active_screen(screen) and _webview_controls():
+                ok, out = _webview_select(field, option)
+                if ok:
+                    done.append("ui_select(%s=%s@webview)" % (field, option))
+                    print("  ui_select %s=%s via webview -> %s" % (field, option, out))
+                    _ok, _d = _ui_auto_dump()
+                    if _ok:
+                        screen = _d
+                    wv = _webview_dump()
+                    if wv:
+                        screen = wv
+                    continue
+            found = _dump_tap_point(screen, field)
+            pt = (found[0], found[1]) if found else None
+            if pt is None:
+                ok, out = _call_tool("ui_dump", {})
+                if ok:
+                    screen = out
+                found = _dump_tap_point(screen, field)
+                pt = (found[0], found[1]) if found else None
+            if pt is None and _webview_active_screen(screen) and _webview_controls():
+                # We're in a WebView: set the select's value via CDP instead of
+                # tapping coordinates.
+                ok, out = _webview_select(field, option)
+                if ok:
+                    done.append("ui_select(%s=%s@webview)" % (field, option))
+                    print("  ui_select %s=%s via webview -> %s" % (field, option, out))
+                    _ok, _d = _ui_auto_dump()
+                    if _ok:
+                        screen = _d
+                    wv = _webview_dump()
+                    if wv:
+                        screen = wv
+                    continue
+            if pt is None:
+                # Field is off-screen: scroll to find it (search down, then up).
+                print("  select %r: field not on screen, scrolling to find it" % field)
+                screen, pt = _scroll_search(screen, field, "down")
+                if pt is None:
+                    screen, pt = _scroll_search(screen, field, "up")
+            if pt is None:
+                print("  select %r: field NOT FOUND" % (field,))
+                done.append("ui_select(%s=%s:field NOT FOUND)" % (field, option))
+                continue
+            ok, out = _call_tool("ui_tap", {"x": pt[0], "y": pt[1]})
+            print("  select field %r @ %s -> %s" % (field, pt, ok))
+            _ok, _d = _ui_auto_dump()
+            if _ok:
+                screen = _d
+            found = _dump_tap_point(screen, option)
+            opt = (found[0], found[1]) if found else None
+            if opt is None:
+                # Option not in the freshly-opened dropdown view yet.
+                ok, out = _call_tool("ui_dump", {})
+                if ok:
+                    screen = out
+                found = _dump_tap_point(screen, option)
+                opt = (found[0], found[1]) if found else None
+            if opt is None:
+                print("  select %r: option %r NOT FOUND" % (field, option))
+                done.append("ui_select(%s=%s:option NOT FOUND)" % (field, option))
+                continue
+            ok, out = _call_tool("ui_tap", {"x": opt[0], "y": opt[1]})
+            done.append("ui_select(%s=%s@%d,%d)" % (field, option, opt[0], opt[1]))
+            print("  select option %r @ %s -> %s" % (option, opt, ok))
+            _ok, _d = _ui_auto_dump()
+            if _ok:
+                screen = _d
+        elif action == "read":
+            read_called = True
+        elif action == "ui_fill":
+            # ACEsi fills the ITS form fields himself from the device profile
+            # (the app's Star autofill is broken because of field-name
+            # mismatches like oapIdNumber vs oapIDnumber).
+            prof = _device_profile()
+            if prof is None:
+                msg = "no profile pulled from device Hive box"
+                done.append("ui_fill(%s)" % msg)
+                print("  ui_fill FAILED -> %s" % msg)
+            else:
+                ok, rep = _fill_its_page(prof)
+                done.append("ui_fill(%s)" % ("ok" if ok else "fail"))
+                print("  ui_fill -> %s" % rep)
+                # Refresh the cached webview controls so the next step sees the
+                # updated field values.
+                _WEBVIEW_PROBE_CACHE["ts"] = 0.0
+                _ok, _d = _ui_auto_dump()
+                if _ok:
+                    screen = _d
+                wv = _webview_dump()
+                if wv:
+                    screen = wv
+            continue
+    # "read all the fields / information" — the form is usually taller than the
+    # screen, so after the navigation steps scroll through it and collect every
+    # label until the screen stops changing (bottom reached).
+    wants_read = bool(re.search(r'\bread\b.*\b(?:all|every|fields|information|details|memoriz)',
+                                user_message, re.IGNORECASE))
+    if wants_read and "ui_dump" in [s[0] for s in steps]:
+        collected = []
+        seen_labels = set()
+        prev_screen = None
+        for _ in range(6):
+            ok, out = _call_tool("ui_dump", {})
+            if ok:
+                screen = out
+                for line in (screen or "").splitlines():
+                    s = line.strip()
+                    if not s or "labeled nodes" in s:
+                        continue
+                    if s not in seen_labels:
+                        seen_labels.add(s)
+                        collected.append(s)
+                if prev_screen is not None and screen.strip() == prev_screen.strip():
+                    break  # bottom reached — no new content
+                prev_screen = screen
+            # Scroll down to reveal the rest of the form.
+            ok, out = _call_tool("ui_swipe",
+                                 {"x1": 540, "y1": 2100, "x2": 540, "y2": 600, "duration": 250})
+            if not ok:
+                break
+            done.append("ui_swipe")
+        if collected:
+            screen = "\n".join(collected)
+            print("  read-all: collected %d labels across %d screens" % (len(collected), done.count("ui_swipe") + 1))
+    # Build the reply: real screen labels from the last dump.
+    fields = []
+    for line in (screen or "").splitlines():
+        s = line.strip()
+        if not s or "labeled nodes" in s:
+            continue
+        fields.append(s)
+    if not fields:
+        fields = ["(no screen state captured)"]
+    body = "\n".join(fields[:45])
+    summary = "Done — steps executed: %s.\nHere is what I last saw on screen:\n%s" % (
+        ", ".join(done), body)
+    # Auto-save the ITS application task so a short phrase replays it next time.
+    # NEVER overwrite the saved navigation skeleton on a *rerun* ("do the ITS
+    # application again ..."): the "but this time X" tail is ephemeral and must
+    # stay applied fresh. Only a fresh navigation definition (no rerun phrase)
+    # is saved, and we save the ORIGINAL text so the navigation skeleton is
+    # preserved without baking in a divergent post-Next tail.
+    if not is_rerun and steps and ("ui_select" in [s[0] for s in steps] or
+                                   any("student number" in str(d).lower()
+                                       for d in steps)):
+        try:
+            set_memory(_ITS_TASK_KEY, orig_message)
+            print("🔄 saved ITS application task for quick re-run")
+        except Exception as e:
+            print("?? auto-save ITS task failed: %s" % e)
+    return summary
+
+
 def run_agent(user_message):
     _agent_reset()
     with _AGENT_LOCK:
         _AGENT["running"] = True
         _AGENT["activity"] = "planning"
+    # Deterministic step-list executor (same as /chat): bypass the model for
+    # explicit numbered UI scripts that qwen2.5:3b cannot follow.
+    script_reply = _execute_ui_script(user_message)
+    if script_reply:
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "done"
+            _AGENT["last_reply"] = script_reply
+        return
     messages = [{"role": "system", "content": CODE_AGENT_PROMPT},
                 {"role": "user", "content": user_message}]
     max_iters = 30
     calls_history = []
+    # Server-side app auto-open (same rationale as _chat_dispatch): if the user
+    # explicitly asked to open the app, open it BEFORE the loop so the model's
+    # first ui_dump reads the real app screen, not the Android home screen.
+    auto_opened = False
+    if _ui_task(user_message) and not _ui_situational_ask(user_message) and (
+            re.search(r'\bui_app_open\b', user_message, re.IGNORECASE)):
+        try:
+            _aok, _atxt = _call_tool("ui_app_open", {})
+            if _aok:
+                auto_opened = True
+                with _AGENT_LOCK:
+                    _AGENT["tools_used"] = 1
+                    _AGENT["steps"].append({"id": _agent_next_id(), "kind": "work",
+                                            "text": "ui_app_open (auto)", "state": "done",
+                                            "icon": "🔧"})
+                calls_history.append("ui_app_open")
+                print("🚀 run_agent auto-opened app (user asked for it)")
+                _dok, _dtxt = _ui_auto_dump()
+                if _dok:
+                    messages.append({"role": "user", "content":
+                        "APP LAUNCHED. Here is what is now on screen:\n%s%s" % (
+                            str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+        except Exception as e:
+            print("⚠️ run_agent auto ui_app_open failed: %s" % e)
+    # Same blind-tap guard as _chat_dispatch: taps/swipes are only allowed after
+    # the model has read the screen (ui_dump / auto-dump) since the last change.
+    seen_screen = bool(auto_opened)
+    last_had_tools = False
     try:
         corrective_max = 6
         for i in range(max_iters):
@@ -2846,7 +4458,14 @@ def run_agent(user_message):
                 return
             with _AGENT_LOCK:
                 _AGENT["activity"] = "thinking (%d/%d)" % (i + 1, max_iters)
-            reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3)
+            # Force a structured tool call on UI tasks until a tool has run or
+            # the previous round stalled (no tool call) — otherwise qwen2.5:3b
+            # narrates a plan instead of acting.
+            force_tool = (_ui_task(user_message) and
+                          (_AGENT["tools_used"] == 0 or not last_had_tools) and
+                          i < 4)
+            reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3,
+                                            tool_choice="required" if force_tool else "auto")
             print("[agent] turn %d reply=%r native=%d" % (i + 1, (reply or "")[:400], len(native_calls)))
             with _AGENT_LOCK:
                 raw = reply or ""
@@ -2859,6 +4478,7 @@ def run_agent(user_message):
                     _AGENT["last_reply"] = "All model providers are unavailable right now."
                 return
             calls = list(native_calls) + (_extract_calls(reply) if not native_calls else [])
+            last_had_tools = bool(calls)
             final = _extract_final(reply)
 
             made_calls = 0
@@ -2920,7 +4540,16 @@ def run_agent(user_message):
                     with _AGENT_LOCK:
                         _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
                                                 "state": "running", "icon": icon})
-                    ok, result = _call_tool(name, args)
+                    # HARD GUARD: block ui_tap/ui_swipe unless the model has read the
+                    # screen (ui_dump in this batch, or a successful ui_dump /
+                    # auto-dump in a previous round) since the last screen change.
+                    if name in ("ui_tap", "ui_swipe") and not seen_screen:
+                        result = ("BLOCKED: You must run ui_dump in the same round "
+                                  "before ui_tap/ui_swipe. Run ui_dump first to read "
+                                  "the screen, then decide your tap coordinates.")
+                        ok = False
+                    else:
+                        ok, result = _call_tool(name, args)
                     executed_any = True
                     calls_history.append(name)
                     with _AGENT_LOCK:
@@ -2937,11 +4566,18 @@ def run_agent(user_message):
                                      "name": name, "content": str(result)})
                     if ok and name in _UI_SCREEN_TOOLS:
                         _dok, _dtxt = _ui_auto_dump()
+                        seen_screen = _dok
                         if _dok:
                             messages.append({"role": "user", "content":
                                 "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
                                     name, str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
                             messages.extend(_auto_bypass_cert_warning(_dtxt))
+                            if name in ("ui_tap", "ui_swipe", "ui_type", "ui_key"):
+                                messages.append({"role": "user", "content":
+                                    "STOP. Read the SCREEN STATE above carefully. "
+                                    "Based on what you see, decide your NEXT action. "
+                                    "Do NOT guess coordinates — use the text/bounds "
+                                    "from the screen state above."})
                     if not ok:
                         messages.append({"role": "user", "content":
                             "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
@@ -3001,7 +4637,7 @@ def run_agent(user_message):
                 continue
             with _AGENT_LOCK:
                 _AGENT["activity"] = "done"
-                _AGENT["last_reply"] = reply
+                _AGENT["last_reply"] = _terse_reply(reply)
             messages.append({"role": "assistant", "content": reply})
             return
         with _AGENT_LOCK:
@@ -3024,7 +4660,7 @@ def run_agent(user_message):
 # Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
 # Passes the native tools= schema to the provider so the model can emit
 # structured tool_calls instead of free-form prose (the stall fix).
-def llm_reply(messages, max_tokens=2048, temperature=0.3):
+def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto"):
     def one(name, endpoint, api_key, model):
         if not api_key:
             return None
@@ -3032,7 +4668,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3):
             r = requests.post(f"{endpoint}/chat/completions",
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
                 json={"model": model, "messages": messages, "temperature": temperature,
-                      "max_tokens": max_tokens, "tools": TOOLS_SCHEMA, "tool_choice": "auto"},
+                      "max_tokens": max_tokens, "tools": TOOLS_SCHEMA, "tool_choice": tool_choice},
                 timeout=(10, 120))
             if r.status_code == 200:
                 msg = r.json()["choices"][0]["message"]
@@ -3078,7 +4714,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3):
         print("🦙 llm_reply via Ollama model=%s" % OLLAMA_MODEL)
         payload = {"model": OLLAMA_MODEL, "messages": messages, "stream": False,
                    "max_tokens": min(max_tokens, 512), "temperature": temperature,
-                   "tools": TOOLS_SCHEMA, "tool_choice": "auto"}
+                   "tools": TOOLS_SCHEMA, "tool_choice": tool_choice}
         r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions", json=payload,
                          timeout=(15, 420))
         if r.status_code == 200:
@@ -3850,7 +5486,7 @@ def drive_upload():
 @app.route('/devices', methods=['GET'])
 def devices():
     try:
-        r = subprocess.run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
+        r = _run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
         devs = [ln.split('\t')[0] for ln in r.stdout.splitlines()[1:]
                 if ln.strip() and 'device' in ln and 'offline' not in ln]
         return jsonify({"count": len(devs), "devices": devs})
@@ -3860,7 +5496,7 @@ def devices():
 @app.route('/agents', methods=['GET'])
 def agents():
     try:
-        r = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
+        r = _run(['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
                            capture_output=True, text=True, timeout=10)
         count = max(0, len([l for l in r.stdout.strip().splitlines() if l.strip()]))
         return jsonify({"count": count, "agents": []})
@@ -3928,4 +5564,9 @@ def portal_redirect():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # debug=False: Flask's dev reloader spawns a child that fights for port
+    # 5000 with any old server still running, silently leaving the PHONE on
+    # stale code (seen: qwen going off to Google because the deterministic
+    # executor wasn't loaded). Reloads are handled by the ace_host watchdog
+    # via its restart flag instead.
+    app.run(host='0.0.0.0', port=5000, debug=False)

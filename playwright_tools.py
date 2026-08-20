@@ -1,4 +1,4 @@
-"""Playwright browser automation helpers for ACE.
+"""Playwright browser automation helpers for ACEsi.
 
 Exposed behind the dev-mode flag so it's never exposed publicly. Used by
 chat() to drive a headless Chromium instance for URL inspection and

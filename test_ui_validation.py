@@ -134,7 +134,11 @@ class UiTestRunTest(unittest.TestCase):
                 return server.TOOLS[name][0](**args)
             return True, "mock ok"
 
+        self._orig_call_tool = server._call_tool
         server._call_tool = fake_call_tool
+
+    def tearDown(self):
+        server._call_tool = self._orig_call_tool
 
     def test_run_all_pass(self):
         steps = [
@@ -246,12 +250,10 @@ class CurlTest(unittest.TestCase):
         self.assertIn("HTTP 200", out)
 
     def test_down_service_returns_false(self):
-        # The ITS portal is currently refusing connections — curl should surface
-        # ok=False with a network-level failure (this is the exact 'no web
-        # service' signal ACEsi uses to tell Chris the domain is right but the
-        # service is down).
-        ok, out = server.tool_curl("https://univenierp01.univen.ac.za/pls/prodi41/w99pkg.mi_login",
-                                   timeout=15)
+        # A connection-refused target (nothing listening on this port) must
+        # surface ok=False with a network-level failure — this is the 'no web
+        # service' signal ACEsi uses to tell the user a service is down.
+        ok, out = server.tool_curl("http://127.0.0.1:1/nonexistent", timeout=15)
         self.assertFalse(ok)
         self.assertIn("curl FAIL", out)
 
@@ -313,7 +315,33 @@ class DomainGateTest(unittest.TestCase):
         self.assertNotIn("curl", names)
         self.assertNotIn("run_command", names)
 
-    def test_general_schema_includes_net_and_code(self):
+    def test_explicit_tool_name_skips_clarification(self):
+        # "use the curl tool" / "run ui_tap" directly names a tool -> dominant
+        # domain is forced, no clarification gate.
+        self.assertEqual(server._explicit_tool_domain("use the curl tool"), "net")
+        self.assertEqual(server._explicit_tool_domain("run ui_dump on the emulator"), "ui")
+        self.assertIsNone(server._explicit_tool_domain("hello there"))
+
+    def test_explicit_curl_direct_instruction_executes(self):
+        msgs = [{"role": "system", "content": "test"},
+                {"role": "user", "content": "Ignore the menu. Use the curl tool on this link: "
+                                          "https://www.facebook.com/share/v/1NuzzaWAKk/"}]
+        executed = []
+        def fake_chat_one(*a, **k):
+            return ("", [("curl", {"url": "https://www.facebook.com/share/v/1NuzzaWAKk/"})])
+        call_orig = server._call_tool
+        po_orig = server._chat_providers
+        server._chat_one = fake_chat_one
+        server._call_tool = lambda name, args: (executed.append(name), True, "")[1:]
+        server._chat_providers = lambda: [("Ollama", server.OLLAMA_ENDPOINT,
+                                           "local", server.OLLAMA_CHAT_MODEL, "compact")]
+        server._ui_auto_dump = lambda: (True, "mock")
+        reply = server._chat_dispatch(msgs, max_rounds=5,
+                                      user_message="use the curl tool on this link: https://www.facebook.com/share/v/1NuzzaWAKk/")
+        server._call_tool = call_orig
+        server._chat_providers = po_orig
+        self.assertNotIn("which would you like", reply.lower())
+        self.assertIn("curl", executed)
         gen = server._filter_tools_schema(server.OLLAMA_TOOLS_SCHEMA,
                                           server._domain_tool_names("general"))
         names = {t["function"]["name"] for t in gen}
@@ -360,6 +388,40 @@ class DomainGateTest(unittest.TestCase):
                   "ui_expect", "ui_test_run", "curl"):
             self.assertEqual(server._TOOL_DOMAINS[n],
                              "ui" if n.startswith("ui_") else "net")
+
+    def test_situational_ui_classification(self):
+        # Regression for the "You are on the ITS portal" stall: ambient/screen
+        # asks must classify as ui so the ui_* tools stay in the schema.
+        for msg in ("You are on the ITS portal",
+                    "You are on the ITS portal.",
+                    "You are on the ITS portal. What does the screen show?",
+                    "what does the screen show",
+                    "what do you see on the emulator",
+                    "read the screen",
+                    "what's on the screen"):
+            self.assertEqual(server._classify_message(msg), {"ui"}, msg)
+
+    def test_situational_ui_does_not_break_net(self):
+        # A URL probe mentioning a portal host stays network, not ui.
+        for msg in ("is the ITS portal up",
+                    "is https://univenierp01.univen.ac.za up",
+                    "curl https://univenierp01.univen.ac.za",
+                    "check if the ITS portal is up"):
+            self.assertEqual(server._classify_message(msg), {"net"}, msg)
+
+    def test_ui_situational_ask_helper(self):
+        self.assertTrue(server._ui_situational_ask("You are on the ITS portal"))
+        self.assertTrue(server._ui_situational_ask("what does the screen show"))
+        self.assertFalse(server._ui_situational_ask("open the app and navigate to the portal"))
+        self.assertFalse(server._ui_situational_ask("hello"))
+
+    def test_nav_task_promotes_general_to_ui(self):
+        # Even if classification somehow leaves a nav task as 'general', the
+        # dispatch must promote it to ui so the schema includes ui_dump/etc.
+        # This mirrors the exact bug: classify='general' stripped all ui_* tools
+        # and the corrective demanded calls the model could not emit.
+        self.assertEqual(server._classify_message("You are on the ITS portal"), {"ui"})
+        self.assertEqual(server._classify_message("show me the ITS portal"), {"ui"})
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>ACE · Phone</title>
+<title>ACEsi · Phone</title>
 <style>
   :root {
     --bg: #000000; --panel: #0a0a0a; --bubble: #151515; --bubble-user: #1a1a1a;
@@ -107,7 +107,7 @@
   <header>
     <div class="logo">A</div>
     <div class="title">
-      <b>ACE</b>
+      <b>ACEsi</b>
       <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">ready</span></span>
     </div>
     <button class="icon-btn" id="notesBtn" title="Instructions / notes">📝</button>
@@ -130,16 +130,16 @@
   <div id="chat"></div>
 
   <div class="input-bar">
-    <textarea id="input" rows="1" placeholder="Message ACE..."></textarea>
+    <textarea id="input" rows="1" placeholder="Message ACEsi..."></textarea>
     <button id="sendBtn" title="Send">➤</button>
   </div>
 </div>
 
 <div class="sheet" id="notesSheet">
   <div class="sheet-card">
-    <h3>📝 Instructions &amp; notes for ACE</h3>
+    <h3>📝 Instructions &amp; notes for ACEsi</h3>
     <input id="noteTitle" placeholder="Title (optional)">
-    <textarea id="noteText" rows="3" placeholder="What should ACE remember or follow?"></textarea>
+    <textarea id="noteText" rows="3" placeholder="What should ACEsi remember or follow?"></textarea>
     <button class="btn" id="saveNote">Save to memory</button>
     <div id="notesList" style="display:flex;flex-direction:column;gap:8px;"></div>
     <button class="btn btn-secondary" id="closeNotes">Close</button>
@@ -220,7 +220,7 @@
       clearInterval(tick);
       thinkEl.remove();
       if (d.type === 'stream' && d.url) {
-        addMsg('This request starts an auto-fix task — open the desktop ACE to watch it.', 'ace');
+        addMsg('This request starts an auto-fix task — open the desktop ACEsi to watch it.', 'ace');
       } else if (d.rate_limited) {
         addMsg('⚠️ Cloud quota used up — switching to a local model.\n\n' + (d.reply || ''), 'ace');
         if (d.model && [...modelSel.options].some(o => o.value === d.model)) modelSel.value = d.model;
