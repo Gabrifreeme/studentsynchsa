@@ -1279,24 +1279,65 @@ var __ssaNavfix = function() {
   // or requesting them, which 404s. We expand truncated procedure names
   // and resolve relative URLs to absolute BEFORE they leave the page.
 
-  // Expand a truncated ITS procedure name: gw1v -> gw1view, gw1p -> gw1proc.
-  function expandProc(u) {
-    if (typeof u !== 'string') return u;
-    var marker = 'gen.gw1pkg.gw1';
-    var i = u.indexOf(marker);
-    if (i === -1) return u;
-    var restStart = i + marker.length;
+  // Expand a truncated ITS procedure name. Handles full-marker truncation
+  // (gen.gw1pkg.gw1v -> gen.gw1pkg.gw1view, gen.gw1pkg.gw1p -> gw1proc) plus
+  // aggressive truncation where the marker itself is partially eaten by a
+  // 64-char URL limit (gwa/gwas/gwav/gwavs -> gw1view, gw1p/gw1pr/gw1pro ->
+  // gw1proc, and short-marker 'gen.gw1pkg.gw' remainders like 'a'/'p').
+  function _expandFromMarker(u, pos, markerLen, fullMarker) {
+    var restStart = pos + markerLen;
     var rest = u.substring(restStart);
     var q = rest.indexOf('?');
     var sl = rest.indexOf('/');
-    var cut = -1;
-    if (q === -1 && sl === -1) { cut = rest.length; }
-    else if (q !== -1 && (sl === -1 || q < sl)) { cut = q; }
-    else { cut = sl; }
+    var hs = rest.indexOf('#');
+    var cut;
+    if (q === -1 && sl === -1 && hs === -1) { cut = rest.length; }
+    else {
+      cut = rest.length;
+      if (q !== -1 && q < cut) cut = q;
+      if (sl !== -1 && sl < cut) cut = sl;
+      if (hs !== -1 && hs < cut) cut = hs;
+    }
     var proc = rest.substring(0, cut);
     var tail = rest.substring(cut);
-    if (proc === 'v') return u.substring(0, restStart) + 'view' + tail;
-    if (proc === 'p') return u.substring(0, restStart) + 'proc' + tail;
+    if (fullMarker) {
+      if (proc === 'view' || proc === 'v' || proc === 'vi' || proc === 'vie' ||
+          proc === 'gwa' || proc === 'gwas' || proc === 'gwav' || proc === 'gwavs' ||
+          proc === 'gw1v' || proc === 'gw1vi' || proc === 'gw1vie' ||
+          proc === 'a' || proc === 'as' || proc === 'av' || proc === 'avs') {
+        return u.substring(0, restStart) + 'view' + tail;
+      }
+      if (proc === 'proc' || proc === 'p' || proc === 'pr' || proc === 'pro' ||
+          proc === 'gw1p' || proc === 'gw1pr' || proc === 'gw1pro') {
+        return u.substring(0, restStart) + 'proc' + tail;
+      }
+      return u.substring(0, restStart) + proc + tail;
+    }
+    if (proc === '' || proc === '1' || proc.indexOf('1v') === 0 ||
+        proc.indexOf('1gwa') === 0 || proc.indexOf('1gwav') === 0 ||
+        proc.indexOf('1gwas') === 0) {
+      return u.substring(0, restStart) + '1view' + tail;
+    }
+    if (proc === '1' || proc.indexOf('1p') === 0) {
+      return u.substring(0, restStart) + '1proc' + tail;
+    }
+    if (proc === 'a' || proc === 'as' || proc === 'av' || proc === 'avs') {
+      return u.substring(0, restStart) + '1view' + tail;
+    }
+    if (proc === 'p' || proc === 'pr' || proc === 'pro') {
+      return u.substring(0, restStart) + '1proc' + tail;
+    }
+    return u.substring(0, restStart) + proc + tail;
+  }
+
+  function expandProc(u) {
+    if (typeof u !== 'string') return u;
+    var fullMarker = 'gen.gw1pkg.gw1';
+    var shortMarker = 'gen.gw1pkg.gw';
+    var i = u.indexOf(fullMarker);
+    if (i !== -1) return _expandFromMarker(u, i, fullMarker.length, true);
+    var j = u.indexOf(shortMarker);
+    if (j !== -1) return _expandFromMarker(u, j, shortMarker.length, false);
     return u;
   }
 
@@ -1329,10 +1370,23 @@ var __ssaNavfix = function() {
   }
 
   // ── Form actions ────────────────────────────────────────────────────
+  // A POST form whose action points at a gw1view page must POST to gw1proc —
+  // the ITS server only accepts POSTs at the proc handler and answers a POST
+  // to gw1view with a 404. wizard.js sometimes (re)sets the Next form action
+  // to gw1view, so rewrite it here and again right before submit.
+  function rewriteViewToProc(u) {
+    if (typeof u !== 'string' || u.indexOf('gen.gw1pkg.gw1') === -1) return u;
+    return u.replace(/(gen\.gw1pkg\.gw1)view([^a-zA-Z0-9]|\$)/g, '\$1proc\$2');
+  }
+
   function fixAction(form, log) {
     if (!form || form.tagName !== 'FORM') return;
     var before = form.getAttribute('action') || '';
     var after = fixUrl(before);
+    // Only rewrite view->proc for explicit POST forms; a form with no method
+    // attribute GETs and must keep its gw1view target.
+    var method = (form.getAttribute('method') || '').toUpperCase();
+    if (method === 'POST') after = rewriteViewToProc(after);
     if (after !== before) {
       form.setAttribute('action', after);
       console.log('[navfix] form action: ' + before + ' -> ' + after);

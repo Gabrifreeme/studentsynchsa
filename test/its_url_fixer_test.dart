@@ -58,6 +58,33 @@ void main() {
       expect(ItsUrl.expandProcedure('gen.gw1pkg.gw1v?p_calling_proc=x'),
           'gen.gw1pkg.gw1view?p_calling_proc=x');
     });
+
+    test('expands aggressive full-marker truncations to gw1view/gw1proc', () {
+      const cases = <String, String>{
+        'gen.gw1pkg.gwa?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gwas?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gwav?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gwavs?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gw1vie?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gw1pr?x=1': 'gen.gw1pkg.gw1proc?x=1',
+        'gen.gw1pkg.gw1pro?x=1': 'gen.gw1pkg.gw1proc?x=1',
+      };
+      cases.forEach((input, expected) {
+        expect(ItsUrl.expandProcedure(input), expected, reason: 'input: $input');
+      });
+    });
+
+    test('expands truncated short-marker (marker itself eaten) to 1view/1proc', () {
+      const cases = <String, String>{
+        'gen.gw1pkg.gw?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gw1view?x=1': 'gen.gw1pkg.gw1view?x=1',
+        'gen.gw1pkg.gw1proc?x=1': 'gen.gw1pkg.gw1proc?x=1',
+        'gen.gw1pkg.gwa?x=1': 'gen.gw1pkg.gw1view?x=1',
+      };
+      cases.forEach((input, expected) {
+        expect(ItsUrl.expandProcedure(input), expected, reason: 'input: $input');
+      });
+    });
   });
 
   group('ItsUrl.normalize', () {

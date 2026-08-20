@@ -18,6 +18,10 @@ class ItsUrl {
   /// Full ITS procedure-name prefix, e.g. `gen.gw1pkg.gw1view`.
   static const String procedureMarker = 'gen.gw1pkg.gw1';
 
+  /// Short ITS procedure-name prefix (`gen.gw1pkg.gw`) used when a 64-char URL
+  /// limit has eaten the `1` of `gw1view`/`gw1proc` too.
+  static const String shortProcedureMarker = 'gen.gw1pkg.gw';
+
   /// True when [url] points at an ITS portal host or path.
   static bool isItsHost(String url) {
     return url.contains('univenierp01') ||
@@ -40,8 +44,18 @@ class ItsUrl {
   /// or the name is already whole.
   static String expandProcedure(String url) {
     final i = url.indexOf(procedureMarker);
-    if (i == -1) return url;
-    final restStart = i + procedureMarker.length;
+    if (i != -1) {
+      return _expandFromMarker(url, i, procedureMarker.length, true);
+    }
+    final j = url.indexOf(shortProcedureMarker);
+    if (j != -1) {
+      return _expandFromMarker(url, j, shortProcedureMarker.length, false);
+    }
+    return url;
+  }
+
+  static String _expandFromMarker(String url, int pos, int markerLen, bool fullMarker) {
+    final restStart = pos + markerLen;
     final rest = url.substring(restStart);
     final q = rest.indexOf('?');
     final sl = rest.indexOf('/');
@@ -57,27 +71,38 @@ class ItsUrl {
     }
     final proc = rest.substring(0, cut);
     final tail = rest.substring(cut);
-    
-    String target;
-    // Full procedure name is already correct
-    if (proc == 'view' || proc == 'proc') {
-      target = proc;
+
+    if (fullMarker) {
+      if (proc == 'view' || proc == 'v' || proc == 'vi' || proc == 'vie' ||
+          proc == 'gwa' || proc == 'gwas' || proc == 'gwav' || proc == 'gwavs' ||
+          proc == 'gw1v' || proc == 'gw1vi' || proc == 'gw1vie' ||
+          proc == 'a' || proc == 'as' || proc == 'av' || proc == 'avs') {
+        return url.substring(0, restStart) + 'view' + tail;
+      }
+      if (proc == 'proc' || proc == 'p' || proc == 'pr' || proc == 'pro' ||
+          proc == 'gw1p' || proc == 'gw1pr' || proc == 'gw1pro') {
+        return url.substring(0, restStart) + 'proc' + tail;
+      }
+      return url.substring(0, restStart) + proc + tail;
     }
-    // Truncated view variants: gw1v, gw1vi, gw1vie, gwa, gwas, gwav, gwavs, gw1v, gw1vi, gw1vie, gwa, gwas, gwav, gwavs
-    else if (proc == 'view' || proc == 'v' || proc == 'vi' || proc == 'vie' ||
-        proc == 'gwa' || proc == 'gwas' || proc == 'gwav' || proc == 'gwavs' ||
-        proc == 'gw1v' || proc == 'gw1vi' || proc == 'gw1vie' ||
-        proc == 'gwa' || proc == 'gwas' || proc == 'gwav' || proc == 'gwavs') {
-      target = 'view';
+
+    // Short marker 'gen.gw1pkg.gw' — the remainder should start with
+    // '1view'/'1proc' or be an aggressive truncation of them.
+    if (proc == '' || proc == '1' || proc.startsWith('1v') ||
+        proc.startsWith('1gwa') || proc.startsWith('1gwav') ||
+        proc.startsWith('1gwas')) {
+      return url.substring(0, restStart) + '1view' + tail;
     }
-    // Truncated proc variants: p, pr, pro, proc, gw1p, gw1pr, gw1pro
-    else if (proc == 'proc' || proc == 'p' || proc == 'pr' || proc == 'pro' ||
-        proc == 'gw1p' || proc == 'gw1pr' || proc == 'gw1pro') {
-      target = 'proc';
-    } else {
-      return url;
+    if (proc.startsWith('1p')) {
+      return url.substring(0, restStart) + '1proc' + tail;
     }
-    return url.substring(0, restStart) + target + tail;
+    if (proc == 'a' || proc == 'as' || proc == 'av' || proc == 'avs') {
+      return url.substring(0, restStart) + '1view' + tail;
+    }
+    if (proc == 'p' || proc == 'pr' || proc == 'pro') {
+      return url.substring(0, restStart) + '1proc' + tail;
+    }
+    return url.substring(0, restStart) + proc + tail;
   }
 
   /// Normalize a malformed ITS URL. Idempotent; returns [url] unchanged when
