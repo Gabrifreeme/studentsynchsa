@@ -249,16 +249,75 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
         await _controller.runJavaScript(
           star.buildPostalCodePickerScript(_profileJson!),
         );
+        // Matric subject handler for ITS_OAP03 (Add Subject button eventRun 39.1)
+        await _controller.runJavaScript(r'''
+(function() {
+  function ssaMatricSubjectHandler() {
+    var addBtn = document.getElementById('oapAddMatric');
+    if (!addBtn) return;
+    var origClick = addBtn.onclick;
+    addBtn.onclick = function(e) {
+      if (typeof eventRun === 'function') {
+        try { eventRun(39.1, this); } catch (e) { console.log('eventRun 39.1 error:', e); }
+      }
+      if (origClick) origClick.call(this, e);
+    };
+    var form = document.forms.frmOne;
+    if (form) {
+      var origSubmit = form.submit;
+      form.submit = function() {
+        var addBtn = document.getElementById('oapAddMatric');
+        if (addBtn && typeof eventRun === 'function') {
+          try { eventRun(39.1, addBtn); } catch (e) {}
+        }
+        return origSubmit.apply(this, arguments);
+      };
+    }
+    console.log('Matric subject handler injected');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { ssaMatricSubjectHandler(); });
+  } else {
+    ssaMatricSubjectHandler();
+  }
+  var obs = new MutationObserver(function(muts) {
+    for (var m = 0; m < muts.length; m++) {
+      if (muts[m].addedNodes.length) { ssaMatricSubjectHandler(); break; }
+    }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+})();
+''');
       }
       await _controller.runJavaScript(
         'if (typeof requestFlutterAutofill === "function") requestFlutterAutofill();',
       );
       if (mounted) {
+        // Get field completion report from JavaScript tracker
+        final report = await _controller.runJavaScriptReturningResult(
+          'window.__ssaFieldTracker ? window.__ssaFieldTracker.getReport() : "Tracker not initialized"'
+        );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Auto-fill triggered!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('✅ Auto-fill completed!', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(report.toString()),
+                ],
+              ),
+            ),
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 15),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'DISMISS',
+              textColor: Colors.white,
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+            ),
           ),
         );
       }

@@ -79,6 +79,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setTextZoom(150);
+      // Expose the WebView over CDP so the Flask bridge can inject JS.
+      AndroidWebViewController.enableDebugging(true);
       // Keep popups (target=_blank) inside this webview so every navigation
       // funnels through onNavigationRequest where ITS URLs get normalized.
       (_controller.platform as AndroidWebViewController).setOnConsoleMessage((msg) {
@@ -748,12 +750,141 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
       try {
         await _controller.runJavaScript(star.buildAutofillOnlyScript(_profileJson!));
         await Future.delayed(const Duration(milliseconds: 30));
-        await _controller.runJavaScript('window.requestFlutterAutofill();');
         await _controller.runJavaScript(star.buildRemoveOldPostalPickerScript());
         await _controller.runJavaScript(star.buildPostalCodePickerScript(_profileJson!));
-        debugPrint('✅ Autofill + postal picker injected');
+        // Matric subject handler for ITS_OAP03 (Add Subject button eventRun 39.1)
+        await _controller.runJavaScript(r'''
+(function() {
+  function ssaMatricSubjectHandler() {
+    var addBtn = document.getElementById('oapAddMatric');
+    if (!addBtn) return;
+    var origClick = addBtn.onclick;
+    addBtn.onclick = function(e) {
+      if (typeof eventRun === 'function') {
+        try { eventRun(39.1, this); } catch (e) { console.log('eventRun 39.1 error:', e); }
+      }
+      if (origClick) origClick.call(this, e);
+    };
+    var form = document.forms.frmOne;
+    if (form) {
+      var origSubmit = form.submit;
+      form.submit = function() {
+        var addBtn = document.getElementById('oapAddMatric');
+        if (addBtn && typeof eventRun === 'function') {
+          try { eventRun(39.1, addBtn); } catch (e) {}
+        }
+        return origSubmit.apply(this, arguments);
+      };
+    }
+    console.log('Matric subject handler injected');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { ssaMatricSubjectHandler(); });
+  } else {
+    ssaMatricSubjectHandler();
+  }
+  var obs = new MutationObserver(function(muts) {
+    for (var m = 0; m < muts.length; m++) {
+      if (muts[m].addedNodes.length) { ssaMatricSubjectHandler(); break; }
+    }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  // Form completeness tracking
+  window.__ssaFieldTracker = window.__ssaFieldTracker || {
+    fields: [],
+    track: function(field, value, filled, reason, page) {
+      this.fields.push({
+        field: field,
+        value: value,
+        filled: filled,
+        reason: reason,
+        page: page || document.getElementById('page_code')?.value || 'unknown',
+        timestamp: new Date().toISOString()
+      });
+    },
+    getReport: function() {
+      var fields = this.fields;
+      if (!fields.length) return 'No field tracking data available yet.';
+      var total = fields.length;
+      var filled = fields.filter(function(f) { return f.filled; }).length;
+      var empty = total - filled;
+      
+      var lines = ['📋 Form Completeness Report', '─────────────────────────────'];
+      
+      var byPage = {};
+      fields.forEach(function(f) {
+        var p = f.page || 'unknown';
+        if (!byPage[p]) byPage[p] = [];
+        byPage[p].push(f);
+      });
+      
+      for (var page in byPage) {
+        var pfields = byPage[page];
+        var pfilled = pfields.filter(function(f) { return f.filled; }).length;
+        lines.push('\\n📄 Page: ' + page + ' (' + pfilled + '/' + pfields.length + ')');
+        pfields.forEach(function(f) {
+          var status = f.filled ? '✅' : '❌';
+          var val = f.value ? ' (' + String(f.value).slice(0,30) + ')' : '';
+          var reason = !f.filled ? ' — ' + f.reason : '';
+          lines.push('  ' + status + ' ' + f.field + val + reason);
+        });
+      }
+      
+      var total = fields.length;
+      var filled = fields.filter(function(f) { return f.filled; }).length;
+      var empty = total - filled;
+      
+      lines.push('\\n📊 Total fields: ' + total);
+      lines.push('✅ Filled: ' + filled);
+      lines.push('❌ Empty: ' + empty);
+      
+      if (empty > 0) {
+        lines.push('\\n💡 You may need to manually complete:');
+        fields.filter(function(f) { return !f.filled; }).forEach(function(f) {
+          lines.push('   - ' + f.field + ': ' + f.reason);
+        });
+      }
+      
+      return lines.join('\\n');
+    },
+    clear: function() { this.fields = []; }
+  };
+  console.log('Form completeness tracker initialized');
+})();
+''');
+        debugPrint('✅ Autofill + postal picker + matric handler + completeness tracker injected');
       } catch (e) {
         debugPrint('❌ Autofill injection failed: $e');
+      }
+      // Show completion report
+      final report = await _controller.runJavaScriptReturningResult(
+        'window.__ssaFieldTracker ? window.__ssaFieldTracker.getReport() : "Tracker not initialized"'
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('✅ Auto-fill completed!', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(report.toString()),
+                ],
+              ),
+            ),
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 15),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'DISMISS',
+              textColor: Colors.white,
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+            ),
+          ),
+        );
       }
     } else {
       if (mounted) {

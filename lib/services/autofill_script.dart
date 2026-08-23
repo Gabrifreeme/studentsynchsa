@@ -1127,36 +1127,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   document.addEventListener('change', function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
   document.addEventListener('blur',   function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
 
-  // ── 5. Main autofill ───────────────────────────────────────────────────
   function doAutofill() {
     console.log('🔍 Autofill started');
-    var fields = {
-      oapFirstNames: profile.personal.firstName,
-      oapSurname: profile.personal.lastName,
-      oapBirthdate: profile.personal.dateOfBirth,
-      itsEmail: profile.contact.email,
-      verifyEmail: profile.contact.email,
-      oapWorkPhone: profile.contact.workPhone,
-      oapHomePhone: profile.contact.phone,
-      oapIntCell: profile.contact.phone,
-      oapStreetAddr1: profile.address.address,
-      oapStreetAddr4: profile.address.province,
-      oapStreetAddrPCodeRq: profile.address.postalCode,
-      oapPostalAddrPCodeRq: profile.address.postalCode,
-    };
-
-    var filled = 0;
-    for (var name in fields) {
-      var value = fields[name];
-      var el = document.getElementById(name);
-      if (el && value) {
-        el.value = value;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        filled++;
-        console.log('✅ Filled ' + name + ': ' + value);
-      }
+    
+    // Check page code - only autofill from Biographical page (ITS_OAP02) onwards
+    // NOT on Start page (ITS_OAP_START) which has student-responsibility fields
+    var pageCode = document.getElementById('page_code')?.value || '';
+    var validPages = ['ITS_OAP02', 'ITS_OAP02_1', 'ITS_OAP03', 'ITS_OAP04', 'ITS_OAP05', 'ITS_OAP06', 'ITS_OAP07', 'ITS_OAP08'];
+    var isValidPage = validPages.some(function(p) { return pageCode.indexOf(p) !== -1; });
+    
+    if (!isValidPage) {
+      console.log('🔍 Autofill skipped - not a valid page for autofill: ' + pageCode);
+      showToast('Auto-fill skipped: This page requires your input', '#EF4444');
+      try { AutofillResult.postMessage(JSON.stringify({ filled: 0, total: 0, skipped: true })); } catch (e) {}
+      return;
     }
+    
+    console.log('🔍 Autofill started on page: ' + pageCode);
 
     // Trigger blur on ID number field so APEX eventRun() fires
     // and populates citizenship + other dependent fields
@@ -1251,13 +1238,14 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         doAutofill();
       } else {
         console.log('❌ doAutofill not found');
-      }
-    };
-    document.body.appendChild(star);
-    console.log('✅ Star injected and connected to doAutofill');
-  })();
-  ''' : ''}
+}
+        }
+        document.body.appendChild(star);
+        console.log('✅ Star injected and connected to doAutofill');
+      });
+    }''' : ''}
 
+  ${!addFloatingStar ? 'doAutofill();' : ''}
 
 })();
 ''';

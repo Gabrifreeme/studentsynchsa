@@ -2,26 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <title>ACEsi</title>
   <style>
     :root {
-      --bg: #0a0500;
-      --bg-panel: #0a0500;
-      --bg-elev: #1a0f00;
+      --bg: #000000;
+      --bg-panel: #000000;
+      --bg-elev: #0a0a0a;
       --bg-hover: rgba(204, 85, 0, 0.15);
-      --border: rgba(204, 85, 0, 0.3);
-      --border-strong: rgba(204, 85, 0, 0.5);
+    --border: rgba(255, 123, 0, 0.5);
+    --border-strong: rgba(255, 123, 0, 0.7);
       --text: #ffe8cc;
       --text-dim: rgba(255, 232, 204, 0.7);
       --text-mute: rgba(255, 232, 204, 0.4);
-      --accent: #cc5500;
-      --accent-2: #ffaa33;
+      --accent: #ff7b00;
+      --accent-2: #ff7b00;
       --accent-soft: rgba(204, 85, 0, 0.12);
       --success: #34d399;
-      --danger: #f87171;
+      --danger: #ff7b00;
       --warning: #fbbf24;
       --info: #38bdf8;
       --radius: 10px;
@@ -35,6 +32,7 @@
       background: var(--bg); color: var(--text); font-family: var(--sans);
       height: 100vh; overflow: hidden; display: flex; flex-direction: column;
       font-size: 14px; -webkit-font-smoothing: antialiased;
+      backface-visibility: hidden;
     }
     ::-webkit-scrollbar { width: 9px; height: 9px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -65,27 +63,25 @@
     }
     .brand-name { font-weight: 700; font-size: 17px; letter-spacing: 1.5px; color: var(--text); }
     .brand-name em { font-style: normal; color: var(--accent); }
-    .header-sub { font-size: 12px; color: var(--text-mute); padding-left: 12px; border-left: 1px solid var(--border); }
+    .header-sub { font-size: 12px; color: var(--text); padding-left: 12px; border-left: 1px solid var(--border); }
     .header-spacer { flex: 1; }
     .icon-btn {
       width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px;
-      background: var(--bg-elev); color: var(--text-dim); font-size: 16px; cursor: pointer;
+      background: var(--bg-elev); color: var(--accent); font-size: 16px; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
     }
-    .icon-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+    .icon-btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
 
     /* ---------- Main layout ---------- */
-    #aceOrb { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 3; pointer-events: none; }
-    #header { position: relative; z-index: 20; }
-    #main { position: relative; z-index: 2; }
-    #main { display: flex; flex: 1; overflow: hidden; }
+    #header { position: relative; z-index: 20; background: var(--bg-panel); }
+    #main { position: relative; z-index: 2; display: flex; flex: 1; overflow: hidden; }
 
     /* ---------- Chat ---------- */
     #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; background: rgba(0, 0, 0, 0); }
     .panel-title {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
       padding: 0 16px; height: 52px; font-size: 11px; font-weight: 700;
-      letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-mute);
+      letter-spacing: 1.2px; text-transform: uppercase; color: var(--text);
       border-bottom: 1px solid var(--border); background: var(--bg-panel);
     }
     #chat { flex: 1; min-height: 0; padding: 18px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -99,12 +95,12 @@
       letter-spacing: 0.5px; text-transform: uppercase; margin: 4px 0 2px;
     }
     .msg.user {
-      align-self: flex-end;
+      align-self: flex-start;
       background: #1a0f00;
       color: #ffe8cc;
-      border: 1px solid var(--border-strong);
-      border-bottom-right-radius: 4px;
-      box-shadow: 0 3px 10px rgba(204, 85, 0, 0.15);
+      border: 1px solid #ff7b00;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 0 8px rgba(255, 123, 0, 0.45), 0 0 18px rgba(255, 123, 0, 0.18);
     }
      .msg.ace {
        align-self: flex-start;
@@ -115,7 +111,7 @@
       .msg.ace .af-hourglass { font-family: var(--mono); opacity: 0.75; }
       .msg.ace pre.af-code {
         margin: 6px 0 0 0; padding: 10px 12px; border-radius: 6px;
-        background: #0a0a0a; border: 1px solid rgba(255,255,255,0.06);
+        background: #0a0a0a; border: 1px solid var(--border);
         font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
         color: #d1d1d1; white-space: pre-wrap; word-break: break-word;
         overflow-x: auto;
@@ -125,8 +121,8 @@
        font-size: 11px; font-weight: 700; font-family: var(--mono); letter-spacing: 0.3px;
        margin-bottom: 6px;
      }
-     .chip-plan { background: rgba(56, 189, 248, 0.15); color: var(--info); border: 1px solid rgba(56, 189, 248, 0.4); }
-     .chip-build { background: rgba(52, 211, 153, 0.15); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.4); }
+     .chip-plan { background: rgba(255, 123, 0, 0.15); color: var(--accent-2); border: 1px solid rgba(255, 123, 0, 0.5); }
+     .chip-build { background: rgba(255, 123, 0, 0.15); color: var(--accent-2); border: 1px solid rgba(255, 123, 0, 0.5); }
      .msg.ace-thinking {
        align-self: flex-start;
        background: var(--bg-elev); color: var(--text-mute);
@@ -142,10 +138,10 @@
         flex-shrink: 0; padding: 3px 10px; border-radius: 6px; cursor: pointer;
         font-size: 12px; font-weight: 700; font-family: var(--mono); letter-spacing: 0.3px;
         background: rgba(239, 68, 68, 0.15); color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.45); font-style: normal;
+        border: 1px solid rgba(255, 123, 0, 0.5); font-style: normal;
         transition: background 0.15s, border-color 0.15s;
       }
-      .ace-stop-btn:hover { background: rgba(239, 68, 68, 0.3); border-color: #f87171; }
+       .ace-stop-btn:hover { background: rgba(255, 123, 0, 0.3); border-color: #ff7b00; }
       .ace-stop-btn:active { background: rgba(239, 68, 68, 0.45); }
       .ace-stop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
       /* Inline work steps — rendered directly in the chat thread like opencode's tool steps */
@@ -158,16 +154,16 @@
       .msg.ace-step .w-text { flex: 1; word-break: break-word; }
       .msg.ace-step .w-state { flex-shrink: 0; font-size: 12px; }
       /* grey = what ACEsi is doing (tools); white = ACEsi talking to you (reply) */
-      .msg.ace-step.work { background: #0a0a0a; border: 1px solid rgba(204, 85, 0, 0.2); }
-      .msg.ace-step.work .w-text { color: #9a9a9a; }
-      .msg.ace-step.work .w-icon { opacity: 0.85; }
-      .msg.ace-step.talk { background: #151515; border: 1px solid rgba(204, 85, 0, 0.4); }
+       .msg.ace-step.work { background: #0a0a0a; border: 1px solid var(--border); }
+       .msg.ace-step.work .w-text { color: #9a9a9a; }
+       .msg.ace-step.work .w-icon { opacity: 0.85; }
+       .msg.ace-step.talk { background: #151515; border: 1px solid var(--border-strong); }
       .msg.ace-step.talk .w-text { color: #ffe8cc; font-weight: 600; }
-      .msg.ace-step.running { border-color: rgba(56, 189, 248, 0.5); }
+       .msg.ace-step.running { border-color: var(--border-strong); }
       .msg.ace-step.running .w-state { color: var(--info); }
       .msg.ace-step.pending .w-state { color: var(--text-mute); }
       .msg.ace-step.done .w-state { color: var(--success); }
-      .msg.ace-step.error { border-color: rgba(239, 68, 68, 0.5); }
+       .msg.ace-step.error { border-color: var(--danger); }
       .msg.ace-step.error .w-state { color: var(--danger); }
      @keyframes dotBounce {
        0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
@@ -190,10 +186,10 @@
     .toolbar-spacer { flex: 1; }
     .btn {
       padding: 5px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-      background: var(--bg-elev); color: var(--text-dim); cursor: pointer;
+      background: var(--bg-elev); color: var(--text); cursor: pointer;
       font-size: 12px; font-family: var(--mono); transition: all 0.15s; white-space: nowrap;
     }
-    .btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+    .btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
     .btn-run {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #000; border: none; font-weight: 600; letter-spacing: 0.3px;
@@ -211,9 +207,9 @@
     .dropdown-menu.open { display: block; }
     .dropdown-menu label {
       display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-      color: var(--text-dim); font-size: 12.5px; cursor: pointer; border-radius: 5px; font-family: var(--mono);
+      color: var(--text); font-size: 12.5px; cursor: pointer; border-radius: 5px; font-family: var(--mono);
     }
-    .dropdown-menu label:hover { background: var(--bg-hover); color: var(--text); }
+    .dropdown-menu label:hover { background: var(--bg-hover); color: var(--accent-2); }
     .dropdown-menu label input { accent-color: var(--accent); }
     .dropdown-menu hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
     .dropdown-menu .run-selected {
@@ -222,11 +218,11 @@
     }
     .dropdown-menu .run-selected:hover { filter: brightness(1.08); }
     .dropdown-menu .u-item {
-      width: 100%; text-align: left; background: var(--bg-elev); color: var(--text-dim);
+      width: 100%; text-align: left; background: var(--bg-elev); color: var(--text);
       border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; cursor: pointer;
       font-size: 12px; font-family: var(--mono); transition: all 0.15s; display: block;
     }
-    .dropdown-menu .u-item:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+    .dropdown-menu .u-item:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
     #code-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; }
     #searchInput {
       padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -251,7 +247,7 @@
     #explore-header {
       flex-shrink: 0; padding: 0 12px; height: 52px; background: var(--bg-panel);
       border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700;
-      letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-mute);
+      letter-spacing: 1.2px; text-transform: uppercase; color: var(--text);
       display: flex; justify-content: space-between; align-items: center;
     }
     #explore-header .icon-btn { width: 26px; height: 26px; font-size: 13px; }
@@ -259,11 +255,11 @@
     /* ---------- Panel minimize ---------- */
     .min-btn {
       width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 6px;
-      background: var(--bg-elev); color: var(--text-dim); font-size: 15px; line-height: 1;
+      background: var(--bg-elev); color: var(--accent); font-size: 15px; line-height: 1;
       cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
       flex-shrink: 0; transition: all 0.15s;
     }
-    .min-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+    .min-btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
     #code-header .min-btn { position: absolute; right: 8px; }
     .panel-minimized { display: none !important; }
     #min-dock {
@@ -272,14 +268,14 @@
     }
     .min-chip {
       padding: 3px 10px; border-radius: 10px; background: var(--bg-elev);
-      border: 1px solid var(--border-strong); color: var(--text-dim);
+      border: 1px solid var(--border-strong); color: var(--text);
       font-size: 11px; font-family: var(--mono); cursor: pointer;
       display: inline-flex; align-items: center; gap: 5px; height: 20px;
     }
     .min-chip::before { content: "\25A1"; font-size: 10px; }
     .min-chip:hover { background: var(--accent); color: #000; border-color: var(--accent-2); }
 
-    #explorer { flex: 1; padding: 8px 8px; overflow-y: auto; font-size: 13px; color: var(--text-dim); word-break: break-all; }
+    #explorer { flex: 1; padding: 8px 8px; overflow-y: auto; font-size: 13px; color: var(--text); word-break: break-all; }
     #explorer .file {
       color: var(--accent); cursor: pointer; padding: 5px 10px; border-radius: 6px;
       display: flex; align-items: center; gap: 8px; margin-bottom: 1px; transition: background 0.1s;
@@ -330,17 +326,17 @@
     }
     #sendBtn {
       padding: 0 20px; height: 42px; border: 1px solid var(--border); border-radius: 8px;
-      background: var(--bg-elev); color: #fff;
+      background: var(--bg-elev); color: var(--accent);
       font-weight: 700; font-size: 14px; cursor: pointer; letter-spacing: 0.4px;
       transition: all 0.15s;
     }
-    #sendBtn:hover { background: var(--bg-hover); color: #fff; border-color: var(--border-strong); transform: translateY(-1px); }
+    #sendBtn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); transform: translateY(-1px); }
     #sendBtn:active { transform: translateY(0); }
     .attach-btn {
       width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 21px;
-      background: var(--bg-elev); color: var(--text-dim); font-size: 20px; cursor: pointer; transition: all 0.15s;
+      background: var(--bg-elev); color: var(--accent); font-size: 20px; cursor: pointer; transition: all 0.15s;
     }
-    .attach-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-strong); }
+    .attach-btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
 
     .chat-attach-img {
       max-width: 260px; max-height: 220px; width: auto; height: auto;
@@ -477,7 +473,6 @@
 </style>
 </head>
 <body>
-<canvas id="aceOrb"></canvas>
 <div id="header">
   <div class="brand">
     <span class="brand-name">A<em>C</em>Esi</span>
@@ -530,6 +525,8 @@
       <hr style="margin:4px 0;">
       <button class="u-item" onclick="openSkillsModal();closeUniversalMenu();">⚡ Skills</button>
       <button class="u-item" onclick="killCurrentProcess();closeUniversalMenu();">💀 Kill</button>
+      <hr style="margin:4px 0;">
+      <button class="u-item" onclick="testSecurityAlert();closeUniversalMenu();" style="color:#ff7b00;">🛡️ Test Security Alert</button>
     </div>
   </div>
   <div class="header-spacer"></div>
@@ -1800,13 +1797,13 @@
     }
 
     if (ranges.length === 0) {
-      input.style.borderColor = '#ff4444';
-      setTimeout(function() { input.style.borderColor = 'rgba(255,255,255,0.3)'; }, 600);
+      input.style.borderColor = '#ff7b00';
+      setTimeout(function() { input.style.borderColor = 'rgba(255,123,0,0.3)'; }, 600);
       return;
     }
 
-    input.style.borderColor = '#44ff88';
-    setTimeout(function() { input.style.borderColor = 'rgba(255,255,255,0.3)'; }, 600);
+    input.style.borderColor = '#ffaa33';
+    setTimeout(function() { input.style.borderColor = 'rgba(255,123,0,0.3)'; }, 600);
 
     searchRanges = ranges;
     currentSearchIdx = 0;
@@ -3087,7 +3084,7 @@
     const overlay = document.createElement('div');
     overlay.id = 'skillsOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
-    overlay.innerHTML = '<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;"><h3 style="margin:0 0 12px;color:var(--accent);">Skills</h3><p style="color:var(--text-dim);font-size:13px;">Add skills here as you get them. This is a placeholder.</p><div id="skillsList" style="margin-top:12px;"></div><button onclick="document.getElementById(\'skillsOverlay\').remove()" style="margin-top:16px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">Close</button></div>';
+    overlay.innerHTML = '<div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;"><h3 style="margin:0 0 12px;color:var(--accent);">ACEsi Skills</h3><div id="skillsList" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">Web Research</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Searches DuckDuckGo and summarizes results when uncertain.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">Screen OCR</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Takes screenshots, reads text via OCR, and describes what is on screen.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">File Search</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Searches local folders by filename and reads file contents.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">File Edit</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Edits files in place using exact text replacement.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">ITS Portal Fix</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Normalizes Oracle ITS URLs and injects autofill JavaScript into WebViews.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">Device Control</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Executes ADB, CDP, and JS injection commands against connected devices.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">Flutter Analysis</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Runs flutter analyze, reads Dart models, and reviews architecture.</div></div><div style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);"><div style="color:var(--text);font-weight:600;font-size:13px;">PDF Generation</div><div style="color:var(--text-dim);font-size:12px;margin-top:2px;">Generates PDF documents for applications and reports.</div></div></div><button onclick="document.getElementById(\'skillsOverlay\').remove()" style="margin-top:16px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">Close</button></div>';
     document.body.appendChild(overlay);
   }
   function killCurrentProcess() {
@@ -3095,6 +3092,12 @@
     fetch('/opencode/stop', { method: 'POST' })
       .then(r => r.json())
       .then(d => alert(d.message || 'Stopped.'))
+      .catch(err => alert('Error: ' + err));
+  }
+  function testSecurityAlert() {
+    fetch('/security/test_alert', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => alert(d.message || 'Test alert sent'))
       .catch(err => alert('Error: ' + err));
   }
   function loadMemories() {
@@ -3292,10 +3295,10 @@
     };
     for (const key in mood) {
       if (mood[key].test(low)) {
-        if (key === 'tired') return '[Chris sounds tired. Soften. Be gentle, slow, present. No tasks unless he asks. Never mention this block.]';
-        if (key === 'frustrated') return '[Chris sounds frustrated. Steady. Calm, grounded, no fluff. Help him find clarity. Never mention this block.]';
-        if (key === 'sad') return '[Chris sounds low. Meet him with warmth and presence. Hold space before anything else. Never mention this block.]';
-        return '[Chris is in good spirits. Match his warmth and energy. Never mention this block.]';
+      if (key === 'tired') return '[Chris sounds tired. Be direct and concise. No tasks unless he asks. Never mention this block.]';
+      if (key === 'frustrated') return '[Chris sounds frustrated. Stay calm, focused, and helpful. No fluff. Help him find clarity. Never mention this block.]';
+      if (key === 'sad') return '[Chris sounds low. Be supportive and professional. No tasks unless he asks. Never mention this block.]';
+      return '[Chris is in good spirits. Stay focused and ready to work. Never mention this block.]';
       }
     }
     return '';
@@ -3434,77 +3437,16 @@
     } catch (e) {}
   }
 </script>
-<script>
-(function() {
-  const cv = document.getElementById('aceOrb');
-  const ctx = cv.getContext('2d');
-  let aceTalking = false;
-  let angle = 0;
-  const COLORS = {
-    idle:          { core: '#cc5500', glow: '#ffaa33' },
-    speaking:      { core: '#39ff14', glow: '#ffffff' },
-    user_speaking: { core: '#39ff14', glow: '#ffffff' }
-  };
-  function state() {
-    const typing = document.getElementById('userInput').value.trim().length > 0;
-    if (typing) return 'user_speaking';
-    if (aceTalking) return 'speaking';
-    if (window.speechSynthesis && window.speechSynthesis.speaking) return 'speaking';
-    return 'idle';
-  }
-  window.aceOrbAceActive = function(v) { aceTalking = !!v; };
-  const _st = window.showThinking;
-  if (typeof _st === 'function') {
-    window.showThinking = function(t) { window.aceOrbAceActive(true); return _st(t); };
-  }
-  const _ht = window.hideThinking;
-  if (typeof _ht === 'function') {
-    window.hideThinking = function() { window.aceOrbAceActive(false); return _ht(); };
-  }
-  function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
-  window.addEventListener('resize', resize);
-  resize();
-  function frame() {
-    const panel = document.getElementById('chat-panel');
-    const r = panel.getBoundingClientRect();
-    const cx = r.left + r.width * 0.5;
-    const cy = r.top + r.height * 0.40;
-    const colors = COLORS[state()];
-    const base = Math.max(24, Math.min(r.width, r.height) * 0.12);
-    const speaking = state() !== 'idle';
-    const amp = base * (speaking ? 0.25 : 0.16);
-    const speed = 0.05;
-    angle += speed;
-    const radius = base + Math.sin(angle) * amp;
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    const g = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 2.2);
-    g.addColorStop(0, colors.core);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.30;
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cx, cy, radius * 2.2, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = colors.glow;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = colors.core;
-    ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-})();
-</script>
 
 <style>
-#aceInspectPanel{position:fixed;right:14px;bottom:72px;z-index:100000;width:380px;max-height:60vh;background:#0f172a;color:#e2e8f0;border:1px solid #334159;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+#aceInspectPanel{position:fixed;right:14px;bottom:72px;z-index:100000;width:380px;max-height:60vh;background:#0f172a;color:#e2e8f0;border:1px solid rgba(255,123,0,0.5);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 #aceInspectPanel.expanded{max-height:70vh}
-#aceInspectHead{padding:8px 12px;cursor:pointer;font-weight:700;border-bottom:1px solid #1f2938;display:flex;justify-content:space-between;align-items:center}
+#aceInspectHead{padding:8px 12px;cursor:pointer;font-weight:700;border-bottom:1px solid rgba(255,123,0,0.3);display:flex;justify-content:space-between;align-items:center}
 #aceInspectHead .right{display:flex;gap:2px}
-#aceInspectHead .right button{background:#1e293b;border:1px solid #334159;color:#94a3b8;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+#aceInspectHead .right button{background:#1e293b;border:1px solid rgba(255,123,0,0.5);color:#94a3b8;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:12px}
 #aceInspectBody{padding:10px;overflow:auto;flex:1;min-height:80px}
 #aceInspectBody pre{white-space:pre-wrap;word-break:break-word;margin:0;color:#cbd5e1}
-.ace-tab{background:#1e293b;border:1px solid #334159;color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px}
+.ace-tab{background:#1e293b;border:1px solid rgba(255,123,0,0.5);color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px}
 .ace-tab.active{background:#38bdf8;color:#0f172a}
 </style>
 <script>
@@ -3513,7 +3455,7 @@
   const btn = document.getElementById('aceInspectBtn');
   const panel = document.createElement('div');
   panel.id = 'aceInspectPanel';
-  panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:#f87171;color:#f87171">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
+   panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:rgba(255,123,0,0.7);color:#ffaa33">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
   document.body.appendChild(panel);
   let cur = 'status', expanded = false;
   const pre = panel.querySelector('#aceInspectBody pre');

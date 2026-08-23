@@ -122,4 +122,67 @@ class ItsUrl {
     out = expandProcedure(out);
     return out;
   }
+
+  static bool hasTruncatedProcedure(String url) {
+    if (!isItsHost(url)) return false;
+    final expanded = expandProcedure(url);
+    return expanded != url;
+  }
+
+  static String? extractProcedureName(String url) {
+    final i = url.indexOf(procedureMarker);
+    if (i != -1) {
+      final rest = url.substring(i + procedureMarker.length);
+      final cut = _firstTerminator(rest);
+      final proc = rest.substring(0, cut);
+      if (proc.isNotEmpty) return proc;
+    }
+    final j = url.indexOf(shortProcedureMarker);
+    if (j != -1) {
+      final rest = url.substring(j + shortProcedureMarker.length);
+      final cut = _firstTerminator(rest);
+      final proc = rest.substring(0, cut);
+      if (proc.isNotEmpty) return proc;
+    }
+    return null;
+  }
+
+  static int _firstTerminator(String s) {
+    final q = s.indexOf('?');
+    final sl = s.indexOf('/');
+    final hash = s.indexOf('#');
+    int cut = s.length;
+    if (q != -1 && q < cut) cut = q;
+    if (sl != -1 && sl < cut) cut = sl;
+    if (hash != -1 && hash < cut) cut = hash;
+    return cut;
+  }
+
+  static Map<String, String> getKnownFixes() => const {
+    'gen.gw1pkg.gw1v': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gw1p': 'gen.gw1pkg.gw1proc',
+    'gen.gw1pkg.gw1lo': 'gen.gw1pkg.gw1lovbind',
+    'gen.gw1pkg.gw1lov': 'gen.gw1pkg.gw1lovbind',
+    'gen.gw1pkg.gwa': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gwas': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gwav': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gwavs': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gw1pr': 'gen.gw1pkg.gw1proc',
+    'gen.gw1pkg.gw1pro': 'gen.gw1pkg.gw1proc',
+  };
+
+  static List<String> getTruncatedVariants() => const [
+    'gen.gw1pkg.gw1v',
+    'gen.gw1pkg.gw1p',
+    'gen.gw1pkg.gw1lo',
+    'gen.gw1pkg.gw1lov',
+    'gen.gw1pkg.gwa',
+    'gen.gw1pkg.gwas',
+    'gen.gw1pkg.gwav',
+    'gen.gw1pkg.gwavs',
+    'gen.gw1pkg.gw1pr',
+    'gen.gw1pkg.gw1pro',
+    'gen.gw1pkg.gw1vi',
+    'gen.gw1pkg.gw1vie',
+  ];
 }

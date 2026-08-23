@@ -29,6 +29,18 @@ void main() {
       expect(s, contains('blank POST response, navigating natively'));
       expect(s, contains('window.__ssaRealSubmit'));
     });
+
+    test('fixAction falls back to the page URL for empty-action POST forms', () {
+      final s = star.buildNavigationFixScript();
+      expect(s, contains("var base = before || form.action || window.location.href;"));
+    });
+
+    test('submit listener lives on window; unnamed selects get _desc guards', () {
+      final s = star.buildNavigationFixScript();
+      expect(s, contains("window.addEventListener('submit'"));
+      expect(s, contains('ssaFixUnnamedSelects'));
+      expect(s, contains("el.name ? el.name + '_desc' : '_desc'"));
+    });
   });
 
   group('buildAutofillOnlyScript', () {
