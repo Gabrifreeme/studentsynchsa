@@ -8,7 +8,7 @@ Future<String?> pickFile([String accept = '']) {
   input.click();
   input.onChange.listen((_) {
     if (input.files!.isNotEmpty) {
-      completer.complete(input.files![0].name ?? '');
+      completer.complete(input.files![0].name);
     } else {
       completer.complete(null);
     }

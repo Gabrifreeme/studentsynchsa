@@ -18,12 +18,10 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
 
   int _calculateAps() {
     int total = 0;
-    int count = 0;
     for (final s in _subjects) {
       if (s.mark > 0 &&
           (s.isLifeOrientation ? _lifeOrientationIncluded : true)) {
         total += _percentageToAps(s.mark);
-        count++;
       }
     }
     // APS is best 6 subjects excluding Life Orientation unless selected

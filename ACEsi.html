@@ -511,12 +511,12 @@
     <button class="btn" id="universalTabBtn" title="Universal — project-wide actions" onclick="toggleUniversalMenu()">🌐 universal ▾</button>
     <div id="universalMenu" class="dropdown-menu" style="display:none;">
       <div class="cmd-checkbox-label" style="padding:2px 12px;font-size:12px;color:var(--text-dim);">Quick actions:</div>
-      <button class="u-item" style="margin-top:2px;" onclick="runCommand('git diff');closeUniversalMenu();">▶ git diff</button>
-      <hr style="margin:4px 0;">
       <button class="u-item" onclick="openUniversalSearch();closeUniversalMenu();">🔍 Search files</button>
       <hr style="margin:4px 0;">
       <button class="u-item" onclick="openDriveModal();closeUniversalMenu();">☁️ Google Drive</button>
       <button class="u-item" onclick="openNotifyModal();closeUniversalMenu();">🔔 Send notification</button>
+      <button class="u-item" onclick="openEmailNotifyModal();closeUniversalMenu();">📧 Email Notifications</button>
+      <button class="u-item" onclick="openWhatsAppNotifyModal();closeUniversalMenu();">💬 WhatsApp Notifications</button>
       <button class="u-item" onclick="openTasksModal();closeUniversalMenu();">📋 Tasks</button>
       <button class="u-item" onclick="openCalModal();closeUniversalMenu();">📅 Calendar</button>
       <button class="u-item" onclick="openTimeModal();closeUniversalMenu();">⏱️ Timers & Alarms</button>
@@ -707,6 +707,52 @@
         <textarea id="ntfyMsg" rows="3" placeholder="Message to send to your phone..." class="settings-input" style="width:100%;box-sizing:border-box;resize:vertical;"></textarea>
         <button onclick="sendNotification()" class="settings-save" style="width:100%;">Send to my phone</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="emailNotifyOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:560px;max-width:92vw;max-height:80vh;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">📧 Email Notifications</h3>
+      <button class="icon-btn" onclick="closeEmailNotifyModal()" title="Close">✕</button>
+    </div>
+    <div style="padding:18px;overflow-y:auto;max-height:60vh;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+        Create rules to get Windows notifications when specific emails arrive.
+      </div>
+      <div id="emailNotifyRules" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button onclick="addEmailNotifyRule()" class="settings-save" style="margin-top:12px;width:100%;">+ Add Rule</button>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button onclick="saveEmailNotifyRules()" class="settings-save" style="flex:1;">Save Rules</button>
+        <button onclick="testEmailNotify()" class="settings-save" style="flex:1;background:var(--accent);color:#000;">Test Notification</button>
+      </div>
+      <div id="emailNotifyStatus" style="margin-top:10px;font-size:12px;color:var(--text-dim);"></div>
+    </div>
+  </div>
+</div>
+
+<div id="whatsAppNotifyOverlay" class="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center;">
+  <div class="settings-dialog" style="width:500px;max-width:92vw;height:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);">
+      <h3 style="margin:0;font-size:15px;">💬 WhatsApp Notifications</h3>
+      <button class="icon-btn" onclick="closeWhatsAppNotifyModal()" title="Close">✕</button>
+    </div>
+    <div style="padding:18px;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+        Send test notifications to WhatsApp Desktop using <code>whatsapp://</code> URI scheme.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="font-size:12px;color:var(--text-dim);">Your WhatsApp number (international format, e.g. <code>27123456789</code>):</label>
+        <input type="text" id="waNumber" placeholder="27123456789" class="settings-input" style="width:100%;box-sizing:border-box;">
+        <label style="font-size:12px;color:var(--text-dim);">Test message:</label>
+        <textarea id="waTestMsg" rows="2" placeholder="Test notification from ACEsi" class="settings-input" style="width:100%;box-sizing:border-box;resize:vertical;"></textarea>
+        <div style="display:flex;gap:10px;">
+          <button onclick="sendWhatsAppTest()" class="settings-save" style="flex:1;">Send Test to WhatsApp</button>
+          <button onclick="saveWhatsAppNumber()" class="settings-save" style="flex:1;background:var(--accent);color:#000;">Save Number</button>
+        </div>
+      </div>
+      <div id="waStatus" style="margin-top:10px;font-size:12px;color:var(--text-dim);"></div>
     </div>
   </div>
 </div>
@@ -2567,6 +2613,132 @@
   function closeNotifyModal() { document.getElementById('notifyOverlay').style.display = 'none'; }
   document.getElementById('notifyOverlay').addEventListener('click', e => { if (e.target.id === 'notifyOverlay') closeNotifyModal(); });
   document.getElementById('stNotifyBtn').addEventListener('click', e => { e.stopPropagation(); openNotifyModal(); });
+
+  // ===== EMAIL NOTIFICATIONS =====
+  let emailNotifyRules = [];
+
+  function openEmailNotifyModal() {
+    document.getElementById('emailNotifyOverlay').style.display = 'flex';
+    loadEmailNotifyRules();
+  }
+  function closeEmailNotifyModal() { document.getElementById('emailNotifyOverlay').style.display = 'none'; }
+  document.getElementById('emailNotifyOverlay').addEventListener('click', e => { if (e.target.id === 'emailNotifyOverlay') closeEmailNotifyModal(); });
+
+  function loadEmailNotifyRules() {
+    fetch('/email-notify/rules')
+      .then(r => r.json())
+      .then(d => {
+        emailNotifyRules = d.rules || [];
+        renderEmailNotifyRules();
+      })
+      .catch(() => { document.getElementById('emailNotifyStatus').textContent = 'Failed to load rules.'; });
+  }
+
+  function renderEmailNotifyRules() {
+    const container = document.getElementById('emailNotifyRules');
+    container.innerHTML = '';
+    emailNotifyRules.forEach((rule, idx) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--bg-elev);border:1px solid var(--border);border-radius:6px;';
+      div.innerHTML = `
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="emailNotifyRules[${idx}].enabled=this.checked" style="width:18px;height:18px;" title="Enable/disable">
+          <input type="text" placeholder="Rule name" value="${rule.name||''}" onchange="emailNotifyRules[${idx}].name=this.value" class="settings-input" style="flex:1;">
+          <button onclick="deleteEmailNotifyRule(${idx})" class="icon-btn" title="Delete" style="color:#ff6b6b;">🗑</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select onchange="emailNotifyRules[${idx}].account=this.value" class="settings-input" style="min-width:120px;">
+            <option value="both" ${rule.account==='both'?'selected':''}>Both (Gmail + Yahoo)</option>
+            <option value="gmail" ${rule.account==='gmail'?'selected':''}>Gmail only</option>
+            <option value="yahoo" ${rule.account==='yahoo'?'selected':''}>Yahoo only</option>
+          </select>
+          <input type="text" placeholder="From contains (optional)" value="${rule.from||''}" onchange="emailNotifyRules[${idx}].from=this.value" class="settings-input" style="flex:1;min-width:150px;">
+          <input type="text" placeholder="Subject contains" value="${rule.subject||''}" onchange="emailNotifyRules[${idx}].subject=this.value" class="settings-input" style="flex:1;min-width:150px;">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" placeholder="Body contains (optional)" value="${rule.body||''}" onchange="emailNotifyRules[${idx}].body=this.value" class="settings-input" style="flex:1;min-width:150px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);">
+            <input type="checkbox" ${rule.notifyOnce ? 'checked' : ''} onchange="emailNotifyRules[${idx}].notifyOnce=this.checked"> Notify only once per email
+          </label>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function addEmailNotifyRule() {
+    emailNotifyRules.push({ name: '', account: 'both', from: '', subject: '', body: '', enabled: true, notifyOnce: true });
+    renderEmailNotifyRules();
+  }
+
+  function deleteEmailNotifyRule(idx) {
+    emailNotifyRules.splice(idx, 1);
+    renderEmailNotifyRules();
+  }
+
+  function saveEmailNotifyRules() {
+    const status = document.getElementById('emailNotifyStatus');
+    status.textContent = 'Saving...';
+    fetch('/email-notify/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rules: emailNotifyRules })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) { status.textContent = 'Saved!'; setTimeout(() => status.textContent = '', 2000); }
+      else { status.textContent = 'Error: ' + (d.error || 'unknown'); }
+    })
+    .catch(e => { status.textContent = 'Error: ' + e; });
+  }
+
+  function testEmailNotify() {
+    const status = document.getElementById('emailNotifyStatus');
+    status.textContent = 'Sending test notification...';
+    fetch('/email-notify/test', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => { status.textContent = d.ok ? 'Test notification sent!' : 'Error: ' + (d.error || 'unknown'); })
+      .catch(e => { status.textContent = 'Error: ' + e; });
+  }
+
+  // ===== WHATSAPP NOTIFICATIONS =====
+  let waNumber = localStorage.getItem('waNumber') || '';
+  if (waNumber) document.getElementById('waNumber').value = waNumber;
+
+  function openWhatsAppNotifyModal() {
+    document.getElementById('whatsAppNotifyOverlay').style.display = 'flex';
+    document.getElementById('waStatus').textContent = '';
+  }
+  function closeWhatsAppNotifyModal() { document.getElementById('whatsAppNotifyOverlay').style.display = 'none'; }
+  document.getElementById('whatsAppNotifyOverlay').addEventListener('click', e => { if (e.target.id === 'whatsAppNotifyOverlay') closeWhatsAppNotifyModal(); });
+
+  function saveWhatsAppNumber() {
+    const num = document.getElementById('waNumber').value.trim();
+    if (!num) { alert('Enter your WhatsApp number first.'); return; }
+    localStorage.setItem('waNumber', num);
+    waNumber = num;
+    document.getElementById('waStatus').textContent = 'Number saved locally.';
+  }
+
+  function sendWhatsAppTest() {
+    const num = document.getElementById('waNumber').value.trim() || waNumber;
+    const msg = document.getElementById('waTestMsg').value.trim() || 'Test notification from ACEsi';
+    if (!num) { alert('Enter your WhatsApp number first (international format, e.g. 27123456789).'); return; }
+    document.getElementById('waStatus').textContent = 'Opening WhatsApp...';
+    fetch('/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: num, message: msg })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        document.getElementById('waStatus').textContent = 'WhatsApp opened with message!';
+        if (d.reply) addMessage(d.reply, 'ace');
+      } else { document.getElementById('waStatus').textContent = 'Error: ' + (d.error || 'unknown'); }
+    })
+    .catch(e => { document.getElementById('waStatus').textContent = 'Error: ' + e; });
+  }
 
   // ===== LIVE DEVICE + AGENT COUNTS =====
   function refreshCounts() {

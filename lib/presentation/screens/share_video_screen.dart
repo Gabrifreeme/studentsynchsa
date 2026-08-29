@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Renders a Facebook video share link of the form:
-///   https://www.facebook.com/share/v/<videoId>/
+///   `https://www.facebook.com/share/v/<videoId>/`
 /// by embedding Facebook's video plugin for that share URL.
 ///
 /// Route shape (see app_router.dart):

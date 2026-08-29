@@ -142,6 +142,8 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             // submission layer so they never reach the server as 404s.
             _controller.runJavaScript(star.buildNavigationFixScript())
                 .catchError((e) => debugPrint('❌ Early navfix error: $e'));
+            _controller.runJavaScript(star.buildThemeCssScript())
+                .catchError((e) => debugPrint('❌ Theme CSS error: $e'));
           },
           onPageFinished: (url) async {
             _currentUrl = url;
@@ -162,6 +164,12 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
               debugPrint('✅ Navigation fix injected');
             } catch (e) {
               debugPrint('❌ Navigation fix error: $e');
+            }
+            try {
+              await _controller.runJavaScript(star.buildThemeCssScript());
+              debugPrint('✅ Theme CSS injected');
+            } catch (e) {
+              debugPrint('❌ Theme CSS error: $e');
             }
             try {
               await _controller.runJavaScript('''
@@ -876,7 +884,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
               ),
             ),
             backgroundColor: Colors.green.shade700,
-            duration: const Duration(seconds: 15),
+             duration: const Duration(seconds: 5),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'DISMISS',

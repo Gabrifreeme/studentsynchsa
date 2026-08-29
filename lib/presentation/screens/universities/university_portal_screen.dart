@@ -297,6 +297,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
         final report = await _controller.runJavaScriptReturningResult(
           'window.__ssaFieldTracker ? window.__ssaFieldTracker.getReport() : "Tracker not initialized"'
         );
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: SingleChildScrollView(
@@ -311,7 +312,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
               ),
             ),
             backgroundColor: Colors.green.shade700,
-            duration: const Duration(seconds: 15),
+             duration: const Duration(seconds: 5),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'DISMISS',
@@ -459,6 +460,11 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
             icon: const Icon(Icons.open_in_browser),
             onPressed: _openInChrome,
             tooltip: 'Open in Chrome (Recommended for forms)',
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: _showGuidanceDialog,
+            tooltip: 'Application guide',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),

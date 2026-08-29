@@ -26,7 +26,6 @@ class _AiRecommendationsScreenState
   final _ctrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _loading = false;
-  bool _initialAsked = false;
 
   @override
   void initState() {
@@ -75,57 +74,6 @@ class _AiRecommendationsScreenState
           'You are Star, a friendly South African university advisor. '
           'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
           '$contextInfo\nStudent asks: $text',
-      onToken: (token) {
-        setState(() {
-          _messages.last = _ChatMessage(
-            text: _messages.last.text + token,
-            isUser: false,
-          );
-        });
-        _scrollDown();
-      },
-    );
-
-    setState(() => _loading = false);
-  }
-
-  Future<void> _askInitial() async {
-    final profile = ref.read(profileProvider).valueOrNull;
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Complete your profile first so Star can help you!'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return;
-    }
-
-    final subjects = profile.grade12Subjects.isNotEmpty
-        ? profile.grade12Subjects
-              .map((s) => '${s.subject} (${s.mark}%)')
-              .toList()
-        : profile.grade11Subjects
-              .map((s) => '${s.subject} (${s.mark}%)')
-              .toList();
-
-    final prompt = AiService.buildPrompt(
-      firstName: profile.personal.firstName,
-      apsScore: profile.apsScore,
-      subjects: subjects,
-      careerInterests: profile.careerInterests,
-      province: profile.address.province,
-    );
-
-    final starMsg = _ChatMessage(text: '', isUser: false);
-    setState(() {
-      _messages.add(starMsg);
-      _initialAsked = true;
-      _loading = true;
-    });
-
-    await AiService.askStream(
-      prompt: prompt,
       onToken: (token) {
         setState(() {
           _messages.last = _ChatMessage(

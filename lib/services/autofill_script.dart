@@ -1129,20 +1129,20 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   function doAutofill() {
     console.log('🔍 Autofill started');
-    
+
     // Check page code - only autofill from Biographical page (ITS_OAP02) onwards
     // NOT on Start page (ITS_OAP_START) which has student-responsibility fields
     var pageCode = document.getElementById('page_code')?.value || '';
     var validPages = ['ITS_OAP02', 'ITS_OAP02_1', 'ITS_OAP03', 'ITS_OAP04', 'ITS_OAP05', 'ITS_OAP06', 'ITS_OAP07', 'ITS_OAP08'];
     var isValidPage = validPages.some(function(p) { return pageCode.indexOf(p) !== -1; });
-    
+
     if (!isValidPage) {
       console.log('🔍 Autofill skipped - not a valid page for autofill: ' + pageCode);
       showToast('Auto-fill skipped: This page requires your input', '#EF4444');
       try { AutofillResult.postMessage(JSON.stringify({ filled: 0, total: 0, skipped: true })); } catch (e) {}
       return;
     }
-    
+
     console.log('🔍 Autofill started on page: ' + pageCode);
 
     // Trigger blur on ID number field so APEX eventRun() fires
@@ -1364,7 +1364,7 @@ var __ssaNavfix = function() {
   // to gw1view, so rewrite it here and again right before submit.
   function rewriteViewToProc(u) {
     if (typeof u !== 'string' || u.indexOf('gen.gw1pkg.gw1') === -1) return u;
-    return u.replace(/(gen\.gw1pkg\.gw1)view([^a-zA-Z0-9]|\$)/g, '\$1proc\$2');
+    return u.replace(/(gen.gw1pkg.gw1)view([^a-zA-Z0-9]|\$)/g, '\$1proc\$2');
   }
 
   function fixAction(form, log) {
@@ -1430,7 +1430,7 @@ var __ssaNavfix = function() {
           diag('POST back HTTP ' + res.status + ' (' + html.length + ' chars)');
           // A blank/empty body would document.write into a white page —
           // navigate natively so the real ITS response shows instead.
-          if (!html || html.replace(/\s+/g, '').length === 0) {
+          if (!html || html.replace(/s+/g, '').length === 0) {
             console.log('[navfix] blank POST response, navigating natively to ' + target);
             window.location.assign(target);
             return;
@@ -1817,6 +1817,65 @@ String buildViewportPatch() {
   }
   vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
   console.log('Viewport patch applied');
+})();
+''';
+}
+
+/// Injects the My Profile dark theme (matches React ITSProfile component,
+/// mirrored from server.py `_UI_CSS`) into the portal page as an idempotent
+/// `<style id="ssa-theme">`. Purely cosmetic — structural widgets (app bar,
+/// progress bar, Material fields, bottom bar) are added by the ACEsi server's
+/// ui_fix script when it is running; this keeps pages themed when it is not.
+String buildThemeCssScript() {
+  return r'''
+(function() {
+  if (window.__ssaThemeActive) return;
+  window.__ssaThemeActive = true;
+
+  var CSS = 'html,body{background:#0F172A!important;color:#F8FAFC!important}'
+    + 'input{background:#1E2635!important;color:#F8FAFC!important;border:none!important;border-radius:8px!important;padding:10px 12px!important;font-size:14px!important}'
+    + 'select{background:#1E2635!important;color:#F8FAFC!important;border:none!important;border-radius:8px!important;padding:10px 12px!important;font-size:14px!important}'
+    + 'textarea{background:#1E2635!important;color:#F8FAFC!important;border:none!important;border-radius:8px!important;padding:10px 12px!important;font-size:14px!important}'
+    + 'input[type=submit]{background:#7C3AED!important}'
+    + 'input[type=button]{background:transparent!important}'
+    + 'td{color:#9CA3AF!important;background:transparent!important}'
+    + 'font{color:#9CA3AF!important}'
+    + 'b,strong{color:#F8FAFC!important}'
+    + 'label{color:#9CA3AF!important}'
+    + 'h1,h2,h3{color:#F8FAFC!important}'
+    + 'a{color:#7C3AED!important}'
+    + 'option{background:#1E2635!important;color:#F8FAFC!important}'
+    + '#ssa-appbar{position:fixed;top:0;left:0;right:0;z-index:2147483000;height:56px;display:flex;align-items:center;justify-content:center;background:#0F172A}'
+    + '#ssa-appbar span{color:#F8FAFC;font-size:18px;font-weight:500}'
+    + '#ssa-prog{position:fixed;top:56px;left:0;right:0;z-index:2147483000;background:#0F172A;padding:16px 24px 6px 24px}'
+    + '#ssa-prog .bar{display:flex;margin-bottom:8px}'
+    + '#ssa-prog .seg{height:4px;border-radius:2px;flex:1;margin:0 2px;background:#1E2635}'
+    + '#ssa-prog .seg.on{background:#7C3AED}'
+    + '#ssa-prog .step{text-align:right;color:#6B7280;font-size:12px;padding-bottom:6px}'
+    + '#ssa-star{position:fixed;right:16px;bottom:110px;z-index:2147482999;width:48px;height:48px;border-radius:50%;background:#1E2635;border:1px solid #2A3447;display:flex;align-items:center;justify-content:center;font-size:22px;color:#FFC107;box-shadow:0 0 12px rgba(255,193,7,.4)}';
+
+  function inject() {
+    var s = document.getElementById('ssa-theme');
+    if (!s) {
+      s = document.createElement('style');
+      s.id = 'ssa-theme';
+      document.head.appendChild(s);
+    }
+    if (s.textContent !== CSS) s.textContent = CSS;
+  }
+
+  inject();
+
+  var observer = new MutationObserver(function() {
+    if (!document.getElementById('ssa-theme')) inject();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  setInterval(function() {
+    if (!document.getElementById('ssa-theme')) inject();
+  }, 500);
+
+  console.log('[SSA] theme CSS injected (resilient)');
 })();
 ''';
 }
@@ -2377,4 +2436,3 @@ String buildRemoveOldPostalPickerScript() {
 })();
 ''';
 }
-

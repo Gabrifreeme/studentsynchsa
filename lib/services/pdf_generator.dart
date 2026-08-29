@@ -319,8 +319,6 @@ class PdfGenerator {
       ],
     );
   }
-
-  List<int> _grade12Subjects() => [];
 }
 
 class _PdfTheme {

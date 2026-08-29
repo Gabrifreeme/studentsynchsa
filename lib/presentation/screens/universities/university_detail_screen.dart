@@ -399,10 +399,12 @@ class UniversityDetailScreen extends ConsumerWidget {
     try {
       final bytes = await PdfGenerator().generateApplicationPdf(profile, universityName: uniName);
       downloadPdfBytes(bytes, '${uniName.replaceAll(RegExp(r'\s+'), '_')}_Application.pdf');
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('PDF generated!'), backgroundColor: AppColors.success),
       );
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: $e'), backgroundColor: AppColors.error),
       );
