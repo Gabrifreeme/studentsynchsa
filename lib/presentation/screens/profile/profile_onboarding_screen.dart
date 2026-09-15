@@ -88,6 +88,7 @@ class _ProfileOnboardingScreenState
   final _gradeCtrl = TextEditingController();
   String _subjectResult = '';
   String _subjectSymbol = '';
+  int _subjectResetKey = 0;
 
   // Page 5 - Qualifications
   int _academicYear = 0;
@@ -1627,6 +1628,7 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              key: ValueKey('subject_result_$_subjectResetKey'),
               initialValue: _subjectResult.isEmpty ? null : _subjectResult,
               decoration: const InputDecoration(
                 labelText: 'Result',
@@ -1645,6 +1647,7 @@ class _ProfileOnboardingScreenState
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              key: ValueKey('subject_symbol_$_subjectResetKey'),
               initialValue: _subjectSymbol.isEmpty ? null : _subjectSymbol,
               decoration: const InputDecoration(
                 labelText: 'Symbol *',
@@ -1691,13 +1694,15 @@ class _ProfileOnboardingScreenState
             }),
             OutlinedButton.icon(
               onPressed: () {
-                if (_subjectCtrl.text.trim().isEmpty ||
-                    _gradeCtrl.text.trim().isEmpty ||
-                    _subjectSymbol.isEmpty) {
+                final missing = <String>[];
+                if (_subjectCtrl.text.trim().isEmpty) missing.add('Subject');
+                if (_gradeCtrl.text.trim().isEmpty) missing.add('Grade');
+                if (_subjectSymbol.isEmpty) missing.add('Symbol');
+                if (missing.isNotEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please fill in subject, grade and symbol'),
-                      duration: Duration(seconds: 2),
+                    SnackBar(
+                      content: Text('Please fill in: ${missing.join(', ')}'),
+                      duration: const Duration(seconds: 3),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -1714,6 +1719,7 @@ class _ProfileOnboardingScreenState
                   _gradeCtrl.clear();
                   _subjectResult = '';
                   _subjectSymbol = '';
+                  _subjectResetKey++;
                 });
               },
               icon: const Icon(Icons.add, size: 18),

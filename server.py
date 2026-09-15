@@ -1619,9 +1619,18 @@ def run_command():
         _security_alert("suspicious_command", f"Pattern: {pattern}, Command: {command[:200]}")
         return jsonify({'error': f"Command blocked: suspicious pattern '{pattern}'"}), 403
     try:
-        if "scrcpy" in command.lower():
+        low = command.lower().strip()
+        if "scrcpy" in low:
             subprocess.Popen('start cmd /k "scrcpy"', shell=True)
             return jsonify({'output': '✅ Scrcpy launched'})
+        # `flutter run` stays attached streaming logs, so subprocess.run() would
+        # block this request forever and the UI would show nothing. Launch it in
+        # its own window (same pattern as scrcpy) and return immediately.
+        if low.startswith("flutter run") or "run-android.cmd" in low:
+            script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "scripts", "run-android.cmd")
+            subprocess.Popen('start "Flutter Run" cmd /k "%s"' % script, shell=True)
+            return jsonify({'output': '▶ Flutter run launched in a new window — watch the terminal there.'})
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         output = result.stdout if result.stdout else result.stderr
         return jsonify({'output': output})
