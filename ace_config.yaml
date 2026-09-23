@@ -1,0 +1,135 @@
+# ace_config.yaml
+# ACEsi general-purpose autonomous agent framework configuration.
+# Defines contexts (app/project environments) and global settings.
+# StudentSyncSA is the default context; other apps/tasks get their own context.
+
+global:
+  version: "1.0"
+  default_context: "studentsyncsa"
+  auto_save: true
+  # LLM provider profile names referenced by context.llm_profile
+  # Each profile: provider chain (first available wins), then fallback to local Ollama.
+  profiles:
+    # Fast + capable cloud model (preferred for planning, code, complex reasoning)
+    cloud:
+      - provider: "openrouter"
+        model: "openai/o1-preview"
+      - provider: "cerebas"
+        model: "gpt-oss-120b"
+      - provider: "groq"
+        model: "llama-3.3-70b-versatile"
+      - provider: "openrouter"
+        model: "nvidia/nemotron-super-120b-a12b:free"
+    # CPU-friendly local model (always available, offline)
+    local:
+      - provider: "ollama"
+        model: "qwen2.5:7b"
+    # Fast local model (weaker quality, but quick for coordinate/verify tasks)
+    local_fast:
+      provider: "ollama"
+      model: "qwen2.5:3b"
+    # Code-specific: best cloud model for code reasoning
+    code:
+      - provider: "openrouter"
+        model: "openai/o1-preview"
+      - provider: "groq"
+        model: "llama-3.3-70b-versatile"
+      - provider: "ollama"
+        model: "qwen2.5:7b"
+
+# ── Tool capability restrictions per context ───────────────────────────────
+# Tools not listed here are unavailable when the context is active.
+# "all" = every tool is available. Otherwise a subset.
+tool_caps:
+  studentsyncsa:
+    allowed: ["ui", "code", "net", "ctrl"]
+    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "grep", "write_file", "edit_file",
+            "run_command", "git_status", "git_log", "git_commit", "git_branch",
+            "git_merge", "build_apk", "pub_add", "pub_remove", "pub_upgrade",
+            "flutter_test", "flutter_analyze",
+            "ui_device", "ui_app_open", "ui_tap", "ui_swipe", "ui_type",
+            "ui_key", "ui_dump", "ui_screenshot",
+            "ui_assert_text", "ui_assert_element", "ui_assert_visible",
+            "ui_expect", "ui_test_run",
+            "cdp_connect", "cdp_evaluate", "cdp_console_logs",
+            "cdp_dom_state", "cdp_network_requests", "cdp_status",
+            "curl", "restart", "notify",
+            "get_time", "web_search", "weather", "note"]
+  generic:
+    allowed: ["ui", "code", "net", "ctrl"]
+    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "grep", "write_file", "edit_file",
+            "run_command", "git_status", "git_log", "git_commit", "git_branch",
+            "git_merge", "cdp_connect", "cdp_evaluate", "cdp_console_logs",
+            "cdp_dom_state", "cdp_network_requests", "cdp_status",
+            "curl", "restart", "notify",
+            "get_time", "web_search", "weather", "note"]
+  web_only:
+    allowed: ["ui", "net", "ctrl"]
+    tools: ["cdp_connect", "cdp_evaluate", "cdp_console_logs",
+            "cdp_dom_state", "cdp_network_requests", "cdp_status",
+            "curl", "restart", "notify",
+            "get_time", "web_search", "weather", "note"]
+
+contexts:
+  # ── Default: StudentSyncSA (full backward compatibility) ─────────────────────
+  studentsyncsa:
+    name: "StudentSyncSA"
+    type: "flutter_android"
+    app_package: "com.studentsyncsa.studentsyncsa"
+    project_root: "/Users/chris/StudentSyncSA"
+    activity: "MainActivity"
+    # ITS portal integration
+    startup_url: "https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP"
+    cdp_url_fragment: "univen|ITS_OAP"
+    llm_profile: "cloud"
+    tool_caps: "studentsyncsa"
+    # Saved tasks / shortcuts
+    shortcuts:
+      its_application: "ui_task.its_application"
+    # App-specific known structure for prompt injection
+    known_structure: "Known app structure (StudentSyncSA): Landing -> login -> bottom nav (Home / Universities) -> tap a university card -> detail screen -> tap Online Portal button -> ITS WebView."
+    # Default prompt overlay
+    prompt_overlay: |
+      KNOWN_APP_STRUCTURE (StudentSyncSA): Landing -> login -> bottom navigation bar
+      with tabs like Home / Universities. The ITS portal is reached via:
+      Universities tab -> tap a university card -> detail screen -> tap
+      "Online Portal" button -> ITS portal opens in an in-app WebView.
+
+  # ── Generic web automation context ────────────────────────────────────────────
+  generic:
+    name: "Generic Web"
+    type: "web"
+    app_package: null           # use local Chrome instead of Android app
+    project_root: null
+    startup_url: null           # user provides URL per-task
+    cdp_url_fragment: ""        # match any page target
+    llm_profile: "cloud"
+    tool_caps: "generic"
+    known_structure: null
+    prompt_overlay: null
+
+  # ── Web-only context (no app, just browser) ──────────────────────────────────
+  web_only:
+    name: "Web Only"
+    type: "web"
+    app_package: null
+    project_root: null
+    startup_url: "https://example.com"
+    cdp_url_fragment: ""
+    llm_profile: "cloud"
+    tool_caps: "web_only"
+    known_structure: null
+    prompt_overlay: null
+
+  # ── Code-only context (no device, just file editing) ──────────────────────────
+  code:
+    name: "Code Tools"
+    type: "code"
+    app_package: null
+    project_root: "."
+    startup_url: null
+    cdp_url_fragment: null
+    llm_profile: "code"
+    tool_caps: "generic"   # has code + net tools, no ui_*
+    known_structure: null
+    prompt_overlay: null

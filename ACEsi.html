@@ -596,7 +596,7 @@
   <div id="min-dock"></div>
   <span class="st-spacer"></span>
   <span class="st-model" id="stModelWrap">
-    <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">DeepSeek V4 Flash</b> ▾</button>
+    <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">GPT-OSS 20B</b> ▾</button>
     <div id="stModelMenu" class="st-model-menu"></div>
   </span>
   <span class="st-item" style="margin-left:8px;display:none;" id="stDriveWrap">
@@ -1550,7 +1550,7 @@ function showThinking(text) {
 
     showThinking(text);
     try {
-      const savedModel = localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free';
+      const savedModel = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
       let model = savedModel;
       let effText = text;
       const moodHint = detectMood(text);
@@ -1597,7 +1597,7 @@ function showThinking(text) {
           });
           const d = await res.json();
           if (d.reply && d.reply.indexOf('opencode server not running') !== -1) {
-            localStorage.setItem('ace_modelSelect', 'deepseek/deepseek-v4-flash-0731:free');
+            localStorage.setItem('ace_modelSelect', 'openai/gpt-oss-20b:free');
             refreshStatusModel();
             buildModelPicker();
             addMessage('⚠️ The opencode server is off. Auto-switched to GPT-OSS 20B (free cloud) — pick a cloud or local model from the menu, or start opencode serve to use opencode models.', 'ace');
@@ -2280,7 +2280,7 @@ function showThinking(text) {
       { type: 'checkbox', id: 'liveCursor', label: 'Show live cursors', desc: 'Display collaborator cursors.' }
     ],
     ai: [
-      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['deepseek/deepseek-v4-flash-0731:free','DeepSeek V4 Flash (free, smart)'],['openai/gpt-oss-20b:free','GPT-OSS 20B (free, tools)'],['google/gemma-4-26b-a4b-it:free','Gemma 4 26B (free)'],['inclusionai/ling-3.0-flash:free','Ling 3.0 Flash (free)'],['cohere/north-mini-code:free','North Mini Code (free)']], def: 'deepseek/deepseek-v4-flash-0731:free' },
+      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['openai/gpt-oss-20b:free','GPT-OSS 20B (free, tools)'],['google/gemma-4-26b-a4b-it:free','Gemma 4 26B (free)'],['inclusionai/ling-3.0-flash:free','Ling 3.0 Flash (free)'],['cohere/north-mini-code:free','North Mini Code (free)']], def: 'openai/gpt-oss-20b:free' },
       { type: 'range', id: 'temperature', label: 'Temperature', desc: 'Randomness of responses (0–2).', min: 0, max: 2, step: 0.1, def: 0.7 },
       { type: 'select', id: 'maxTokens', label: 'Max tokens', desc: 'Maximum response length.', options: [['250','250'],['500','500'],['1000','1000'],['2000','2000']], def: '500' }
     ],
@@ -2303,8 +2303,7 @@ function showThinking(text) {
   };
 
 const DEFAULT_MODELS = [
-    ['deepseek/deepseek-v4-flash-0731:free', 'DeepSeek V4 Flash · free · smart'],
-    ['openai/gpt-oss-20b:free', 'GPT-OSS 20B · free (backup)'],
+    ['openai/gpt-oss-20b:free', 'GPT-OSS 20B · free (tools)'],
     ['google/gemma-4-26b-a4b-it:free', 'Gemma 4 26B · free'],
     ['inclusionai/ling-3.0-flash:free', 'Ling 3.0 Flash · free'],
     ['cohere/north-mini-code:free', 'North Mini Code · free']
@@ -2316,7 +2315,6 @@ const DEFAULT_MODELS = [
   ];
 
   const OPENCODE_MODELS = [
-    ['opencode/deepseek-v4-flash-free', 'DeepSeek V4 Flash · free'],
     ['opencode/big-pickle', 'Big Pickle'],
     ['opencode/north-mini-code-free', 'North Mini Code · free'],
     ['opencode/ling-3.0-flash-free', 'Ling 3.0 Flash · free'],
@@ -2457,7 +2455,7 @@ const DEFAULT_MODELS = [
     const menu = document.getElementById('stModelMenu');
     const openrouter = DEFAULT_MODELS;
     const custom = getLlmModels().map(m => [m.model, m.name]);
-    const current = localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free';
+    const current = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
     let html = '<div class="st-model-group">Opencode</div>';
     OPENCODE_MODELS.forEach(o => {
       const active = current === o[0] || (current === 'opencode' && o[0] === 'opencode/deepseek-v4-flash-free');
@@ -2501,7 +2499,7 @@ const DEFAULT_MODELS = [
 
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free');
+    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free');
   }
 
   function toggleModelMenu() {
@@ -2584,7 +2582,7 @@ const DEFAULT_MODELS = [
 
   async function saveSettings() {
     const selEl = document.getElementById('modelSelect');
-    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free')) {
+    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free')) {
       if (!(await requireAdmin())) return;
     }
     const llmNameCheck = document.getElementById('llmName');
