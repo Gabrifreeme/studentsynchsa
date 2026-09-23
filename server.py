@@ -3106,6 +3106,20 @@ def _safe_user_path(path):
     p = path.strip().lower()
     if p in _USER_ALIASES:
         return _USER_ALIASES[p]
+    # If it's a relative path like "Pictures/file.png" or just "file.png",
+    # search for it in the allowed directories.
+    if not os.path.isabs(path):
+        # Try "Pictures/file.png" -> join with ~/
+        for root in _USER_ALLOWED_ROOTS:
+            candidate = os.path.join(root, path)
+            if os.path.isfile(candidate):
+                return os.path.realpath(candidate)
+        # Try just the filename in each allowed root
+        filename = os.path.basename(path)
+        for root in _USER_ALLOWED_ROOTS:
+            for dirpath, dirnames, filenames in os.walk(root):
+                if filename in filenames:
+                    return os.path.realpath(os.path.join(dirpath, filename))
     if os.path.isabs(path):
         rp = os.path.realpath(path)
     else:
@@ -3141,6 +3155,26 @@ def tool_read_user_file(path):
         return True, cut
     except Exception as e:
         return False, str(e)
+
+def tool_open_user_file(path):
+    """Open a file from user directories (Pictures, Desktop, Downloads) with the system default application."""
+    if _kill_armed():
+        return False, "E-STOP is armed — no file tools."
+    rp = _safe_user_path(path)
+    if not rp or not os.path.isfile(rp):
+        return False, "file not found or not allowed: %s" % path
+    try:
+        import subprocess, platform
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(rp)
+        elif system == "Darwin":
+            subprocess.run(["open", rp], check=False)
+        else:
+            subprocess.run(["xdg-open", rp], check=False)
+        return True, "opened %s with default viewer" % rp
+    except Exception as e:
+        return False, "failed to open: %s" % e
 
 def tool_grep(pattern, path="."):
     if _kill_armed():
@@ -4490,6 +4524,7 @@ TOOLS = {
     "read_file": (tool_read_file, ("path",)),
     "list_user_files": (tool_list_user_files, ("path",)),
     "read_user_file": (tool_read_user_file, ("path",)),
+    "open_user_file": (tool_open_user_file, ("path",)),
     "grep": (tool_grep, ("pattern", "path")),
     "write_file": (tool_write_file, ("path", "content")),
     "open_in_vscode": (tool_open_in_vscode, ("path", "content")),
@@ -4554,6 +4589,9 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "read_user_file",
         "description": "Read a file from user directories (Pictures, Desktop, Downloads). Args: path.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "open_user_file",
+        "description": "Open a file from user directories (Pictures, Desktop, Downloads) with the system default application (image viewer, PDF viewer, etc.). Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "grep",
         "description": "Regex search file contents. Args: pattern, path.",
@@ -5135,7 +5173,7 @@ _TOOL_DOMAINS = {
     # both code edits and on-device taps
     "curl": "net",
     # file-system / code tools
-    "list_files": "code", "read_file": "code", "list_user_files": "code", "read_user_file": "code", "grep": "code",
+    "list_files": "code", "read_file": "code", "list_user_files": "code", "read_user_file": "code", "open_user_file": "code", "grep": "code",
     "write_file": "code", "edit_file": "code", "open_in_vscode": "code", "run_command": "code",
     "git_status": "code", "git_log": "code", "git_commit": "code",
     "git_branch": "code", "git_merge": "code",

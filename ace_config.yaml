@@ -43,7 +43,7 @@ global:
 tool_caps:
   studentsyncsa:
     allowed: ["ui", "code", "net", "ctrl"]
-    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "grep", "write_file", "edit_file",
+    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "grep", "write_file", "edit_file",
             "run_command", "git_status", "git_log", "git_commit", "git_branch",
             "git_merge", "build_apk", "pub_add", "pub_remove", "pub_upgrade",
             "flutter_test", "flutter_analyze",
@@ -57,7 +57,7 @@ tool_caps:
             "get_time", "web_search", "weather", "note"]
   generic:
     allowed: ["ui", "code", "net", "ctrl"]
-    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "grep", "write_file", "edit_file",
+    tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "grep", "write_file", "edit_file",
             "run_command", "git_status", "git_log", "git_commit", "git_branch",
             "git_merge", "cdp_connect", "cdp_evaluate", "cdp_console_logs",
             "cdp_dom_state", "cdp_network_requests", "cdp_status",
