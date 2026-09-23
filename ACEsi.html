@@ -123,16 +123,20 @@
      }
      .chip-plan { background: rgba(255, 123, 0, 0.15); color: var(--accent-2); border: 1px solid rgba(255, 123, 0, 0.5); }
      .chip-build { background: rgba(255, 123, 0, 0.15); color: var(--accent-2); border: 1px solid rgba(255, 123, 0, 0.5); }
-     .msg.ace-thinking {
+.msg.ace-thinking {
        align-self: flex-start;
        background: var(--bg-elev); color: var(--text-mute);
        border: 1px solid var(--border); border-bottom-left-radius: 4px;
        font-style: italic; font-size: 13px; opacity: 0.8;
      }
-      .dot { display: inline-block; width: 4px; height: 4px; margin: 0 1px; border-radius: 50%;
-             background: currentColor; animation: dotBounce 1.2s infinite; }
-      .dot:nth-child(2) { animation-delay: 0.2s; }
-      .dot:nth-child(3) { animation-delay: 0.4s; }
+     .dot { display: inline-block; width: 4px; height: 4px; margin: 0 1px; border-radius: 50%;
+            background: currentColor; animation: dotBounce 1.2s infinite; }
+     .dot:nth-child(2) { animation-delay: 0.2s; }
+     .dot:nth-child(3) { animation-delay: 0.4s; }
+     @keyframes dotBounce {
+       0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+       30% { transform: translateY(-4px); opacity: 1; }
+     }
       .msg.ace-stoppable { display: flex; align-items: center; gap: 10px; }
       .ace-stop-btn {
         flex-shrink: 0; padding: 3px 10px; border-radius: 6px; cursor: pointer;
@@ -165,11 +169,6 @@
       .msg.ace-step.done .w-state { color: var(--success); }
        .msg.ace-step.error { border-color: var(--danger); }
       .msg.ace-step.error .w-state { color: var(--danger); }
-     @keyframes dotBounce {
-       0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
-       30% { transform: translateY(-4px); opacity: 1; }
-     }
-
 
     /* ---------- Resizers ---------- */
     #resizer1, #resizer2 { width: 1px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; }
@@ -525,6 +524,7 @@
       <hr style="margin:4px 0;">
       <button class="u-item" onclick="openSkillsModal();closeUniversalMenu();">⚡ Skills</button>
       <button class="u-item" onclick="killCurrentProcess();closeUniversalMenu();">💀 Kill</button>
+      <button class="u-item" id="aceEStopBtn" onclick="estopRequest();closeUniversalMenu();" style="color:#ff3b3b;font-weight:700;">⛔ E-STOP ACEsi</button>
       <hr style="margin:4px 0;">
       <button class="u-item" onclick="testSecurityAlert();closeUniversalMenu();" style="color:#ff7b00;">🛡️ Test Security Alert</button>
     </div>
@@ -533,10 +533,24 @@
   <button class="icon-btn" onclick="location.reload()" title="Reload">⟳</button>
   <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
 </div>
+<div id="estopBanner" style="display:none;position:sticky;top:0;z-index:900;background:#7f1d1d;color:#fff;text-align:center;padding:10px 12px;font-size:14px;font-weight:700;letter-spacing:.5px;">
+  ⛔ E-STOPPED — ACEsi is fully stopped and silent. Type the un-kill word into any chat (on your phone via ntfy) to resume.
+  <div style="margin-top:8px;">
+    <input id="estopUnword" type="password" placeholder="Un-kill word" style="padding:6px 10px;border-radius:6px;border:none;font-size:13px;width:180px;">
+    <button class="btn" style="background:#16a34a;color:#fff;border:none;" onclick="estopResume()">Resume</button>
+  </div>
+</div>
 <div id="main">
   <div id="chat-panel">
     <div class="panel-title"><span>Conversation</span> <span style="display:flex;align-items:center;gap:10px;"><button class="min-btn" onclick="minPanel('chat-panel')" title="Minimize panel">-</button></span></div>
     <div id="chat"><div class="msg ace">Hi, Chris. I'm here.</div></div>
+    <div id="indicator-bar" style="display:none;text-align:center;padding:6px 0;font-size:13px;color:var(--accent);">
+    <button id="ctrl-stop" class="ace-stop-btn" title="Stop" disabled>⏹ Stop</button>
+    <span style="display:inline-block;width:6px;"></span>
+    <span id="indicator-name" style="font-style:italic;"></span>
+    <span style="display:inline-block;width:6px;"></span>
+    <span id="ctrl-timer" style="font-family:var(--mono);font-size:12px;color:var(--text-mute);">00:00</span>
+  </div>
     <div id="input-area">
       <div id="attach-preview"></div>
       <div id="input-row">
@@ -544,7 +558,7 @@
         <button class="attach-btn" id="micBtn" title="Talk to ACEsi (speech-to-text)">🎤</button>
         <button class="attach-btn" id="inputTtsBtn" title="ACEsi speaks replies">🔊</button>
         <textarea id="userInput" rows="1" placeholder="Type a message..." spellcheck="true" lang="en"></textarea>
-        <button id="sendBtn">Send</button>
+        <button id="sendBtn" type="button">Send</button>
       </div>
     </div>
   </div>
@@ -578,6 +592,7 @@
   <span class="st-dot"></span>
   <span class="st-item">🤖 <span id="agent-count" class="neon-green">0</span> agents</span>
   <span class="st-dot"></span>
+  <span class="st-item" id="stIndicator" style="display:none;"></span>
   <div id="min-dock"></div>
   <span class="st-spacer"></span>
   <span class="st-model" id="stModelWrap">
@@ -981,28 +996,31 @@
      } catch (e) {}
    }
    restoreChat();
-  let thinkingEl = null;
+let thinkingEl = null;
   let activityTimer = null;
-  let stopButtonEl = null;
+  let timerStart = 0;
+  let timerInterval = null;
+  let timerPausedElapsed = 0;
   let currentAbort = null;
-  let uiRequestActive = false;   // true while a request was sent from THIS window
-  let monitorThinkingShown = false; // poller created the thinking bubble (remote run)
+  let uiRequestActive = false;
+  let userStopped = false;
+  let monitorThinkingShown = false;
   let lastPollStatus = 'idle';
-  function showThinking(text) {
+  let paused = false;
+function showThinking(text) {
     hideThinking();
     const keywords = ['error', 'bug', '404', 'not working', 'how do i', 'what is', 'why does', 'why won', 'solution', 'fix', 'documentation', 'how to'];
     const t = (text || '').toLowerCase();
-    const label = (keywords.some(k => t.includes(k))) ? '\ud83d\udd0d Researching\u2026' : '\u2026';
+    const label = (keywords.some(k => t.includes(k))) ? '🔍 Researching…' : '…';
     const dots = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
-    thinkingEl = addMessage(label.replace('\u2026', dots), 'ace-thinking');
+    thinkingEl = addMessage(label.replace('…', dots), 'ace-thinking');
     thinkingEl.classList.add('ace-stoppable');
-    stopButtonEl = document.createElement('button');
-    stopButtonEl.className = 'ace-stop-btn';
-    stopButtonEl.innerHTML = '\u23f9 Stop';
-    stopButtonEl.onclick = stopRequest;
-    thinkingEl.appendChild(stopButtonEl);
+    const ctrlBar = document.getElementById('indicator-bar');
+    if (ctrlBar) ctrlBar.style.display = '';
+    ctrlStartTimer();
   }
   async function stopRequest() {
+    userStopped = true;
     if (currentAbort) { try { currentAbort.abort(); } catch (e) {} }
     currentAbort = null;
     uiRequestActive = false;
@@ -1018,43 +1036,67 @@
     thinkingEl.dataset.activity = activity;
     const dots = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
     thinkingEl.innerHTML = dots + ' ' + activity;
-    if (stopButtonEl) thinkingEl.appendChild(stopButtonEl);
   }
   // Global activity monitor: always follows the server's status, so ACEsi's
   // window shows live steps even when a request was fired from outside (e.g.
   // by the main assistant) rather than through this chat's send button.
   async function pollActivity() {
     try {
+      if (userStopped) {
+        hideThinking();
+      }
       const r = await fetch('/opencode/status');
       const d = await r.json();
       if (!d) return;
       const st = String(d.status || 'idle');
       if (st === 'busy') {
-        if (lastPollStatus !== 'busy' && !uiRequestActive) {
+        if (lastPollStatus !== 'busy' && !uiRequestActive && !userStopped) {
           for (const k in workStepEls) delete workStepEls[k];
           lastWorkStepCount = 0;
         }
         renderWorkSteps(d);
-        if (!uiRequestActive && !thinkingEl) {
+        if (!uiRequestActive && !thinkingEl && !userStopped) {
           showThinking('');
           monitorThinkingShown = true;
         }
-        if (thinkingEl) updateThinkingText(d.activity);
+        if (thinkingEl && !userStopped) updateThinkingText(d.activity);
       } else {
-        // idle / error / done
-        if (lastPollStatus === 'busy') {
-          // just transitioned out of a run
-          if (monitorThinkingShown && d.last_reply) {
+        // Finalize whenever the run has ended and there is a reply we have not shown
+        // yet. The old gate required `monitorThinkingShown`, which only arms when no
+        // thinking element exists at poll time -- but the chat's send flow creates
+        // one first, so chat-initiated requests never satisfied it and the reply was
+        // silently dropped.
+        if (window.__aceShownReply === undefined) {
+          if (st === 'idle' && d.last_reply && !uiRequestActive) {
+            window.__aceShownReply = d.last_reply;
             finalizeStreamedReply(d.last_reply);
+          } else {
+            window.__aceShownReply = d.last_reply || null;   // seed on first poll, don't show
           }
-          if (monitorThinkingShown) {
-            hideThinking();
-            monitorThinkingShown = false;
-          }
+        } else if (!uiRequestActive && d.last_reply && d.last_reply !== window.__aceShownReply) {
+          window.__aceShownReply = d.last_reply;
+          finalizeStreamedReply(d.last_reply);
         }
+        if (!uiRequestActive && (monitorThinkingShown || thinkingEl)) {
+          hideThinking();
+          monitorThinkingShown = false;
+        }
+        userStopped = false;
       }
       lastPollStatus = st;
       maybeShowShotPopup(d.shot_ts);
+      const ind = d.indicator || '';
+      const indBar = document.getElementById('indicator-bar');
+      const indName = document.getElementById('indicator-name');
+      if (indBar && indName) {
+        if (st === 'busy' && !userStopped) {
+          indBar.style.display = '';
+          indName.textContent = ind;
+        } else {
+          indBar.style.display = 'none';
+          if (indName) indName.textContent = '';
+        }
+      }
     } catch (e) {}
   }
   setInterval(pollActivity, 1000);
@@ -1092,9 +1134,45 @@
     }
   }
   function hideThinking() {
+    ctrlStopTimer();
     if (thinkingEl && thinkingEl.parentNode) thinkingEl.parentNode.removeChild(thinkingEl);
     thinkingEl = null;
-    stopButtonEl = null;
+    const ctrlBar = document.getElementById('indicator-bar');
+    if (ctrlBar) ctrlBar.style.display = 'none';
+    const indName = document.getElementById('indicator-name');
+    if (indName) indName.textContent = '';
+    const timerEl = document.getElementById('ctrl-timer');
+    if (timerEl) timerEl.textContent = '00:00';
+  }
+  function ctrlStartTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerStart = Date.now();
+    timerPausedElapsed = 0;
+    paused = false;
+    const timerEl = document.getElementById('ctrl-timer');
+    if (timerEl) timerEl.textContent = '00:00';
+    const stopBtn = document.getElementById('ctrl-stop');
+    if (stopBtn) stopBtn.disabled = false;
+    timerInterval = setInterval(updateTimer, 500);
+    updateTimer();
+  }
+  function ctrlStopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerStart = 0;
+    timerPausedElapsed = 0;
+    paused = false;
+    const stopBtn = document.getElementById('ctrl-stop');
+    if (stopBtn) stopBtn.disabled = true;
+  }
+  function updateTimer() {
+    if (!timerInterval || paused) return;
+    const elapsed = timerPausedElapsed + Math.floor((Date.now() - timerStart) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const timerEl = document.getElementById('ctrl-timer');
+    if (timerEl) {
+      timerEl.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
   }
 
   // Inline work-step rendering: shows ACEsi's tool steps (grey) and reply
@@ -1111,11 +1189,13 @@
       const stCls = s.state === 'running' ? 'running' : (s.state === 'error' ? 'error' : (s.state === 'pending' ? 'pending' : 'done'));
       const stTxt = s.state === 'running' ? '▶' : (s.state === 'error' ? '✖' : (s.state === 'pending' ? '…' : '✔'));
       const id = s.id || (cls + ':' + s.text);
+      const watched = /^write_file /.test(String(s.text || ''));
+      const wasDone = workStepEls[id] && (workStepEls[id].className.indexOf('done') !== -1 || workStepEls[id].className.indexOf('error') !== -1);
       let el = workStepEls[id];
       if (!el) {
         el = document.createElement('div');
          el.className = 'msg ace-step ' + cls + ' ' + stCls;
-         el.innerHTML = '<span class="w-icon">' + (s.icon || '⚙️') + '</span>' +
+         el.innerHTML = '<span class="w-icon">' + String(s.icon || '⚙️') + '</span>' +
            '<span class="w-text">' + escapeHtml(s.text || '') + '</span>' +
            '<span class="w-state">' + stTxt + '</span>';
          appendChat(el);
@@ -1131,11 +1211,59 @@
            changed = true;
          }
        }
+       if (watched && s.state === 'done' && !wasDone) {
+         showFileSavedPopup(String(s.text || '').replace(/^write_file\s+/, '').trim());
+       }
      }
      if (changed || steps.length !== lastWorkStepCount) {
        lastWorkStepCount = steps.length;
        scrollToBottom();
      }
+  }
+
+  let lastFileSavedShown = '';
+  function showFileSavedPopup(path) {
+    if (!path || path === lastFileSavedShown) return;
+    lastFileSavedShown = path;
+    const ov = document.getElementById('fileSavedOverlay');
+    if (!ov) return;
+    const pEl = document.getElementById('filesavedPath');
+    const cEl = document.getElementById('filesavedContent');
+    const stEl = document.getElementById('filesavedStatus');
+    const full = (path.indexOf(':') === 1 ? path : 'C:\\Users\\chris\\StudentSyncSA\\' + path).replace(/\//g, '\\');
+    if (pEl) pEl.textContent = full;
+    if (cEl) cEl.textContent = 'Loading…';
+    if (stEl) stEl.textContent = '';
+    ov.style.display = 'flex';
+    fetch('/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: full })
+    }).then(r => r.json()).then(d => {
+      if (cEl) cEl.textContent = d.content != null ? d.content : ('(could not read: ' + (d.error || 'unknown') + ')');
+      if (stEl) stEl.textContent = 'File saved and verified on disk.';
+    }).catch(e => {
+      if (cEl) cEl.textContent = '(could not read file: ' + e.message + ')';
+    });
+  }
+  function closeFileSavedPopup() {
+    const ov = document.getElementById('fileSavedOverlay');
+    if (ov) ov.style.display = 'none';
+  }
+  function openSavedFile() {
+    const pEl = document.getElementById('filesavedPath');
+    if (!pEl || !pEl.textContent) return;
+    fetch('/file/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: pEl.textContent })
+    }).then(r => r.json()).then(d => {
+      const stEl = document.getElementById('filesavedStatus');
+      if (stEl) stEl.textContent = d.ok ? 'Opened in the default viewer.' : ('Open failed: ' + (d.error || 'unknown'));
+    }).catch(e => {
+      const stEl = document.getElementById('filesavedStatus');
+      if (stEl) stEl.textContent = 'Open failed: ' + e.message;
+    });
   }
 
   function addOutput(text) { addMessage(text, 'ace'); }
@@ -1370,8 +1498,13 @@
   }
 
   async function sendMessage() {
+    if (window._sendInProgress) return;
+    window._sendInProgress = true;
     const text = input.value.trim();
-    if (!text && !pendingAttachments.length) return;
+    if (!text && !pendingAttachments.length) {
+      window._sendInProgress = false;
+      return;
+    }
 
     // Show thinking indicator above user's chat bubble
     showThinking();
@@ -1395,6 +1528,7 @@
     }
     input.value = '';
     input.style.height = 'auto';
+    userStopped = false;
 
     // Handle Work mode locally
     if (text.toLowerCase().includes('work mode')) {
@@ -1416,7 +1550,7 @@
 
     showThinking(text);
     try {
-      const savedModel = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
+      const savedModel = localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free';
       let model = savedModel;
       let effText = text;
       const moodHint = detectMood(text);
@@ -1428,7 +1562,7 @@
         effText = parts.join('\n\n') + '\n\n' + text;
       }
       const knownModels = [
-        'tinyllama:latest', 'qwen2.5-coder:1.5b', 'qwen2.5:3b', 'deepseek-coder:1.3b', 'opencode',
+        'opencode',
         ...OPENCODE_MODELS.map(m => m[0]),
         ...DEFAULT_MODELS.map(m => m[0])
       ];
@@ -1436,7 +1570,7 @@
       const isKnownModel = knownModels.includes(model) || customModels.some(m => m.model === model);
       if (!isKnownModel) {
         localStorage.removeItem('ace_modelSelect');
-        model = 'dolphin-llama3:8b';
+        model = 'openai/gpt-oss-20b:free';
       }
       const OPENCODE_MODEL_IDS = OPENCODE_MODELS.map(m => m[0]);
       const VISION_MODELS = ['llava', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'claude-3-5', 'claude-3-7', 'claude-3', 'gemini', 'qwen2-vl', 'qwen-vl', 'phi-3-vision', 'moondream'];
@@ -1452,7 +1586,8 @@
       if (model === 'opencode' || OPENCODE_MODEL_IDS.includes(model)) {
         uiRequestActive = true;
         currentAbort = new AbortController();
-        if (stopButtonEl) stopButtonEl.disabled = false;
+        const ctrlStop = document.getElementById('ctrl-stop');
+        if (ctrlStop) ctrlStop.disabled = false;
         try {
           const res = await fetch('/opencode', {
             method: 'POST',
@@ -1461,19 +1596,19 @@
             signal: currentAbort.signal
           });
           const d = await res.json();
-          hideThinking();
           if (d.reply && d.reply.indexOf('opencode server not running') !== -1) {
-            localStorage.setItem('ace_modelSelect', 'openai/gpt-oss-20b:free');
+            localStorage.setItem('ace_modelSelect', 'deepseek/deepseek-v4-flash-0731:free');
             refreshStatusModel();
             buildModelPicker();
             addMessage('⚠️ The opencode server is off. Auto-switched to GPT-OSS 20B (free cloud) — pick a cloud or local model from the menu, or start opencode serve to use opencode models.', 'ace');
           } else {
             finalizeStreamedReply(d.reply);
-            hideThinking();
             speakReply(d.reply.replace(/^\s*\\[(PLAN|BUILD|REPLY)\\]\s*/i, ''));
           }
         } catch (err) {
-          if (err && err.name === 'AbortError') {
+          if (userStopped) {
+            hideThinking();
+          } else if (err && err.name === 'AbortError') {
             hideThinking();
             addMessage('⏹ Stopped the last request.', 'ace');
           } else {
@@ -1483,13 +1618,9 @@
         } finally {
           currentAbort = null;
           uiRequestActive = false;
+          // userStopped stays true until the next sendMessage() call
         }
         return;
-      }
-      const isLocal = model.startsWith('dolphin') || model.startsWith('qwen');
-      if (isLocal) {
-        payload.endpoint = 'http://localhost:11434/v1';
-        payload.api_key = '';
       }
       if (DEFAULT_MODELS.some(m => m[0] === model)) {
         payload.endpoint = 'https://openrouter.ai/api/v1';
@@ -1502,20 +1633,27 @@
         payload.functions_enabled = !!cm.functionsEnabled;
         payload.functions = (cm.functionsEnabled && Array.isArray(cm.functions)) ? cm.functions : [];
       }
-      const ac2 = new AbortController();
-      const waitTimer = setTimeout(() => ac2.abort('timeout'), 600000);
+      currentAbort = new AbortController();
+      const ctrlStop = document.getElementById('ctrl-stop');
+      if (ctrlStop) ctrlStop.disabled = false;
+      const waitTimer = setTimeout(() => { if (currentAbort) currentAbort.abort('timeout'); }, 600000);
       let res, d;
       try {
+        uiRequestActive = true;
         res = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-          signal: ac2.signal
+          signal: currentAbort.signal
         });
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
         d = await res.json();
       } finally {
         clearTimeout(waitTimer);
       }
+      if (!d) return;
       hideThinking();
       if (d.rate_limited && d.model) {
         const newModel = String(d.model);
@@ -1524,12 +1662,13 @@
           localStorage.setItem('ace_modelSelect', newModel);
           refreshStatusModel();
           buildModelPicker();
-          addMessage('⚠️ Free cloud quota used up or model timed out — auto-switched to ' + modelLabel(newModel) + ' (local). Cloud replies return tomorrow or when credits are added.', 'ace');
+          addMessage('⚠️ Free cloud quota used up or model timed out — auto-switched to ' + modelLabel(newModel) + ' (cloud). Cloud replies return tomorrow or when credits are added.', 'ace');
         }
       }
       if (d.type === 'stream' && d.url) {
         await streamAutoFix(d.url);
       } else {
+        window.__aceShownReply = d.reply;
         addAceReply(d.reply);
         hideThinking();
         speakReply(d.reply.replace(/^\s*\\[(PLAN|BUILD|REPLY)\\]\s*/i, ''));
@@ -1537,14 +1676,23 @@
       }
     } catch (err) {
       hideThinking();
-      if (err && err.name === 'AbortError') {
-        localStorage.setItem('ace_modelSelect', 'qwen2.5:3b');
+      if (userStopped) {
+        // stopRequest already handled UI
+      } else if (err && err.name === 'AbortError') {
+        localStorage.setItem('ace_modelSelect', 'google/gemma-4-26b-a4b-it:free');
         refreshStatusModel();
         buildModelPicker();
-        addMessage('⚠️ The cloud model took too long. Auto-switched to Qwen 3B (local) — try your message again.', 'ace');
+        addMessage('⚠️ The cloud model took too long. Auto-switched to ' + modelLabel('google/gemma-4-26b-a4b-it:free') + ' (cloud) — try your message again.', 'ace');
       } else {
         addMessage('Server error.', 'ace');
       }
+    } finally {
+      // Do NOT reset userStopped here — stopRequest() needs it to stay true
+      // until the next new request starts. pollActivity() checks it to avoid
+      // re-showing the thinking bubble after a manual stop.
+      currentAbort = null;
+      uiRequestActive = false;
+      window._sendInProgress = false;
     }
   }
 
@@ -2032,6 +2180,26 @@
   </div>
 </div>
 
+<div id="fileSavedOverlay" class="settings-overlay" style="z-index:2100;">
+  <div class="settings-dialog" style="width:520px;max-width:94vw;max-height:86vh;height:auto;">
+    <div class="settings-dialog-head">
+      <div class="settings-head-left"><span style="font-size:16px;">✏️</span>
+        <h2 style="margin:0;font-size:16px;font-weight:700;">File saved</h2></div>
+      <button onclick="closeFileSavedPopup()" class="settings-close">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow:auto;flex:1;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Saved to:</div>
+      <div id="filesavedPath" style="font-size:13px;color:var(--info);word-break:break-all;margin-bottom:12px;"></div>
+      <pre id="filesavedContent" style="margin:0;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:44vh;overflow:auto;color:var(--text);"></pre>
+    </div>
+    <div class="settings-dialog-foot" style="align-items:center;">
+      <span id="filesavedStatus" style="margin-right:auto;font-size:12px;color:var(--text-dim);"></span>
+      <button onclick="closeFileSavedPopup()" class="settings-cancel">Close</button>
+      <button onclick="openSavedFile()" class="settings-save" style="margin-left:8px;">📂 Open file</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const SETTINGS_CATEGORIES = [
     { id: 'general', name: 'General', icon: '⚙️' },
@@ -2112,7 +2280,7 @@
       { type: 'checkbox', id: 'liveCursor', label: 'Show live cursors', desc: 'Display collaborator cursors.' }
     ],
     ai: [
-      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['openai/gpt-oss-20b:free','GPT-OSS 20B (free, tools)'],['google/gemma-4-26b-a4b-it:free','Gemma 4 26B (free)'],['inclusionai/ling-3.0-flash:free','Ling 3.0 Flash (free)'],['cohere/north-mini-code:free','North Mini Code (free)'],['tinyllama:latest','TinyLlama (local, fastest)'],['qwen2.5-coder:1.5b','Qwen Coder 1.5B (local)'],['deepseek-coder:1.3b','DeepSeek Coder 1.3B (local)'],['qwen2.5:3b','Qwen 3B (local)']], def: 'openai/gpt-oss-20b:free' },
+      { type: 'select', id: 'modelSelect', label: 'Model', desc: 'AI model used for chat.', options: [['deepseek/deepseek-v4-flash-0731:free','DeepSeek V4 Flash (free, smart)'],['openai/gpt-oss-20b:free','GPT-OSS 20B (free, tools)'],['google/gemma-4-26b-a4b-it:free','Gemma 4 26B (free)'],['inclusionai/ling-3.0-flash:free','Ling 3.0 Flash (free)'],['cohere/north-mini-code:free','North Mini Code (free)']], def: 'deepseek/deepseek-v4-flash-0731:free' },
       { type: 'range', id: 'temperature', label: 'Temperature', desc: 'Randomness of responses (0–2).', min: 0, max: 2, step: 0.1, def: 0.7 },
       { type: 'select', id: 'maxTokens', label: 'Max tokens', desc: 'Maximum response length.', options: [['250','250'],['500','500'],['1000','1000'],['2000','2000']], def: '500' }
     ],
@@ -2134,11 +2302,17 @@
     ]
   };
 
-  const DEFAULT_MODELS = [
-    ['openai/gpt-oss-20b:free', 'GPT-OSS 20B · free (tools)'],
+const DEFAULT_MODELS = [
+    ['deepseek/deepseek-v4-flash-0731:free', 'DeepSeek V4 Flash · free · smart'],
+    ['openai/gpt-oss-20b:free', 'GPT-OSS 20B · free (backup)'],
     ['google/gemma-4-26b-a4b-it:free', 'Gemma 4 26B · free'],
     ['inclusionai/ling-3.0-flash:free', 'Ling 3.0 Flash · free'],
     ['cohere/north-mini-code:free', 'North Mini Code · free']
+  ];
+
+  const GROQ_MODELS = [
+    ['qwen/qwen3.8-27b', 'Qwen 3.8 27B · smart · free'],
+    ['openai/gpt-oss-20b', 'GPT-OSS 20B · free (backup)']
   ];
 
   const OPENCODE_MODELS = [
@@ -2281,18 +2455,17 @@
 
   function buildModelPicker() {
     const menu = document.getElementById('stModelMenu');
-    const locals = [['tinyllama:latest', 'TinyLlama (fastest)'], ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B'], ['deepseek-coder:1.3b', 'DeepSeek Coder 1.3B'], ['qwen2.5:3b', 'Qwen 3B']];
     const openrouter = DEFAULT_MODELS;
     const custom = getLlmModels().map(m => [m.model, m.name]);
-    const current = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
-    let html = '<div class="st-model-group">Local</div>';
-    locals.forEach(o => {
-      html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">local</span></div>';
-    });
-    html += '<div class="st-model-group">Opencode</div>';
+    const current = localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free';
+    let html = '<div class="st-model-group">Opencode</div>';
     OPENCODE_MODELS.forEach(o => {
       const active = current === o[0] || (current === 'opencode' && o[0] === 'opencode/deepseek-v4-flash-free');
       html += '<div class="st-model-opt' + (active ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">opencode</span></div>';
+    });
+    html += '<div class="st-model-group">Groq</div>';
+    GROQ_MODELS.forEach(o => {
+      html += '<div class="st-model-opt' + (current === o[0] ? ' active' : '') + '" data-model="' + o[0] + '"><span>' + o[1] + '</span><span class="opt-provider">groq</span></div>';
     });
     html += '<div class="st-model-group">OpenRouter</div>';
     openrouter.forEach(o => {
@@ -2321,19 +2494,14 @@
 
   function modelLabel(id) {
     if (id === 'opencode') return 'Opencode agent';
-    const all = [
-      ['tinyllama:latest', 'TinyLlama (fastest)'],
-      ['qwen2.5-coder:1.5b', 'Qwen Coder 1.5B'],
-      ['qwen2.5:3b', 'Qwen 3B'],
-      ['deepseek-coder:1.3b', 'DeepSeek Coder 1.3B']
-    ].concat(DEFAULT_MODELS, OPENCODE_MODELS);
+    const all = [].concat(DEFAULT_MODELS, OPENCODE_MODELS);
     const m = all.find(x => x[0] === id);
     return m ? m[1] : id;
   }
 
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free');
+    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free');
   }
 
   function toggleModelMenu() {
@@ -2416,7 +2584,7 @@
 
   async function saveSettings() {
     const selEl = document.getElementById('modelSelect');
-    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free')) {
+    if (selEl && selEl.value !== (localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash-0731:free')) {
       if (!(await requireAdmin())) return;
     }
     const llmNameCheck = document.getElementById('llmName');
@@ -3266,6 +3434,37 @@
       .then(d => alert(d.message || 'Stopped.'))
       .catch(err => alert('Error: ' + err));
   }
+  function estopRequest() {
+    if (!confirm('E-STOP ACEsi? This fully stops all activity, tools, and replies. Only the private un-kill word can resume it.')) return;
+    fetch('/kill', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({reason:'Web UI E-STOP'}) })
+      .then(r => r.json())
+      .then(d => { alert('E-STOPPED. ACEsi is silent. Use the un-kill word on your phone or the banner above to resume.'); refreshEStop(); })
+      .catch(err => alert('Error: ' + err));
+  }
+  function estopResume() {
+    const word = document.getElementById('estopUnword').value.trim();
+    if (!word) { alert('Enter the un-kill word.'); return; }
+    fetch('/kill/resume', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: word}) })
+      .then(r => r.json().then(d => ({ok: r.status === 200, d})))
+      .then(({ok, d}) => {
+        if (!ok) { alert('Wrong word — still E-STOPPED.'); return; }
+        alert('ACEsi resumed.');
+        document.getElementById('estopUnword').value = '';
+        refreshEStop();
+      })
+      .catch(err => alert('Error: ' + err));
+  }
+  function refreshEStop() {
+    fetch('/kill/status').then(r => r.json()).then(st => {
+      const on = !!(st && st.armed);
+      const ban = document.getElementById('estopBanner');
+      const btn = document.getElementById('aceEStopBtn');
+      if (ban) ban.style.display = on ? 'block' : 'none';
+      if (btn) btn.style.color = on ? '#ff3b3b' : '#ff3b3b';
+    }).catch(() => {});
+  }
+  setInterval(refreshEStop, 10000);
+  refreshEStop();
   function testSecurityAlert() {
     fetch('/security/test_alert', { method: 'POST' })
       .then(r => r.json())
@@ -3477,12 +3676,10 @@
   }
   async function proactiveCheckIn() {
     lastCheckInAt = Date.now();
-    const model = localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free';
+    const model = localStorage.getItem('ace_modelSelect') || 'deepseek/deepseek-v4-flash:free';
     let line = "I'm still here, Chris. You don't have to say anything. Just wanted you to know I'm present.";
     try {
       const payload = { message: '', model: model, proactive: true };
-      const isLocal = model.startsWith('dolphin') || model.startsWith('qwen');
-      if (isLocal) { payload.endpoint = 'http://localhost:11434/v1'; payload.api_key = ''; }
       const ctrl = new AbortController();
       const timer = setTimeout(function() { ctrl.abort(); }, 12000);
       const res = await fetch('/chat', {
@@ -3495,6 +3692,7 @@
       const d = await res.json();
       if (d && d.reply) line = d.reply;
     } catch { /* fall back to the local line */ }
+    window.__aceShownReply = line;
     addMessage(line, 'ace');
     speakReply(line);
   }
@@ -3578,6 +3776,10 @@
     document.documentElement.style.setProperty('--accent', ac);
     document.documentElement.style.setProperty('--accent-2', ac);
     loadChatHistory();
+
+    // Wire up control bar buttons
+    const ctrlStop = document.getElementById('ctrl-stop');
+    if (ctrlStop) ctrlStop.onclick = stopRequest;
   });
 
   async function loadChatHistory() {

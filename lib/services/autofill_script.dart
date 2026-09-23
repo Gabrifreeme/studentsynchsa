@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // ─────────────────────────────────────────────────────────────────────────────
 // autofill_script.dart  –  StudentSyncSA Star Auto-Fill
 //
@@ -476,6 +477,8 @@ const String ssaDatePickerJs = r'''
 
 String buildDatePickerScript() => ssaDatePickerJs;
 
+=======
+>>>>>>> Stashed changes
 String buildAutofillScript(String profileJson) {
   return _script(profileJson, addFloatingStar: true);
 }
@@ -484,10 +487,402 @@ String buildAutofillOnlyScript(String profileJson) {
   return _script(profileJson, addFloatingStar: false);
 }
 
-String _script(String profileJson, {required bool addFloatingStar}) {
+String buildGuidanceScript(String profileJson, String guidanceJson) {
+  return _script(profileJson, addFloatingStar: true, guidanceJson: guidanceJson);
+}
+
+String buildNavigationFixScript() {
   return '''
 (function() {
-  // ── 1. Profile data ────────────────────────────────────────────────────
+  if (window.__ssaNavFix) return;
+  window.__ssaNavFix = true;
+
+  var _open = window.open;
+  window.open = function(url, name, specs) {
+    if (url) {
+      window.location.href = url;
+      return window;
+    }
+    return _open.apply(window, arguments);
+  };
+
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('a[target="_blank"], a[target="_new"]');
+    if (a && a.href) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = a.href;
+    }
+  }, true);
+})();
+''';
+}
+
+String buildViewportPatch() {
+  return '''
+(function() {
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'viewport';
+    document.head.appendChild(meta);
+  }
+  meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+})();
+''';
+}
+
+String buildBlanketAutofillSuppressScript() {
+  return '''
+(function() {
+  var inputs = document.querySelectorAll('input');
+  for (var i = 0; i < inputs.length; i++) {
+    var el = inputs[i];
+    if (!el.getAttribute('autocomplete')) {
+      el.setAttribute('autocomplete', 'off');
+    }
+    el.removeAttribute('autocorrect');
+    el.removeAttribute('autocapitalize');
+    el.removeAttribute('spellcheck');
+  }
+})();
+''';
+}
+
+String buildSecurityPatch() {
+  return '''
+(function() {
+  window.__defineGetter__('top', function() { return window; });
+  window.__defineGetter__('parent', function() { return window; });
+  window.__defineGetter__('owner', function() { return window; });
+  try { delete window.top; } catch(e) {}
+  try { delete window.parent; } catch(e) {}
+  try { delete window.owner; } catch(e) {}
+  window.top = window;
+  window.parent = window;
+})();
+''';
+}
+
+String buildLabelPatch() {
+  return '''
+(function() {
+  var inputs = document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button])');
+  for (var i = 0; i < inputs.length; i++) {
+    var el = inputs[i];
+    if (el.labels && el.labels.length > 0) continue;
+    var label = document.querySelector('label[for="' + el.id + '"]');
+    if (label) continue;
+    var parent = el.parentElement;
+    for (var d = 0; d < 5 && parent; d++) {
+      var lbl = parent.querySelector('label');
+      if (lbl) break;
+      var text = parent.textContent.trim();
+      if (text && text.length < 80 && (parent.tagName === 'TD' || parent.tagName === 'TH' || parent.tagName === 'LABEL')) {
+        el.setAttribute('aria-label', text.replace(/\\s+/g, ' ').replace(/[:\\*]/g, '').trim());
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }
+})();
+''';
+}
+
+String buildAutocompletePatch() {
+  return '''
+(function() {
+  var map = {
+    'input[name*="name" i], input[name*="姓名" i]': 'name',
+    'input[name*="email" i], input[type="email"]': 'email',
+    'input[name*="phone" i], input[name*="cell" i], input[name*="tel" i]': 'tel',
+    'input[name*="address" i], input[name*="street" i]': 'street-address',
+    'input[name*="city" i], input[name*="town" i]': 'address-level2',
+    'input[name*="province" i], input[name*="state" i]': 'address-level1',
+    'input[name*="postal" i], input[name*="zip" i]': 'postal-code',
+    'input[name*="country" i]': 'country',
+    'input[name*="company" i], input[name*="organisation" i]': 'organization',
+    'input[name*="id" i], input[name*="passport" i]': 'off',
+  };
+  for (var sel in map) {
+    var els = document.querySelectorAll(sel);
+    for (var i = 0; i < els.length; i++) {
+      els[i].setAttribute('autocomplete', map[sel]);
+    }
+  }
+})();
+''';
+}
+
+String buildSelectAutocompletePatch() {
+  return '''
+(function() {
+  var selects = document.querySelectorAll('select');
+  for (var i = 0; i < selects.length; i++) {
+    var sel = selects[i];
+    var name = (sel.name || '').toLowerCase();
+    var opts = [];
+    for (var j = 0; j < sel.options.length; j++) {
+      opts.push({ text: sel.options[j].text.trim().toLowerCase(), value: sel.options[j].value });
+    }
+    sel._ssaOpts = opts;
+  }
+})();
+''';
+}
+
+String buildProvinceDisambiguationPatch() {
+  return '''
+(function() {
+  var selects = document.querySelectorAll('select');
+  for (var i = 0; i < selects.length; i++) {
+    var sel = selects[i];
+    var name = (sel.name || '').toUpperCase();
+    if (name.indexOf('PROVINCE') === -1 && name.indexOf('P_PROVINCE') === -1) continue;
+    var provMap = {
+      'gauteng': 'GP', 'kwazulu-natal': 'KZN', 'kwa-zulu natal': 'KZN',
+      'western cape': 'WC', 'eastern cape': 'EC', 'free state': 'FS',
+      'limpopo': 'LP', 'mpumalanga': 'MP', 'north west': 'NW',
+      'northern cape': 'NC',
+    };
+    for (var j = 0; j < sel.options.length; j++) {
+      var ot = sel.options[j].text.trim().toLowerCase();
+      var ov = sel.options[j].value.trim().toUpperCase();
+      if (provMap[ot]) {
+        sel.options[j].setAttribute('data-ssa-prov', provMap[ot]);
+      }
+    }
+  }
+})();
+''';
+}
+
+String buildFocusPatch() {
+  return '''
+(function() {
+  var inputs = document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset])');
+  for (var i = 0; i < inputs.length; i++) {
+    inputs[i].setAttribute('inputmode', 'text');
+  }
+  var phones = document.querySelectorAll('input[name*="phone" i], input[name*="cell" i], input[name*="tel" i]');
+  for (var i = 0; i < phones.length; i++) {
+    phones[i].setAttribute('inputmode', 'tel');
+  }
+  var emails = document.querySelectorAll('input[name*="email" i], input[type="email"]');
+  for (var i = 0; i < emails.length; i++) {
+    emails[i].setAttribute('inputmode', 'email');
+  }
+  var nums = document.querySelectorAll('input[name*="id" i], input[name*="passport" i], input[name*="postal" i]');
+  for (var i = 0; i < nums.length; i++) {
+    nums[i].setAttribute('inputmode', 'numeric');
+  }
+})();
+''';
+}
+
+String buildInputmodePatch() {
+  return '''
+(function() {
+  var style = document.createElement('style');
+  style.textContent = 'input, select, textarea { font-size: 16px !important; min-height: 44px !important; }';
+  document.head.appendChild(style);
+})();
+''';
+}
+
+String buildFormLabelPatch() {
+  return '''
+(function() {
+  var forms = document.querySelectorAll('form');
+  for (var f = 0; f < forms.length; f++) {
+    forms[f].setAttribute('autocomplete', 'off');
+  }
+  var submitBtns = document.querySelectorAll('input[type="submit"], button[type="submit"]');
+  for (var i = 0; i < submitBtns.length; i++) {
+    submitBtns[i].style.minHeight = '44px';
+    submitBtns[i].style.minWidth = '44px';
+  }
+})();
+''';
+}
+
+// ============================================
+// GOLD STAR GUIDANCE
+// ============================================
+
+String buildStarScript(String profileJson) {
+  return '''
+(function() {
+  if (window.__ssaStarActive) return;
+  window.__ssaStarActive = true;
+
+  var profile = $profileJson;
+
+  // ── Guidance steps ────────────────────────
+  var steps = [
+    { icon: '\\uD83C\\uDFAF', title: 'Start Application',
+      text: 'Click "Apply Now" or the red APPLY pill to go to the ITS portal.' },
+    { icon: '\\uD83D\\uDC64', title: 'Register as New Applicant',
+      text: 'On the ITS login page, click "New applicant" to start a new application.' },
+    { icon: '\\uD83D\\uDCDD', title: 'Personal Details',
+      text: 'Fill in your name, ID number, date of birth, gender, and nationality.' },
+    { icon: '\\uD83D\\uDCF1', title: 'Contact Information',
+      text: 'Enter your cell number, email, and physical & postal address.' },
+    { icon: '\\uD83C\\uDFEB', title: 'School & Matric Details',
+      text: 'Provide school name, matric year, and exam number.' },
+    { icon: '\\uD83C\\uDF93', title: 'Faculty & Programme',
+      text: 'Choose your faculty and programme of study.' },
+    { icon: '\\u2705', title: 'Review & Submit',
+      text: 'Review everything and submit — you will receive a reference number by SMS/email.' },
+    { icon: '\\uD83D\\uDCCE', title: 'Upload Documents',
+      text: 'Upload your ID, matric certificate, and proof of residence when prompted.' }
+  ];
+
+  var ga = function() {};
+  if (typeof doAutofill === 'function') ga = doAutofill;
+
+  // ── Log helper ────────────────────────────
+  function log(msg) {
+    try { window.FlutterLog && FlutterLog.postMessage('[STAR] ' + msg); } catch(e) {}
+  }
+
+  // ── Inject the star ───────────────────────
+  function placeStar() {
+    if (document.getElementById('ssa-star')) return;
+
+    var s = document.createElement('div');
+    s.id = 'ssa-star';
+    s.textContent = '\\u2B50';
+    s.style.cssText = 'position:fixed;bottom:20px;right:20px;width:60px;height:60px;'
+      + 'border-radius:50%;z-index:2147483647;cursor:pointer;font-size:32px;'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'background:radial-gradient(circle at 30% 30%, #FFD700, #FFA500);'
+      + 'box-shadow:0 4px 20px rgba(0,0,0,0.4);'
+      + 'border:3px solid #FFF;'
+      + 'user-select:none;transition:transform 0.2s;';
+    s.onmouseover = function() { s.style.transform = 'scale(1.1)'; };
+    s.onmouseout  = function() { s.style.transform = 'scale(1)'; };
+    s.onclick = showGuide;
+    s.setAttribute('aria-label', 'Application guide');
+
+    (document.body || document.documentElement).appendChild(s);
+    log('injected on ' + window.location.href);
+  }
+
+  // ── Guidance panel ────────────────────────
+  function showGuide() {
+    var old = document.getElementById('ssa-guide');
+    if (old) { old.remove(); return; }
+
+    var ov = document.createElement('div');
+    ov.id = 'ssa-guide';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483646;'
+      + 'background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;'
+      + 'justify-content:center;padding:16px;box-sizing:border-box;';
+
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:20px 20px 0 0;'
+      + 'max-width:400px;width:100%;max-height:85vh;overflow-y:auto;'
+      + 'padding:20px 16px 24px;box-shadow:0 -4px 30px rgba(0,0,0,0.25);'
+      + 'font:16px/1.5 Arial,sans-serif;color:#1F2937;';
+
+    // Header
+    card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+      + '<span style="font-size:20px;font-weight:700;">\\u2B50 How to Apply</span>'
+      + '<span id="ssa-guide-close" style="font-size:24px;cursor:pointer;color:#9CA3AF;">\\u00D7</span>'
+      + '</div>';
+
+    // Steps
+    var ol = document.createElement('ol');
+    ol.style.cssText = 'margin:0;padding:0 0 0 20px;';
+    for (var i = 0; i < steps.length; i++) {
+      var li = document.createElement('li');
+      li.style.cssText = 'margin-bottom:12px;';
+      li.innerHTML = '<div><strong>' + steps[i].icon + ' ' + steps[i].title + '</strong></div>'
+        + '<div style="font-size:14px;color:#4B5563;">' + steps[i].text + '</div>';
+      ol.appendChild(li);
+    }
+    card.appendChild(ol);
+
+    // Auto-fill button
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;';
+    var fillBtn = document.createElement('button');
+    fillBtn.textContent = '\\u26A1 Run Auto-Fill';
+    fillBtn.style.cssText = 'flex:1;padding:12px;border:none;border-radius:12px;'
+      + 'background:#065F46;color:#fff;font-size:15px;font-weight:600;cursor:pointer;'
+      + 'min-height:48px;';
+    fillBtn.onclick = function() {
+      ov.remove();
+      if (typeof doAutofill === 'function') doAutofill();
+    };
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = 'flex:1;padding:12px;border:1px solid #D1D5DB;border-radius:12px;'
+      + 'background:#fff;color:#374151;font-size:15px;cursor:pointer;min-height:48px;';
+    closeBtn.onclick = function() { ov.remove(); };
+    btnRow.appendChild(fillBtn);
+    btnRow.appendChild(closeBtn);
+    card.appendChild(btnRow);
+
+    ov.appendChild(card);
+    document.body.appendChild(ov);
+
+    // Close handlers
+    document.getElementById('ssa-guide-close').onclick = function() { ov.remove(); };
+    ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { ov.remove(); document.removeEventListener('keydown', esc); }
+    });
+  }
+
+  // ── Self-heal via MutationObserver ────────
+  var _reTimer = null;
+  function scheduleReinject() {
+    if (_reTimer) return;
+    _reTimer = setTimeout(function() {
+      _reTimer = null;
+      if (!document.getElementById('ssa-star')) {
+        placeStar();
+        log('re-injected (DOM mutation)');
+      }
+    }, 300);
+  }
+
+  if (window.MutationObserver) {
+    try {
+      var obs = new MutationObserver(function() { scheduleReinject(); });
+      if (document.body) {
+        obs.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          obs.observe(document.body, { childList: true, subtree: true });
+        });
+      }
+    } catch(e) {}
+  }
+
+  // ── Re-inject on SPA navigation ──────────
+  window.addEventListener('popstate', function() { scheduleReinject(); });
+  window.addEventListener('hashchange', function() { scheduleReinject(); });
+  setTimeout(function() { scheduleReinject(); }, 1500);
+
+  // ── Kick off ──────────────────────────────
+  function boot() {
+    placeStar();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+''';
+}
+
+String _script(String profileJson, {required bool addFloatingStar, String guidanceJson = ''}) {  return '''
+(function() {
+  // ÔöÇÔöÇ 1. Profile data ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   var profile = $profileJson;
 
   // ── 1b. Shared custom date picker (also injected separately by the
@@ -638,6 +1033,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     postalCode:        gv('address.postalCode'),
     heardAboutUs:      gv('demographic.heardAboutUs'),
     nationality:       gv('demographic.nationality'),
+<<<<<<< Updated upstream
     isSACitizen:       (function() {
                          var nat = (gv('demographic.nationality') || '').toLowerCase();
                          var idn = (gv('personal.idNumber') || '').trim();
@@ -685,6 +1081,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
                           var wr = (gv('status.wantsResidence') || '').toLowerCase();
                           return wr.indexOf('y') !== -1 ? 'Y' : 'N';
                         })(),
+=======
+    homeLanguage:      gv('demographic.homeLanguage'),
+>>>>>>> Stashed changes
     populationGroup:   gv('demographic.populationGroup'),
     maritalStatus:     gv('demographic.maritalStatus'),
     maritalYesNo:      (function() {
@@ -719,9 +1118,10 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     nextOfKinEmail:    gv('nextOfKin.email'),
   };
 
-  // ── 2. ITS portal exact-name map (P_* Oracle fields) ──────────────────
+  // ÔöÇÔöÇ 2. ITS portal exact-name map (P_* Oracle fields) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   // These are the actual INPUT NAME attributes used by ITS/Univen/UL/TUT etc.
   var itsExact = {
+<<<<<<< Updated upstream
     // UNIVEN / Venda OAP exact-name maps
     'OAPCITIZENTYPE':     vs.isSACitizen,
     'OAPCITZCODE':        vs.citizenshipShortCode,
@@ -750,6 +1150,8 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'OAPHEARD':               vs.heardAboutUs,
     'OAPHEARD_DESC':          vs.heardAboutUs,
     'oapGender':              vs.genderCode,
+=======
+>>>>>>> Stashed changes
     // Personal
     'P_SURNAME':           vs.lastName,
     'P_NAME':              vs.firstName,
@@ -822,7 +1224,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     'P_NOK_EMAIL':         vs.nextOfKinEmail,
   };
 
-  // ── 3. Generic fuzzy fieldMap (fallback for non-ITS sites) ────────────
+  // ÔöÇÔöÇ 3. Generic fuzzy fieldMap (fallback for non-ITS sites) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   var fieldMap = {
     firstName:         ['firstname','first name','fname','given name','name'],
     lastName:          ['lastname','last name','surname','lname','family name'],
@@ -839,13 +1241,20 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     province:          ['province','state','region','select province'],
     postalCode:        ['postal code','postalcode','post code','postcode','zip'],
     nationality:       ['nationality','citizenship','citizen'],
-    isSACitizen:       ['sa citizen','possession of','valid sa','sa id'],
     homeLanguage:      ['home language','homelanguage','language'],
     populationGroup:   ['population group','ethnicity'],
+<<<<<<< Updated upstream
     raceValue:         ['race'],
     maritalStatus:     ['marital status','maritalstatus'],
     maritalYesNo:      ['married','are you married'],
     disabilityValue:   ['disabled','disability','are you disabled'],
+=======
+    raceValue:         ['race','population group'],
+    maritalStatus:     ['marital status','maritalstatus'],
+    maritalYesNo:      ['married','are you married','marital status'],
+    disabilityValue:   ['disabled','disability','are you disabled'],
+    raceValue:         ['race','population group'],
+>>>>>>> Stashed changes
     schoolName:        ['school','high school','institution'],
     currentGrade:      ['grade','current grade'],
     matricYear:        ['matric year','exam year','year of matric'],
@@ -861,7 +1270,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     nextOfKinEmail:    ['guardian email','parent email'],
   };
 
-  // ── 4. Helpers ─────────────────────────────────────────────────────────
+  // ÔöÇÔöÇ 4. Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   function showToast(msg, color) {
     var old = document.getElementById('ssa-toast');
     if (old) old.remove();
@@ -888,43 +1297,39 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   function findOption(sel, want) {    if (!want) return null;
     var wl = want.toLowerCase().trim();
+<<<<<<< Updated upstream
     var wlWords = wl.split(/\\s+/);
+=======
+>>>>>>> Stashed changes
     var best = null, bestScore = -1;
     for (var i = 0; i < sel.options.length; i++) {
       var opt = sel.options[i];
       if (isPlaceholder(opt.text)) continue;
       var tl = opt.text.toLowerCase().trim();
       var vl = opt.value.toLowerCase().trim();
+<<<<<<< Updated upstream
       var tlWords = tl.split(/\\s+/);
       var vlWords = vl.split(/\\s+/);
+=======
+>>>>>>> Stashed changes
       var score = -1;
-      // 100: exact text/value equals want
-      if (tl === wl || vl === wl) score = 100;
-      // 60: whole-word match (want word == option word) — avoids "female" matching "male"
-      if (score < 60) {
-        for (var w = 0; w < wlWords.length; w++) {
-          var word = wlWords[w];
-          if (word.length < 2) continue;
-          var hit = false;
-          for (var o = 0; o < tlWords.length; o++) { if (tlWords[o] === word) { hit = true; break; } }
-          if (!hit) for (var v = 0; v < vlWords.length; v++) { if (vlWords[v] === word) { hit = true; break; } }
-          if (hit) { score = 60; break; }
+      if (tl === wl || vl === wl)                               score = 100;
+      else if (tl.indexOf(wl) !== -1 || vl.indexOf(wl) !== -1) score = 50;
+      else if (wl.indexOf(tl) !== -1 && tl.length > 2)         score = 30;
+      else {
+        var words = wl.split(/\\s+/);
+        for (var w = 0; w < words.length; w++) {
+          if (words[w].length > 2 && (tl.indexOf(words[w]) !== -1 || vl.indexOf(words[w]) !== -1)) {
+            score = 10; break;
+          }
         }
-      }
-      // 60: prefix match (handles "africa" <-> "african", value prefix)
-      if (score < 60) {
-        if (tl.indexOf(wl) === 0 || vl.indexOf(wl) === 0 || wl.indexOf(tl) === 0 || wl.indexOf(vl) === 0) score = 60;
-      }
-      // 30: substring containment (lowest priority, avoids female/male false tie)
-      if (score < 30) {
-        if (tl.indexOf(wl) !== -1 || vl.indexOf(wl) !== -1) score = 30;
       }
       if (score > bestScore) { bestScore = score; best = opt; }
     }
     return bestScore >= 10 ? best : null;
   }
 
-  // Plain value setter + minimal events — ITS is plain HTML, no framework needed.
+  // Plain value setter + minimal events ÔÇö ITS is plain HTML, no framework needed.
   // We still dispatch input+change for any JS validation the portal has.
   function fill(el, value) {
     if (!value && value !== 0) return false;
@@ -936,8 +1341,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       el.dispatchEvent(new Event('change', { bubbles: true }));
       if (typeof jQuery !== 'undefined') {
         try { jQuery(el).trigger('change.select2'); } catch(e) {}
+<<<<<<< Updated upstream
         try { jQuery(el).trigger('select2:select'); } catch(e) {}
         try { if (jQuery(el).data('select2')) jQuery(el).val(opt.value).trigger('change'); } catch(e) {}
+=======
+>>>>>>> Stashed changes
       }
       return true;
     }
@@ -956,14 +1364,6 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       return false;
     }
     if (el.type === 'checkbox') return false;
-    // Some fields (e.g. oapCitzCode) are read-only by default — clear that.
-    try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch (e) {}
-    // Only force visibility for non-hidden fields. Hidden backing/value fields
-    // (common on LOV-style forms) must stay hidden, otherwise a duplicate
-    // visible row appears next to the visible display field.
-    if (el.type !== 'hidden') {
-      try { el.style.display = 'block'; el.style.visibility = 'visible'; } catch (e) {}
-    }
     el.value = v;
     el.dispatchEvent(new Event('input',  { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -989,21 +1389,15 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         if (lel) parts.push(lel.textContent);
       }
       var p = el.parentElement;
-      for (var d = 0; d < 6 && p; d++) {
+      for (var d = 0; d < 3 && p; d++) {
         if (p.tagName === 'TD' || p.tagName === 'TH' || p.tagName === 'LABEL') {
           parts.push(p.textContent);
+          break;
         }
         if (p.tagName === 'TR') {
           var cells = p.cells;
           if (cells && cells.length >= 2) parts.push(cells[0].textContent);
-          // Radio/checkbox questions often sit in the PREVIOUS row, not an ancestor.
-          if (el.type === 'radio' || el.type === 'checkbox') {
-            var prev = p.previousElementSibling;
-            for (var pr = 0; pr < 2 && prev; pr++) {
-              if (prev.textContent) parts.push(prev.textContent);
-              prev = prev.previousElementSibling;
-            }
-          }
+          break;
         }
         p = p.parentElement;
       }
@@ -1027,6 +1421,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     return bestKey;
   }
 
+<<<<<<< Updated upstream
   // ── 4b. Citizenship auto-fill ──────────────────────────────────────────
   // When a 13-digit SA ID is present (typed into the portal or from the
   // profile), auto-set the citizenship code field(s) to R.S.A. The portal's
@@ -1127,6 +1522,9 @@ String _script(String profileJson, {required bool addFloatingStar}) {
   document.addEventListener('change', function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
   document.addEventListener('blur',   function(e) { if (isIdField(e.target)) ssaAutoCitizenship(); }, true);
 
+=======
+  // ÔöÇÔöÇ 5. Main autofill ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+>>>>>>> Stashed changes
   function doAutofill() {
     console.log('🔍 Autofill started');
 
@@ -1143,6 +1541,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       return;
     }
 
+<<<<<<< Updated upstream
     console.log('🔍 Autofill started on page: ' + pageCode);
 
     // Trigger blur on ID number field so APEX eventRun() fires
@@ -1156,6 +1555,56 @@ String _script(String profileJson, {required bool addFloatingStar}) {
         || doc.querySelector('input[name="oapIDnumber"]')
         || doc.querySelector('input[id*="id" i]');
       if (idEl) break;
+=======
+    var inputs = document.querySelectorAll(
+      'input:not([type=hidden]):not([type=submit]):not([type=button])'
+      + ':not([type=reset]):not([type=image]),'
+      + 'select, textarea'
+    );
+
+    var filled = 0;
+    var alreadyHandled = {};
+
+    for (var i = 0; i < inputs.length; i++) {
+      var el = inputs[i];
+      if (el.readOnly || el.disabled) continue;
+
+      var elName = (el.name || '').toUpperCase().trim();
+
+      // Pass 1: ITS exact name match (highest confidence)
+      if (elName && itsExact[elName] !== undefined) {
+        if (itsExact[elName] && fill(el, itsExact[elName])) {
+          el.style.outline = '3px solid #10B981';
+          filled++;
+          alreadyHandled[i] = true;
+          continue;
+        }
+      }
+
+      // Pass 2: ITS partial/case-insensitive name match
+      if (elName) {
+        for (var itk in itsExact) {
+          if (elName.indexOf(itk) !== -1 || itk.indexOf(elName) !== -1) {
+            if (itsExact[itk] && fill(el, itsExact[itk])) {
+              el.style.outline = '3px solid #10B981';
+              filled++;
+              alreadyHandled[i] = true;
+              break;
+            }
+          }
+        }
+        if (alreadyHandled[i]) continue;
+      }
+
+      // Pass 3: Generic fuzzy match on label/placeholder text
+      var key = fuzzyMatch(el);
+      if (key && vs[key]) {
+        if (fill(el, vs[key])) {
+          el.style.outline = '3px solid #10B981';
+          filled++;
+        }
+      }
+>>>>>>> Stashed changes
     }
     if (idEl && idEl.value) {
       idEl.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -1168,14 +1617,82 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     var msg = filled > 0 ? '✅ Filled ' + filled + ' fields' : 'No fields found';
     console.log(msg);
 
+    // ── Retry dynamic Select2 selects ──────────────────────────
+    var fallbackOpts = {
+      'select[name="race"]':    ['African','Asian','Coloured','Indian','Other','White'],
+      'select[name="address"]': ['Eastern Cape','Free State','Gauteng','Kwazulu/Natal','Limpopo','Mpumalanga','North West','Northern Cape','Western Cape'],
+    };
+
+    function tryFillSelect(sel, val) {
+      var el = document.querySelector(sel);
+      if (!el || !val) return false;
+      if (el.options.length === 0) return false;
+      el.removeAttribute('readonly');
+      var opt = findOption(el, val);
+      if (!opt) return false;
+      el.value = opt.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof jQuery !== 'undefined') {
+        try { jQuery(el).trigger('change.select2'); } catch(e) {}
+        try { jQuery(el).trigger('select2:select'); } catch(e) {}
+        try { if (jQuery(el).data('select2')) jQuery(el).val(opt.value).trigger('change'); } catch(e) {}
+      }
+      el.style.outline = '3px solid #10B981';
+      filled++;
+      return true;
+    }
+
+    function injectFallback(sel, val) {
+      var el = document.querySelector(sel);
+      if (!el || !val) return false;
+      if (el.options.length > 0) return false;
+      var opts = fallbackOpts[sel];
+      if (!opts) return false;
+      opts.forEach(function(text) {
+        var opt = document.createElement('option');
+        opt.value = text;
+        opt.text = text;
+        el.add(opt);
+      });
+      el.value = val;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof jQuery !== 'undefined') {
+        try { jQuery(el).trigger('change.select2'); } catch(e) {}
+        try { jQuery(el).trigger('select2:select'); } catch(e) {}
+        try { if (jQuery(el).data('select2')) jQuery(el).val(val).trigger('change'); } catch(e) {}
+      }
+      el.style.outline = '3px solid #10B981';
+      filled++;
+      return true;
+    }
+
+    var pending = dynamicSelects.filter(function(d) { return !tryFillSelect(d.sel, d.val); });
+    if (pending.length > 0) {
+      var retries = 0;
+      var retryInterval = setInterval(function() {
+        retries++;
+        pending = pending.filter(function(d) { return !tryFillSelect(d.sel, d.val); });
+        if (pending.length === 0 || retries >= 30) {
+          clearInterval(retryInterval);
+          // Fallback: inject options if API never loaded
+          pending.forEach(function(d) { injectFallback(d.sel, d.val); });
+        }
+      }, 500);
+    }
+
     showToast(
       filled > 0
-        ? '✅ Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
+        ? 'Ô£à Filled ' + filled + ' field' + (filled !== 1 ? 's' : '') + '!'
         : 'No fields matched. Try scrolling to the next section.',
       filled > 0 ? '#10B981' : '#EF4444'
     );
+<<<<<<< Updated upstream
 
     try { AutofillResult.postMessage(JSON.stringify({ filled: filled, total: filled })); } catch (e) {}
+=======
+>>>>>>> Stashed changes
   }
 
   window.requestFlutterAutofill = doAutofill;
@@ -1212,6 +1729,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     if (document.getElementById('ssa-star')) return;
     const star = document.createElement('div');
     star.id = 'ssa-star';
+<<<<<<< Updated upstream
     star.textContent = '⭐';
     star.style.cssText = `
       position: fixed;
@@ -1246,6 +1764,23 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     }''' : ''}
 
   ${!addFloatingStar ? 'doAutofill();' : ''}
+=======
+    star.innerHTML = 'Ô¡É';
+    star.title = 'Star Auto-Fill';
+    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
+      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
+      + 'color:#FFD700;font-size:32px;user-select:none;';
+    star.onclick = doAutofill;
+    function tryAppend() {
+      if (document.body) document.body.appendChild(star);
+      else setTimeout(tryAppend, 300);
+    }
+    tryAppend();
+  })();
+  ''' : ''}
+>>>>>>> Stashed changes
 
 })();
 ''';
