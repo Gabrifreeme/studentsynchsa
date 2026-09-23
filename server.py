@@ -5261,9 +5261,16 @@ def _classify_message(user_message):
     # Word-boundary anchored so ".c" in "example.com" is NOT a code file, but
     # "file.c" / "main.dart" / "index.html" are.
     _code_ext_re = r'\.(?:' + '|'.join(re.escape(ext[1:]) for ext in _code_exts) + r')\b'
+    # File-access phrases that should route to code domain (not UI navigation).
+    _file_access_phrases = (
+        "look for", "find the file", "my pictures", "my files", "my desktop",
+        "my downloads", "open an find", "open and find", "in my pictures",
+        "in my files", "in my desktop", "in my downloads", "pictures folder",
+        "desktop folder", "downloads folder")
     code_strong = any(k in m for k in (
         "edit ", "replace ", "write file", "open file", "read file",
         "edit_file", "write_file", "read_file")) or \
+        any(k in m for k in _file_access_phrases) or \
         bool(re.search(_code_ext_re, m)) or \
         bool(re.search(r'\b(?:lib|src|test|assets)/[\w/]+\.\w+', m))
     domains = set()
