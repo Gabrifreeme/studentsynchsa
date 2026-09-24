@@ -2513,6 +2513,33 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             except Exception:
                 pass
 
+    # AUTO-OPEN FALLBACK: Chris asked to open/view/show a file in his user
+    # folders, the model may have listed the directory (list_user_files) but never
+    # actually opened the target. Resolve the hinted filename server-side and
+    # display it inline so the request still completes even if the model stalls.
+    if "view_user_file" not in names and "open_user_file" not in names and \
+       "read_user_file" not in names and _match_open_user_file(user_message):
+        _hint = _extract_user_file_hint(user_message)
+        if _hint:
+            _rp = _find_user_file_fuzzy(_hint)
+            if _rp:
+                ok, result = tool_view_user_file(_rp)
+                if ok:
+                    names.append("view_user_file")
+                    sid = _agent_next_id()
+                    with _AGENT_LOCK:
+                        _AGENT["steps"].append({"id": sid, "kind": "work",
+                                                "text": "view_user_file %s" % os.path.basename(_rp),
+                                                "state": "done", "icon": _tool_icon("view_user_file"),
+                                                "view": result.view if isinstance(result, _ViewResult) else result})
+                    print("🖼 /chat auto-open fallback: viewed %s" % _rp)
+                    llm_messages.append({"role": "tool",
+                                         "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
+                                         "name": "view_user_file",
+                                         "content": str(result)})
+                else:
+                    print("⚠️ /chat auto-open fallback: could not view %s" % _rp)
+
     summary = _final_answer(llm_messages, names, last_screen, active,
                             user_message, chat_one=_chat_one)
     summary = _normalize_reply(summary)
@@ -2921,7 +2948,14 @@ def chat():
             "write the final file. Then stop and tell Chris the draft is open for review in VS "
             "Code and that you will save it to <path> when he says 'save it'.\n"
             "IMPORTANT: For simple factual questions (e.g. 'what is X?', 'who is Y?'), just "
-            "answer directly from the tool results. Do NOT save to a file unless explicitly asked.\n"
+            "answer directly from the tool results. Do NOT save to a file unless explicitly asked.\n\n"
+            "ANSWER QUALITY RULES — NEVER VIOLATE:\n"
+            "1. When web_search returns results, SYNTHESIZE them into a DEFINITIVE answer. Never say 'it depends', 'it's unclear', or 'would you like more detail?'. Give the exact answer the user asked for.\n"
+            "2. For 'who is X?' or 'what is X?' — give a complete, direct answer from the search results. Do NOT end with 'would you like more detail?', 'is there anything specific?', 'would you like me to dig deeper?', 'want me to go deeper?', or ANY question back to the user.\n"
+            "3. If search results contain the answer, STATE IT CLEARLY. Do not hedge, deflect, or ask follow-up questions.\n"
+            "4. For historical/factual questions (oldest book, who was Mandela, market prices) — give the concrete fact from the sources. If sources disagree, cite the consensus or most authoritative source.\n"
+            "5. NEVER end a factual answer with a question back to the user.\n"
+            "6. FORBIDDEN PHRASES — NEVER USE: 'Would you like me to...', 'Want me to...', 'Would you like...', 'Would you like more...', 'Is there anything...', 'Let me know if...', 'Shall I...', 'Do you want...'. These are DEFLECTIONS. Answer directly instead.\n"
             + _mood_softener_line()
             + build_context_block()
             + "\n\n" + _GROUNDING_DIRECTIVE + "\n\n" + _GROUNDING_FALLBACK
@@ -3543,6 +3577,75 @@ def _safe_user_path(path):
         if rp == root or rp.startswith(root + os.sep):
             return rp
     return None
+
+def _extract_user_file_hint(message):
+    """Pull a filename out of a natural-language 'open/view <file>' request.
+    E.g. 'the file Median XL and open it' -> 'Median XL'. Matches the biggest
+    token run after 'file', or a dotted filename directly."""
+    m = (message or "")
+    pat = re.search(
+        r'\bfile\s+(?:called\s+|named\s+|sf?\s+)?'
+        r"([A-Za-z0-9][A-Za-z0-9 _.\-]*?)"
+        r'(?=\s+(?:and\b|then\b|,|\.|$|\bin\b|\bon\b|\bopen\b|\bview\b|\bplease\b))',
+        m, re.IGNORECASE)
+    if pat:
+        hint = pat.group(1).strip()
+        if len(hint) >= 2:
+            return hint
+    pat2 = re.search(
+        r'\b([A-Za-z0-9][A-Za-z0-9 _.\-]{2,}\.(?:png|jpe?g|gif|webp|bmp|pdf|txt|md|docx|csv|json))\b',
+        m, re.IGNORECASE)
+    if pat2:
+        return pat2.group(1).strip()
+    return None
+
+
+def _match_open_user_file(message):
+    """True when Chris asked to open/view/show a file in his user folders."""
+    ml = (message or "").lower()
+    has_open = bool(re.search(r'\b(?:open|view|show|display)\b', ml))
+    filey = bool(re.search(
+        r'\b(?:file|picture|photo|image|capture|median)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b', ml))
+    find_open = bool(re.search(r'\bfind\b[^.!?\n]{0,80}\b(?:open|view|show)\b', ml))
+    return bool((has_open and filey) or find_open)
+
+
+def _find_user_file_fuzzy(name):
+    """Case-insensitive search for a filename across the allowed user roots,
+    trying the bare name and with common extensions appended. Returns the
+    realpath or None."""
+    if not name:
+        return None
+    base = os.path.basename(name.strip().strip('"\'')).lower()
+    base = re.sub(r'^the\s+file\s*[: ]?\s*', '', base).strip()
+    base = re.sub(r'\s+(?:now|please)$', '', base).strip()
+    if not base:
+        return None
+    exts = ['', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.pdf',
+            '.txt', '.md', '.markdown', '.docx', '.doc', '.xlsx', '.csv',
+            '.json', '.log']
+    for root in _USER_ALLOWED_ROOTS:
+        for dirpath, dirnames, filenames in os.walk(root):
+            try:
+                low = dirpath.lower()
+            except Exception:
+                continue
+            if not os.path.realpath(dirpath).startswith(os.path.realpath(root) + os.sep) and \
+               os.path.realpath(dirpath) != os.path.realpath(root):
+                # descending from a symlink/reparse point we already covered
+                if len(dirpath) >= len(root) and dirpath.lower().startswith(root.lower()):
+                    pass
+                else:
+                    continue
+            for fn in filenames:
+                fnl = fn.lower()
+                if fnl == base:
+                    return os.path.realpath(os.path.join(dirpath, fn))
+                for e in exts:
+                    if fnl == base + e:
+                        return os.path.realpath(os.path.join(dirpath, fn))
+    return None
+
 
 def tool_list_user_files(path="."):
     """List files in user directories (Pictures, Desktop, Downloads)."""
@@ -5424,6 +5527,8 @@ _SUBTASK_PROBES = [
     ("save file",    ("write_file", "open_in_vscode"), r"\bsave\b|\bwrite .*file\b"),
     ("weather",      ("weather",),               r"\bweather\b"),
     ("current time", ("get_time",),              r"\bcurrent time\b|\bwhat time\b"),
+    ("open/view user file", ("view_user_file", "open_user_file", "read_user_file"),
+     r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b"),
 ]
 
 
