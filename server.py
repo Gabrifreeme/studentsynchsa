@@ -1533,7 +1533,13 @@ LAST_FILE_PATH = None
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'ACEsi.html')
+    resp = send_from_directory('.', 'ACEsi.html')
+    # Never let the browser cache the chat UI — stale JS was the root cause of
+    # "popup never shows" (old page missing the view-rendering code).
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 # Strict file read/open detection. Only messages that LEAD with read/open AND
@@ -1887,6 +1893,43 @@ def _final_summary_call(active, llm_messages, names, last_screen):
         if text:
             return text
     return None
+
+
+def _auto_open_user_file_fallback(names, llm_messages, user_message):
+    """Deterministic fallback: Chris asked to open/view/show a file in his user
+    folders but the model answered from memory without calling the file tool
+    (or it narrated a plan and stopped). Resolve the hinted filename server-side
+    and attach the opened-file view so the request still completes AND the UI
+    popup appears even when the model stalls. Returns True when a file was
+    opened (a step with view data was appended to the ledger)."""
+    if ("view_user_file" in names or "open_user_file" in names or
+            "read_user_file" in names or not _match_open_user_file(user_message)):
+        return False
+    _hint = _extract_user_file_hint(user_message)
+    if not _hint:
+        return False
+    _rp = _find_user_file_fuzzy(_hint)
+    if not _rp:
+        print("⚠️ /chat auto-open fallback: no file matches hint %r" % _hint)
+        return False
+    ok, result = tool_view_user_file(_rp)
+    if not ok:
+        print("⚠️ /chat auto-open fallback: could not view %s" % _rp)
+        return False
+    names.append("view_user_file")
+    sid = _agent_next_id()
+    _view = result.view if isinstance(result, _ViewResult) else result
+    with _AGENT_LOCK:
+        _AGENT["steps"].append({"id": sid, "kind": "work",
+                                "text": "view_user_file %s" % os.path.basename(_rp),
+                                "state": "done", "icon": _tool_icon("view_user_file"),
+                                "view": _view})
+    llm_messages.append({"role": "tool",
+                         "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
+                         "name": "view_user_file",
+                         "content": str(result)})
+    print("🖼 /chat auto-open fallback: viewed %s" % _rp)
+    return True
 
 
 def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model=None):
@@ -2298,6 +2341,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         _already_reasked = True
                         active = None
                         continue
+                    # AUTO-OPEN: before returning a text-only reply, make sure a
+                    # requested file actually gets opened (view step + UI popup),
+                    # even when the model answered from memory without a tool call.
+                    _auto_open_user_file_fallback(names, llm_messages, user_message)
                     return _terse_reply(text or "")
 # Model returned empty text after using tools — nudge it to answer
                 if names:
@@ -2481,10 +2528,23 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = _draft_reply
             return _draft_reply
+    # AUTO-OPEN FALLBACK (helper): Chris asked to open/view/show a file in his
+    # user folders but the model answered from memory without calling the file
+    # tool (or it narrated a plan and stopped). Resolve the hinted filename
+    # server-side and attach the opened-file view so the request still completes
+    # AND the UI popup appears even when the model stalls. Returns True when a
+    # file was opened (a step with view data was appended to the ledger).
+    def _auto_open_user_file():
+        return _auto_open_user_file_fallback(names, llm_messages, user_message)
+
     # If the model already emitted a FINAL line, that is the answer.
     # But if it's ungrounded, re-ground it with tool evidence first.
+    # The auto-open fallback MUST run before this return, otherwise a
+    # memory-based FINAL reply (no tool call → no step → no view in the UI)
+    # would skip the popup entirely.
     if last_text and "FINAL" in last_text.upper():
-        if names and _is_ungrounded(last_text):
+        _auto_opened = _auto_open_user_file()
+        if _auto_opened or (names and _is_ungrounded(last_text)):
             summary = _final_answer(llm_messages, names, last_screen, active,
                                     user_message, chat_one=_chat_one)
             with _AGENT_LOCK:
@@ -2517,28 +2577,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # folders, the model may have listed the directory (list_user_files) but never
     # actually opened the target. Resolve the hinted filename server-side and
     # display it inline so the request still completes even if the model stalls.
-    if "view_user_file" not in names and "open_user_file" not in names and \
-       "read_user_file" not in names and _match_open_user_file(user_message):
-        _hint = _extract_user_file_hint(user_message)
-        if _hint:
-            _rp = _find_user_file_fuzzy(_hint)
-            if _rp:
-                ok, result = tool_view_user_file(_rp)
-                if ok:
-                    names.append("view_user_file")
-                    sid = _agent_next_id()
-                    with _AGENT_LOCK:
-                        _AGENT["steps"].append({"id": sid, "kind": "work",
-                                                "text": "view_user_file %s" % os.path.basename(_rp),
-                                                "state": "done", "icon": _tool_icon("view_user_file"),
-                                                "view": result.view if isinstance(result, _ViewResult) else result})
-                    print("🖼 /chat auto-open fallback: viewed %s" % _rp)
-                    llm_messages.append({"role": "tool",
-                                         "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
-                                         "name": "view_user_file",
-                                         "content": str(result)})
-                else:
-                    print("⚠️ /chat auto-open fallback: could not view %s" % _rp)
+    _auto_open_user_file()
 
     summary = _final_answer(llm_messages, names, last_screen, active,
                             user_message, chat_one=_chat_one)

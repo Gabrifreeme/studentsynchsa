@@ -1121,6 +1121,44 @@ function showThinking(text) {
     const ov = document.getElementById('shotOverlay');
     if (ov) ov.style.display = 'none';
   }
+  function showFileViewPopup(v, step) {
+    // Default popup behavior for any open_user_file / view_user_file result:
+    // whenever ACEsi opens a file, it appears right here in his UI.
+    const ov = document.getElementById('fileViewOverlay');
+    if (!ov || !v) return;
+    const nameEl = document.getElementById('fileViewName');
+    if (nameEl) nameEl.textContent = v.filename || (step && step.text) || 'File';
+    const bodyEl = document.getElementById('fileViewBody');
+    if (!bodyEl) return;
+    bodyEl.innerHTML = '';
+    if (v.type === 'image') {
+      const img = document.createElement('img');
+      img.src = 'data:' + (v.mime || 'image/png') + ';base64,' + v.data;
+      img.alt = v.filename || 'opened file';
+      img.style.cssText = 'max-width:100%;max-height:64vh;border-radius:8px;display:inline-block;';
+      bodyEl.appendChild(img);
+    } else if (v.type === 'pdf') {
+      const fr = document.createElement('iframe');
+      fr.src = 'data:' + (v.mime || 'application/pdf') + ';base64,' + v.data;
+      fr.style.cssText = 'width:100%;height:64vh;border-radius:8px;border:1px solid var(--border);';
+      bodyEl.appendChild(fr);
+    } else if (v.type === 'text') {
+      const pre = document.createElement('pre');
+      pre.textContent = v.content || '';
+      pre.style.cssText = 'margin:0;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;color:var(--text);';
+      bodyEl.appendChild(pre);
+    } else {
+      const txt = document.createElement('div');
+      txt.textContent = v.content || (v.type || '') + ' view';
+      txt.style.cssText = 'font-size:13px;color:var(--text);';
+      bodyEl.appendChild(txt);
+    }
+    ov.style.display = 'flex';
+  }
+  function closeFileViewPopup() {
+    const ov = document.getElementById('fileViewOverlay');
+    if (ov) ov.style.display = 'none';
+  }
   async function saveShotToDisk() {
     try {
       const r = await fetch('/screenshot/save', { method: 'POST' });
@@ -1232,6 +1270,7 @@ if (watched && s.state === 'done' && !wasDone) {
             viewEl.innerHTML = '<pre style="white-space:pre-wrap;max-height:300px;overflow:auto;margin-top:6px;padding:8px;background:var(--bg-elev);border-radius:6px;border:1px solid var(--border);">' + escapeHtml(v.content) + '</pre>';
           }
           el.appendChild(viewEl);
+          showFileViewPopup(v, s);
         }
       }
      if (changed || steps.length !== lastWorkStepCount) {
@@ -2196,6 +2235,17 @@ if (watched && s.state === 'done' && !wasDone) {
         Captured from the device.</span>
       <button onclick="saveShotToDisk()" class="settings-cancel">💾 Save to disk</button>
     </div>
+  </div>
+</div>
+
+<div id="fileViewOverlay" class="settings-overlay" style="z-index:2050;">
+  <div class="settings-dialog" style="width:720px;max-width:94vw;max-height:88vh;height:auto;">
+    <div class="settings-dialog-head">
+      <div class="settings-head-left"><span style="font-size:16px;">📂</span>
+        <h2 style="margin:0;font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60vw;" id="fileViewName">File</h2></div>
+      <button onclick="closeFileViewPopup()" class="settings-close">✕</button>
+    </div>
+    <div id="fileViewBody" style="padding:14px 18px;overflow:auto;flex:1;text-align:center;background:var(--bg);"></div>
   </div>
 </div>
 
