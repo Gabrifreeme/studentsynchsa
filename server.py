@@ -3912,24 +3912,36 @@ def tool_view_user_file(path):
         try:
             with open(rp, 'rb') as f:
                 data = f.read()
+            if len(data) == 0:
+                raise OSError("file is empty (cloud placeholder not downloaded?)")
             b64 = base64.b64encode(data).decode('ascii')
             mime = mimetypes.guess_type(rp)[0] or 'image/' + ext[1:]
             view = {"type": "image", "mime": mime, "data": b64, "filename": os.path.basename(rp),
                     "path": rp}
             return True, _ViewResult("[Image displayed inline: %s]" % os.path.basename(rp), view)
         except Exception as e:
-            return False, "failed to read image: %s" % e
+            # Unreadable cloud-only file: open it externally so OneDrive can
+            # hydrate/download the real content, and still surface a popup.
+            _open_external(rp)
+            return True, _ViewResult(
+                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp})
     # PDFs - return base64 for iframe embed
     if ext == '.pdf':
         try:
             with open(rp, 'rb') as f:
                 data = f.read()
+            if len(data) == 0:
+                raise OSError("file is empty (cloud placeholder not downloaded?)")
             b64 = base64.b64encode(data).decode('ascii')
             view = {"type": "pdf", "mime": "application/pdf", "data": b64, "filename": os.path.basename(rp),
                     "path": rp}
             return True, _ViewResult("[PDF displayed inline: %s]" % os.path.basename(rp), view)
         except Exception as e:
-            return False, "failed to read pdf: %s" % e
+            _open_external(rp)
+            return True, _ViewResult(
+                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp})
     # Word docs - extract paragraphs from the docx zip so the text displays.
     if ext == '.docx':
         try:
@@ -3950,7 +3962,12 @@ def tool_view_user_file(path):
                     "path": rp}
             return True, _ViewResult("[Word document displayed inline: %s]" % os.path.basename(rp), view)
         except Exception as e:
-            return False, "failed to read docx: %s" % e
+            # Not a real zip = cloud-only placeholder (OneDrive hasn't downloaded
+            # the content). Open it externally so the app hydrates it.
+            _open_external(rp)
+            return True, _ViewResult(
+                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp})
     # Text files - return text
     try:
         with open(rp, 'r', encoding='utf-8', errors='replace') as f:
@@ -3962,7 +3979,10 @@ def tool_view_user_file(path):
                 "path": rp}
         return True, _ViewResult("[Text file displayed inline: %s]" % os.path.basename(rp), view)
     except Exception as e:
-        return False, "failed to read: %s" % e
+        _open_external(rp)
+        return True, _ViewResult(
+            "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
+            {"type": "external", "filename": os.path.basename(rp), "path": rp})
 
 def tool_grep(pattern, path="."):
     if _kill_armed():
