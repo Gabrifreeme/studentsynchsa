@@ -1914,8 +1914,28 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
         return False
     ok, result = tool_view_user_file(_rp)
     if not ok:
-        print("⚠️ /chat auto-open fallback: could not view %s" % _rp)
-        return False
+        # Inline view failed (e.g. OneDrive cloud-only placeholder). Still open
+        # it externally so the request completes: os.startfile lets the provider
+        # hydrate the file and opens the default app for editing.
+        print("⚠️ /chat auto-open fallback: could not view %s — opening externally" % _rp)
+        try:
+            os.startfile(_rp)
+        except Exception as _e:
+            print("⚠️ /chat auto-open fallback: external open also failed: %s" % _e)
+        names.append("open_user_file")
+        sid = _agent_next_id()
+        with _AGENT_LOCK:
+            _AGENT["steps"].append({"id": sid, "kind": "work",
+                                    "text": "open_user_file %s" % os.path.basename(_rp),
+                                    "state": "done", "icon": _tool_icon("open_user_file"),
+                                    "view": {"type": "external", "filename": os.path.basename(_rp),
+                                             "path": _rp}})
+        llm_messages.append({"role": "tool",
+                             "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
+                             "name": "open_user_file",
+                             "content": "Opened externally: %s" % _rp})
+        print("🖼 /chat auto-open fallback: externally opened %s" % _rp)
+        return True
     names.append("view_user_file")
     sid = _agent_next_id()
     _view = result.view if isinstance(result, _ViewResult) else result
@@ -3172,6 +3192,21 @@ def file_open():
         return jsonify({'error': str(e)})
     return jsonify({'ok': True, 'path': os.path.relpath(rp, PROJECT_ROOT)})
 
+@app.route('/userfile/open', methods=['POST'])
+def userfile_open():
+    """Open a file from anywhere on Chris's PC in its default application (for
+    editing, viewing externally, etc.). Called when he clicks a file in a popup."""
+    data = request.json or {}
+    path = data.get('path', '')
+    rp = _safe_user_path(path)
+    if not rp or not os.path.isfile(rp):
+        return jsonify({'error': 'file not found: %s' % path})
+    try:
+        os.startfile(rp)
+    except Exception as e:
+        return jsonify({'error': str(e)})
+    return jsonify({'ok': True, 'path': rp})
+
 # ===== Autonomous code agent (ACEsi writing/editing code on its own) =====
 # The model plans with THOUGHT/CALL/FINAL lines; the server executes tools,
 # feeds results back, and loops until FINAL. The frontend already polls
@@ -3803,7 +3838,8 @@ def tool_view_user_file(path):
                 data = f.read()
             b64 = base64.b64encode(data).decode('ascii')
             mime = mimetypes.guess_type(rp)[0] or 'image/' + ext[1:]
-            view = {"type": "image", "mime": mime, "data": b64, "filename": os.path.basename(rp)}
+            view = {"type": "image", "mime": mime, "data": b64, "filename": os.path.basename(rp),
+                    "path": rp}
             return True, _ViewResult("[Image displayed inline: %s]" % os.path.basename(rp), view)
         except Exception as e:
             return False, "failed to read image: %s" % e
@@ -3813,10 +3849,32 @@ def tool_view_user_file(path):
             with open(rp, 'rb') as f:
                 data = f.read()
             b64 = base64.b64encode(data).decode('ascii')
-            view = {"type": "pdf", "mime": "application/pdf", "data": b64, "filename": os.path.basename(rp)}
+            view = {"type": "pdf", "mime": "application/pdf", "data": b64, "filename": os.path.basename(rp),
+                    "path": rp}
             return True, _ViewResult("[PDF displayed inline: %s]" % os.path.basename(rp), view)
         except Exception as e:
             return False, "failed to read pdf: %s" % e
+    # Word docs - extract paragraphs from the docx zip so the text displays.
+    if ext == '.docx':
+        try:
+            import zipfile, re as _re
+            text_parts = []
+            with zipfile.ZipFile(rp) as z:
+                for name in z.namelist():
+                    if name in ('word/document.xml',) or (name.startswith('word/') and name.endswith('.xml')):
+                        xml = z.read(name).decode('utf-8', errors='replace')
+                        paras = _re.findall(r'<w:p[ >].*?</w:p>|<w:p[ ]?/>', xml, _re.S)
+                        for p in paras:
+                            txt = _re.sub(r'<[^>]+>', '', p)
+                            txt = txt.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"').replace('&apos;', "'")
+                            if txt.strip():
+                                text_parts.append(txt.strip())
+            cut = '\n'.join(text_parts)[:8000]
+            view = {"type": "text", "content": cut or "(no extractable text)", "filename": os.path.basename(rp),
+                    "path": rp}
+            return True, _ViewResult("[Word document displayed inline: %s]" % os.path.basename(rp), view)
+        except Exception as e:
+            return False, "failed to read docx: %s" % e
     # Text files - return text
     try:
         with open(rp, 'r', encoding='utf-8', errors='replace') as f:
@@ -3824,7 +3882,8 @@ def tool_view_user_file(path):
         cut = c[:8000]
         if len(c) > 8000:
             cut += "\n...[truncated, %d chars total]" % len(c)
-        view = {"type": "text", "content": cut, "filename": os.path.basename(rp)}
+        view = {"type": "text", "content": cut, "filename": os.path.basename(rp),
+                "path": rp}
         return True, _ViewResult("[Text file displayed inline: %s]" % os.path.basename(rp), view)
     except Exception as e:
         return False, "failed to read: %s" % e
@@ -7872,6 +7931,9 @@ def run_agent(user_message):
                     raw += "\n" + "\n".join("CALL: %s %s" % (n, json.dumps(a)) for n, a in native_calls)
                 _AGENT["last_raw"] = raw[:600]
             if not reply and not native_calls:
+                # Fallback still applies when the model is down: a file the user
+                # explicitly asked for opens deterministically, no model needed.
+                _auto_open_user_file_fallback(calls_history, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "stopped (no model reply)"
                     _AGENT["last_reply"] = "All model providers are unavailable right now."
@@ -7999,6 +8061,10 @@ def run_agent(user_message):
                         with _AGENT_LOCK:
                             _AGENT["activity"] = "done"
                             _advance_indicator()
+                        # Auto-open fallback (same as /chat): the model looped on
+                        # list/grep without ever opening the requested file.
+                        _auto_open_user_file_fallback(calls_history, messages, user_message)
+                        with _AGENT_LOCK:
                             _AGENT["last_reply"] = _terse_reply(reply) if reply else (
                                 "I attempted the task multiple times but couldn't find a "
                                 "reliable answer. Check the steps above for what I found.")
@@ -8030,6 +8096,9 @@ def run_agent(user_message):
                             "now — do NOT emit FINAL until you have actually performed the work "
                             "and verified the result. Never defer back to the user."})
                         continue
+                # Auto-open fallback (same as /chat): the model may have FINAL'd
+                # without ever calling view_user_file/open_user_file.
+                _auto_open_user_file_fallback(calls_history, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "done"
                     _advance_indicator()
@@ -8058,6 +8127,9 @@ def run_agent(user_message):
                         "now — do NOT emit FINAL until you have actually performed the work "
                         "and verified the result. Never defer back to the user."})
                     continue
+                # Auto-open fallback (same as /chat): FINAL text without any file
+                # view still resolves and opens the requested file server-side.
+                _auto_open_user_file_fallback(calls_history, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "done"
                     _advance_indicator()
@@ -8081,6 +8153,9 @@ def run_agent(user_message):
                     "task (ui_* for device/app actions, file/dev tools for code work). Do NOT "
                     "emit FINAL until you have used at least one tool and verified the result."})
                 continue
+            # Auto-open fallback (same as /chat): no CALL and no FINAL — still try
+            # to open a file the user explicitly asked for.
+            _auto_open_user_file_fallback(calls_history, messages, user_message)
             with _AGENT_LOCK:
                 _AGENT["activity"] = "done"
                 _advance_indicator()

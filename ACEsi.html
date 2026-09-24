@@ -1128,6 +1128,9 @@ function showThinking(text) {
     if (!ov || !v) return;
     const nameEl = document.getElementById('fileViewName');
     if (nameEl) nameEl.textContent = v.filename || (step && step.text) || 'File';
+    const pathEl = document.getElementById('fileViewPath');
+    if (pathEl) pathEl.textContent = v.path ? ('📍 ' + v.path) : '';
+    fileViewCurrentPath = (v.path || '');
     const bodyEl = document.getElementById('fileViewBody');
     if (!bodyEl) return;
     bodyEl.innerHTML = '';
@@ -1135,7 +1138,9 @@ function showThinking(text) {
       const img = document.createElement('img');
       img.src = 'data:' + (v.mime || 'image/png') + ';base64,' + v.data;
       img.alt = v.filename || 'opened file';
-      img.style.cssText = 'max-width:100%;max-height:64vh;border-radius:8px;display:inline-block;';
+      img.title = 'Click to open the real file for editing';
+      img.style.cssText = 'max-width:100%;max-height:64vh;border-radius:8px;display:inline-block;cursor:pointer;';
+      img.addEventListener('click', openFileViewToEdit);
       bodyEl.appendChild(img);
     } else if (v.type === 'pdf') {
       const fr = document.createElement('iframe');
@@ -1147,6 +1152,23 @@ function showThinking(text) {
       pre.textContent = v.content || '';
       pre.style.cssText = 'margin:0;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;color:var(--text);';
       bodyEl.appendChild(pre);
+    } else if (v.type === 'external') {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px;';
+      const ic = document.createElement('div');
+      ic.textContent = '📄';
+      ic.style.cssText = 'font-size:42px;';
+      const txt = document.createElement('div');
+      txt.textContent = 'This file was opened on your PC. Click below to open it again for editing.';
+      txt.style.cssText = 'font-size:13px;color:var(--text);';
+      const btn = document.createElement('button');
+      btn.textContent = '↗ Open / edit';
+      btn.className = 'settings-cancel';
+      btn.onclick = openFileViewToEdit;
+      wrap.appendChild(ic);
+      wrap.appendChild(txt);
+      wrap.appendChild(btn);
+      bodyEl.appendChild(wrap);
     } else {
       const txt = document.createElement('div');
       txt.textContent = v.content || (v.type || '') + ' view';
@@ -1158,6 +1180,27 @@ function showThinking(text) {
   function closeFileViewPopup() {
     const ov = document.getElementById('fileViewOverlay');
     if (ov) ov.style.display = 'none';
+  }
+  let fileViewCurrentPath = '';
+  async function openFileViewToEdit() {
+    const path = fileViewCurrentPath;
+    const name = document.getElementById('fileViewName');
+    if (!path) {
+      if (name) name.textContent = 'No file path known';
+      return;
+    }
+    try {
+      const r = await fetch('/userfile/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path })
+      });
+      const d = await r.json();
+      if (d.ok && name) name.textContent = 'Opened for edit ↗';
+      else if (name) name.textContent = 'Open failed: ' + (d.error || 'unknown');
+    } catch (e) {
+      if (name) name.textContent = 'Open failed: ' + e;
+    }
   }
   async function saveShotToDisk() {
     try {
@@ -2246,6 +2289,13 @@ if (watched && s.state === 'done' && !wasDone) {
       <button onclick="closeFileViewPopup()" class="settings-close">✕</button>
     </div>
     <div id="fileViewBody" style="padding:14px 18px;overflow:auto;flex:1;text-align:center;background:var(--bg);"></div>
+    <div class="settings-dialog-foot" style="align-items:center;flex-direction:column;gap:6px;">
+      <span id="fileViewPath" style="font-size:11px;color:var(--text-dim);word-break:break-all;max-width:100%;"></span>
+      <div style="display:flex;gap:8px;">
+        <button id="fileViewOpenBtn" onclick="openFileViewToEdit()" class="settings-cancel">↗ Open / edit</button>
+        <button onclick="closeFileViewPopup()" class="settings-cancel">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
