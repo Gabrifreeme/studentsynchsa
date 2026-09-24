@@ -2912,10 +2912,11 @@ def chat():
             "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
             "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
             "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
-            "FILE TOOLS: When Chris asks you to look at, find, open, or show a file in his Pictures, "
-            "Desktop, or Downloads folders, use list_user_files to locate it, then view_user_file to "
-            "display it inline in the chat. The tool open_user_file is ONLY for 'launch externally in "
+            "FILE TOOLS: You have FULL access to Chris's PC (Documents, Pictures, Desktop, Downloads, any folder). When he asks you to look at, find, open, or show a file, use list_user_files to locate the folder, then view_user_file (accepts a full path OR a bare filename like 'GEPFGEPF' — it searches automatically) to display it inline in the chat. "
+            "If view_user_file's search fails, run list_user_files on the specific folder to confirm the exact filename first. "
+            "The tool open_user_file is ONLY for 'launch externally in "
             "default app' — do NOT use it for normal 'show me the file' requests.\n"
+            "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
             "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
             "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
             "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
@@ -3537,45 +3538,51 @@ _USER_ALLOWED_ROOTS = [
     os.path.join(os.path.expanduser("~"), "Pictures"),
     os.path.join(os.path.expanduser("~"), "Desktop"),
     os.path.join(os.path.expanduser("~"), "Downloads"),
+    os.path.join(os.path.expanduser("~"), "Documents"),
 ]
 
 _USER_ALIASES = {
     "pictures": os.path.join(os.path.expanduser("~"), "Pictures"),
     "desktop": os.path.join(os.path.expanduser("~"), "Desktop"),
     "downloads": os.path.join(os.path.expanduser("~"), "Downloads"),
+    "documents": os.path.join(os.path.expanduser("~"), "Documents"),
+    "my documents": os.path.join(os.path.expanduser("~"), "Documents"),
+    "docs": os.path.join(os.path.expanduser("~"), "Documents"),
     "my pictures": os.path.join(os.path.expanduser("~"), "Pictures"),
     "my desktop": os.path.join(os.path.expanduser("~"), "Desktop"),
     "my downloads": os.path.join(os.path.expanduser("~"), "Downloads"),
 }
 
 def _safe_user_path(path):
-    """Resolve path under allowed user directories only."""
+    """Resolve a user path to a real, existing location. Gives ACEsi access to
+    the whole PC: any path that exists is allowed (absolute or relative to the
+    home dir / project). Bare folder names ('Documents') and bare filenames
+    ('GEPFGEPF') are resolved under the home dir or by searching the home tree.
+    Returns the realpath string, or None if nothing matches."""
     if not path:
         return None
     p = path.strip().lower()
     if p in _USER_ALIASES:
         return _USER_ALIASES[p]
-    # If it's a relative path like "Pictures/file.png" or just "file.png",
-    # search for it in the allowed directories.
+    home = os.path.expanduser("~")
     if not os.path.isabs(path):
-        # Try "Pictures/file.png" -> join with ~/
-        for root in _USER_ALLOWED_ROOTS:
-            candidate = os.path.join(root, path)
-            if os.path.isfile(candidate):
-                return os.path.realpath(candidate)
-        # Try just the filename in each allowed root
-        filename = os.path.basename(path)
-        for root in _USER_ALLOWED_ROOTS:
-            for dirpath, dirnames, filenames in os.walk(root):
-                if filename in filenames:
-                    return os.path.realpath(os.path.join(dirpath, filename))
-    if os.path.isabs(path):
-        rp = os.path.realpath(path)
-    else:
-        rp = os.path.realpath(os.path.join(PROJECT_ROOT, path))
-    for root in _USER_ALLOWED_ROOTS:
-        if rp == root or rp.startswith(root + os.sep):
+        # Try "<home>/<path>" directly (covers 'Documents', 'My Documents',
+        # 'Documents/GEPFGEPF', 'Pictures/foo.png' etc.)
+        cand = os.path.join(home, path.strip())
+        if os.path.exists(cand):
+            return os.path.realpath(cand)
+        # Try "<PROJECT_ROOT>/<path>" (dev files when not user folders)
+        cand = os.path.join(PROJECT_ROOT, path.strip())
+        if os.path.exists(cand):
+            return os.path.realpath(cand)
+        # Bare filename -> deep-ish search under the whole home tree
+        rp = _find_user_file_fuzzy(path)
+        if rp:
             return rp
+        return None
+    rp = os.path.realpath(path)
+    if os.path.exists(rp):
+        return rp
     return None
 
 def _extract_user_file_hint(message):
@@ -3603,17 +3610,16 @@ def _extract_user_file_hint(message):
 def _match_open_user_file(message):
     """True when Chris asked to open/view/show a file in his user folders."""
     ml = (message or "").lower()
-    has_open = bool(re.search(r'\b(?:open|view|show|display)\b', ml))
+    has_open = bool(re.search(r'\b(?:open|view|show|display|read)\b', ml))
     filey = bool(re.search(
-        r'\b(?:file|picture|photo|image|capture|median)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b', ml))
+        r'\b(?:file|picture|photo|image|capture|median|gdpfgdpf)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b', ml))
     find_open = bool(re.search(r'\bfind\b[^.!?\n]{0,80}\b(?:open|view|show)\b', ml))
     return bool((has_open and filey) or find_open)
 
 
 def _find_user_file_fuzzy(name):
-    """Case-insensitive search for a filename across the allowed user roots,
-    trying the bare name and with common extensions appended. Returns the
-    realpath or None."""
+    """Case-insensitive search for a filename under the home tree, trying the
+    bare name and with common extensions appended. Returns the realpath or None."""
     if not name:
         return None
     base = os.path.basename(name.strip().strip('"\'')).lower()
@@ -3624,31 +3630,39 @@ def _find_user_file_fuzzy(name):
     exts = ['', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.pdf',
             '.txt', '.md', '.markdown', '.docx', '.doc', '.xlsx', '.csv',
             '.json', '.log']
-    for root in _USER_ALLOWED_ROOTS:
-        for dirpath, dirnames, filenames in os.walk(root):
+    # Root = the whole home profile (full PC access); the four named root
+    # aliases are all under it anyway. Skip heavy/unrestricted system dirs.
+    SKIP = {'appdata', 'application data', 'ntuser.dat', 'ntuser.ini',
+            '$recycle.bin', 'program files', 'program files (x86)',
+            'windows', 'system volume information'}
+    roots = _USER_ALLOWED_ROOTS + [os.path.expanduser("~")]
+    seen = set()
+    for root in roots:
+        rr = os.path.realpath(root)
+        if rr in seen:
+            continue
+        seen.add(rr)
+        if not os.path.isdir(rr):
+            continue
+        for dirpath, dirnames, filenames in os.walk(rr):
+            # prune heavy system dirs during the walk
+            dirnames[:] = [d for d in dirnames if d.lower() not in SKIP]
             try:
-                low = dirpath.lower()
+                rp_dir = os.path.realpath(dirpath)
             except Exception:
                 continue
-            if not os.path.realpath(dirpath).startswith(os.path.realpath(root) + os.sep) and \
-               os.path.realpath(dirpath) != os.path.realpath(root):
-                # descending from a symlink/reparse point we already covered
-                if len(dirpath) >= len(root) and dirpath.lower().startswith(root.lower()):
-                    pass
-                else:
-                    continue
             for fn in filenames:
                 fnl = fn.lower()
                 if fnl == base:
-                    return os.path.realpath(os.path.join(dirpath, fn))
+                    return os.path.realpath(os.path.join(rp_dir, fn))
                 for e in exts:
                     if fnl == base + e:
-                        return os.path.realpath(os.path.join(dirpath, fn))
+                        return os.path.realpath(os.path.join(rp_dir, fn))
     return None
 
 
 def tool_list_user_files(path="."):
-    """List files in user directories (Pictures, Desktop, Downloads)."""
+    """List files/dirs anywhere on Chris's PC (any folder)."""
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
     rp = _safe_user_path(path)
@@ -3658,7 +3672,7 @@ def tool_list_user_files(path="."):
     return True, "\n".join(out)[:4000]
 
 def tool_read_user_file(path):
-    """Read a file from user directories (Pictures, Desktop, Downloads)."""
+    """Read a file's content from anywhere on Chris's PC."""
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
     rp = _safe_user_path(path)
@@ -3675,7 +3689,7 @@ def tool_read_user_file(path):
         return False, str(e)
 
 def tool_open_user_file(path):
-    """Open a file from user directories (Pictures, Desktop, Downloads) with the system default application."""
+    """Open a file from anywhere on Chris's PC with the system default application."""
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
     rp = _safe_user_path(path)
@@ -3706,7 +3720,7 @@ class _ViewResult:
         return self.model_msg
 
 def tool_view_user_file(path):
-    """View a file from user directories (Pictures, Desktop, Downloads) inline in chat.
+    """View a file from anywhere on Chris's PC inline in chat.
     Returns base64 data for images (png, jpg, jpeg, gif, webp, bmp) and PDFs.
     For other files, returns text content or an error."""
     if _kill_armed():
@@ -3717,6 +3731,33 @@ def tool_view_user_file(path):
     import base64, mimetypes
     ext = os.path.splitext(rp)[1].lower()
     image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif'}
+    # Sniff magic bytes so extension-less files (e.g. 'GEPFGEPF' that IS a PNG)
+    # still display as images/PDFs instead of garbage text.
+    sniff_type = None
+    try:
+        with open(rp, 'rb') as _f:
+            _head = _f.read(16)
+        if _head[:8] == b'\x89PNG\r\n\x1a\n':
+            sniff_type = 'image'
+            if ext not in image_exts:
+                ext = '.png'
+        elif _head[:2] == b'\xff\xd8':
+            sniff_type = 'image'
+            if ext not in image_exts:
+                ext = '.jpg'
+        elif _head[:6] in (b'GIF87a', b'GIF89a'):
+            sniff_type = 'image'
+            if ext not in image_exts:
+                ext = '.gif'
+        elif _head[:4] == b'%PDF':
+            sniff_type = 'pdf'
+        elif _head[:4] in (b'RIFF',):
+            if _head[8:12] == b'WEBP':
+                sniff_type = 'image'
+                if ext not in image_exts:
+                    ext = '.webp'
+    except Exception:
+        pass
     if ext in image_exts:
         try:
             with open(rp, 'rb') as f:
@@ -5159,13 +5200,13 @@ TOOLS_SCHEMA = [
         "description": "Read a file's contents. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "list_user_files",
-        "description": "List files/dirs in user directories (Pictures, Desktop, Downloads). Args: path (dir to list).",
+        "description": "List files/dirs on Chris's PC. Paths can be 'Documents', 'My Pictures', 'Desktop', 'Downloads' or any folder on the machine. Args: path (dir to list).",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "read_user_file",
-        "description": "Read a file from user directories (Pictures, Desktop, Downloads). Args: path.",
+        "description": "Read a file's content from anywhere on Chris's PC (any folder: Documents, Pictures, Desktop, Downloads, etc). Accepts a full path or a bare filename. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "view_user_file",
-        "description": "VIEW a file from user directories (Pictures, Desktop, Downloads) inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
+        "description": "VIEW a file from Chris's PC inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Accepts a full path or a bare filename. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "open_user_file",
         "description": "LAUNCH a file EXTERNALLY with the system default application (Windows Photos, browser, etc.). Use ONLY when the user explicitly says 'open externally', 'launch in default app', or 'open outside ACEsi'. For normal 'show me the file' or 'open the file' in a browsing context, use view_user_file instead. Args: path.",
