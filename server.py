@@ -3763,7 +3763,11 @@ def tool_read_user_file(path):
         return False, str(e)
 
 def tool_open_user_file(path):
-    """Open a file from anywhere on Chris's PC with the system default application."""
+    """Open a file from anywhere on Chris's PC with the system default application.
+    Also returns the inline view data (same as tool_view_user_file) so the popup
+    ALWAYS appears in ACEsi's UI — the user opens a file and sees it immediately,
+    with his click-to-edit button attached.
+    """
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
     rp = _safe_user_path(path)
@@ -3778,9 +3782,17 @@ def tool_open_user_file(path):
             subprocess.run(["open", rp], check=False)
         else:
             subprocess.run(["xdg-open", rp], check=False)
-        return True, "opened %s with default viewer" % rp
     except Exception as e:
-        return False, "failed to open: %s" % e
+        print("⚠️ tool_open_user_file external launch failed: %s" % e)
+    # Attach inline view so the UI popup appears AND stays clickable-to-edit.
+    ok, result = tool_view_user_file(rp)
+    if ok and isinstance(result, _ViewResult):
+        return True, _ViewResult(
+            "opened %s in the default app; displayed inline too" % os.path.basename(rp),
+            result.view)
+    return True, _ViewResult(
+        "opened %s in the default app" % os.path.basename(rp),
+        {"type": "external", "filename": os.path.basename(rp), "path": rp})
 
 class _ViewResult:
     """Tool result that shows nicely to the model but carries view data for frontend."""
@@ -8025,6 +8037,12 @@ def run_agent(user_message):
                             if s["id"] == sid:
                                 s["state"] = "done" if ok else "error"
                                 s["error"] = "" if ok else result
+                                # Store viewable result for frontend inline rendering
+                                if ok and name in ("view_user_file", "open_user_file"):
+                                    if isinstance(result, _ViewResult):
+                                        s["view"] = result.view
+                                    elif isinstance(result, dict):
+                                        s["view"] = result
                     messages.append({"role": "tool", "tool_call_id": tcid,
                                      "name": name, "content": str(result)})
                     if ok and name in _UI_SCREEN_TOOLS:
