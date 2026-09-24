@@ -2940,7 +2940,195 @@ def _agent_next_id():
         _agent_seq[0] += 1
         return "a%d" % _agent_seq[0]
 
-# ── ACEsi dispatcher integration (ace_dispatcher module) ────────────────
+# ===== Task Queue System =====
+# Persistent queue of tasks that ACEsi executes sequentially.
+# Survives restarts, reports progress, handles failures.
+_TASK_QUEUE_FILE = 'task_queue.json'
+_TASK_QUEUE_LOCK = threading.RLock()
+
+def _load_task_queue():
+    return load_json(_TASK_QUEUE_FILE, {"queue": [], "current_index": 0, "status": "idle", "results": []})
+
+def _save_task_queue(queue_data):
+    save_json(_TASK_QUEUE_FILE, queue_data)
+
+def _queue_add(tasks, on_failure="stop"):
+    """Add tasks to queue. tasks = list of {"task": "...", "on_failure": "skip|retry|stop"}.
+    on_failure default applies to all tasks unless overridden per-task."""
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        for t in tasks:
+            if isinstance(t, str):
+                t = {"task": t}
+            q["queue"].append({
+                "task": t.get("task", ""),
+                "on_failure": t.get("on_failure", on_failure),
+                "status": "pending",
+                "result": None,
+                "error": None,
+                "started_at": None,
+                "finished_at": None,
+            })
+        q["status"] = "pending" if q["status"] == "idle" else q["status"]
+        _save_task_queue(q)
+        return q
+
+def _queue_clear():
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        q["queue"] = []
+        q["current_index"] = 0
+        q["status"] = "idle"
+        q["results"] = []
+        _save_task_queue(q)
+        return q
+
+def _queue_status():
+    with _TASK_QUEUE_LOCK:
+        return _load_task_queue()
+
+def _queue_stop():
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        if q["status"] in ("running", "pending"):
+            q["status"] = "stopped"
+            _save_task_queue(q)
+        return q
+
+def _queue_resume():
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        if q["status"] in ("stopped", "paused"):
+            q["status"] = "pending"
+            _save_task_queue(q)
+        return q
+
+def _queue_skip_current():
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        if q["status"] == "running" and 0 <= q["current_index"] < len(q["queue"]):
+            q["queue"][q["current_index"]]["status"] = "skipped"
+            q["queue"][q["current_index"]]["error"] = "Skipped by user"
+            q["queue"][q["current_index"]]["finished_at"] = time.time()
+            q["current_index"] += 1
+            if q["current_index"] >= len(q["queue"]):
+                q["status"] = "completed"
+            else:
+                q["status"] = "pending"
+            _save_task_queue(q)
+        return q
+
+def _queue_retry_current():
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        if q["status"] in ("running", "failed") and 0 <= q["current_index"] < len(q["queue"]):
+            q["queue"][q["current_index"]]["status"] = "pending"
+            q["queue"][q["current_index"]]["error"] = None
+            q["queue"][q["current_index"]]["started_at"] = None
+            q["queue"][q["current_index"]]["finished_at"] = None
+            if q["status"] == "failed":
+                q["status"] = "pending"
+            _save_task_queue(q)
+        return q
+
+def _queue_run_next():
+    """Run the next pending task. Returns (task_dict, result_text, success_bool) or None if none."""
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        # Find next pending task at or after current_index
+        idx = q["current_index"]
+        while idx < len(q["queue"]) and q["queue"][idx]["status"] in ("done", "skipped"):
+            idx += 1
+        if idx >= len(q["queue"]):
+            if q["status"] == "running":
+                q["status"] = "completed"
+                _save_task_queue(q)
+            return None
+        q["current_index"] = idx
+        q["status"] = "running"
+        task = q["queue"][idx]
+        task["status"] = "running"
+        task["started_at"] = time.time()
+        _save_task_queue(q)
+    
+    # Execute outside the lock to avoid blocking status checks
+    task_text = task["task"]
+    try:
+        # Use the existing chat dispatch for task execution
+        msgs = [{"role": "system", "content": "You are ACEsi, an autonomous agent. Execute the task and report results."},
+                {"role": "user", "content": task_text}]
+        reply = _chat_dispatch(msgs, user_message=task_text, preferred_model=None)
+        success = reply is not None and not reply.startswith("Error:")
+        result_text = reply if reply else "No response"
+    except Exception as e:
+        success = False
+        result_text = "%s: %s" % (type(e).__name__, e)
+    
+    # Update queue with result
+    with _TASK_QUEUE_LOCK:
+        q = _load_task_queue()
+        if idx < len(q["queue"]):
+            task = q["queue"][idx]
+            task["status"] = "done" if success else "failed"
+            task["result"] = result_text
+            task["finished_at"] = time.time()
+            if not success:
+                task["error"] = result_text
+            # Record result summary
+            q["results"].append({
+                "index": idx,
+                "task": task_text,
+                "status": task["status"],
+                "result": result_text[:500],
+                "error": task["error"],
+            })
+            # Determine next status based on on_failure policy
+            if not success:
+                policy = task.get("on_failure", "stop")
+                if policy == "skip":
+                    q["current_index"] += 1
+                elif policy == "retry":
+                    task["status"] = "pending"
+                    task["error"] = None
+                    task["started_at"] = None
+                    task["finished_at"] = None
+                elif policy == "stop":
+                    q["status"] = "failed"
+                    _save_task_queue(q)
+                    return task, result_text, success
+            if q["status"] != "failed":
+                q["current_index"] += 1
+                if q["current_index"] >= len(q["queue"]):
+                    q["status"] = "completed"
+                else:
+                    q["status"] = "pending"
+            _save_task_queue(q)
+    return task, result_text, success
+
+# Background runner - call periodically to process queue
+def _task_queue_worker():
+    """Call this periodically (e.g., from a timer) to run queued tasks."""
+    while True:
+        with _TASK_QUEUE_LOCK:
+            q = _load_task_queue()
+            if q["status"] != "running" and q["status"] != "pending":
+                break
+            # Find next pending
+            idx = q["current_index"]
+            while idx < len(q["queue"]) and q["queue"][idx]["status"] in ("done", "skipped"):
+                idx += 1
+            if idx >= len(q["queue"]):
+                if q["status"] == "running":
+                    q["status"] = "completed"
+                    _save_task_queue(q)
+                break
+        # Run one task
+        _queue_run_next()
+        # Small delay to avoid tight loop
+        time.sleep(0.5)
+    return True
+
+# ===== ACEsi dispatcher integration (ace_dispatcher module) ────────────────
 # Provides robust multi-subtask execution as a fallback when the
 # model-driven _chat_dispatch loop exhausts all providers.
 # Key properties: tools never crash the loop (ToolRegistry.call),
@@ -8858,6 +9046,67 @@ try:
     REGISTRY.assert_prompt_matches(CODE_AGENT_PROMPT, source="server.py[CODE_AGENT_PROMPT]")
 except Exception as e:
     print("⚠️ Prompt drift check failed:", e)
+
+
+# ===== Task Queue API Endpoints =====
+@app.route('/queue/add', methods=['POST'])
+def queue_add():
+    data = request.json or {}
+    tasks = data.get('tasks', [])
+    on_failure = data.get('on_failure', 'stop')  # skip|retry|stop
+    if not tasks:
+        return jsonify({"error": "Provide 'tasks' array"}), 400
+    q = _queue_add(tasks, on_failure)
+    return jsonify({"status": "added", "queue_length": len(q["queue"]), "queue": q})
+
+@app.route('/queue/status', methods=['GET'])
+def queue_status():
+    q = _queue_status()
+    return jsonify(q)
+
+@app.route('/queue/clear', methods=['POST'])
+def queue_clear():
+    q = _queue_clear()
+    return jsonify({"status": "cleared", "queue": q})
+
+@app.route('/queue/stop', methods=['POST'])
+def queue_stop():
+    q = _queue_stop()
+    return jsonify({"status": "stopped", "queue": q})
+
+@app.route('/queue/resume', methods=['POST'])
+def queue_resume():
+    q = _queue_resume()
+    return jsonify({"status": "resumed", "queue": q})
+
+@app.route('/queue/skip', methods=['POST'])
+def queue_skip():
+    q = _queue_skip_current()
+    return jsonify({"status": "skipped", "queue": q})
+
+@app.route('/queue/retry', methods=['POST'])
+def queue_retry():
+    q = _queue_retry_current()
+    return jsonify({"status": "retry", "queue": q})
+
+@app.route('/queue/run', methods=['POST'])
+def queue_run():
+    """Run the next task in the queue (or all if run_all=true)."""
+    data = request.json or {}
+    run_all = data.get('run_all', False)
+    results = []
+    if run_all:
+        while True:
+            res = _queue_run_next()
+            if res is None:
+                break
+            results.append({"task": res[0]["task"], "result": res[1], "success": res[2]})
+    else:
+        res = _queue_run_next()
+        if res:
+            results.append({"task": res[0]["task"], "result": res[1], "success": res[2]})
+    q = _queue_status()
+    return jsonify({"executed": len(results), "results": results, "queue": q})
 
 
 # Deep-memory bootstrap: fold the legacy rich table in, seed the relationship
