@@ -1154,20 +1154,15 @@ function showThinking(text) {
       bodyEl.appendChild(pre);
     } else if (v.type === 'external') {
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px;';
+      wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;';
       const ic = document.createElement('div');
       ic.textContent = '📄';
-      ic.style.cssText = 'font-size:42px;';
+      ic.style.cssText = 'font-size:40px;';
       const txt = document.createElement('div');
-      txt.textContent = 'This file was opened on your PC. Click below to open it again for editing.';
+      txt.textContent = 'Opened outside — use Open / edit below to launch it again.';
       txt.style.cssText = 'font-size:13px;color:var(--text);';
-      const btn = document.createElement('button');
-      btn.textContent = '↗ Open / edit';
-      btn.className = 'settings-cancel';
-      btn.onclick = openFileViewToEdit;
       wrap.appendChild(ic);
       wrap.appendChild(txt);
-      wrap.appendChild(btn);
       bodyEl.appendChild(wrap);
     } else {
       const txt = document.createElement('div');
@@ -1196,7 +1191,7 @@ function showThinking(text) {
         body: JSON.stringify({ path: path })
       });
       const d = await r.json();
-      if (d.ok && name) name.textContent = 'Opened for edit ↗';
+      if (d.ok && name) name.textContent = '↗ ' + (d.msg || 'Opened for you');
       else if (name) name.textContent = 'Open failed: ' + (d.error || 'unknown');
     } catch (e) {
       if (name) name.textContent = 'Open failed: ' + e;
@@ -1306,14 +1301,18 @@ if (watched && s.state === 'done' && !wasDone) {
           const viewEl = document.createElement('div');
           viewEl.className = 'w-view';
           if (v.type === 'image') {
-            viewEl.innerHTML = '<img src="data:' + v.mime + ';base64,' + v.data + '" alt="' + escapeHtml(v.filename) + '" style="max-width:100%;max-height:400px;border-radius:6px;border:1px solid var(--border);margin-top:6px;">';
+            viewEl.innerHTML = '<img src="data:' + v.mime + ';base64,' + v.data + '" alt="' + escapeHtml(v.filename) + '" style="max-width:100%;max-height:400px;border-radius:6px;border:1px solid var(--border);margin-top:6px;" onclick="openFileViewToEdit()">';
           } else if (v.type === 'pdf') {
             viewEl.innerHTML = '<iframe src="data:' + v.mime + ';base64,' + v.data + '" style="width:100%;height:400px;border-radius:6px;border:1px solid var(--border);margin-top:6px;"></iframe>';
           } else if (v.type === 'text') {
             viewEl.innerHTML = '<pre style="white-space:pre-wrap;max-height:300px;overflow:auto;margin-top:6px;padding:8px;background:var(--bg-elev);border-radius:6px;border:1px solid var(--border);">' + escapeHtml(v.content) + '</pre>';
           }
           el.appendChild(viewEl);
-          showFileViewPopup(v, s);
+          if (typeof lastFileViewStep === 'undefined') lastFileViewStep = '';
+          if (s.id !== lastFileViewStep) {
+            lastFileViewStep = s.id;
+            showFileViewPopup(v, s);
+          }
         }
       }
      if (changed || steps.length !== lastWorkStepCount) {

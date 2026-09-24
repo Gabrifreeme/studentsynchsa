@@ -3176,6 +3176,64 @@ def write_file():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+def _open_external(rp):
+    """Open a real file in its default app. For OneDrive cloud-only placeholders
+    (recall-on-data-access / offline attribute set), first forces them to pin to
+    this device so the target app can actually open the content; if the file
+    stays unreadable (provider not syncing), opens its folder in Explorer instead
+    and reports honest feedback. Returns (ok, message)."""
+    if not rp or not os.path.isfile(rp):
+        return False, "file not found: %s" % rp
+    cloud_only = False
+    try:
+        if os.name == 'nt':
+            import ctypes
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(rp)
+            if attrs != 0xFFFFFFFF:
+                cloud_only = bool(attrs & (0x1000 | 0x400000))  # OFFLINE | RECALL_ON_DATA_ACCESS
+    except Exception:
+        pass
+    def _try_read():
+        try:
+            with open(rp, 'rb') as _f:
+                return len(_f.read(1)) == 1
+        except Exception:
+            return False
+    if cloud_only and not _try_read():
+        # Force pin to this device (asks OneDrive to download the real content).
+        try:
+            import subprocess
+            subprocess.run(["attrib", "-U", "+P", rp], capture_output=True, timeout=30)
+        except Exception as e:
+            print("⚠️ cloud-file pin attempt failed: %s" % e)
+        # Give the sync engine a moment to hydrate.
+        for _ in range(10):
+            time.sleep(1.0)
+            if _try_read():
+                break
+        if not _try_read():
+            # Provider isn't syncing (e.g. OneDrive not running in session). Open
+            # Explorer so Chris can see/trigger the sync manually.
+            try:
+                import subprocess
+                subprocess.run(["explorer.exe", "/select,", rp], check=False)
+            except Exception as e:
+                print("⚠️ explorer fallback failed: %s" % e)
+            return True, "cloud file not downloaded yet — opened its folder in Explorer (start OneDrive to sync it)"
+    try:
+        import subprocess, platform
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(rp)
+        elif system == "Darwin":
+            subprocess.run(["open", rp], check=False)
+        else:
+            subprocess.run(["xdg-open", rp], check=False)
+    except Exception as e:
+        return False, "failed to open: %s" % e
+    return True, "opened %s for you" % os.path.basename(rp)
+
+
 @app.route('/file/open', methods=['POST'])
 def file_open():
     """Open a saved file in the OS default viewer so the user can verify it."""
@@ -3201,11 +3259,10 @@ def userfile_open():
     rp = _safe_user_path(path)
     if not rp or not os.path.isfile(rp):
         return jsonify({'error': 'file not found: %s' % path})
-    try:
-        os.startfile(rp)
-    except Exception as e:
-        return jsonify({'error': str(e)})
-    return jsonify({'ok': True, 'path': rp})
+    ok, msg = _open_external(rp)
+    if not ok:
+        return jsonify({'error': msg})
+    return jsonify({'ok': True, 'path': rp, 'msg': msg})
 
 # ===== Autonomous code agent (ACEsi writing/editing code on its own) =====
 # The model plans with THOUGHT/CALL/FINAL lines; the server executes tools,
@@ -3736,13 +3793,30 @@ def _find_user_file_fuzzy(name):
 
 
 def tool_list_user_files(path="."):
-    """List files/dirs anywhere on Chris's PC (any folder)."""
+    """List files/dirs anywhere on Chris's PC (any folder). Shallow — shows the
+    immediate entries only (subfolders get an item count), so a big folder like
+    Documents doesn't flood the reply/UI with hundreds of recursive lines."""
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
     rp = _safe_user_path(path)
     if not rp or not os.path.isdir(rp):
         return False, "dir not found or not allowed: %s" % path
-    out = _walk_files(rp)
+    try:
+        dirs = sorted(d for d in os.listdir(rp) if os.path.isdir(os.path.join(rp, d)))
+        files = sorted(f for f in os.listdir(rp) if os.path.isfile(os.path.join(rp, f)))
+    except Exception as e:
+        return False, "cannot list: %s" % e
+    out = []
+    for d in dirs:
+        dp = os.path.join(rp, d)
+        try:
+            n = len([1 for _ in os.listdir(dp)])
+        except Exception:
+            n = 0
+        out.append("📁 %s/  (%d items)" % (d, n))
+    out.extend("📄 %s" % f for f in files)
+    if not out:
+        return True, "(empty folder)"
     return True, "\n".join(out)[:4000]
 
 def tool_read_user_file(path):
@@ -3773,17 +3847,7 @@ def tool_open_user_file(path):
     rp = _safe_user_path(path)
     if not rp or not os.path.isfile(rp):
         return False, "file not found or not allowed: %s" % path
-    try:
-        import subprocess, platform
-        system = platform.system()
-        if system == "Windows":
-            os.startfile(rp)
-        elif system == "Darwin":
-            subprocess.run(["open", rp], check=False)
-        else:
-            subprocess.run(["xdg-open", rp], check=False)
-    except Exception as e:
-        print("⚠️ tool_open_user_file external launch failed: %s" % e)
+    _open_external(rp)
     # Attach inline view so the UI popup appears AND stays clickable-to-edit.
     ok, result = tool_view_user_file(rp)
     if ok and isinstance(result, _ViewResult):
