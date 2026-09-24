@@ -2668,6 +2668,10 @@ def chat():
             "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
             "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
             "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
+            "FILE TOOLS: When Chris asks you to look at, find, open, or show a file in his Pictures, "
+            "Desktop, or Downloads folders, use list_user_files to locate it, then view_user_file to "
+            "display it inline in the chat. The tool open_user_file is ONLY for 'launch externally in "
+            "default app' — do NOT use it for normal 'show me the file' requests.\n"
             "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
             "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
             "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
@@ -4653,10 +4657,10 @@ TOOLS_SCHEMA = [
         "description": "Read a file from user directories (Pictures, Desktop, Downloads). Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "view_user_file",
-        "description": "View a file from user directories (Pictures, Desktop, Downloads) inline in chat. Returns base64 for images (png, jpg, gif, webp, bmp, tiff) and PDFs; text for other files. Args: path.",
+        "description": "VIEW a file from user directories (Pictures, Desktop, Downloads) inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "open_user_file",
-        "description": "Open a file from user directories (Pictures, Desktop, Downloads) with the system default application (image viewer, PDF viewer, etc.). Args: path.",
+        "description": "LAUNCH a file EXTERNALLY with the system default application (Windows Photos, browser, etc.). Use ONLY when the user explicitly says 'open externally', 'launch in default app', or 'open outside ACEsi'. For normal 'show me the file' or 'open the file' in a browsing context, use view_user_file instead. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "grep",
         "description": "Regex search file contents. Args: pattern, path.",
