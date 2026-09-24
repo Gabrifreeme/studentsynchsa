@@ -1049,12 +1049,17 @@ function showThinking(text) {
       const d = await r.json();
       if (!d) return;
       const st = String(d.status || 'idle');
+      // Render work steps on EVERY poll (busy AND idle). The view data on a
+      // view_user_file step is only attached when the step reaches state 'done',
+      // which often happens in the same instant the run flips busy->idle. If we
+      // only rendered while 'busy', the final poll would miss the view and the
+      // inline image popup would silently never appear.
+      renderWorkSteps(d);
       if (st === 'busy') {
         if (lastPollStatus !== 'busy' && !uiRequestActive && !userStopped) {
           for (const k in workStepEls) delete workStepEls[k];
           lastWorkStepCount = 0;
         }
-        renderWorkSteps(d);
         if (!uiRequestActive && !thinkingEl && !userStopped) {
           showThinking('');
           monitorThinkingShown = true;
