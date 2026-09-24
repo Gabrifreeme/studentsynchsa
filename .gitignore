@@ -88,3 +88,12 @@ summary_config.json
 *.ace_bak
 
 ui_screenshots/
+
+# Kill switch state + password hashes (never commit)
+kill_switch.json
+.ace_kill.local
+
+# Job scheduler state
+jobs.json
+playbook.json
+audit.log
