@@ -1211,10 +1211,24 @@ function showThinking(text) {
            changed = true;
          }
        }
-       if (watched && s.state === 'done' && !wasDone) {
-         showFileSavedPopup(String(s.text || '').replace(/^write_file\s+/, '').trim());
-       }
-     }
+if (watched && s.state === 'done' && !wasDone) {
+          showFileSavedPopup(String(s.text || '').replace(/^write_file\s+/, '').trim());
+        }
+        // Render inline view for view_user_file / open_user_file results
+        if (s.view && s.state === 'done' && !el.querySelector('.w-view')) {
+          const v = s.view;
+          const viewEl = document.createElement('div');
+          viewEl.className = 'w-view';
+          if (v.type === 'image') {
+            viewEl.innerHTML = '<img src="data:' + v.mime + ';base64,' + v.data + '" alt="' + escapeHtml(v.filename) + '" style="max-width:100%;max-height:400px;border-radius:6px;border:1px solid var(--border);margin-top:6px;">';
+          } else if (v.type === 'pdf') {
+            viewEl.innerHTML = '<iframe src="data:' + v.mime + ';base64,' + v.data + '" style="width:100%;height:400px;border-radius:6px;border:1px solid var(--border);margin-top:6px;"></iframe>';
+          } else if (v.type === 'text') {
+            viewEl.innerHTML = '<pre style="white-space:pre-wrap;max-height:300px;overflow:auto;margin-top:6px;padding:8px;background:var(--bg-elev);border-radius:6px;border:1px solid var(--border);">' + escapeHtml(v.content) + '</pre>';
+          }
+          el.appendChild(viewEl);
+        }
+      }
      if (changed || steps.length !== lastWorkStepCount) {
        lastWorkStepCount = steps.length;
        scrollToBottom();

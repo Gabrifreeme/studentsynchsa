@@ -2163,6 +2163,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         if s["id"] == sid:
                             s["state"] = "done" if ok else "error"
                             s["error"] = "" if ok else result
+                            # Store viewable result (image/pdf/text) for frontend rendering
+                            if ok and run_name in ("view_user_file", "open_user_file"):
+                                if isinstance(result, _ViewResult):
+                                    s["view"] = result.view
+                                elif isinstance(result, dict):
+                                    s["view"] = result
                     llm_messages.append({"role": "tool", "tool_call_id": tcid,
                                          "name": name, "content": str(result)[:4000]})
                 # Detect unproductive re-querying: a research tool (web_search /
@@ -3175,6 +3181,61 @@ def tool_open_user_file(path):
         return True, "opened %s with default viewer" % rp
     except Exception as e:
         return False, "failed to open: %s" % e
+
+class _ViewResult:
+    """Tool result that shows nicely to the model but carries view data for frontend."""
+    __slots__ = ("model_msg", "view")
+    def __init__(self, model_msg, view):
+        self.model_msg = model_msg
+        self.view = view
+    def __str__(self):
+        return self.model_msg
+    def __repr__(self):
+        return self.model_msg
+
+def tool_view_user_file(path):
+    """View a file from user directories (Pictures, Desktop, Downloads) inline in chat.
+    Returns base64 data for images (png, jpg, jpeg, gif, webp, bmp) and PDFs.
+    For other files, returns text content or an error."""
+    if _kill_armed():
+        return False, "E-STOP is armed — no file tools."
+    rp = _safe_user_path(path)
+    if not rp or not os.path.isfile(rp):
+        return False, "file not found or not allowed: %s" % path
+    import base64, mimetypes
+    ext = os.path.splitext(rp)[1].lower()
+    image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif'}
+    if ext in image_exts:
+        try:
+            with open(rp, 'rb') as f:
+                data = f.read()
+            b64 = base64.b64encode(data).decode('ascii')
+            mime = mimetypes.guess_type(rp)[0] or 'image/' + ext[1:]
+            view = {"type": "image", "mime": mime, "data": b64, "filename": os.path.basename(rp)}
+            return True, _ViewResult("[Image displayed inline: %s]" % os.path.basename(rp), view)
+        except Exception as e:
+            return False, "failed to read image: %s" % e
+    # PDFs - return base64 for iframe embed
+    if ext == '.pdf':
+        try:
+            with open(rp, 'rb') as f:
+                data = f.read()
+            b64 = base64.b64encode(data).decode('ascii')
+            view = {"type": "pdf", "mime": "application/pdf", "data": b64, "filename": os.path.basename(rp)}
+            return True, _ViewResult("[PDF displayed inline: %s]" % os.path.basename(rp), view)
+        except Exception as e:
+            return False, "failed to read pdf: %s" % e
+    # Text files - return text
+    try:
+        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+            c = f.read()
+        cut = c[:8000]
+        if len(c) > 8000:
+            cut += "\n...[truncated, %d chars total]" % len(c)
+        view = {"type": "text", "content": cut, "filename": os.path.basename(rp)}
+        return True, _ViewResult("[Text file displayed inline: %s]" % os.path.basename(rp), view)
+    except Exception as e:
+        return False, "failed to read: %s" % e
 
 def tool_grep(pattern, path="."):
     if _kill_armed():
@@ -4525,6 +4586,7 @@ TOOLS = {
     "list_user_files": (tool_list_user_files, ("path",)),
     "read_user_file": (tool_read_user_file, ("path",)),
     "open_user_file": (tool_open_user_file, ("path",)),
+    "view_user_file": (tool_view_user_file, ("path",)),
     "grep": (tool_grep, ("pattern", "path")),
     "write_file": (tool_write_file, ("path", "content")),
     "open_in_vscode": (tool_open_in_vscode, ("path", "content")),
@@ -4589,6 +4651,9 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "read_user_file",
         "description": "Read a file from user directories (Pictures, Desktop, Downloads). Args: path.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "view_user_file",
+        "description": "View a file from user directories (Pictures, Desktop, Downloads) inline in chat. Returns base64 for images (png, jpg, gif, webp, bmp, tiff) and PDFs; text for other files. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "open_user_file",
         "description": "Open a file from user directories (Pictures, Desktop, Downloads) with the system default application (image viewer, PDF viewer, etc.). Args: path.",
@@ -5173,7 +5238,7 @@ _TOOL_DOMAINS = {
     # both code edits and on-device taps
     "curl": "net",
     # file-system / code tools
-    "list_files": "code", "read_file": "code", "list_user_files": "code", "read_user_file": "code", "open_user_file": "code", "grep": "code",
+    "list_files": "code", "read_file": "code", "list_user_files": "code", "read_user_file": "code", "open_user_file": "code", "view_user_file": "code", "grep": "code",
     "write_file": "code", "edit_file": "code", "open_in_vscode": "code", "run_command": "code",
     "git_status": "code", "git_log": "code", "git_commit": "code",
     "git_branch": "code", "git_merge": "code",
