@@ -576,6 +576,223 @@ def get_recent_conversation(limit=8):
     conn.close()
     return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
 
+
+# ===== Conversation Recall & Session Management =====
+def get_conversations_by_date(date_str, limit=50):
+    """Get all conversations on a specific date (YYYY-MM-DD)."""
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id", (date_str + '%',))
+    rows = c.fetchall()
+    conn.close()
+    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows]
+
+def get_conversations_by_topic(keyword, limit=50, days_back=30):
+    """Search conversations by keyword/topic."""
+    cutoff = (datetime.now() - timedelta(days=days_back)).isoformat()
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE content LIKE ? AND timestamp >= ? ORDER BY id DESC LIMIT ?",
+              ('%' + keyword + '%', cutoff, limit))
+    rows = c.fetchall()
+    conn.close()
+    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in reversed(rows)]
+
+def get_conversation_range(start_id, end_id):
+    """Get conversations in an ID range (inclusive)."""
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE id BETWEEN ? AND ? ORDER BY id", (start_id, end_id))
+    rows = c.fetchall()
+    conn.close()
+    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows]
+
+def get_dates_with_conversations(days_back=90):
+    """Get list of dates that have conversations, with message counts."""
+    cutoff = (datetime.now() - timedelta(days=days_back)).isoformat()
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT date(timestamp) as d, COUNT(*) as c FROM conversations WHERE timestamp >= ? GROUP BY date(timestamp) ORDER BY d DESC", (cutoff,))
+    rows = c.fetchall()
+    conn.close()
+    return [{"date": r[0], "count": r[1]} for r in rows]
+
+# ===== Session Summarization =====
+_SESSION_SUMMARY_PROMPT = """Summarize this conversation session in 3-5 bullet points:
+- Key topics discussed
+- Decisions made or tasks completed
+- Important facts learned about Chris
+- Any commitments or follow-ups
+- Mood/energy level observed
+
+Conversation:
+{conversation}
+
+Summary:"""
+
+def summarize_session(messages, max_length=800):
+    """Create a summary of a conversation session using the LLM."""
+    if not messages:
+        return "No messages to summarize."
+    # Format conversation
+    conv_text = "\n".join([f"{m['role']}: {m['content'][:500]}" for m in messages])
+    prompt = _SESSION_SUMMARY_PROMPT.format(conversation=conv_text)
+    msgs = [{"role": "user", "content": prompt}]
+    try:
+        reply = _chat_dispatch(msgs, user_message=prompt, preferred_model=None)
+        if reply:
+            return reply.strip()
+    except Exception:
+        pass
+    # Fallback: simple heuristic summary
+    user_msgs = [m for m in messages if m['role'] == 'user']
+    topics = []
+    for m in user_msgs:
+        content = m['content'].lower()
+        if 'fix' in content or 'bug' in content: topics.append('bug fixes')
+        if 'test' in content: topics.append('testing')
+        if 'commit' in content or 'git' in content: topics.append('git commits')
+        if 'deploy' in content: topics.append('deployment')
+        if 'memory' in content: topics.append('memory system')
+        if 'queue' in content: topics.append('task queue')
+    unique = list(dict.fromkeys(topics))
+    return f"Session covered: {', '.join(unique) if unique else 'general discussion'}. {len(user_msgs)} user messages."
+
+def save_session_summary(summary, session_date=None, session_id=None):
+    """Save a session summary to the memories table."""
+    session_date = session_date or datetime.now().date().isoformat()
+    key = f"session_summary.{session_date}.{session_id or 'main'}"
+    set_memory(key, summary)
+    return key
+
+# ===== Profile Building =====
+def extract_profile_traits():
+    """Analyze conversation history to build a profile of Chris.
+    Returns a dict with: interests, work_style, preferences, communication_patterns, recurring_topics, tools_used."""
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    
+    # Get all user messages from last 90 days
+    cutoff = (datetime.now() - timedelta(days=90)).isoformat()
+    c.execute("SELECT content FROM conversations WHERE role='user' AND timestamp >= ? ORDER BY id", (cutoff,))
+    user_messages = [r[0] for r in c.fetchall()]
+    conn.close()
+    
+    if not user_messages:
+        return {"interests": [], "work_style": "unknown", "preferences": {}, "communication_patterns": {}, "recurring_topics": [], "tools_used": []}
+    
+    all_text = " ".join(user_messages).lower()
+    
+    # Extract recurring topics (keywords that appear frequently)
+    topic_keywords = {
+        'flutter': ['flutter', 'dart', 'pub', 'build_apk', 'widget'],
+        'android': ['android', 'adb', 'emulator', 'apk', 'activity'],
+        'web': ['webview', 'cdp', 'javascript', 'html', 'css', 'portal'],
+        'git': ['git', 'commit', 'push', 'branch', 'merge', 'pull'],
+        'testing': ['test', 'flutter test', 'analyze', 'debug'],
+        'deployment': ['deploy', 'release', 'build', 'apk', 'play store'],
+        'memory': ['memory', 'recall', 'remember', 'session'],
+        'automation': ['automate', 'script', 'task', 'queue', 'schedule'],
+        'ui': ['ui', 'tap', 'swipe', 'screenshot', 'dump', 'appium'],
+        'database': ['database', 'sql', 'sqlite', 'query', 'schema'],
+        'api': ['api', 'rest', 'endpoint', 'curl', 'request'],
+    }
+    
+    topic_counts = {}
+    for topic, keywords in topic_keywords.items():
+        count = sum(1 for kw in keywords if kw in all_text)
+        if count > 0:
+            topic_counts[topic] = count
+    
+    # Communication patterns
+    total_msgs = len(user_messages)
+    avg_len = sum(len(m) for m in user_messages) / total_msgs if total_msgs > 0 else 0
+    question_ratio = sum(1 for m in user_messages if '?' in m) / total_msgs if total_msgs > 0 else 0
+    command_ratio = sum(1 for m in user_messages if m.strip().startswith(('fix ', 'run ', 'open ', 'show ', 'list ', 'view ', 'edit ', 'write '))) / total_msgs if total_msgs > 0 else 0
+    
+    # Work style inference
+    if topic_counts.get('flutter', 0) > 5:
+        work_style = 'flutter_developer'
+    elif topic_counts.get('web', 0) > 5:
+        work_style = 'web_developer'
+    elif topic_counts.get('automation', 0) > 3:
+        work_style = 'automation_engineer'
+    elif topic_counts.get('android', 0) > 3:
+        work_style = 'android_developer'
+    else:
+        work_style = 'generalist'
+    
+    # Tools mentioned
+    tools_used = []
+    if 'ui_' in all_text or 'cdp_' in all_text or 'webview' in all_text:
+        tools_used.append('ui_automation')
+    if 'git ' in all_text:
+        tools_used.append('git')
+    if 'flutter test' in all_text or 'flutter analyze' in all_text:
+        tools_used.append('flutter_tools')
+    if 'queue' in all_text:
+        tools_used.append('task_queue')
+    if 'memory' in all_text:
+        tools_used.append('memory_system')
+    
+    # Recurring topics (top 5)
+    recurring = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    recurring_topics = [t for t, _ in recurring]
+    
+    # Preferences
+    preferences = {
+        'prefers_concise': avg_len < 100,
+        'uses_commands': command_ratio > 0.3,
+        'asks_questions': question_ratio > 0.2,
+    }
+    
+    return {
+        "interests": recurring_topics,
+        "work_style": work_style,
+        "preferences": preferences,
+        "communication_patterns": {
+            "avg_message_length": round(avg_len),
+            "question_ratio": round(question_ratio, 2),
+            "command_ratio": round(command_ratio, 2),
+            "total_messages_90d": total_msgs,
+        },
+        "recurring_topics": recurring_topics,
+        "tools_used": list(set(tools_used)),
+        "last_analyzed": datetime.now().isoformat(),
+    }
+
+def get_profile():
+    """Get the cached profile or build a fresh one."""
+    memories = get_memories()
+    profile = memories.get("profile.derived")
+    if profile:
+        try:
+            profile = json.loads(profile.get("value", "{}"))
+            if profile.get("last_analyzed"):
+                # Check if profile is stale (>7 days)
+                try:
+                    last = datetime.fromisoformat(profile["last_analyzed"])
+                    if (datetime.now() - last).days < 7:
+                        return profile
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    # Build fresh
+    fresh = extract_profile_traits()
+    set_memory("profile.derived", json.dumps(fresh))
+    return fresh
+
+def update_profile_from_session(messages):
+    """Update profile incrementally from a new session."""
+    profile = get_profile()
+    # Merge new observations (simple increment for now)
+    # In future: more sophisticated incremental updates
+    profile["last_updated"] = datetime.now().isoformat()
+    set_memory("profile.derived", json.dumps(profile))
+    return profile
+
+
 # ===== Config (key/value settings) =====
 def get_config(key, default=None):
     conn = sqlite3.connect('ace_memory.db')
@@ -9107,6 +9324,77 @@ def queue_run():
             results.append({"task": res[0]["task"], "result": res[1], "success": res[2]})
     q = _queue_status()
     return jsonify({"executed": len(results), "results": results, "queue": q})
+
+
+# ===== Memory / Profile API =====
+@app.route('/memory/conversations/date/<date>', methods=['GET'])
+def memory_conversations_by_date(date):
+    """Get all conversations for a specific date (YYYY-MM-DD)."""
+    limit = int(request.args.get('limit', 50))
+    return jsonify(get_conversations_by_date(date, limit))
+
+@app.route('/memory/conversations/search', methods=['GET'])
+def memory_conversations_search():
+    """Search conversations by keyword."""
+    keyword = request.args.get('q', '')
+    limit = int(request.args.get('limit', 50))
+    days = int(request.args.get('days', 30))
+    if not keyword:
+        return jsonify({"error": "Provide 'q' parameter"}), 400
+    return jsonify(get_conversations_by_topic(keyword, limit, days))
+
+@app.route('/memory/conversations/range', methods=['GET'])
+def memory_conversations_range():
+    """Get conversations in an ID range."""
+    start = int(request.args.get('start', 0))
+    end = int(request.args.get('end', 0))
+    if not start or not end:
+        return jsonify({"error": "Provide 'start' and 'end' parameters"}), 400
+    return jsonify(get_conversation_range(start, end))
+
+@app.route('/memory/conversations/dates', methods=['GET'])
+def memory_conversations_dates():
+    """Get list of dates with conversation counts."""
+    days = int(request.args.get('days', 90))
+    return jsonify(get_dates_with_conversations(days))
+
+@app.route('/memory/session/summarize', methods=['POST'])
+def memory_session_summarize():
+    """Summarize a conversation session."""
+    data = request.json or {}
+    messages = data.get('messages', [])
+    summary = summarize_session(messages)
+    return jsonify({"summary": summary})
+
+@app.route('/memory/session/save', methods=['POST'])
+def memory_session_save():
+    """Save a session summary."""
+    data = request.json or {}
+    summary = data.get('summary', '')
+    session_date = data.get('session_date')
+    session_id = data.get('session_id')
+    if not summary:
+        return jsonify({"error": "Provide 'summary'"}), 400
+    key = save_session_summary(summary, session_date, session_id)
+    return jsonify({"saved": True, "key": key})
+
+@app.route('/profile', methods=['GET'])
+def profile_get():
+    """Get the built profile of Chris."""
+    return jsonify(get_profile())
+
+@app.route('/profile/refresh', methods=['POST'])
+def profile_refresh():
+    """Force rebuild the profile from conversation history."""
+    fresh = extract_profile_traits()
+    set_memory("profile.derived", fresh)
+    return jsonify({"refreshed": True, "profile": fresh})
+
+@app.route('/memory/conversations/recent', methods=['GET'])
+def memory_conversations_recent():
+    """Get recent conversation turns."""
+    limit = int(request.args.get('limit', 20))
+    return jsonify(get_recent_conversation(limit))
 
 
 # Deep-memory bootstrap: fold the legacy rich table in, seed the relationship
