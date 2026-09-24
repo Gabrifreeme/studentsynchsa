@@ -2574,11 +2574,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _AGENT["last_reply"] = last_text
         return last_text
 
-    # No tools ran and no real text — nothing to summarize.
+    # No tools ran and no real text — nothing to summarize. But a file-open ask
+    # must still open even when no model is available: resolve the hinted file
+    # deterministically so the popup appears (no LLM required).
     if not names and not (last_text and last_text.strip()):
-        with _AGENT_LOCK:
-            _AGENT["last_reply"] = last_text or ""
-        return last_text
+        _auto_picked = _auto_open_user_file()
+        msg = _AGENT["last_reply"]
+        if not (msg and msg.strip()):
+            with _AGENT_LOCK:
+                _AGENT["last_reply"] = (("Opened the file you asked for.")
+                                        if _auto_picked else (last_text or ""))
+        return _AGENT["last_reply"]
 
     # Auto-capture a screenshot if the user asked for one but the model didn't.
     if names:
