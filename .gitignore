@@ -45,9 +45,6 @@ app.*.map.json
 /android/app/release
 .aider*
 .env
-.env
-.env
-.env
 
 # Node / Python runtime
 node_modules/

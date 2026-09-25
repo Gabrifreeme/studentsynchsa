@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
@@ -142,14 +143,101 @@ class AuthService implements AuthRepository {
   Future<AuthResult> autoLogin() async {
     try {
       var profile = await _profileRepo.getProfile();
+      // If a real profile exists, return it as-is — don't overwrite with test data
       if (profile != null) {
+        debugPrint('autoLogin: found existing profile id=${profile.id}');
+        if (HiveDatabase.settings.get('auth_user_id') == null ||
+            (HiveDatabase.settings.get('auth_user_id') ?? '').isEmpty) {
+          await _setAuthData(email: profile.contact.email.isNotEmpty ? profile.contact.email : 'test.user@example.com', id: profile.id);
+        }
         return AuthResult(success: true, profile: profile);
       }
-      final id = const Uuid().v4();
-      return AuthResult(
-        success: true,
-        profile: StudentProfile(id: id, contact: ContactInfo(email: 'test.user@example.com')),
-      );
+      // No profile — create test fixture for first launch
+      final existingId = const Uuid().v4();
+      profile = StudentProfile(
+          id: existingId,
+          onboardingComplete: true,
+          personal: PersonalDetails(
+            title: 'Mr',
+            initials: 'T',
+            firstName: 'Test',
+            lastName: 'User',
+            gender: 'Male',
+            dateOfBirth: DateTime(1964, 4, 13),
+            idNumber: '6404135555555',
+          ),
+          contact: ContactInfo(
+            email: 'test.user@example.com',
+            phone: '0712345678',
+          ),
+          address: AddressInfo(
+            address: '123 Test Street',
+            addressLine2: 'Test Suburb',
+            province: 'Gauteng',
+            postalCode: '2000',
+          ),
+          demographic: DemographicInfo(
+            nationality: 'RSA',
+            countryOfBirth: 'South Africa',
+            homeLanguage: 'English',
+            populationGroup: 'Black',
+            maritalStatus: 'Single',
+          ),
+          status: StatusInfo(
+            disabilityStatus: 'No',
+            bursaryRequired: 'Yes',
+            employmentStatus: 'Studying at school',
+          ),
+          school: SchoolInfo(
+            schoolName: 'Test High School',
+            currentGrade: 'Grade 12',
+            currentlyDoing: 'Studying at school',
+          ),
+          nextOfKin: NextOfKin(
+            name: 'Parent Test',
+            mobilePhone: '0712345679',
+            homePhone: '0211234567',
+            addressLine1: '123 Test Street',
+            addressLine2: 'Test Suburb',
+            postalCode: '2000',
+            email: 'parent@example.com',
+          ),
+          accountContact: AccountContact(
+            name: 'Account Contact',
+            mobilePhone: '0723456789',
+            homePhone: '0217654321',
+            addressLine1: '456 Account Street',
+            addressLine2: 'Account Suburb',
+            postalCode: '2001',
+            email: 'account@example.com',
+          ),
+          results: ResultsInfo(
+            matricYear: DateTime.now().year - 1,
+            applicationLevel: 'Undergraduate',
+            upgrading: 'No',
+            matricType: 'South African',
+            examinationNumber: '1234567890',
+            schoolLeavingCertificate: 'GRADE 12',
+          ),
+          qualification: QualificationInfo(
+            academicYear: DateTime.now().year,
+            applicationPeriod: '1ST YEAR',
+            studyMode: 'FULL-TIME',
+            studyTiming: 'Full-Time',
+            choices: [
+              QualificationChoice(faculty: 'Science', programme: 'Computer Science'),
+            ],
+          ),
+          agreement: AgreementInfo(
+            acceptanceStatus: 'Accepted',
+          ),
+        );
+        await _profileRepo.saveProfile(profile);
+      if (HiveDatabase.settings.get('auth_user_id') == null || 
+          (HiveDatabase.settings.get('auth_user_id') ?? '').isEmpty) {
+        await _setAuthData(email: profile.contact.email, id: profile.id);
+      }
+      return AuthResult(success: true, profile: profile);
     } catch (e) {
       return AuthResult(success: false, error: e.toString());
     }
