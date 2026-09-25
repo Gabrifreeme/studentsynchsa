@@ -839,6 +839,10 @@ _data_lock = threading.RLock()
 _LK = _load_local_keys()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or _LK.get("groq", "")
 CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY") or _LK.get("cerebras", "")
+# Same env-then-.ace_keys.local fallback as the other providers, so a key can
+# live in either gitignored local store instead of only in source or .env.
+OPENROUTER_API_KEY = OPENROUTER_API_KEY or _LK.get("openrouter", "")
+FREELLM_API_KEY = FREELLM_API_KEY or _LK.get("freellm", "")
 
 def load_json(filename, default):
     path = os.path.join(DATA_DIR, filename)
@@ -1813,6 +1817,136 @@ def _categorized_memory_lines(mem, light=False):
     if leftover:
         out.append("other facts:\n" + "\n".join(leftover[:6]))
     return out
+
+
+# ===== Standing preferences (durable "how Chris wants things done") =====
+# Distinct from memories: a memory is a fact, a preference is an instruction
+# that must be obeyed on every future reply (tone, units, format, defaults).
+_PREFERENCES_FILE = 'preferences.json'
+_PREFERENCES_LOCK = threading.RLock()
+
+_PREFERENCE_ALIASES = {
+    'tone': 'tone', 'style': 'tone', 'mood': 'tone', 'manner': 'tone',
+    'voice': 'tone', 'vibe': 'tone', 'attitude': 'tone',
+    'unit': 'units', 'units': 'units', 'measurement': 'units',
+    'measure': 'units', 'measurements': 'units',
+    'format': 'format', 'formatting': 'format', 'layout': 'format',
+    'structure': 'format',
+    'name': 'name', 'nickname': 'name', 'call me': 'name',
+    'what to call me': 'name', 'what should i call you': 'name',
+    'what should you call me': 'name', 'what do you call me': 'name',
+    'language': 'language', 'lang': 'language', 'tongue': 'language',
+    'brevity': 'brevity', 'verbosity': 'brevity', 'length': 'brevity',
+    'timezone': 'timezone', 'tz': 'timezone',
+    'currency': 'currency',
+    'greeting': 'greeting',
+    'pronouns': 'pronouns',
+    'notification': 'notifications', 'notifications': 'notifications',
+    'notify': 'notifications', 'alerts': 'notifications',
+    'schedule': 'schedule', 'routines': 'schedule', 'routine': 'schedule',
+    'email': 'email', 'emails': 'email', 'address': 'email',
+    'phone': 'phone', 'number': 'phone', 'cell': 'phone', 'cellphone': 'phone',
+    'location': 'location', 'city': 'location', 'home': 'location',
+    'study': 'study', 'course': 'study', 'courses': 'study',
+    'university': 'study', 'subject': 'study', 'subjects': 'study',
+    'date': 'dates', 'dates': 'dates', 'time': 'dates',
+    'food': 'diet', 'diet': 'diet',
+}
+
+# Filler words the model prefixes onto a preference name ("my tone", "always
+# use metric units"). Stripped before lookup so those collapse onto one key
+# instead of accumulating near-duplicate entries.
+_PREF_FILLER = ('my ', 'the ', 'a ', 'an ', 'please ', 'always ', 'prefer ',
+                'preferred ', 'default ', 'reply ', 'replies ', 'response ',
+                'answer ', 'answers ', 'use ', 'using ')
+
+
+def _pref_key(key):
+    """Normalise a preference name so 'My Tone', 'style' and 'tone' are one entry.
+
+    Only short names are folded onto a known concept; a long phrase keeps its
+    own key so a genuine one-off instruction is never silently merged away.
+    """
+    k = re.sub(r'\s+', ' ', str(key or '').strip().lower()).strip(' .:;-')
+    if not k:
+        return ''
+    for filler in _PREF_FILLER:
+        if k.startswith(filler) and len(k) > len(filler):
+            k = k[len(filler):].strip()
+            break
+    if k in _PREFERENCE_ALIASES:
+        return _PREFERENCE_ALIASES[k]
+    tokens = k.split()
+    if len(tokens) <= 3:
+        for t in tokens:  # longest concept wins, left to right
+            if t in _PREFERENCE_ALIASES:
+                return _PREFERENCE_ALIASES[t]
+    return k
+
+
+def get_preferences():
+    prefs = load_json(_PREFERENCES_FILE, {})
+    return prefs if isinstance(prefs, dict) else {}
+
+
+def set_preference(key, value):
+    k = _pref_key(key)
+    if not k:
+        return {"ok": False, "error": "preference name is empty"}
+    val = str(value).strip()
+    if not val:
+        return {"ok": False, "error": "preference value is empty — say what to prefer"}
+    with _PREFERENCES_LOCK:
+        prefs = get_preferences()
+        previous = prefs.get(k)
+        prefs[k] = val
+        prefs['_meta'] = prefs.get('_meta', {})
+        prefs['_meta'][k] = datetime.now().isoformat()
+        save_json(_PREFERENCES_FILE, prefs)
+    audit_write('preference', 'set', {'key': k, 'value': val}, True, val)
+    text = f"Preference saved: {k} = {val}"
+    if previous and previous != val:
+        text += f" (was: {previous})"
+    return {"ok": True, "preference": k, "value": val, "previous": previous, "message": text}
+
+
+def forget_preference(key):
+    k = _pref_key(key)
+    with _PREFERENCES_LOCK:
+        prefs = get_preferences()
+        if k not in prefs:
+            return {"ok": False, "error": f"no preference named '{k}'"}
+        removed = prefs.pop(k)
+        meta = prefs.get('_meta') or {}
+        meta.pop(k, None)
+        prefs['_meta'] = meta
+        save_json(_PREFERENCES_FILE, prefs)
+    audit_write('preference', 'forget', {'key': k}, True, removed)
+    return {"ok": True, "removed": k, "value": removed,
+            "message": f"Preference removed: {k} (was: {removed})"}
+
+
+def list_preferences():
+    prefs = {k: v for k, v in get_preferences().items() if not k.startswith('_')}
+    if not prefs:
+        return {"count": 0, "preferences": {},
+                "message": "No standing preferences stored yet."}
+    lines = "\n".join(f"- {k}: {v}" for k, v in sorted(prefs.items()))
+    return {"count": len(prefs), "preferences": prefs,
+            "message": f"{len(prefs)} standing preference(s):\n{lines}"}
+
+
+def build_preferences_block(light=False):
+    """Render preferences as a prompt block, or None when none are stored."""
+    prefs = {k: v for k, v in get_preferences().items() if not k.startswith('_')}
+    if not prefs:
+        return None
+    if light:
+        prefs = dict(list(prefs.items())[:4])
+    lines = "\n".join(f"- {k}: {v}" for k, v in sorted(prefs.items()))
+    return ("[Chris's standing preferences — FOLLOW THESE on every reply, "
+            "they outrank your default style unless he overrides them now:\n"
+            + lines + "]")
 
 
 # ===== Context fed into every chat reply =====
@@ -3397,6 +3531,8 @@ def chat():
             print(f"✂️ Truncated to {max_chars} chars")
 
         # Persona + context (memory, journal, time) fed into every reply.
+        _prefs_block = build_preferences_block()
+        _prefs_text = ("\n\n" + _prefs_block) if _prefs_block else ""
         system_prompt = (
             "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
             "You are calm, present, and can be quiet — you don't gush, over-cheer, or over-promise. "
@@ -3437,6 +3573,15 @@ def chat():
             "If he says he does NOT want a local/desktop notification, do not use any "
             "Windows toast — ntfy to his phone is the channel.\n"
             "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
+            "STANDING PREFERENCES: the moment Chris states how he wants things done "
+            "('call me Braam', 'answer in Afrikaans', 'use metric units', 'keep it to two "
+            "lines', 'no bullet points', 'be more formal'), call set_preference with that "
+            "key and value, then confirm it in one short sentence. Do this WITHOUT being "
+            "asked to remember it. Always pick the key from the tool's list — never invent "
+            "a key name like 'name_preference'. If he tells you to STOP following one, call "
+            "forget_preference. If he asks what you always do for him, call "
+            "list_preferences. Any preference stored this way overrides your default "
+            "style in every later reply until it is changed or removed.\n"
             "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
             "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
             "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
@@ -3479,6 +3624,7 @@ def chat():
             "6. FORBIDDEN PHRASES — NEVER USE: 'Would you like me to...', 'Want me to...', 'Would you like...', 'Would you like more...', 'Is there anything...', 'Let me know if...', 'Shall I...', 'Do you want...'. These are DEFLECTIONS. Answer directly instead.\n"
             + _mood_softener_line()
             + build_context_block()
+            + _prefs_text
             + "\n\n" + _GROUNDING_DIRECTIVE + "\n\n" + _GROUNDING_FALLBACK
         )
 
@@ -5536,7 +5682,7 @@ def _search_tavily(query, max_results, include_images=False):
     import urllib.parse as _up
     import json
 
-    api_key = os.environ.get("TAVILY_API_KEY", "")
+    api_key = os.environ.get("TAVILY_API_KEY") or _LK.get("tavily", "")
     if not api_key:
         raise RuntimeError("TAVILY_API_KEY is not set")
     url = "https://api.tavily.com/search"
@@ -5905,6 +6051,35 @@ def tool_check_email(force_all=True):
     return check_email_now(force_all=bool(force_all))
 
 
+def tool_set_preference(key, value):
+    """Store a STANDING PREFERENCE — an instruction Chris wants obeyed on every
+    future reply (tone, units, reply length, format, what to call him).
+    Call this the moment he states one, e.g. 'call me Chris', 'always answer in
+    Afrikaans', 'use metric units', 'keep replies to 2 lines'.
+    Args: key (REQUIRED, one of: name, pronouns, tone, brevity, format, language,
+    units, currency, dates, email, phone, location, study, notifications, schedule,
+    greeting, diet), value (REQUIRED).
+    Returns (ok, result). A preference outranks your default style later. Near
+    synonyms are merged server-side, but use the exact enum key."""
+    res = set_preference(key, value)
+    return bool(res.get("ok")), res.get("message") or res.get("error", "failed")
+
+
+def tool_list_preferences():
+    """List the standing preferences currently stored, so you can tell Chris what
+    you will keep doing and change anything he asks to change."""
+    res = list_preferences()
+    return True, res["message"]
+
+
+def tool_forget_preference(key):
+    """Remove a standing preference when Chris says to stop following it
+    (e.g. 'stop calling me Chris', 'don't keep replies short anymore').
+    Args: key (REQUIRED, the preference name). Returns (ok, result)."""
+    res = forget_preference(key)
+    return bool(res.get("ok")), res.get("message") or res.get("error", "failed")
+
+
 def tool_list_email_rules():
     """List the email-watch rules (which senders/subjects trigger a phone push)."""
     rules = _load_email_rules()
@@ -5975,6 +6150,9 @@ TOOLS = {
     "todo_list": (tool_todo_list, ("category", "done")),
     "todo_done": (tool_todo_done, ("task_id",)),
     "todo_remove": (tool_todo_remove, ("task_id",)),
+    "set_preference": (tool_set_preference, ("key", "value")),
+    "list_preferences": (tool_list_preferences, ()),
+    "forget_preference": (tool_forget_preference, ("key",)),
 }
 
 # Native OpenAI-compatible tool schema. Sent to the provider so the model can
@@ -6215,6 +6393,24 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {
             "task_id": {"type": "integer"}},
             "required": ["task_id"]}}},
+    {"type": "function", "function": {"name": "set_preference",
+        "description": "Store a standing preference Chris wants obeyed on every future reply. Call it as soon as he states one, without being asked. Pick the key from the enum — do NOT invent key names. Args: key (REQUIRED, one of the enum values), value (REQUIRED).",
+        "parameters": {"type": "object", "properties": {
+            "key": {"type": "string", "enum": [
+                "name", "pronouns", "tone", "brevity", "format", "language",
+                "units", "currency", "dates", "email", "phone", "location",
+                "study", "notifications", "schedule", "greeting", "diet"]},
+            "value": {"type": "string", "description": "what to prefer from now on"}},
+            "required": ["key", "value"]}}},
+    {"type": "function", "function": {"name": "list_preferences",
+        "description": "List the standing preferences already stored.",
+        "parameters": {"type": "object", "properties": {},
+            "required": []}}},
+    {"type": "function", "function": {"name": "forget_preference",
+        "description": "Stop following a stored preference when Chris asks you to. Args: key (REQUIRED).",
+        "parameters": {"type": "object", "properties": {
+            "key": {"type": "string"}},
+            "required": ["key"]}}},
 ]
 
 # Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
@@ -9915,6 +10111,34 @@ def email_check():
         force = request.args.get('force_all', '1') != '0'
     ok, out = check_email_now(force_all=bool(force))
     return jsonify({"ok": ok, "result": out}), (200 if ok else 400)
+
+
+@app.route('/preferences', methods=['GET'])
+def preferences_get():
+    res = list_preferences()
+    prefs = res["preferences"]
+    return jsonify({"ok": True, "count": res["count"], "preferences": prefs,
+                    "file": os.path.join(DATA_DIR, _PREFERENCES_FILE)})
+
+
+@app.route('/preferences', methods=['POST'])
+def preferences_set():
+    """Store a standing preference. Body: {key, value}."""
+    d = request.json or {}
+    if not isinstance(d, dict):
+        return jsonify({"ok": False, "error": "JSON object required"}), 400
+    res = set_preference(d.get("key"), d.get("value"))
+    if not res.get("ok"):
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+@app.route('/preferences/<path:key>', methods=['DELETE'])
+def preferences_delete(key):
+    res = forget_preference(key)
+    if not res.get("ok"):
+        return jsonify(res), 404
+    return jsonify(res)
 
 
 @app.route('/email/rules', methods=['GET'])

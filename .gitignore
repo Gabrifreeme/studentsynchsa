@@ -101,3 +101,6 @@ kill_switch.json
 jobs.json
 playbook.json
 audit.log
+
+# Standing preferences (personal: name, location, study) - local only
+preferences.json
