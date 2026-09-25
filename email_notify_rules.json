@@ -1,0 +1,22 @@
+{
+  "rules": [
+    {
+      "name": "NSFAS",
+      "account": "both",
+      "from": "nsfas.gov.za",
+      "subject": "nsfas",
+      "body": "",
+      "enabled": true,
+      "notifyOnce": true
+    },
+    {
+      "name": "nwu.ac.za",
+      "account": "gmail",
+      "from": "",
+      "subject": "University ",
+      "body": "",
+      "enabled": true,
+      "notifyOnce": true
+    }
+  ]
+}

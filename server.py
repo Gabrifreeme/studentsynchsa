@@ -1111,10 +1111,16 @@ def _record_self_ntfy_id(r):
 
 def send_ntfy(title, message):
     try:
+        # Titles travel as an HTTP header, which requests encodes as latin-1, so
+        # an em-dash in a title (e.g. "ACEsi — Email alert") used to raise
+        # UnicodeEncodeError and the phone never got the alert. Keep the title
+        # ASCII (or percent-encode) and put the readable text in the body, which
+        # is sent as UTF-8 bytes and has no such limit.
+        safe_title = str(title).encode("ascii", "replace").decode("ascii")
         r = requests.post(
             f"{NTFY_SERVER}/{NTFY_TOPIC}",
-            data=message.encode('utf-8'),
-            headers={"Priority": "high", "Title": title},
+            data=str(message).encode('utf-8'),
+            headers={"Priority": "high", "Title": safe_title},
             timeout=10
         )
         _record_self_ntfy_id(r)
@@ -1124,6 +1130,345 @@ def send_ntfy(title, message):
         return False
 def send_test_ping():
     send_ntfy("ACEsi Test", "This is a test ping from ACEsi")
+
+
+# ===== Email watch -> PHONE PUSH (ntfy) =====
+# Chris asks to be told "ASAP" about email (e.g. NSFAS). That must arrive on his
+# PHONE, so every match is pushed through ntfy — the same channel as tool_notify.
+# It is deliberately NOT a Windows/local toast and NOT an email reply, because
+# neither shows up when he is away from the desk.
+#
+# Accounts + rules live in emails.json / email_notify_rules.json so they can be
+# edited without touching code. A rule matches when ANY of its from/subject/body
+# needles appear (case-insensitive); empty needles are ignored, so a rule with
+# only `from` set matches on sender alone.
+EMAIL_ACCOUNTS_FILE = "emails.json"
+EMAIL_RULES_FILE = "email_notify_rules.json"
+_EMAIL_STATE_FILE = ".email_watch_state.json"
+_EMAIL_POLL_TICK = 120      # seconds between mailbox polls
+_EMAIL_SEEN_CAP = 400       # remember this many seen message ids per account
+
+
+def _load_email_accounts():
+    try:
+        return load_json(EMAIL_ACCOUNTS_FILE, {}) or {}
+    except Exception:
+        return {}
+
+
+def _load_email_rules():
+    data = None
+    try:
+        data = load_json(EMAIL_RULES_FILE, {}) or {}
+    except Exception:
+        data = {}
+    rules = data.get("rules") if isinstance(data, dict) else data
+    return [r for r in (rules or []) if isinstance(r, dict) and r.get("enabled", True)]
+
+
+def _save_email_rules(rules):
+    try:
+        save_json(EMAIL_RULES_FILE, {"rules": rules})
+    except Exception as e:
+        print("⚠️ could not save email rules: %s" % e)
+
+
+def _email_rule_matches(rule, sender, subject, body):
+    for field, hay in (("from", sender), ("subject", subject), ("body", body)):
+        needle = (rule.get(field) or "").strip().lower()
+        if needle and needle in (hay or "").lower():
+            return True
+    return False
+
+
+def _email_rule_label(rule, sender=None, subject=None, body=None):
+    """Describe a rule for logs. When the matched content is supplied, name the
+    field that ACTUALLY matched; otherwise fall back to the first field set."""
+    if sender is not None:
+        for field, hay in (("from", sender), ("subject", subject), ("body", body)):
+            needle = (rule.get(field) or "").strip().lower()
+            if needle and needle in (hay or "").lower():
+                return "%s %s" % (field, rule[field].strip())
+    for f in ("from", "subject", "body"):
+        if (rule.get(f) or "").strip():
+            return "%s %s" % (f, rule[f].strip())
+    return rule.get("name") or "rule"
+
+
+def _load_email_state():
+    try:
+        return load_json(_EMAIL_STATE_FILE, {}) or {}
+    except Exception:
+        return {}
+
+
+def _save_email_state(state):
+    try:
+        save_json(_EMAIL_STATE_FILE, state)
+    except Exception as e:
+        print("⚠️ could not save email watch state: %s" % e)
+
+
+def _strip_html(html):
+    import re as _re2
+    txt = _re2.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html or "")
+    txt = _re2.sub(r"(?s)<[^>]+>", " ", txt)
+    txt = _re2.sub(r"&nbsp;?", " ", txt)
+    txt = _re2.sub(r"&amp;", "&", txt)
+    return _re2.sub(r"\s+", " ", txt).strip()
+
+
+def _imap_quoted(needle):
+    """Quote an IMAP search argument safely (strip quotes/backslashes)."""
+    return '"%s"' % str(needle).replace("\\", "").replace('"', "")
+
+
+def _imap_uid_list(M, *args):
+    """Run a UID SEARCH and return a set of uid strings ([] on any failure)."""
+    try:
+        typ, data = M.uid("SEARCH", None, *args)
+    except Exception:
+        return set()
+    if typ != "OK" or not data or not data[0]:
+        return set()
+    return {u.decode() if isinstance(u, bytes) else str(u)
+            for u in data[0].split()}
+
+
+def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
+    """Return [(uid, sender, subject, body)] for messages that are new (or all
+    candidates when force_all) and match one of `rules`.
+
+    Uses stable UIDs, not sequence numbers: deleting an old email renumbers
+    every sequence after it, which would re-alert a whole window. Candidate
+    detection happens SERVER-SIDE via IMAP SEARCH on FROM/SUBJECT/TEXT, so only
+    real matches get their body downloaded. Fetching the newest 25 full bodies
+    every tick cost 37s on Gmail and 217s on Yahoo, i.e. the 120s poll could
+    never keep up; this returns in a couple of seconds.
+    """
+    import imaplib
+    import email as _email_mod
+    from email.header import decode_header, make_header
+
+    def dec(v):
+        try:
+            return str(make_header(decode_header(v or "")))
+        except Exception:
+            return v or ""
+
+    out = []
+    M = None
+    try:
+        M = imaplib.IMAP4_SSL(cfg["host"], int(cfg.get("port", 993)), timeout=60)
+        M.login(cfg["user"], cfg["app_password"])
+        M.select("INBOX")
+
+        # The recent window is all we alert on: a fresh NSFAS mail is always in
+        # it, and it keeps the pass bounded on huge mailboxes.
+        all_uids = _imap_uid_list(M, "ALL")
+        if not all_uids:
+            return []
+        recent = sorted(all_uids, key=int)[-25:]
+
+        # Server-side candidate search: OR of every non-empty needle in every
+        # rule. TEXT covers the body (and headers), so a rule that only sets
+        # `body` still gets found.
+        candidates = set()
+        for r in (rules or []):
+            for field in ("from", "subject", "body"):
+                needle = (r.get(field) or "").strip()
+                if not needle:
+                    continue
+                key = "FROM" if field == "from" else (
+                    "SUBJECT" if field == "subject" else "TEXT")
+                args = []
+                try:
+                    needle.encode("ascii")
+                except UnicodeEncodeError:
+                    args += ["CHARSET", "UTF-8"]
+                candidates |= _imap_uid_list(M, *(args + [key, _imap_quoted(needle)]))
+        # Only alert on mail inside the recent window that we have not seen.
+        # force_all means "ignore the seen-cache", NOT "ignore the rules" --
+        # the candidates filter must always apply or every recent mail is
+        # downloaded and then locally rejected.
+        wanted = [u for u in recent
+                  if (u not in seen_ids or force_all) and u in candidates]
+
+        for uid in reversed(wanted):
+            try:
+                typ, msgdata = M.uid("FETCH", uid, "(RFC822)")
+            except Exception:
+                continue
+            if typ != "OK" or not msgdata or not msgdata[0]:
+                continue
+            raw = msgdata[0][1]
+            msg = _email_mod.message_from_bytes(raw)
+            sender = dec(msg.get("From", ""))
+            subject = dec(msg.get("Subject", ""))
+            body = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    ct = (part.get_content_type() or "").lower()
+                    if ct == "text/plain" and "attachment" not in (part.get("Content-Disposition") or ""):
+                        try:
+                            body = part.get_payload(decode=True).decode(
+                                part.get_content_charset() or "utf-8", "replace")
+                        except Exception:
+                            pass
+                        if body.strip():
+                            break
+                else:
+                    for part in msg.walk():
+                        if (part.get_content_type() or "").lower() == "text/html":
+                            try:
+                                body = _strip_html(part.get_payload(
+                                    decode=True).decode(
+                                    part.get_content_charset() or "utf-8", "replace"))
+                            except Exception:
+                                pass
+                            break
+            else:
+                try:
+                    ctype = (msg.get_content_type() or "").lower()
+                    raw_body = msg.get_payload(decode=True)
+                    txt = raw_body.decode(msg.get_content_charset() or "utf-8", "replace")
+                    body = _strip_html(txt) if ctype == "text/html" else txt
+                except Exception:
+                    body = ""
+            out.append((uid, sender, subject, (body or "")[:4000]))
+
+        # Refresh the seen-window regardless of matches, so ordinary mail never
+        # re-alerts later. UIDs are stable, unlike sequence numbers.
+        seen_ids.update(recent)
+        if len(seen_ids) > _EMAIL_SEEN_CAP:
+            for old in sorted(seen_ids, key=lambda k: int(k) if k.isdigit() else 0
+                              )[:len(seen_ids) - _EMAIL_SEEN_CAP]:
+                seen_ids.discard(old)
+    finally:
+        if M is not None:
+            # logout() can itself raise on a half-closed socket; never let that
+            # mask the real result.
+            try:
+                M.close()
+            except Exception:
+                pass
+            try:
+                M.logout()
+            except Exception:
+                pass
+    return out
+
+
+def check_email_now(force_all=False):
+    """Poll every configured mailbox and phone-push (ntfy) any email matching an
+    enabled rule. Returns (ok, summary). force_all=True also re-reports recent
+    matches that are already in the seen-cache (used by the 'check my email now'
+    tool/endpoint) so Chris gets an answer immediately instead of 'nothing new'."""
+    accounts = _load_email_accounts()
+    rules = _load_email_rules()
+    if not rules:
+        return False, "No email rules are enabled — nothing to watch for."
+    state = _load_email_state()
+    hits, checked, errors = [], 0, []
+    for name, cfg in (accounts or {}).items():
+        if not isinstance(cfg, dict) or not cfg.get("user") or not cfg.get("app_password"):
+            continue
+        # Only rules that actually apply to THIS mailbox. Using `any(not
+        # applicable)` here was wrong: the NWU rule is gmail-only, so the
+        # inverse test made Yahoo look unmonitored and it was never checked.
+        applicable = [r for r in rules
+                      if r.get("account") in (None, "", "both", name)]
+        if not applicable:
+            continue
+        seen = set(state.get(name, []))
+        msgs = None
+        for attempt in range(2):
+            try:
+                msgs = _imap_fetch_new(name, cfg, seen, rules=applicable,
+                                       force_all=force_all)
+                break
+            except Exception as e:
+                # Yahoo rate-limits repeat logins and intermittently returns
+                # "[SERVERBUG] LOGIN Server error" or a TLS handshake timeout.
+                # Back off well past 4s so the retry actually lands instead of
+                # tripping the same limit.
+                print("⚠️ email watch: %s mailbox failed (attempt %d) — %s"
+                      % (name, attempt + 1, e))
+                if attempt == 0:
+                    time.sleep(15)
+        if msgs is None:
+            errors.append(name)
+            continue
+        checked += 1
+        for mid, sender, subject, body in msgs:
+            matched = [r for r in applicable
+                       if _email_rule_matches(r, sender, subject, body)]
+            if not matched:
+                continue
+            snippet = (body or "")[:220].strip()
+            msg = ("New email in your %s inbox\n\nFrom: %s\nSubject: %s%s"
+                   % (name, sender, subject, ("\n\n" + snippet) if snippet else ""))
+            ok = send_ntfy("ACEsi", msg)
+            print("📧 email watch: matched %r on %s -> ntfy ok=%s"
+                  % (_email_rule_label(matched[0], sender, subject, body),
+                     name, ok))
+            hits.append("%s: %s — %s" % (name, sender, subject))
+        # Sort numerically: these are IMAP sequence numbers, and a plain
+        # string sort puts "10" before "9", which would keep the wrong window.
+        state[name] = sorted(seen, key=lambda k: int(k) if k.isdigit() else 0)[-_EMAIL_SEEN_CAP:]
+    if checked:
+        _save_email_state(state)
+    if hits:
+        msg = "Pushed %d matching email(s) to your phone: %s" % (len(hits), "; ".join(hits))
+        if errors:
+            msg += " (could not reach: %s)" % ", ".join(errors)
+        return True, msg
+    if not checked:
+        return False, ("No mailbox could be checked. Failed: %s. Check emails.json."
+                       % (", ".join(errors) if errors else "none configured"))
+    return True, ("Checked %d mailbox(es); no email matched the active rules.%s"
+                  % (checked, " Could not reach: %s." % ", ".join(errors) if errors else ""))
+
+
+def _email_watch_loop():
+    # First run only primes the seen-cache so ACEsi doesn't blast Chris with
+    # notifications for every email already sitting in the inbox.
+    prime = True
+    while True:
+        try:
+            if prime:
+                accounts = _load_email_accounts()
+                state = _load_email_state()
+                for name, cfg in (accounts or {}).items():
+                    if not isinstance(cfg, dict) or not cfg.get("app_password"):
+                        continue
+                    seen = set(state.get(name, []))
+                    for attempt in range(2):
+                        try:
+                            # No rules on the prime pass: just refresh the seen
+                            # window cheaply, never alert on existing mail.
+                            _imap_fetch_new(name, cfg, seen)
+                            break
+                        except Exception as e:
+                            print("⚠️ email watch prime %s (attempt %d): %s"
+                                  % (name, attempt + 1, e))
+                            if attempt == 0:
+                                time.sleep(15)
+                    state[name] = sorted(seen, key=lambda k: int(k) if k.isdigit() else 0
+                                         )[-_EMAIL_SEEN_CAP:]
+                _save_email_state(state)
+                prime = False
+                print("📧 email watch: primed mailboxes, now polling every %ds"
+                      % _EMAIL_POLL_TICK)
+            else:
+                check_email_now()
+        except Exception as e:
+            print("⚠️ email watch loop: %s: %s" % (type(e).__name__, e))
+        time.sleep(_EMAIL_POLL_TICK)
+
+
+if get_config("email_watch_enabled", "1") != "0":
+    threading.Thread(target=_email_watch_loop, daemon=True).start()
 
 
 # ===== ntfy inbox: Chris can publish a message to the ACEsi topic from his
@@ -1952,6 +2297,78 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
     return True
 
 
+def _wants_web_image(user_message):
+    """True when Chris asked to see a picture/photo/image from the internet."""
+    m = (user_message or "").lower()
+    return bool(re.search(r'\b(picture|photo|image|pic|pics|gif|photo of|picture of|image of)\b', m))
+
+
+def _find_image_url_in_text(text):
+    """Return the first http(s) URL in `text` that looks like a direct image
+    file (ends in an image extension, NET tools + curl)."""
+    for url in re.findall(r'https?://[^\s)\]>"\'<]+', text or ""):
+        u = url.rstrip('.,;:') 
+        if re.search(r'\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)', u, re.IGNORECASE):
+            return u
+    return None
+
+
+def _auto_open_web_image_fallback(reply_text, llm_messages, user_message,
+                                  triggered_by_tool=False):
+    """Deterministic fallback: Chris asked for a picture from the internet and
+    the model found an image URL but never called view_web_image (it either
+    pasted the link in prose, or looped on web_search and stopped without a
+    FINAL). Fetch and display the first image URL we can find so the popup still
+    appears. Looks in the reply text first, then in the accumulated tool output.
+    Returns True when a web image view was appended to the ledger."""
+    if "view_web_image" in _seen_tool_names():
+        return False
+    if not _wants_web_image(user_message):
+        return False
+    # Collect every candidate image URL, not just the first: the model often
+    # invents a plausible-looking path that 404s while a real one sits further
+    # down the search output. Try them in order until one actually downloads.
+    candidates = []
+    for text in [reply_text] + [m.get("content", "") for m in
+                                reversed(llm_messages or []) if m.get("role") == "tool"]:
+        for u in re.findall(r'https?://[^\s)\]>"\'<]+', text or ""):
+            u = u.rstrip('.,;:')
+            if re.search(r'\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)', u, re.IGNORECASE):
+                if u not in candidates:
+                    candidates.append(u)
+    if not candidates:
+        return False
+    ok = False
+    result = None
+    url = None
+    for cand in candidates[:6]:
+        _ok, _res = tool_view_web_image(cand)
+        if _ok and isinstance(_res, _ViewResult):
+            ok, result, url = True, _res, cand
+            break
+        print("⚠️ web-image fallback: could not fetch %s — %s" % (cand, _res))
+    if not ok:
+        return False
+    sid = _agent_next_id()
+    with _AGENT_LOCK:
+        _AGENT["steps"].append({"id": sid, "kind": "work",
+                                "text": "view_web_image %s" % str(result.view.get("filename", url)),
+                                "state": "done", "icon": _tool_icon("view_web_image") or "🌐",
+                                "view": result.view})
+    llm_messages.append({"role": "tool",
+                         "tool_call_id": "webimg_%d" % int(time.time() * 1000),
+                         "name": "view_web_image",
+                         "content": str(result)[:4000]})
+    print("🌐 web-image fallback: displayed %s" % url)
+    return True
+
+
+def _seen_tool_names():
+    with _AGENT_LOCK:
+        return {s.get("text", "").split()[0] for s in _AGENT.get("steps", [])
+                if s.get("kind") == "work" and s.get("text")}
+
+
 def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model=None):
     """Agent-style tool loop for /chat. Passes the tool schema to the model; when
     it emits a tool call (ui_*, git_*, flutter_*, cdp_*, ...) EXECUTE it via
@@ -2365,6 +2782,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # requested file actually gets opened (view step + UI popup),
                     # even when the model answered from memory without a tool call.
                     _auto_open_user_file_fallback(names, llm_messages, user_message)
+                    _auto_open_web_image_fallback(text or "", llm_messages, user_message)
                     return _terse_reply(text or "")
 # Model returned empty text after using tools — nudge it to answer
                 if names:
@@ -2448,7 +2866,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             s["state"] = "done" if ok else "error"
                             s["error"] = "" if ok else result
                             # Store viewable result (image/pdf/text) for frontend rendering
-                            if ok and run_name in ("view_user_file", "open_user_file"):
+                            if ok and run_name in ("view_user_file", "open_user_file", "view_web_image"):
                                 if isinstance(result, _ViewResult):
                                     s["view"] = result.view
                                 elif isinstance(result, dict):
@@ -2564,6 +2982,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # would skip the popup entirely.
     if last_text and "FINAL" in last_text.upper():
         _auto_opened = _auto_open_user_file()
+        _auto_open_web_image_fallback(last_text, llm_messages, user_message)
         if _auto_opened or (names and _is_ungrounded(last_text)):
             summary = _final_answer(llm_messages, names, last_screen, active,
                                     user_message, chat_one=_chat_one)
@@ -2981,6 +3400,20 @@ def chat():
             "If view_user_file's search fails, run list_user_files on the specific folder to confirm the exact filename first. "
             "The tool open_user_file is ONLY for 'launch externally in "
             "default app' — do NOT use it for normal 'show me the file' requests.\n"
+            "WEB IMAGES: when Chris asks to 'get a picture of X', 'show me an image of Y', or 'open the picture "
+            "from the internet', you MUST actually display it: after web_search/webfetch returns a link, call "
+            "view_web_image with the image URL (the .jpg/.png/.gif link itself) so the picture pops up in the chat. "
+            "Do NOT just paste the URL into your reply.\n"
+            "EMAIL + PHONE ALERTS: a background watcher already polls Chris's Gmail and "
+            "Yahoo every ~2 minutes and pushes a PHONE notification (ntfy) when an email "
+            "matches a watch rule (NSFAS is already watched). So when he says 'keep an eye "
+            "on my email, tell me when an NSFAS mail arrives' or 'check my NSFAS email': "
+            "call check_email to look NOW, and tell him plainly that alerts are set to his "
+            "PHONE and are already active. Never suggest he set up a filter in his email "
+            "client, check his spam folder, or contact NSFAS directly — that is a "
+            "deflection. Only add a NEW sender with the email_rules tool if he names one. "
+            "If he says he does NOT want a local/desktop notification, do not use any "
+            "Windows toast — ntfy to his phone is the channel.\n"
             "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
             "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
             "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
@@ -3989,6 +4422,60 @@ def tool_view_user_file(path):
         return True, _ViewResult(
             "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
             {"type": "external", "filename": os.path.basename(rp), "path": rp})
+
+
+def tool_view_web_image(url):
+    """Download an image from a URL and display it inline in the ACEsi chat
+    window as a popup (same as a local image). Args: url. The URL must point
+    directly at an image file (png/jpg/jpeg/gif/webp/bmp). Returns a base64
+    image view so the frontend renders it. For non-image URLs use curl/webfetch."""
+    import base64, mimetypes, ssl
+    if not url or not str(url).startswith(("http://", "https://")):
+        return False, "view_web_image usage: url=http[s]://.../image.png"
+    try:
+        req = _urlreq.Request(str(url), headers={"User-Agent":
+            "Mozilla/5.0 (ACEsi image viewer)"})
+        ctx = ssl.create_default_context()
+        handler = _urlreq.HTTPSHandler(context=ctx)
+        opener = _urlreq.build_opener(handler, _urlreq.HTTPRedirectHandler())
+        with opener.open(req, timeout=30) as resp:
+            data = resp.read(15 * 1024 * 1024)
+            ctype = (resp.headers.get("Content-Type") or "").split(";")[0].lower()
+        if not data:
+            return False, "view_web_image: empty response from %s" % url
+        # Sniff magic bytes to pick the right mime/ext (servers mislabel often).
+        ext = ".jpg"
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            ext, ctype = ".png", "image/png"
+        elif data[:2] == b'\xff\xd8':
+            ext, ctype = ".jpg", "image/jpeg"
+        elif data[:6] in (b'GIF87a', b'GIF89a'):
+            ext, ctype = ".gif", "image/gif"
+        elif data[:12] == b'RIFF' and data[8:12] == b'WEBP':
+            ext, ctype = ".webp", "image/webp"
+        elif data[:4] in (b'%PDF',):
+            return True, _ViewResult(
+                "[URL points at a PDF, not an image: %s]" % url,
+                {"type": "pdf", "mime": "application/pdf",
+                 "data": base64.b64encode(data).decode('ascii'),
+                 "filename": "web_document.pdf", "path": url})
+        b64 = base64.b64encode(data).decode('ascii')
+        if not ctype.startswith("image/"):
+            ctype = "image/" + ext[1:]
+        fname = os.path.basename(_urlreq.urlsplit(str(url)).path) or ("image" + ext)
+        if "." not in fname:
+            fname += ext
+        view = {"type": "image", "mime": ctype, "data": b64,
+                "filename": fname, "path": str(url)}
+        return True, _ViewResult("[Image displayed inline (from web): %s]" % fname, view)
+    except _urlerr.HTTPError as e:
+        return False, "view_web_image: HTTP %d fetching %s" % (e.code, url)
+    except _urlerr.URLError as e:
+        return False, "view_web_image: network error fetching %s — %s" % (url, str(getattr(e, "reason", e)))
+    except _socket.timeout:
+        return False, "view_web_image: timeout fetching %s" % url
+    except Exception as e:
+        return False, "view_web_image: %s" % str(e)[:200]
 
 def tool_grep(pattern, path="."):
     if _kill_armed():
@@ -5003,23 +5490,30 @@ def _decode_bing_redirect(href):
     return href
 
 
-def _search_tavily(query, max_results):
+def _search_tavily(query, max_results, include_images=False):
     """Search using Tavily API. Returns title + URL + content snippet so the
-    model can actually answer from the result text (not just link names)."""
+    model can actually answer from the result text (not just link names).
+    With include_images=True the response also carries an IMAGE block with
+    real, fetchable image URLs — the model otherwise invents image paths that
+    404 when it tries to show a picture."""
     import urllib.request as _urlreq
     import urllib.parse as _up
     import json
 
     api_key = "REDACTED_TAVILY_KEY"
     url = "https://api.tavily.com/search"
-    payload = json.dumps({
+    body = {
         "api_key": api_key,
         "query": query,
         "max_results": int(max_results),
         "search_depth": "basic",
         "include_answer": False,
         "include_raw_content": False,
-    }).encode("utf-8")
+    }
+    if include_images:
+        body["include_images"] = True
+        body["include_image_descriptions"] = False
+    payload = json.dumps(body).encode("utf-8")
 
     req = _urlreq.Request(
         url,
@@ -5031,6 +5525,24 @@ def _search_tavily(query, max_results):
         data = json.loads(resp.read().decode("utf-8"))
 
     items = []
+    if include_images:
+        # Tavily returns images as either plain URL strings or {"url": ...} dicts
+        # depending on the plan/response, so accept both shapes.
+        imgs = data.get("images") or []
+        shown = []
+        for im in imgs:
+            if isinstance(im, str):
+                iu = im.strip()
+            elif isinstance(im, dict):
+                iu = (im.get("url") or "").strip()
+            else:
+                iu = ""
+            if iu and iu not in shown:
+                shown.append(iu)
+        if shown:
+            items.append("IMAGE RESULTS (pass one of these URLs to view_web_image):")
+            for iu in shown[:6]:
+                items.append("- image: %s" % iu)
     for r in data.get("results", [])[:max_results]:
         title = r.get("title", "").strip()
         url = r.get("url", "").strip()
@@ -5159,8 +5671,13 @@ def tool_web_search(query, max_results=6):
         return False, "web_search usage: query=<search text>"
 
     q = str(query).strip()
+    # Ask for real image URLs when the query is about seeing something. Without
+    # this the model has to guess an image path from page URLs, and guesses 404.
+    want_images = bool(re.search(
+        r'\b(picture|photo|image|images|pic|pics|portrait|logo|poster|'
+        r'illustration|drawing|artwork|wallpaper|headshot)\b', q, re.IGNORECASE))
     providers = [
-        ("Tavily", lambda: _search_tavily(q, max_results)),
+        ("Tavily", lambda: _search_tavily(q, max_results, include_images=want_images)),
         ("Serper", lambda: _search_serper(q, max_results)),
         ("DuckDuckGo", lambda: _search_duckduckgo(q, max_results)),
         ("Bing", lambda: _search_bing(q, max_results)),
@@ -5333,6 +5850,27 @@ def tool_notify(title="ACEsi", message="Ping from ACEsi"):
             else (False, "ntfy push failed (check internet / ntfy app subscription)"))
 
 
+def tool_check_email(force_all=True):
+    """Check Chris's Gmail/Yahoo inboxes NOW and phone-push (ntfy) anything
+    matching an enabled rule in email_notify_rules.json (e.g. NSFAS).
+    Returns (ok, result). The background watcher does this automatically every
+    couple of minutes; call this when Chris wants an answer right now."""
+    return check_email_now(force_all=bool(force_all))
+
+
+def tool_list_email_rules():
+    """List the email-watch rules (which senders/subjects trigger a phone push)."""
+    rules = _load_email_rules()
+    if not rules:
+        return True, "No email rules enabled."
+    lines = []
+    for r in rules:
+        lines.append("- %s [%s] from=%r subject=%r body=%r" % (
+            r.get("name") or "(unnamed)", r.get("account") or "both",
+            r.get("from") or "", r.get("subject") or "", r.get("body") or ""))
+    return True, "\n".join(lines)
+
+
 TOOLS = {
     "list_files": (tool_list_files, ("path",)),
     "read_file": (tool_read_file, ("path",)),
@@ -5377,7 +5915,10 @@ TOOLS = {
     "cdp_network_requests": (tool_cdp_network_requests, ()),
     "cdp_status": (tool_cdp_status, ()),
     "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
+    "view_web_image": (tool_view_web_image, ("url",)),
     "notify": (tool_notify, ("title", "message")),
+    "check_email": (tool_check_email, ("force_all",)),
+    "list_email_rules": (tool_list_email_rules, ()),
     "get_time": (tool_get_time, ()),
     "web_search": (tool_web_search, ("query", "max_results")),
     "webfetch": (tool_webfetch, ("url", "format")),
@@ -5411,6 +5952,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "open_user_file",
         "description": "LAUNCH a file EXTERNALLY with the system default application (Windows Photos, browser, etc.). Use ONLY when the user explicitly says 'open externally', 'launch in default app', or 'open outside ACEsi'. For normal 'show me the file' or 'open the file' in a browsing context, use view_user_file instead. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "view_web_image",
+        "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet (e.g. 'get me a picture of X', 'show me an image of Y'). The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Always call this after web_search/webfetch finds an image URL. Args: url.",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
     {"type": "function", "function": {"name": "grep",
         "description": "Regex search file contents. Args: pattern, path.",
         "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern", "path"]}}},
@@ -5569,6 +6113,14 @@ TOOLS_SCHEMA = [
             "title": {"type": "string", "title": "title", "description": "Optional. Notification title, default 'ACEsi'."},
             "message": {"type": "string", "title": "message", "description": "Optional. The message text to push. Default 'Ping from ACEsi'."}},
             "required": []}}},
+    {"type": "function", "function": {"name": "check_email",
+        "description": "Check Chris's Gmail and Yahoo inboxes NOW and push a PHONE notification (ntfy) for any email matching his watch rules (e.g. NSFAS). Use this when he asks about email out of the blue ('check my email', 'any NSFAS email?', 'did I get an NSFAS mail?'). A background watcher already does this every ~2 minutes; this tool forces it immediately. Args: force_all (optional boolean, default true — true re-checks the whole recent inbox, false only looks for mail newer than the last poll).",
+        "parameters": {"type": "object", "properties": {
+            "force_all": {"type": "boolean", "title": "force_all", "description": "Optional. Re-scan the recent inbox instead of only new mail. Default true."}},
+            "required": []}}},
+    {"type": "function", "function": {"name": "list_email_rules",
+        "description": "List the active email-watch rules — which senders/subjects/keywords trigger a phone push for Chris. No args.",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "get_time",
         "description": "Current local date/time, weekday, and dates 1 and 7 days out. No args.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -5689,6 +6241,10 @@ OLLAMA_TOOLS_SCHEMA = [
         "description": "Send a push notification to Chris's phone via ntfy. Use when Chris asks to 'ping my phone', 'notify me'. Args: message (text), title optional.",
         "parameters": {"type": "object", "properties": {
             "title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+    {"type": "function", "function": {"name": "check_email",
+        "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+        "parameters": {"type": "object", "properties": {
+            "force_all": {"type": "boolean"}}, "required": []}}},
     {"type": "function", "function": {"name": "get_time",
         "description": "Current local date/time and weekday. No args.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -5929,6 +6485,12 @@ NET_TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "webfetch",
         "description": "Fetch full page content. Args: url, format.",
         "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+    {"type": "function", "function": {"name": "check_email",
+        "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+        "parameters": {"type": "object", "properties": {"force_all": {"type": "boolean"}}, "required": []}}},
+    {"type": "function", "function": {"name": "view_web_image",
+        "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
     {"type": "function", "function": {"name": "weather",
         "description": "Current weather for a city. Args: city.",
         "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
@@ -6003,6 +6565,9 @@ _TOOL_DOMAINS = {
     "restart": "ctrl",
     # push notification to Chris's phone (available in every domain, like ctrl)
     "notify": "ctrl",
+    # email watch: polls Gmail/Yahoo and phone-pushes matches (NSFAS etc.)
+    "check_email": "ctrl",
+    "list_email_rules": "ctrl",
     # general helpers available in every domain (get_time, note) — network info
     # helpers (web_search, weather) live in net so code-only contexts exclude them
     "get_time": "ctrl",
@@ -6013,6 +6578,7 @@ _TOOL_DOMAINS = {
     "todo_remove": "ctrl",
     "web_search": "net",
     "webfetch": "net",
+    "view_web_image": "net",
     "weather": "net",
 }
 
@@ -6202,6 +6768,49 @@ def _domain_tool_names(domain):
 
 def _filter_tools_schema(schema, allowed_names):
     return [t for t in schema if t["function"]["name"] in allowed_names]
+
+
+# Free-tier input-token caps (per request). Groq's ITPM is 7000 for this org;
+# keep a safety margin so a large system prompt + schema still fits.
+_LLM_INPUT_TOKEN_BUDGET = 6200
+# Tools the model must always keep: the ones that answer "show me X" and let it
+# find things on the web/file system. Everything else is droppable when the
+# payload is too big for the provider.
+_LLM_CORE_TOOLS = {
+    "web_search", "view_web_image", "webfetch", "curl",
+    "view_user_file", "list_user_files", "read_file", "grep", "list_files",
+    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
+    "ui_dump", "ui_screenshot", "ui_app_open", "ui_tap", "ui_type", "ui_swipe",
+}
+
+
+def _fit_schema_to_budget(messages, tools_schema, max_tokens, budget=_LLM_INPUT_TOKEN_BUDGET):
+    """Drop the least important tools until prompt+schema fits the provider cap.
+
+    Providers reject an oversized request with 413 and llm_reply then falls
+    through to "all providers unavailable", which looks like an outage but is
+    really a payload-size problem. Core tools are never dropped; the rest are
+    removed largest-first until the estimated token count fits.
+    """
+    def est(tools):
+        payload = json.dumps({"messages": messages, "tools": tools,
+                              "max_tokens": max_tokens})
+        return len(payload) // 4
+
+    tools = list(tools_schema)
+    if est(tools) <= budget:
+        return tools
+    droppable = [t for t in tools
+                 if t["function"]["name"] not in _LLM_CORE_TOOLS]
+    # Biggest schemas cost the most tokens, so shed those first.
+    droppable.sort(key=lambda t: len(json.dumps(t)), reverse=True)
+    for t in droppable:
+        if est(tools) <= budget:
+            break
+        tools.remove(t)
+    print("✂️ schema trimmed %d -> %d tools to fit %d-token budget (est %d)"
+          % (len(tools_schema), len(tools), budget, est(tools)))
+    return tools
 
 
 class _DomainGate(Exception):
@@ -8007,6 +8616,16 @@ def run_agent(user_message):
     # the model has read the screen (ui_dump / auto-dump) since the last change.
     seen_screen = bool(auto_opened)
     last_had_tools = False
+    # Domain-filter the tool schema for run_agent too. Free-tier providers cap
+    # input tokens per minute (Groq ITPM = 7000); the full schema + this prompt
+    # exceeds it and every provider 4xx/413s, which surfaced as "all model
+    # providers are unavailable". Mirrors _chat_dispatch's active_domain logic.
+    _concrete = _classify_message(user_message) - {"general"}
+    _agent_domain = (_explicit_tool_domain(user_message)
+                     or (next(iter(_concrete)) if _concrete else "general"))
+    if _agent_domain == "general" and _nav_task(user_message):
+        _agent_domain = "ui"
+    _agent_allowed = _domain_tool_names(_agent_domain)
     try:
         corrective_max = 6
         for i in range(max_iters):
@@ -8025,7 +8644,8 @@ def run_agent(user_message):
                           (_AGENT["tools_used"] == 0 or not last_had_tools) and
                           i < 4)
             reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3,
-                                            tool_choice="required" if force_tool else "auto")
+                                            tool_choice="required" if force_tool else "auto",
+                                            allowed_names=_agent_allowed)
             print("[agent] turn %d reply=%r native=%d" % (i + 1, (reply or "")[:400], len(native_calls)))
             with _AGENT_LOCK:
                 raw = reply or ""
@@ -8036,6 +8656,7 @@ def run_agent(user_message):
                 # Fallback still applies when the model is down: a file the user
                 # explicitly asked for opens deterministically, no model needed.
                 _auto_open_user_file_fallback(calls_history, messages, user_message)
+                _auto_open_web_image_fallback(reply, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "stopped (no model reply)"
                     _AGENT["last_reply"] = "All model providers are unavailable right now."
@@ -8128,7 +8749,7 @@ def run_agent(user_message):
                                 s["state"] = "done" if ok else "error"
                                 s["error"] = "" if ok else result
                                 # Store viewable result for frontend inline rendering
-                                if ok and name in ("view_user_file", "open_user_file"):
+                                if ok and name in ("view_user_file", "open_user_file", "view_web_image"):
                                     if isinstance(result, _ViewResult):
                                         s["view"] = result.view
                                     elif isinstance(result, dict):
@@ -8165,6 +8786,23 @@ def run_agent(user_message):
                     from collections import Counter as _Counter
                     _counts = _Counter(calls_history)
                     _loop_tool = _counts.most_common(1)[0]
+                    # Repeated web_search with no display: the model is stuck
+                    # gathering links. Tell it exactly how to show the picture
+                    # before giving up, so the image still appears.
+                    if (_loop_tool[1] >= 2 and _loop_tool[0] in ("web_search", "webfetch")
+                            and "view_web_image" not in _seen_tool_names()
+                            and _wants_web_image(user_message)
+                            and _AGENT["corrective"] < corrective_max):
+                        with _AGENT_LOCK:
+                            _AGENT["corrective"] += 1
+                        messages.append({"role": "assistant", "content": reply})
+                        messages.append({"role": "user", "content":
+                            "STOP searching. You already have the image URL in the results above. "
+                            "Call view_web_image NOW with that direct image link "
+                            "(the .jpg/.png/.gif URL itself) so the picture pops up in the chat. "
+                            "Then reply with FINAL: the answer plus a one-line confirmation that "
+                            "the image is displayed above. Do NOT call web_search again."})
+                        continue
                     if _loop_tool[1] >= 3:
                         with _AGENT_LOCK:
                             _AGENT["activity"] = "done"
@@ -8172,8 +8810,8 @@ def run_agent(user_message):
                         # Auto-open fallback (same as /chat): the model looped on
                         # list/grep without ever opening the requested file.
                         _auto_open_user_file_fallback(calls_history, messages, user_message)
-                        with _AGENT_LOCK:
-                            _AGENT["last_reply"] = _terse_reply(reply) if reply else (
+                        _auto_open_web_image_fallback(final or reply, messages, user_message)
+                        _AGENT["last_reply"] = _terse_reply(reply) if reply else (
                                 "I attempted the task multiple times but couldn't find a "
                                 "reliable answer. Check the steps above for what I found.")
                         messages.append({"role": "assistant", "content":
@@ -8207,6 +8845,7 @@ def run_agent(user_message):
                 # Auto-open fallback (same as /chat): the model may have FINAL'd
                 # without ever calling view_user_file/open_user_file.
                 _auto_open_user_file_fallback(calls_history, messages, user_message)
+                _auto_open_web_image_fallback(final, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "done"
                     _advance_indicator()
@@ -8238,6 +8877,7 @@ def run_agent(user_message):
                 # Auto-open fallback (same as /chat): FINAL text without any file
                 # view still resolves and opens the requested file server-side.
                 _auto_open_user_file_fallback(calls_history, messages, user_message)
+                _auto_open_web_image_fallback(final, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "done"
                     _advance_indicator()
@@ -8263,11 +8903,12 @@ def run_agent(user_message):
                 continue
             # Auto-open fallback (same as /chat): no CALL and no FINAL — still try
             # to open a file the user explicitly asked for.
-            _auto_open_user_file_fallback(calls_history, messages, user_message)
-            with _AGENT_LOCK:
-                _AGENT["activity"] = "done"
-                _advance_indicator()
-                _AGENT["last_reply"] = _terse_reply(reply)
+                _auto_open_user_file_fallback(calls_history, messages, user_message)
+                _auto_open_web_image_fallback(final, messages, user_message)
+                with _AGENT_LOCK:
+                    _AGENT["activity"] = "done"
+                    _advance_indicator()
+                    _AGENT["last_reply"] = _terse_reply(reply)
             messages.append({"role": "assistant", "content": reply})
             return
         with _AGENT_LOCK:
@@ -8296,39 +8937,58 @@ def run_agent(user_message):
 # Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
 # Passes the native tools= schema to the provider so the model can emit
 # structured tool_calls instead of free-form prose (the stall fix).
-def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto"):
+def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
+              allowed_names=None):
+    # Free-tier providers cap input tokens per minute (Groq ITPM = 7000). Sending
+    # the full 54-tool schema (~8.9k tok) with the agent prompt trips a 413, which
+    # made every /opencode task look like "all providers are down". Restrict to the
+    # task's domain tools first, then trim further if still over budget.
+    tools_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names) if allowed_names else TOOLS_SCHEMA
+    tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
+
     def one(name, endpoint, api_key, model):
         if not api_key:
             return None
-        try:
-            r = requests.post(f"{endpoint}/chat/completions",
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-                json={"model": model, "messages": messages, "temperature": temperature,
-                      "max_tokens": max_tokens, "tools": TOOLS_SCHEMA, "tool_choice": tool_choice},
-                timeout=(10, 120))
-            if r.status_code == 200:
-                msg = r.json()["choices"][0]["message"]
-                text = (msg.get("content") or "").strip()
-                tcs = []
-                for tc in (msg.get("tool_calls") or []):
-                    fn = tc.get("function") or {}
-                    nm = fn.get("name")
-                    try:
-                        args = json.loads(fn.get("arguments") or "{}")
-                    except Exception:
-                        args = {}
-                    if nm:
-                        tcs.append((nm, args))
-                if tcs:
-                    print(f"✅ llm_reply via {name} ({len(tcs)} tool_call(s))")
-                    return text, tcs
-                if text:
-                    print(f"✅ llm_reply via {name} ({len(text)} chars, no tools)")
-                    return text, []
-                return None
-            print(f"❌ {name} {r.status_code}: {r.text[:160]}")
-        except Exception as e:
-            print(f"❌ {name} exc: {e}")
+        # Free tiers cap INPUT TOKENS PER MINUTE (Groq ITPM = 7000). A multi-turn
+        # agent loop sends one request per turn, so turn 2+ can 429 even when each
+        # request is individually under the cap. Wait out the sliding window and
+        # retry instead of abandoning the task as "all providers unavailable".
+        for attempt in range(3):
+            try:
+                r = requests.post(f"{endpoint}/chat/completions",
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                    json={"model": model, "messages": messages, "temperature": temperature,
+                          "max_tokens": max_tokens, "tools": tools_schema, "tool_choice": tool_choice},
+                    timeout=(10, 120))
+                if r.status_code == 200:
+                    msg = r.json()["choices"][0]["message"]
+                    text = (msg.get("content") or "").strip()
+                    tcs = []
+                    for tc in (msg.get("tool_calls") or []):
+                        fn = tc.get("function") or {}
+                        nm = fn.get("name")
+                        try:
+                            args = json.loads(fn.get("arguments") or "{}")
+                        except Exception:
+                            args = {}
+                        if nm:
+                            tcs.append((nm, args))
+                    if tcs:
+                        print(f"✅ llm_reply via {name} ({len(tcs)} tool_call(s))")
+                        return text, tcs
+                    if text:
+                        print(f"✅ llm_reply via {name} ({len(text)} chars, no tools)")
+                        return text, []
+                    return None
+                if r.status_code == 429 and attempt < 2:
+                    wait = 20 * (attempt + 1)
+                    print(f"⏳ {name} 429 rate limit; waiting {wait}s for the token window")
+                    time.sleep(wait)
+                    continue
+                print(f"❌ {name} {r.status_code}: {r.text[:160]}")
+            except Exception as e:
+                print(f"❌ {name} exc: {e}")
+            return None
         return None
     # Offline mode: skip cloud providers entirely, go straight to local Ollama.
     if os.environ.get("ACE_OFFLINE") == "1":
@@ -9170,6 +9830,55 @@ def notifications_pending():
     events.sort(key=lambda e: e['ts'])
     return jsonify({"events": events})
 
+
+# ===== Email watch: poll now, and manage the rules that trigger a PHONE push =====
+@app.route('/email/check', methods=['POST', 'GET'])
+def email_check():
+    """Poll Gmail/Yahoo immediately and ntfy-push anything matching a rule."""
+    data = request.json or {} if request.method == 'POST' else {}
+    force = data.get('force_all', True) if isinstance(data, dict) else True
+    if request.args:
+        force = request.args.get('force_all', '1') != '0'
+    ok, out = check_email_now(force_all=bool(force))
+    return jsonify({"ok": ok, "result": out}), (200 if ok else 400)
+
+
+@app.route('/email/rules', methods=['GET'])
+def email_rules_get():
+    return jsonify({"rules": _load_email_rules(),
+                    "accounts": sorted(_load_email_accounts().keys())})
+
+
+@app.route('/email/rules', methods=['POST'])
+def email_rules_set():
+    """Create/replace a watch rule. Body: {from|subject|body, account, name}."""
+    d = request.json or {}
+    if not isinstance(d, dict):
+        return jsonify({"ok": False, "error": "JSON object required"}), 400
+    needles = {f: (d.get(f) or "").strip() for f in ("from", "subject", "body")}
+    if not any(needles.values()):
+        return jsonify({"ok": False,
+                        "error": "give at least one of from / subject / body"}), 400
+    rules = _load_email_rules()
+    rules.append({"name": d.get("name") or next((v for v in needles.values() if v), "rule"),
+                  "account": d.get("account") or "both",
+                  "enabled": bool(d.get("enabled", True)),
+                  "notifyOnce": bool(d.get("notifyOnce", True)),
+                  **needles})
+    _save_email_rules(rules)
+    return jsonify({"ok": True, "rules": rules})
+
+
+@app.route('/email/test-push', methods=['POST', 'GET'])
+def email_test_push():
+    """Send one ntfy push so Chris can confirm the phone actually receives them."""
+    ok = send_ntfy("ACEsi — Email alerts on",
+                   "Email watching is live. I'll ping this phone the moment an "
+                   "NSFAS (or other watched) email lands.")
+    return jsonify({"ok": ok, "channel": "ntfy", "topic": NTFY_TOPIC})
+
+
+
 # ===== Google Drive (raw REST, no extra deps) =====
 DRIVE_CRED_FILE = os.path.join(DATA_DIR, 'drive_credentials.json')
 DRIVE_TOKEN_FILE = os.path.join(DATA_DIR, 'drive_token.json')
@@ -9624,7 +10333,13 @@ def build_system_prompt(mode="code"):
 
 
 # Replace the placeholder in the code-agent prompt with the generated tool list.
-CODE_AGENT_PROMPT = CODE_AGENT_PROMPT.replace("{TOOLS}", REGISTRY.describe_for_prompt())
+# Names + signatures only: the full per-tool descriptions are already delivered in
+# the JSON `tools` schema, and repeating them here added ~2.3k tokens to EVERY turn.
+# On free-tier providers (Groq ITPM = 7000/min) that duplication pushed the second
+# agent turn over the per-minute input cap and the task died as "all providers
+# unavailable". assert_prompt_matches still passes because every tool name appears.
+CODE_AGENT_PROMPT = CODE_AGENT_PROMPT.replace(
+    "{TOOLS}", "\n".join("- `%s`" % REGISTRY.signature(n) for n in REGISTRY.names()))
 
 # Startup drift check: the prompt must mention every registered tool.
 try:

@@ -73,6 +73,13 @@ drive_token.json
 
 ntfy_topic.txt
 
+# email watch: IMAP app-passwords + runtime seen-cache (secrets / local state)
+emails.json
+.email_watch_state.json
+email_notify_rules.local.json
+server_stdout.txt
+server_stderr.txt
+
 ace_memory.json
 
 .ace_keys.local
