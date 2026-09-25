@@ -3907,48 +3907,62 @@ def _queue_run_next():
             # Determine next status based on on_failure policy
             if not success:
                 policy = task.get("on_failure", "stop")
-                if policy == "skip":
-                    q["current_index"] += 1
-                elif policy == "retry":
+                if policy == "stop":
+                    q["status"] = "failed"
+                    _save_task_queue(q)
+                    return task, result_text, success
+                if policy == "retry":
+                    # Reset the task and return WITHOUT advancing current_index.
+                    # Both _queue_run_next and the worker only scan
+                    # idx >= current_index, and current_index is persisted, so
+                    # advancing here orphaned the retry permanently - even
+                    # across a restart. Retry never actually happened.
                     task["status"] = "pending"
                     task["error"] = None
                     task["started_at"] = None
                     task["finished_at"] = None
-                elif policy == "stop":
-                    q["status"] = "failed"
+                    q["status"] = "pending"
                     _save_task_queue(q)
                     return task, result_text, success
-            if q["status"] != "failed":
-                q["current_index"] += 1
-                if q["current_index"] >= len(q["queue"]):
-                    q["status"] = "completed"
-                else:
-                    q["status"] = "pending"
+                # policy == "skip": fall through to the single advance below.
+            # Advance exactly once. Previously "skip" incremented here AND in
+            # the policy branch, so every skipped task silently swallowed the
+            # next, un-run task.
+            q["current_index"] += 1
+            if q["current_index"] >= len(q["queue"]):
+                q["status"] = "completed"
+            else:
+                q["status"] = "pending"
             _save_task_queue(q)
     return task, result_text, success
 
-# Background runner - call periodically to process queue
+# Background runner - drains the queue on its own
+_TASK_QUEUE_POLL = 5
+
+
 def _task_queue_worker():
-    """Call this periodically (e.g., from a timer) to run queued tasks."""
+    """Daemon loop: run queued tasks automatically, one at a time, in order.
+
+    This used to be documented as "call this periodically (e.g. from a timer)"
+    but nothing ever called it, so a queued task only advanced when a human
+    explicitly POSTed /queue/run. It is now started at boot (see the thread
+    launch next to the other watchdogs), which is what makes "fix the 404 bug,
+    then run tests, then commit" actually run itself.
+    """
+    time.sleep(8)  # let boot settle before touching the model providers
     while True:
-        with _TASK_QUEUE_LOCK:
-            q = _load_task_queue()
-            if q["status"] != "running" and q["status"] != "pending":
-                break
-            # Find next pending
-            idx = q["current_index"]
-            while idx < len(q["queue"]) and q["queue"][idx]["status"] in ("done", "skipped"):
-                idx += 1
-            if idx >= len(q["queue"]):
-                if q["status"] == "running":
-                    q["status"] = "completed"
-                    _save_task_queue(q)
-                break
-        # Run one task
-        _queue_run_next()
-        # Small delay to avoid tight loop
-        time.sleep(0.5)
-    return True
+        active = False
+        try:
+            if not _kill_armed():
+                with _TASK_QUEUE_LOCK:
+                    q = _load_task_queue()
+                    active = q["status"] in ("running", "pending")
+                if active:
+                    _queue_run_next()
+        except Exception as e:
+            print("⚠️ task queue worker: %s: %s" % (type(e).__name__, e))
+        # Fast while there is work, slow when idle so we don't burn CPU.
+        time.sleep(0.5 if active else _TASK_QUEUE_POLL)
 
 # ===== ACEsi dispatcher integration (ace_dispatcher module) ────────────────
 # Provides robust multi-subtask execution as a fallback when the
@@ -5779,7 +5793,16 @@ def tool_todo_add(text, priority="medium", category="general"):
         return False, "todo_add usage: text=<task description> [priority=high|medium|low] [category=name]"
     with _data_lock:
         todos = load_json(TODO_FILE, {}).get("items", [])
-        item = {"id": len(todos) + 1, "text": str(text).strip()[:300],
+        # max(existing)+1, not len()+1: after removing id 2 from [1,2,3] the
+        # list is [1,3], and len()+1 handed out a duplicate id 3, so
+        # todo_done(3) then completed the wrong item.
+        next_id = 1
+        for t in todos:
+            try:
+                next_id = max(next_id, int(t.get("id", 0)) + 1)
+            except (TypeError, ValueError):
+                continue
+        item = {"id": next_id, "text": str(text).strip()[:300],
                 "priority": str(priority).lower() if str(priority).lower() in ("high", "medium", "low") else "medium",
                 "category": str(category).strip()[:100] or "general",
                 "done": False, "created": datetime.now().isoformat()}
@@ -8979,7 +9002,10 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                     if text:
                         print(f"✅ llm_reply via {name} ({len(text)} chars, no tools)")
                         return text, []
-                    return None
+                    # HTTP 200 but an empty completion is a provider glitch,
+                    # not a final answer - retry instead of giving up.
+                    print(f"⚠️ {name} returned 200 with no text and no tool calls")
+                    continue
                 if r.status_code == 429 and attempt < 2:
                     wait = 20 * (attempt + 1)
                     print(f"⏳ {name} 429 rate limit; waiting {wait}s for the token window")
@@ -8988,6 +9014,13 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                 print(f"❌ {name} {r.status_code}: {r.text[:160]}")
             except Exception as e:
                 print(f"❌ {name} exc: {e}")
+            # Retry transient failures (5xx, timeouts, connection resets) too.
+            # This used to `return None` here, which abandoned the provider on
+            # the FIRST non-429 error and made the loop below unreachable, so
+            # only 429 ever actually retried.
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
             return None
         return None
     # Offline mode: skip cloud providers entirely, go straight to local Ollama.
@@ -8996,7 +9029,8 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
     else:
         for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
                                      ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-                                     ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)):
+                                     ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+                                     ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL)):
             res = one(name, ep, key, model)
             if res is not None:
                 return res
@@ -9527,12 +9561,24 @@ def _jobs_due_estimate(job, now=None):
         last = job.get('last_run_ts') or 0
         key = ('interval', sched.get('minutes'))
         return int(time.time()) - last >= int(sched.get('minutes', 60)) * 60, key
-    # daily
-    key = ('daily', now.strftime('%Y-%m-%d') + ' ' + sched.get('time', '07:00'))
-    return now.strftime('%H:%M') == sched.get('time', '07:00'), key
+    # daily. Compare (time passed, not yet fired today) rather than exact
+    # "HH:MM" equality: with a 20s poll, one GC pause, a slow request or a
+    # laptop sleep at exactly 07:00 used to skip that day's job permanently.
+    at = str(sched.get('time') or '07:00')
+    key = ('daily', now.strftime('%Y-%m-%d') + ' ' + at)
+    # Compare against the SAME string form that _job_fire persists, otherwise
+    # a stored "daily|2026-09-25 07:00" never matches this tuple and a daily
+    # job re-fires all day.
+    if job.get('last_fire_key') == '|'.join(str(p) for p in key):
+        return False, key          # already ran for this date+time
+    try:
+        due_at = datetime.combine(now.date(), datetime.strptime(at, "%H:%M").time())
+    except ValueError:
+        return False, key          # malformed time: never fire, never wedge
+    return now >= due_at, key
 
 
-def _job_fire(job):
+def _job_fire(job, fire_key=None):
     """Run one autonomous job through the /chat brain (full determinism + tools),
     then push the outcome to Chris. Runs in its own thread."""
     def runner():
@@ -9555,6 +9601,10 @@ def _job_fire(job):
                 if j.get('id') == jid:
                     j['last_run'] = datetime.now().isoformat()
                     j['last_run_ts'] = int(time.time())
+                    # Remember which (date,time) slot this job consumed so a
+                    # daily job cannot re-fire later the same day.
+                    if fire_key:
+                        j['last_fire_key'] = '|'.join(str(p) for p in fire_key)
                     if (j.get('schedule') or {}).get('type') == 'once':
                         j['enabled'] = False
             _jobs_save(jobs)
@@ -9594,7 +9644,7 @@ def job_watch():
                     # Only run if we haven't fired for this (type, key) yet.
                     if _JOBS_RUNNING.get(job.get('id')):
                         continue
-                    _job_fire(job)
+                    _job_fire(job, fire_key=key)
         except Exception as e:
             print(f"⚠️ job watchdog: {e}")
         time.sleep(20)
@@ -9878,6 +9928,59 @@ def email_test_push():
     return jsonify({"ok": ok, "channel": "ntfy", "topic": NTFY_TOPIC})
 
 
+@app.route('/whatsapp/send', methods=['POST'])
+def whatsapp_send():
+    """Prepare a WhatsApp message for a contact.
+
+    The UI calls this and expects {ok, reply}. There is no WhatsApp Business
+    API credential on this box, so rather than pretend to deliver, this returns
+    a prefilled wa.me link the browser can open (and says so honestly). To send
+    server-side instead, set WHATSAPP_TOKEN/WHATSAPP_PHONE_ID.
+    """
+    d = request.json or {}
+    phone = re.sub(r'\D', '', str(d.get("phone") or ""))
+    message = str(d.get("message") or "").strip()
+    if not phone:
+        return jsonify({"ok": False, "error": "phone is required (international format)"}), 400
+    if not message:
+        return jsonify({"ok": False, "error": "message is required"}), 400
+    if not (8 <= len(phone) <= 15):
+        return jsonify({"ok": False,
+                        "error": "that does not look like an international number"}), 400
+    link = "https://wa.me/%s?text=%s" % (phone, quote_plus(message[:2000]))
+    tok = os.environ.get("WHATSAPP_TOKEN")
+    pnum = os.environ.get("WHATSAPP_PHONE_ID")
+    if tok and pnum:
+        try:
+            r = requests.post(
+                "https://graph.facebook.com/v19.0/%s/messages" % pnum,
+                headers={"Authorization": "Bearer %s" % tok,
+                         "Content-Type": "application/json"},
+                json={"messaging_product": "whatsapp",
+                      "to": phone,
+                      "type": "text",
+                      "text": {"body": message[:2000]}}, timeout=15)
+            ok = r.status_code < 300
+            return jsonify({"ok": ok, "delivered": "whatsapp_api",
+                            "reply": ("Sent on WhatsApp." if ok
+                                      else "WhatsApp API refused: %s" % r.text[:160])})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)[:160]}), 502
+    return jsonify({
+        "ok": True, "delivered": "link", "link": link,
+        "reply": "No WhatsApp API key is set, so I prepared the message instead "
+                 "of sending it. Opening WhatsApp now — press send there."})
+
+
+@app.route('/security/test-alert', methods=['POST'])
+def security_test_alert():
+    """Fire a test security alert through the same ntfy channel real alerts use."""
+    ok = send_ntfy("ACEsi — Security test",
+                   "Test security alert. This is what a suspicious email or "
+                   "login attempt would look like on your phone.")
+    return jsonify({"ok": ok, "channel": "ntfy"})
+
+
 
 # ===== Google Drive (raw REST, no extra deps) =====
 DRIVE_CRED_FILE = os.path.join(DATA_DIR, 'drive_credentials.json')
@@ -10122,10 +10225,18 @@ def summary_scheduler():
                 continue
             now = datetime.now()
             enabled = get_config('summary_enabled', 'true') != 'false'
-            target = get_config('summary_time', '07:00')
-            cur = now.strftime('%H:%M')
+            target = str(get_config('summary_time', '07:00') or '07:00')
             today = now.date().isoformat()
-            if enabled and cur == target and get_config('last_summary_date', '') != today:
+            # "time has passed today and not yet sent" instead of exact HH:MM
+            # equality: sleeping the laptop through 07:00 used to skip the
+            # briefing for the whole day.
+            try:
+                due_at = datetime.combine(now.date(),
+                                          datetime.strptime(target, "%H:%M").time())
+            except ValueError:
+                due_at = None
+            if (enabled and due_at and now >= due_at
+                    and get_config('last_summary_date', '') != today):
                 set_config('last_summary_date', today)
                 text = build_summary_text()
                 send_ntfy("ACEsi — Good morning", "Good morning, Chris.\n\n" + text)
@@ -10138,6 +10249,11 @@ threading.Thread(target=summary_scheduler, daemon=True).start()
 
 # Job scheduler daemon: fires autonomous jobs when due (respects E-STOP).
 threading.Thread(target=job_watch, daemon=True).start()
+
+# Task queue daemon: drains queued tasks in order without needing a manual
+# /queue/run. Without this the queue was inert.
+threading.Thread(target=_task_queue_worker, daemon=True).start()
+
 @app.route('/test_ping')
 def test_ping():
     send_test_ping()
@@ -10470,7 +10586,10 @@ def profile_get():
 def profile_refresh():
     """Force rebuild the profile from conversation history."""
     fresh = extract_profile_traits()
-    set_memory("profile.derived", fresh)
+    # set_memory writes straight into a TEXT column, so a dict raised
+    # sqlite3.ProgrammingError and this route 500'd. Serialise it, matching
+    # get_profile().
+    set_memory("profile.derived", json.dumps(fresh))
     return jsonify({"refreshed": True, "profile": fresh})
 
 @app.route('/memory/conversations/recent', methods=['GET'])
@@ -10478,6 +10597,29 @@ def memory_conversations_recent():
     """Get recent conversation turns."""
     limit = int(request.args.get('limit', 20))
     return jsonify(get_recent_conversation(limit))
+
+
+@app.route('/conversations', methods=['GET'])
+def conversations_list():
+    """Recent conversation turns WITH timestamps, oldest first.
+
+    ACEsi.html (and mobile.html) load chat history from here expecting
+    {conversations:[{role, content, timestamp}]}. The route did not exist, so
+    history silently never loaded - a 404 that the frontend swallowed in an
+    empty catch block.
+    """
+    try:
+        limit = max(1, min(500, int(request.args.get('limit', 60))))
+    except (TypeError, ValueError):
+        limit = 60
+    conn = sqlite3.connect('ace_memory.db')
+    rows = conn.execute(
+        "SELECT role, content, timestamp FROM conversations ORDER BY id DESC LIMIT ?",
+        (limit,)).fetchall()
+    conn.close()
+    return jsonify({"conversations": [
+        {"role": r[0], "content": r[1], "timestamp": r[2] or ""}
+        for r in reversed(rows)]})
 
 
 # Deep-memory bootstrap: fold the legacy rich table in, seed the relationship

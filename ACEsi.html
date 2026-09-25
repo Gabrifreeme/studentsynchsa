@@ -2909,7 +2909,7 @@ const DEFAULT_MODELS = [
   document.getElementById('emailNotifyOverlay').addEventListener('click', e => { if (e.target.id === 'emailNotifyOverlay') closeEmailNotifyModal(); });
 
   function loadEmailNotifyRules() {
-    fetch('/email-notify/rules')
+    fetch('/email/rules')
       .then(r => r.json())
       .then(d => {
         emailNotifyRules = d.rules || [];
@@ -2963,7 +2963,7 @@ const DEFAULT_MODELS = [
   function saveEmailNotifyRules() {
     const status = document.getElementById('emailNotifyStatus');
     status.textContent = 'Saving...';
-    fetch('/email-notify/rules', {
+    fetch('/email/rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rules: emailNotifyRules })
@@ -2979,7 +2979,7 @@ const DEFAULT_MODELS = [
   function testEmailNotify() {
     const status = document.getElementById('emailNotifyStatus');
     status.textContent = 'Sending test notification...';
-    fetch('/email-notify/test', { method: 'POST' })
+    fetch('/email/test-push', { method: 'POST' })
       .then(r => r.json())
       .then(d => { status.textContent = d.ok ? 'Test notification sent!' : 'Error: ' + (d.error || 'unknown'); })
       .catch(e => { status.textContent = 'Error: ' + e; });
@@ -3582,7 +3582,7 @@ const DEFAULT_MODELS = [
   setInterval(refreshEStop, 10000);
   refreshEStop();
   function testSecurityAlert() {
-    fetch('/security/test_alert', { method: 'POST' })
+    fetch('/security/test-alert', { method: 'POST' })
       .then(r => r.json())
       .then(d => alert(d.message || 'Test alert sent'))
       .catch(err => alert('Error: ' + err));
@@ -3899,13 +3899,15 @@ const DEFAULT_MODELS = [
   });
 
   async function loadChatHistory() {
+    const chatEl0 = document.getElementById('chat');
     try {
       const res = await fetch('/conversations?limit=60');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const d = await res.json();
       const convs = (d && d.conversations) || [];
       if (!convs.length) return;
       // Clear the greeting so history sits at the top.
-      const chatEl = document.getElementById('chat');
+      const chatEl = chatEl0;
       if (chatEl) chatEl.innerHTML = '';
       let lastTs = null;
       convs.forEach(c => {
@@ -3924,7 +3926,10 @@ const DEFAULT_MODELS = [
           }
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      // Don't fail silently - a broken history fetch used to be invisible.
+      console.warn('chat history unavailable:', e && e.message);
+    }
   }
 </script>
 
