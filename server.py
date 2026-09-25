@@ -47,7 +47,29 @@ except Exception:
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-OPENROUTER_API_KEY = "REDACTED_OPENROUTER_KEY"
+# Load provider keys from a gitignored .env without requiring python-dotenv.
+# Real environment variables always win, so this is only a local convenience.
+def _load_dotenv(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip("'\"")
+                if key and key not in os.environ:
+                    os.environ[key] = val
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        print("dotenv load failed: %s" % exc)
+
+
+_load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "deepseek/deepseek-chat-v2:free"
 OPENROUTER_FALLBACKS = [
@@ -81,7 +103,7 @@ CEREBRAS_MODEL = "gpt-oss-120b"
 
 # FreeLLMAPI (Railway)
 FREELLM_ENDPOINT = "https://freellmapi-production-1394.up.railway.app/v1"
-FREELLM_API_KEY = "REDACTED_FREELLM_KEY"
+FREELLM_API_KEY = os.environ.get("FREELLM_API_KEY", "")
 FREELLM_MODEL = "auto"
 
 # Both /chat dispatch and llm_reply use the 7b model. 3b is faster (~20-40s/round)
@@ -5514,7 +5536,9 @@ def _search_tavily(query, max_results, include_images=False):
     import urllib.parse as _up
     import json
 
-    api_key = "REDACTED_TAVILY_KEY"
+    api_key = os.environ.get("TAVILY_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("TAVILY_API_KEY is not set")
     url = "https://api.tavily.com/search"
     body = {
         "api_key": api_key,
