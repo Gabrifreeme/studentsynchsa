@@ -79,10 +79,7 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setTextZoom(150);
-      // Expose the WebView over CDP so the Flask bridge can inject JS.
       AndroidWebViewController.enableDebugging(true);
-      // Keep popups (target=_blank) inside this webview so every navigation
-      // funnels through onNavigationRequest where ITS URLs get normalized.
       (_controller.platform as AndroidWebViewController).setOnConsoleMessage((msg) {
         debugPrint('[WebView ${msg.level}] ${msg.message}');
       });
@@ -92,19 +89,19 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
       .setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) {
-            var url = request.url.toString();
+            final url = request.url.toString();
             debugPrint('🟡 Navigation: $url');
 
             if (ItsUrl.isItsHost(url)) {
               final fixed = ItsUrl.normalize(url);
               final isPostHandler =
                   url.contains('gw1proc') || url.contains('gen.gw1pkg.gw1p');
-              // Also catch aggressive truncation (gwa, gwas, gwav, etc.)
               final isTruncated =
                   url.contains('gen.gw1pkg.gw') &&
                   !url.contains('gw1view') &&
                   !url.contains('gw1proc') &&
                   !url.contains('gw1startup');
+              debugPrint('🔎 isTruncated=$isTruncated isPostHandler=$isPostHandler fixed=$fixed url=$url');
               if ((fixed != url || isTruncated) && !isPostHandler) {
                 debugPrint('🔧 Expanding ITS URL: $url -> $fixed');
                 _reportTruncatedUrl('EXPANDED $fixed');
@@ -564,23 +561,60 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
             } catch (e) {
               debugPrint('❌ Date picker error: $e');
             }
-            // TEMP: Hardcode postal code for Next button testing
+            // Postal code enforcer: ITS sometimes renders/stores the street
+            // address text in the postal-code field (e.g. "28 Gggggggggg").
+            // Overwrite both street/postal code fields from the profile whenever
+            // the current value is not a valid digit-only SA postal code.
             try {
               await _controller.runJavaScript('''
 (function() {
-  var pcode = document.querySelector('[name="oapStreetAddrPCodeRq"]');
-  var pdesc = document.querySelector('[name="oapStreetAddrPCodeRq_desc"]');
-  if (pcode && (!pcode.value || pcode.value.length < 4)) {
-    pcode.value = '2197';
-    if (pdesc) {
-      pdesc.value = 'JOHANNESBURG';
-      pdesc.dispatchEvent(new Event('change', {bubbles: true}));
+  var prof = $_profileJson || {};
+  var tries = 0;
+  function isPostalCode(v) {
+    var s = (v || '').trim();
+    if (s.length < 4 || s.length > 5) return false;
+    for (var i = 0; i < s.length; i++) {
+      if (s.charAt(i) < '0' || s.charAt(i) > '9') return false;
     }
-    console.log('TEMP: Postal code set to 2197 / JOHANNESBURG');
+    return true;
   }
+  function enforce() {
+    tries++;
+    if (prof && prof.address) {
+      var postal = (prof.address.postalCode || '').trim();
+      if (postal.length >= 4 && postal.length <= 5) {
+        var fields = [
+          ['oapStreetAddrPCodeRq', 'oapStreetAddrPCodeRq_desc'],
+          ['oapPostalAddrPCodeRq', 'oapPostalAddrPCodeRq_desc']
+        ];
+        var done = true;
+        for (var i = 0; i < fields.length; i++) {
+          var pcode = document.querySelector('[name="' + fields[i][0] + '"]');
+          if (pcode && !isPostalCode(pcode.value)) {
+            var pdesc = document.querySelector('[name="' + fields[i][1] + '"]');
+            pcode.removeAttribute('readonly');
+            pcode.removeAttribute('disabled');
+            pcode.value = postal;
+            if (pdesc) {
+              pdesc.value = postal;
+              pdesc.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            pcode.dispatchEvent(new Event('input',  {bubbles: true}));
+            pcode.dispatchEvent(new Event('change', {bubbles: true}));
+            pcode.dispatchEvent(new Event('blur',   {bubbles: true}));
+            console.log('Postal code corrected to profile value ' + postal + ' (' + fields[i][0] + ')');
+            done = false;
+          }
+        }
+        if (done) return;
+      }
+    }
+    if (tries < 12) setTimeout(enforce, 1500);
+  }
+  enforce();
 })();
 ''');
-              debugPrint('✅ Temp postal code injected');
+              debugPrint('✅ Postal code enforcer injected');
             } catch (_) {}
 
             // Remove old postal code picker and ensure the new picker is visible/functional.
@@ -1050,37 +1084,35 @@ class _UniversityWebViewScreenState extends ConsumerState<UniversityWebViewScree
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ...guidance.steps.map((s) => _GuideStep(s.$1, s.$2)),
-            if (_profileJson != null) ...[
-              const SizedBox(height: 12),
-              const Text('You like me to try and auto fill this page?',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _injectAutofill(ctx),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.green),
-                        foregroundColor: Colors.green,
-                      ),
-                      child: const Text('Yes'),
+            const SizedBox(height: 12),
+            const Text('Would you like me to try and auto fill this page?',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _injectAutofill(ctx),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.green),
+                      foregroundColor: Colors.green,
                     ),
+                    child: const Text('Yes'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.grey),
-                        foregroundColor: Colors.grey,
-                      ),
-                      child: const Text('No'),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      foregroundColor: Colors.grey,
                     ),
+                    child: const Text('No'),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
         ),
         actions: [

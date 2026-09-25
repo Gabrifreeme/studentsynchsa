@@ -21,7 +21,22 @@ import os, sys, json, time, threading, subprocess
 import urllib.request
 import websocket
 
-APP_PACKAGE = "com.studentsyncsa.studentsyncsa"
+# ── Context-aware app package ──────────────────────────────────────────────
+# ACEsi is a general-purpose agent framework. The Android app to talk to is
+# resolved from the active Context (ace_context.py). Falls back to the legacy
+# hardcoded package for backward compatibility.
+try:
+    import ace_context as _ctx
+    def _app_package():
+        c = _ctx.get_active_context()
+        if c and c.get("app_package"):
+            return c["app_package"]
+        return "com.studentsyncsa.studentsyncsa"
+except Exception:
+    def _app_package():
+        return "com.studentsyncsa.studentsyncsa"
+
+APP_PACKAGE = _app_package()  # legacy constant for backward compat
 DEFAULT_FORWARD_PORT = 9229
 SCAN_PORTS = [9230, 9222, 9229, 9223, 9225]
 
@@ -51,6 +66,26 @@ def _device_serial():
 
 
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def set_context(name):
+    """Delegate to ace_context.set_active_context — switching the active
+    context also invalidates any cached CDP session so the next call to
+    _get_session re-discovers the correct target for the new context."""
+    global _session
+    try:
+        import ace_context
+        changed = ace_context.set_active_context(name)
+        if changed:
+            _session = None  # force re-discover target
+        return True, changed
+    except Exception as e:
+        return False, str(e)
+
+
+def current_app_package():
+    """Public accessor for the currently resolved app package."""
+    return _app_package()
 
 
 def _adb(*args, timeout=15):
@@ -103,23 +138,38 @@ def _adb_forward(name, port):
 
 
 def _app_pid():
-    out = _adb("shell", "pidof " + APP_PACKAGE)
+    pkg = _app_package()
+    out = _adb("shell", "pidof " + pkg)
     tok = (out or "").split()
     return tok[0] if tok else None
 
 
+def _cdp_url_fragment():
+    """Return the URL/title fragment used to select the right browser/WebView tab.
+    Reads from the active Context; falls back to the ACE_CDP_URL_FRAGMENT env var."""
+    try:
+        c = _ctx.get_active_context()
+        if c and c.get("cdp_url_fragment"):
+            return c["cdp_url_fragment"]
+    except Exception:
+        pass
+    return _env("ACE_CDP_URL_FRAGMENT", "")
+
+
 def _select_target(targets):
-    frag = _env("ACE_CDP_URL_FRAGMENT", "").lower()
-    pages = [t for t in targets if t.get("type") == "page" and t.get("webSocketDebuggerUrl")]
+    frag = _cdp_url_fragment().lower() if _cdp_url_fragment() else ""
+    pages = [t for t in targets if t.get("type") == "page" and t.get("webSocketDebugUrl")]
     if frag:
+        # Support | as OR (e.g. "univen|ITS_OAP")
+        frags = frag.split("|")
         for t in pages:
             u = ((t.get("url") or "") + " " + (t.get("title") or "")).lower()
-            if frag in u:
+            if any(f and f in u for f in frags):
                 return t
     if pages:
         return pages[0]
     for t in targets:
-        if t.get("webSocketDebuggerUrl"):
+        if t.get("webSocketDebugUrl"):
             return t
     return None
 
@@ -156,6 +206,12 @@ def _ensure_local_browser():
     connections are accepted (Chrome 115+ otherwise rejects foreign origins)."""
     if _env("ACE_DEVICE_SERIAL") or _env("ACE_CDP_BROWSER_WS"):
         return False
+    # If the active context targets an Android app, don't auto-launch local Chrome
+    if _app_package() and _app_package() != "com.studentsyncsa.studentsyncsa":
+        pass  # let device discovery handle it
+    elif _app_package() == "com.studentsyncsa.studentsyncsa" and not _env("ACE_DEVICE_PACKAGE"):
+        # Backward compat: old StudentSyncSA default still tries local Chrome
+        pass
     port = 9230
     for host in ("127.0.0.1", "[::1]"):
         try:

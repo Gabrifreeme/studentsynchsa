@@ -16,11 +16,11 @@ class ChatDispatchTest(unittest.TestCase):
         # Simulates correct navigation (an action + reading the screen).
         self.executed = []
         self.script = [
-            ("", [("ui_app_open", {})]),
-            ("", [("ui_tap", {"x": 540, "y": 2300})]),
-            ("", [("ui_dump", {})]),
-            ("", [("ui_screenshot", {"name": "navigation"})]),
-            ("Opened the app and captured ui_screenshots/navigation.png.", []),
+            ("", [("ui_app_open", {})], "stop"),
+            ("", [("ui_tap", {"x": 540, "y": 2300})], "stop"),
+            ("", [("ui_dump", {})], "stop"),
+            ("", [("ui_screenshot", {"name": "navigation"})], "stop"),
+            ("Opened the app and captured ui_screenshots/navigation.png.", [], "stop"),
         ]
 
         def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None, tool_choice="auto"):
@@ -65,13 +65,13 @@ class ChatDispatchTest(unittest.TestCase):
         # Model opens the app and screenshots WITHOUT navigating/reading the
         # screen. The nav gate must reject the "done" text and force more work.
         self.script = [
-            ("", [("ui_app_open", {})]),
-            ("", [("ui_screenshot", {"name": "login"})]),
-            ("Done, here is the screenshot.", []),          # must be rejected
-            ("", [("ui_tap", {"x": 540, "y": 2300})]),      # corrected behaviour
-            ("", [("ui_dump", {})]),
-            ("", [("ui_screenshot", {"name": "portal"})]),
-            ("Reached the portal.", []),
+            ("", [("ui_app_open", {})], "stop"),
+            ("", [("ui_screenshot", {"name": "login"})], "stop"),
+            ("Done, here is the screenshot.", [], "stop"),          # must be rejected
+            ("", [("ui_tap", {"x": 540, "y": 2300})], "stop"),      # corrected behaviour
+            ("", [("ui_dump", {})], "stop"),
+            ("", [("ui_screenshot", {"name": "portal"})], "stop"),
+            ("Reached the portal.", [], "stop"),
         ]
         msgs = [{"role": "system", "content": "test"},
                 {"role": "user", "content": "open the app and navigate to the portal, screenshot it"}]
@@ -79,14 +79,14 @@ class ChatDispatchTest(unittest.TestCase):
                                       user_message="open the app and navigate to the portal, screenshot it")
         self.assertEqual(reply, "Reached the portal.")
         self.assertIn("ui_dump", [t[0] for t in self.executed])
-        self.assertIn("ui_tap", [t[0] for t in self.executed])
+        self.assertIn("ui_tap", [t[0] for t in self.executed], "stop")
         # The corrective message was fed back before the model corrected itself
         corrective = [m["content"] for m in msgs if isinstance(m.get("content"), str)
                       and "You took a screenshot but" in m["content"]]
         self.assertTrue(corrective)
 
     def test_plain_reply_does_not_need_tools(self):
-        server._chat_one = lambda *a, **k: ("Just chatting.", [])
+        server._chat_one = lambda *a, **k: ("Just chatting.", [], "stop")
         msgs = [{"role": "system", "content": "test"},
                 {"role": "user", "content": "hello"}]
         reply = server._chat_dispatch(msgs, max_rounds=3, user_message="hello")
@@ -98,12 +98,12 @@ class ChatDispatchTest(unittest.TestCase):
         # call, not return the narrated plan as the reply.
         self.script = [
             ("My plan: open the app, then dump the UI, then tap the Venda portal "
-             "tile, then screenshot.", []),                # prose, no tools -> pushed
-            ("", [("ui_app_open", {})]),
-            ("", [("ui_tap", {"x": 540, "y": 2300})]),
-            ("", [("ui_dump", {})]),
-            ("", [("ui_screenshot", {"name": "portal"})]),
-            ("Reached the portal.", []),
+             "tile, then screenshot.", [], "stop"),                # prose, no tools -> pushed
+            ("", [("ui_app_open", {})], "stop"),
+            ("", [("ui_tap", {"x": 540, "y": 2300})], "stop"),
+            ("", [("ui_dump", {})], "stop"),
+            ("", [("ui_screenshot", {"name": "portal"})], "stop"),
+            ("Reached the portal.", [], "stop"),
         ]
         msgs = [{"role": "system", "content": "test"},
                 {"role": "user", "content": "open the app and navigate to the portal, screenshot it"}]
@@ -207,7 +207,7 @@ def test_round_cap_returns_action_summary(self):
         # Model keeps emitting tool calls and never produces a final text reply.
         # The dispatch must not return None/"Error: no models available" — it
         # reports the actions actually performed on the device.
-        server._chat_one = lambda *a, **k: ("", [("ui_tap", {"x": 540, "y": 1200})])
+        server._chat_one = lambda *a, **k: ("", [("ui_tap", {"x": 540, "y": 1200})], "stop")
         msgs = [{"role": "system", "content": "test"},
                 {"role": "user", "content": "navigate to the portal and screenshot"}]
         reply = server._chat_dispatch(msgs, max_rounds=3,
@@ -227,10 +227,10 @@ class ChatDispatchProseCallTest(unittest.TestCase):
         self.script = [
             # turn 1: prose CALL lines, NO native tool_calls
             ("I will open the app and navigate.\nCALL: ui_app_open {}\n"
-             "CALL: ui_dump {}\nNow tapping the portal.\n", []),
+             "CALL: ui_dump {}\nNow tapping the portal.\n", [], "stop"),
             ("CALL: ui_tap {\"x\": 540, \"y\": 2300}\n",
-             [("ui_tap", {"x": 540, "y": 2300})]),
-            ("Done, I reached the portal.", []),
+              [("ui_tap", {"x": 540, "y": 2300})], "stop"),
+            ("Done, I reached the portal.", [], "stop"),
         ]
 
         def fake_chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None, tools_schema=None, tool_choice="auto"):
@@ -383,6 +383,116 @@ class ScreenshotBehaviorTest(unittest.TestCase):
         self.assertIn("SAVED", res)
         for f in after - before:
             os.remove(os.path.join(shots_dir, f))
+
+
+class IndicatorTest(unittest.TestCase):
+    """Test that real-time indicators advance correctly during ACEsi runs."""
+
+    def setUp(self):
+        self.executed = []
+        server._reset_indicator()
+
+    def tearDown(self):
+        import importlib
+        importlib.reload(server)
+
+    def test_indicator_advances_during_chat_dispatch(self):
+        # Indicator should be empty when idle, then advance through states
+        # while the agent is running.
+        self.assertEqual(server._current_indicator(), "",
+                         "Indicator should be empty when idle")
+        self.assertEqual(server._AGENT["running"], False)
+
+        self.script = [
+            ("", [("ui_app_open", {})], "stop"),
+            ("", [("ui_tap", {"x": 540, "y": 2300})], "stop"),
+            ("", [("ui_dump", {})], "stop"),
+            ("", [("ui_screenshot", {"name": "portal"})], "stop"),
+            ("Reached the portal.", [], "stop"),
+        ]
+
+        import time
+        def fake_chat_one(name, endpoint, api_key, model, msgs,
+                          timeout=(10, 90), extra_options=None,
+                          tools_schema=None, tool_choice="auto"):
+            time.sleep(0.05)  # slow down so indicator is observable
+            return self.script.pop(0)
+
+        def fake_call_tool(name, args):
+            self.executed.append(name)
+            return True, "mock ok"
+
+        def fake_auto_dump():
+            return True, "mock screen"
+
+        server._chat_one = fake_chat_one
+        server._call_tool = fake_call_tool
+        server._ui_auto_dump = fake_auto_dump
+
+        # Collect indicator snapshots during the run.
+        indicators = []
+        msgs = [{"role": "system", "content": "test"},
+                {"role": "user", "content": "open the app and navigate to the portal, screenshot it"}]
+
+        # Run dispatch in a thread so we can poll status.
+        import threading
+        result = {}
+
+        def run():
+            result["reply"] = server._chat_dispatch(msgs, max_rounds=8,
+                                                    user_message="open the app and navigate to the portal, screenshot it")
+
+        t = threading.Thread(target=run)
+        t.start()
+        # Poll indicator while running.
+        while t.is_alive():
+            ind = server._current_indicator()
+            if ind:
+                indicators.append(ind)
+            time.sleep(0.01)
+        t.join()
+
+        # Indicator should have advanced at least once during the run.
+        self.assertTrue(len(indicators) >= 1,
+                        "Expected at least one indicator snapshot during run, got %d" % len(indicators))
+        # All snapshots should be valid states.
+        for ind in indicators:
+            self.assertIn(ind, server.INDICATOR_STATES,
+                          "Indicator %r should be valid" % ind)
+        # After the run, indicator should be empty (agent idle).
+        self.assertEqual(server._current_indicator(), "",
+                         "Indicator should be empty after run (agent idle)")
+        self.assertEqual(server._AGENT["running"], False)
+        # Final reply should be correct.
+        self.assertEqual(result["reply"], "Reached the portal.")
+
+    def test_indicator_states_are_sequential(self):
+        # Verify INDICATOR_STATES is ordered and non-empty.
+        self.assertTrue(len(server.INDICATOR_STATES) >= 2,
+                        "Need at least 2 indicator states")
+        for i, state in enumerate(server.INDICATOR_STATES):
+            self.assertIsInstance(state, str,
+                                  "Indicator state %d should be a string" % i)
+            self.assertTrue(state.strip(),
+                            "Indicator state %d should not be empty" % i)
+        # No duplicate states.
+        self.assertEqual(len(server.INDICATOR_STATES),
+                         len(set(server.INDICATOR_STATES)),
+                         "Indicator states should be unique")
+
+    def test_status_endpoint_includes_indicator(self):
+        server._reset_indicator()
+        # Directly check the status dict structure.
+        with server._AGENT_LOCK:
+            status = {
+                "status": "busy" if server._AGENT["running"] else "idle",
+                "indicator": server._current_indicator(),
+                "activity": server._AGENT["activity"],
+            }
+        self.assertIn("indicator", status,
+                      "Status should include 'indicator' field")
+        self.assertIn(status["indicator"], server.INDICATOR_STATES + [""],
+                      "Indicator should be a valid state or empty")
 
 
 if __name__ == "__main__":

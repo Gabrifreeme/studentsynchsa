@@ -30,16 +30,17 @@ void main() {
       expect(s, contains('window.__ssaRealSubmit'));
     });
 
-    test('fixAction falls back to the page URL for empty-action POST forms', () {
+    test('fixAction resolves empty-action POST forms against the page URL', () {
       final s = star.buildNavigationFixScript();
-      expect(s, contains("var base = before || form.action || window.location.href;"));
+      expect(s, contains("var base = window.location.href;"));
+      expect(s, contains("var before = form.getAttribute('action') || '';"));
     });
 
-    test('submit listener lives on window; unnamed selects get _desc guards', () {
+    test('submit is hijacked via a document capture listener + patched prototype', () {
       final s = star.buildNavigationFixScript();
-      expect(s, contains("window.addEventListener('submit'"));
-      expect(s, contains('ssaFixUnnamedSelects'));
-      expect(s, contains("el.name ? el.name + '_desc' : '_desc'"));
+      expect(s, contains("document.addEventListener('submit'"));
+      expect(s, contains('HTMLFormElement.prototype.submit = submitWrapper;'));
+      expect(s, contains('window.__ssaRealSubmit'));
     });
   });
 
@@ -48,6 +49,22 @@ void main() {
       final s = star.buildAutofillOnlyScript('{}');
       expect(s, contains("getElementById('oapIDnumber')"));
       expect(s, isNot(contains("getElementById('oapIdNumber')")));
+    });
+
+    test('injected selects get a name + matching _desc so wizard.js completes', () {
+      final s = star.buildNavigationFixScript();
+      expect(s, contains("select.name = 'custom-citz-code';"));
+      expect(s, contains("citzDesc.id = 'custom-citz-code_desc';"));
+      expect(s, contains("sel.name = 'ssa-heard-select';"));
+      expect(s, contains("heardDesc.id = 'ssa-heard-select_desc';"));
+    });
+
+    test('doAutofill declares filled and applies the exact-name + fuzzy fill loops', () {
+      final s = star.buildAutofillOnlyScript('{}');
+      expect(s, contains('var filled = 0;'));
+      expect(s, contains('for (var itsKey in itsExact)'));
+      expect(s, contains('lowerIts[itsKey.toLowerCase()]'));
+      expect(s, contains('var fk = fuzzyMatch(el2);'));
     });
   });
 }

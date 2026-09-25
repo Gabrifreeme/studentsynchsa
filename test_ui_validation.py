@@ -225,7 +225,7 @@ class TestBudgetTest(unittest.TestCase):
         import types
 
         def fake_chat_one(*a, **k):
-            return ("FINAL: tests passed", [])
+            return ("FINAL: tests passed", [], "stop")
 
         call_tool_orig = server._call_tool
         server._chat_one = fake_chat_one
@@ -328,7 +328,7 @@ class DomainGateTest(unittest.TestCase):
                                           "https://www.facebook.com/share/v/1NuzzaWAKk/"}]
         executed = []
         def fake_chat_one(*a, **k):
-            return ("", [("curl", {"url": "https://www.facebook.com/share/v/1NuzzaWAKk/"})])
+            return ("", [("curl", {"url": "https://www.facebook.com/share/v/1NuzzaWAKk/"})], "stop")
         call_orig = server._call_tool
         po_orig = server._chat_providers
         server._chat_one = fake_chat_one
@@ -363,7 +363,7 @@ class DomainGateTest(unittest.TestCase):
         executed = []
 
         def fake_chat_one(*a, **k):
-            return ("", [("curl", {"url": "https://example.com"})])
+            return ("", [("curl", {"url": "https://example.com"})], "stop")
 
         call_orig = server._call_tool
         po_orig = server._chat_providers
