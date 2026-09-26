@@ -3019,8 +3019,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Which fields are already in, so a repeat fill can be spotted.
     _filled_fields = set()
     _repeat_field_nudges = 0
-    # Snapshot of the request log taken just before the submit, and whether the
-    # resulting POST has already been read out for the model.
+    # Snapshot of the request log taken just before a submit is allowed to run,
+    # and whether the resulting POST has already been read out for the model.
     _req_ids_before_submit = None
     _read_captured = False
     # Mirror of the above: once the form has actually been submitted, the next
@@ -3405,6 +3405,23 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                           "handing the result to the model" % len(_recs), flush=True)
                     llm_messages.append({"role": "user", "content": _msg})
                     continue
+            if tcs:
+                # Snapshot the request log BEFORE a submit runs. The click
+                # dispatches the form synchronously, so snapshotting afterwards
+                # (which is what the post-execution path did) puts the POST we
+                # are looking for into the "already seen" set, and the capture
+                # then finds nothing and reports that no request was made.
+                _pf = tcs[0]
+                if isinstance(_pf, (tuple, list)) and len(_pf) >= 2:
+                    _pname, _pargs = _pf[0], _pf[1]
+                elif isinstance(_pf, dict):
+                    _pname = _pf.get("name") or _pf.get("tool") or ""
+                    _pargs = _pf.get("args") or _pf.get("arguments") or {}
+                else:
+                    _pname, _pargs = "", {}
+                if _is_form_submit_call(_pname, _pargs):
+                    _req_ids_before_submit = d.request_ids()
+                    _read_captured = False
             if not tcs:
                 if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
                     # Pick the RIGHT first tool: a screen-read ask ("You are on
@@ -3582,10 +3599,6 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 if _is_form_submit_call(run_name, run_args):
                     if _awaiting_submit:
                         print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
-                    # Snapshot the log before the click so the POST it causes can
-                    # be told apart from everything already recorded.
-                    _req_ids_before_submit = d.request_ids()
-                    _read_captured = False
                     _awaiting_submit = False
                     _awaiting_field = False
                     _awaiting_read = True
