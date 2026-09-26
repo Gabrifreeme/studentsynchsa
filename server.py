@@ -2988,6 +2988,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     _already_reasked = False
     _call_counts = {}
     _call_arg_sigs = {}
+    # Form-submission guard: set once a password field has been filled, cleared
+    # by a submit. While it is set, a round that does not submit gets a nudge
+    # instead of being allowed to wander off into a DOM dump. Bounded so a model
+    # that ignores the nudge cannot spin on it forever.
+    _awaiting_submit = False
+    _submit_nudges = 0
     # Explicit "ui_app_open <App>" (or "open the app") instructions are honored
     # SERVER-SIDE before the model loop. qwen2.5:3b often skips ui_app_open and
     # ui_dumps the home screen instead, wasting the whole run. If the user asked
@@ -3227,6 +3233,24 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     continue
             if tcs:
                 _advance_indicator()
+            # Form-submission guard. A password fill has happened and no submit
+            # followed, so the form is filled but nothing was sent: reading the
+            # network panel now returns nothing useful and the model tends to
+            # loop on that. Re-ask once or twice with an explicit next action
+            # instead of letting it burn the round budget.
+            if _awaiting_submit and tcs and _submit_nudges < 2:
+                _first_call = tcs[0] if isinstance(tcs[0], dict) else {}
+                _cname = _first_call.get("name") or _first_call.get("tool") or ""
+                _cargs = (_first_call.get("args")
+                          or _first_call.get("arguments")
+                          or _first_call.get("parameters") or {})
+                if not _is_form_submit_call(_cname, _cargs):
+                    _submit_nudges += 1
+                    print("SUBMIT-GUARD: password filled but next call was %s; "
+                          "nudging for submit (n=%d)" % (_cname, _submit_nudges),
+                          flush=True)
+                    llm_messages.append({"role": "user", "content": _SUBMIT_NUDGE})
+                    continue
             if not tcs:
                 if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
                     # Pick the RIGHT first tool: a screen-read ask ("You are on
@@ -3400,6 +3424,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # model, so it now has real screen state to tap from.
                     seen_screen = True
                 names.append(run_name)
+                # Keep the submit guard in step with what actually ran.
+                if _is_form_submit_call(run_name, run_args):
+                    if _awaiting_submit:
+                        print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
+                    _awaiting_submit = False
+                elif _is_password_fill(run_name, run_args):
+                    _awaiting_submit = True
+                    print("SUBMIT-GUARD: password filled via %s; submit required next"
+                          % run_name, flush=True)
                 tcid = "chat_t%d_%d" % (rnd, j)
                 print(f"🔧 /chat executed {run_name} ok={ok}")
                 with _AGENT_LOCK:
@@ -7788,6 +7821,53 @@ def _short_tool(t):
     return out
 
 
+_SUBMIT_BLOBS = ("submit", "requestsubmit", ".click(", "click()", "dispatchevent")
+_PASSWORD_BLOBS = ("password", "passwd")
+
+
+def _args_blob(args):
+    """Flatten a tool call's args into one lowercase blob for sniffing."""
+    if not isinstance(args, dict):
+        return str(args or "").lower()
+    return " ".join(str(v) for v in args.values()).lower()
+
+
+def _is_form_submit_call(name, args):
+    """Would this tool call actually submit a form?
+
+    Deliberately narrow. A false negative here only costs one nudge; a false
+    positive would let the model skip the submit and go straight to reading a
+    network panel that has nothing in it, which is the exact stall this guards.
+    """
+    if name in ("ui_key",):
+        return True                      # Enter is a submit on a login form
+    if name == "ui_tap":
+        return any(h in _args_blob(args)
+                   for h in ("submit", "login", "sign in", "signin", "log in"))
+    if name in ("cdp_evaluate", "run_command", "ui_type"):
+        blob = _args_blob(args)
+        return any(h in blob for h in _SUBMIT_BLOBS)
+    return False
+
+
+def _is_password_fill(name, args):
+    """A tool call that fills a password field and does not itself submit."""
+    if name not in ("cdp_evaluate", "run_command"):
+        return False
+    blob = _args_blob(args)
+    if not any(h in blob for h in _PASSWORD_BLOBS):
+        return False
+    return not _is_form_submit_call(name, args)
+
+
+_SUBMIT_NUDGE = ("SUBMIT NOW. You just filled the password field, so the form is "
+                 "filled but not sent and there is no POST to read yet. Call "
+                 "cdp_evaluate right now to click the submit button (or call "
+                 "form.requestSubmit() / button.click()). Do not screenshot, do "
+                 "not dump the DOM, do not call cdp_network_requests. The submit "
+                 "must be this next tool call.")
+
+
 def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
                            reserve=0):
     """Turn a TOTAL input budget into the schema budget actually available.
@@ -7870,6 +7950,13 @@ def build_reduced_schema(base_schema, want_files=False, budget=None):
 # examples - is what the free tiers cannot pay for.
 _REDUCED_SYS = (
     "You are ACEsi. You act through tools; never ask Chris to run commands yourself.\n"
+    "FORM SUBMISSION PROTOCOL (mandatory, overrides everything else):\n"
+    "1. Fill the username field with cdp_evaluate.\n"
+    "2. Fill the password field with cdp_evaluate.\n"
+    "3. IMMEDIATELY click submit with cdp_evaluate - same round, no intervening reads.\n"
+    "4. Only THEN call cdp_network_requests to inspect the resulting POST.\n"
+    "Do NOT screenshot, dump the DOM, or evaluate anything else between steps 2 and 3. "
+    "The submit must be the very next tool call after the last field is filled.\n"
     "Emit ONE tool call per message as JSON: {\"tool\": \"<name>\", \"args\": {...}}.\n"
     "Never narrate between calls (no 'I will', no commentary) - just call the next tool.\n"
     "When the task is done, stop calling tools and reply with a short plain report of the result.\n"
