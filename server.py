@@ -3011,6 +3011,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # that ignores the nudge cannot spin on it forever.
     _awaiting_submit = False
     _submit_nudges = 0
+    # Set by any field fill, cleared by a submit. A fill means the form is not
+    # ready, so a read in the next slot cannot succeed. Separate from
+    # _awaiting_submit, which means "every field is in, submit now".
+    _awaiting_field = False
+    _field_nudges = 0
     # Mirror of the above: once the form has actually been submitted, the next
     # call has to read the request. Without this the model submits and then
     # goes back to filling the form, which is the same stall one step later.
@@ -3260,34 +3265,54 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             # network panel now returns nothing useful and the model tends to
             # loop on that. Re-ask once or twice with an explicit next action
             # instead of letting it burn the round budget.
+            if _awaiting_field and tcs and _field_nudges < 3:
+                # A fill happened and the next call is a read. There is no POST
+                # to read until the remaining fields are in and the form is
+                # sent, so let the model fill or submit instead - but do NOT
+                # demand a submit yet, because the other fields may not be
+                # filled. This is the case the model actually falls into:
+                # fill username, then go read the network panel.
+                _cf = tcs[0]
+                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
+                    _cname, _cargs = _cf[0], _cf[1]
+                elif isinstance(_cf, dict):
+                    _cname = _cf.get("name") or _cf.get("tool") or ""
+                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
+                else:
+                    _cname, _cargs = "", {}
+                if not (_is_field_fill(_cname, _cargs)
+                        or _is_form_submit_call(_cname, _cargs)
+                        or _is_network_read_call(_cname, _cargs)):
+                    _field_nudges += 1
+                    print("FIELD-GUARD: after a fill, next call was %s; "
+                          "nudging to finish the form (n=%d)" % (_cname, _field_nudges),
+                          flush=True)
+                    llm_messages.append({"role": "user", "content": _FIELD_NUDGE})
+                    continue
             if _awaiting_submit and tcs and _submit_nudges < 2:
-                # tcs is a list of (name, args) tuples, not dicts. Getting this
-                # wrong made the guard read an empty tool name and nudge even
-                # when the model was doing the right thing.
-                _first_call = tcs[0]
-                if isinstance(_first_call, (tuple, list)) and len(_first_call) >= 2:
-                    _cname, _cargs = _first_call[0], _first_call[1]
-                elif isinstance(_first_call, dict):
-                    _cname = _first_call.get("name") or _first_call.get("tool") or ""
-                    _cargs = (_first_call.get("args")
-                              or _first_call.get("arguments") or {})
+                # Every field is filled, so the only correct next call is submit.
+                _cf = tcs[0]
+                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
+                    _cname, _cargs = _cf[0], _cf[1]
+                elif isinstance(_cf, dict):
+                    _cname = _cf.get("name") or _cf.get("tool") or ""
+                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
                 else:
                     _cname, _cargs = "", {}
                 if not _is_form_submit_call(_cname, _cargs):
                     _submit_nudges += 1
-                    print("SUBMIT-GUARD: field filled but next call was %s; "
+                    print("SUBMIT-GUARD: all fields filled but next call was %s; "
                           "nudging for submit (n=%d)" % (_cname, _submit_nudges),
                           flush=True)
                     llm_messages.append({"role": "user", "content": _SUBMIT_NUDGE})
                     continue
             if _awaiting_read and tcs and _read_nudges < 2:
-                _first_call = tcs[0]
-                if isinstance(_first_call, (tuple, list)) and len(_first_call) >= 2:
-                    _cname, _cargs = _first_call[0], _first_call[1]
-                elif isinstance(_first_call, dict):
-                    _cname = _first_call.get("name") or _first_call.get("tool") or ""
-                    _cargs = (_first_call.get("args")
-                              or _first_call.get("arguments") or {})
+                _cf = tcs[0]
+                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
+                    _cname, _cargs = _cf[0], _cf[1]
+                elif isinstance(_cf, dict):
+                    _cname = _cf.get("name") or _cf.get("tool") or ""
+                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
                 else:
                     _cname, _cargs = "", {}
                 if not _is_network_read_call(_cname, _cargs):
@@ -3475,11 +3500,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if _awaiting_submit:
                         print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
                     _awaiting_submit = False
+                    _awaiting_field = False
                     _awaiting_read = True
                 elif _is_field_fill(run_name, run_args):
-                    _awaiting_submit = True
-                    print("SUBMIT-GUARD: field filled via %s; submit required next"
-                          % run_name, flush=True)
+                    _awaiting_field = True
+                    # Only a password fill means every field is done, so only
+                    # then is a submit the next required action. Demanding a
+                    # submit after the USERNAME fill stopped the model filling
+                    # the password at all, so the form submitted empty.
+                    if _is_password_fill(run_name, run_args):
+                        _awaiting_submit = True
+                    print("SUBMIT-GUARD: field filled via %s (submit required next: %s)"
+                          % (run_name, _awaiting_submit), flush=True)
                 elif _is_network_read_call(run_name, run_args):
                     _awaiting_read = False
                 tcid = "chat_t%d_%d" % (rnd, j)
@@ -7961,6 +7993,13 @@ _READ_NUDGE = ("READ THE POST NOW. The form has been submitted, so the request "
                "url_contains 'authenticate', or filter_status '302'/'303') and "
                "report its status code, URL and whether it has a body. Do not "
                "re-fill the form, do not re-submit, do not screenshot.")
+
+_FIELD_NUDGE = ("FINISH THE FORM FIRST. You have filled one field, so the form "
+                "is not ready to send and there is no POST to read yet. Your "
+                "next call must be another cdp_evaluate that fills the "
+                "remaining field (the password, if you have not filled it), or "
+                "the cdp_evaluate that clicks submit. Do not call "
+                "cdp_network_requests, do not screenshot, do not dump the DOM.")
 
 
 def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
