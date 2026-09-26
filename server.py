@@ -3019,6 +3019,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Which fields are already in, so a repeat fill can be spotted.
     _filled_fields = set()
     _repeat_field_nudges = 0
+    # Snapshot of the request log taken just before the submit, and whether the
+    # resulting POST has already been read out for the model.
+    _req_ids_before_submit = None
+    _read_captured = False
     # Mirror of the above: once the form has actually been submitted, the next
     # call has to read the request. Without this the model submits and then
     # goes back to filling the form, which is the same stall one step later.
@@ -3347,6 +3351,60 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                           flush=True)
                     llm_messages.append({"role": "user", "content": _READ_NUDGE})
                     continue
+            if _awaiting_read and not _read_captured:
+                # Asking the model to go and read the request does not work: it
+                # has twice ignored the nudge and gone back to filling the form,
+                # which then fails because the page already navigated away. The
+                # submit already happened and the request log already has it, so
+                # read it here and hand over the answer.
+                _recs = d.find_new_requests(before=_req_ids_before_submit,
+                                            methods=("POST",), timeout=8.0,
+                                            require_done=True)
+                if _recs:
+                    _read_captured = True
+                    _awaiting_read = False
+                    _lines = []
+                    for _r in _recs[-3:]:
+                        _st = _r.get("status")
+                        if _st is None:
+                            _st = ("failed:%s" % _r.get("errorText")
+                                   if _r.get("state") == "failed" else "no response")
+                        # Location lives in response_headers; there is no
+                        # top-level "location" key on the record.
+                        _hdrs = _r.get("response_headers") or {}
+                        _loc = ""
+                        for _hk, _hv in _hdrs.items():
+                            if str(_hk).lower() == "location":
+                                _loc = _hv
+                                break
+                        _loc = _loc or _r.get("redirected_to") or "(none)"
+                        # A 3xx response carries no body, so do not go looking
+                        # for one. Anything else is read from the log, and if
+                        # that fails the reason is reported rather than guessed.
+                        if _st in (301, 302, 303, 304, 307, 308):
+                            _body = "no (redirect response carries no body)"
+                        else:
+                            _ok, _txt = d.get_response_body(
+                                url_contains=str(_r.get("url") or "").split("?")[0])
+                            if _ok:
+                                _body = ("yes" if _txt and not str(_txt).startswith("(")
+                                         else "no (empty)")
+                            else:
+                                _body = "not retrievable (%s)" % str(_txt)[:90]
+                        _lines.append(
+                            "  %s %s -> status %s, Location: %s, has a response "
+                            "body: %s" % (_r.get("method"), _r.get("url"), _st,
+                                          _loc, _body))
+                    _msg = ("SERVER-CAPTURED RESULT for the form submission you "
+                            "just made:\n" + "\n".join(_lines)
+                            + "\nReport the method, URL, status code, Location and "
+                              "body presence from this. You do not need to call "
+                              "cdp_network_requests, and you must not re-fill or "
+                              "re-submit the form.")
+                    print("READ-GUARD: captured %d POST(s) server-side; "
+                          "handing the result to the model" % len(_recs), flush=True)
+                    llm_messages.append({"role": "user", "content": _msg})
+                    continue
             if not tcs:
                 if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
                     # Pick the RIGHT first tool: a screen-read ask ("You are on
@@ -3524,6 +3582,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 if _is_form_submit_call(run_name, run_args):
                     if _awaiting_submit:
                         print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
+                    # Snapshot the log before the click so the POST it causes can
+                    # be told apart from everything already recorded.
+                    _req_ids_before_submit = d.request_ids()
+                    _read_captured = False
                     _awaiting_submit = False
                     _awaiting_field = False
                     _awaiting_read = True

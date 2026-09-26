@@ -635,6 +635,54 @@ def _fmt_headers(headers):
     return " | ".join(out)
 
 
+def request_ids():
+    """Keys currently in the request log. Snapshot this before an action, then
+    pass it to find_new_requests() to see only what that action caused."""
+    s = _get_session()
+    if not s:
+        return set()
+    with _lock:
+        return set(s.network_reqs.keys())
+
+
+def find_new_requests(before=None, methods=("POST",), timeout=6.0, interval=0.3,
+                      url_contains=None, require_done=False):
+    """Wait for a request that appeared after `before` and matches `methods`.
+
+    get_network_requests() returns a formatted string, which is no use for
+    deciding "did the click I just made cause a POST?". This returns the records
+    themselves, so the caller can read the status and Location directly and
+    report the answer without asking a model to go and look.
+
+    require_done waits for the response to arrive, not just the request. A record
+    exists from RequestWillBeSent, with status still None, so returning early
+    would report a request as "pending" when the caller is trying to state its
+    final status. Records that fail outright count as done.
+    """
+    before = set(before or ())
+    want = {str(m).upper() for m in methods} if methods else None
+    needle = str(url_contains).lower() if url_contains else None
+    deadline = time.time() + max(0.0, float(timeout))
+    while True:
+        s = _get_session()
+        if s:
+            with _lock:
+                fresh = [r for k, r in s.network_reqs.items() if k not in before]
+            hit = [r for r in fresh
+                   if (want is None or str(r.get("method") or "").upper() in want)
+                   and (needle is None or needle in (r.get("url") or "").lower())]
+            if require_done:
+                done = [r for r in hit
+                        if r.get("status") is not None or r.get("state") == "failed"]
+                if done:
+                    return done
+            elif hit:
+                return hit
+        if time.time() >= deadline:
+            return []
+        time.sleep(max(0.05, float(interval)))
+
+
 def get_network_requests(filter_status=None, filter_url=None, limit=100):
     s = _get_session()
     if not s:
