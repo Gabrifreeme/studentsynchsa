@@ -3011,6 +3011,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # that ignores the nudge cannot spin on it forever.
     _awaiting_submit = False
     _submit_nudges = 0
+    # Mirror of the above: once the form has actually been submitted, the next
+    # call has to read the request. Without this the model submits and then
+    # goes back to filling the form, which is the same stall one step later.
+    _awaiting_read = False
+    _read_nudges = 0
     # Explicit "ui_app_open <App>" (or "open the app") instructions are honored
     # SERVER-SIDE before the model loop. qwen2.5:3b often skips ui_app_open and
     # ui_dumps the home screen instead, wasting the whole run. If the user asked
@@ -3256,17 +3261,41 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             # loop on that. Re-ask once or twice with an explicit next action
             # instead of letting it burn the round budget.
             if _awaiting_submit and tcs and _submit_nudges < 2:
-                _first_call = tcs[0] if isinstance(tcs[0], dict) else {}
-                _cname = _first_call.get("name") or _first_call.get("tool") or ""
-                _cargs = (_first_call.get("args")
-                          or _first_call.get("arguments")
-                          or _first_call.get("parameters") or {})
+                # tcs is a list of (name, args) tuples, not dicts. Getting this
+                # wrong made the guard read an empty tool name and nudge even
+                # when the model was doing the right thing.
+                _first_call = tcs[0]
+                if isinstance(_first_call, (tuple, list)) and len(_first_call) >= 2:
+                    _cname, _cargs = _first_call[0], _first_call[1]
+                elif isinstance(_first_call, dict):
+                    _cname = _first_call.get("name") or _first_call.get("tool") or ""
+                    _cargs = (_first_call.get("args")
+                              or _first_call.get("arguments") or {})
+                else:
+                    _cname, _cargs = "", {}
                 if not _is_form_submit_call(_cname, _cargs):
                     _submit_nudges += 1
-                    print("SUBMIT-GUARD: password filled but next call was %s; "
+                    print("SUBMIT-GUARD: field filled but next call was %s; "
                           "nudging for submit (n=%d)" % (_cname, _submit_nudges),
                           flush=True)
                     llm_messages.append({"role": "user", "content": _SUBMIT_NUDGE})
+                    continue
+            if _awaiting_read and tcs and _read_nudges < 2:
+                _first_call = tcs[0]
+                if isinstance(_first_call, (tuple, list)) and len(_first_call) >= 2:
+                    _cname, _cargs = _first_call[0], _first_call[1]
+                elif isinstance(_first_call, dict):
+                    _cname = _first_call.get("name") or _first_call.get("tool") or ""
+                    _cargs = (_first_call.get("args")
+                              or _first_call.get("arguments") or {})
+                else:
+                    _cname, _cargs = "", {}
+                if not _is_network_read_call(_cname, _cargs):
+                    _read_nudges += 1
+                    print("READ-GUARD: submit seen but next call was %s; "
+                          "nudging for the POST read (n=%d)" % (_cname, _read_nudges),
+                          flush=True)
+                    llm_messages.append({"role": "user", "content": _READ_NUDGE})
                     continue
             if not tcs:
                 if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
@@ -3441,15 +3470,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # model, so it now has real screen state to tap from.
                     seen_screen = True
                 names.append(run_name)
-                # Keep the submit guard in step with what actually ran.
+                # Keep the submit/read guards in step with what actually ran.
                 if _is_form_submit_call(run_name, run_args):
                     if _awaiting_submit:
                         print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
                     _awaiting_submit = False
+                    _awaiting_read = True
                 elif _is_field_fill(run_name, run_args):
                     _awaiting_submit = True
                     print("SUBMIT-GUARD: field filled via %s; submit required next"
                           % run_name, flush=True)
+                elif _is_network_read_call(run_name, run_args):
+                    _awaiting_read = False
                 tcid = "chat_t%d_%d" % (rnd, j)
                 print(f"🔧 /chat executed {run_name} ok={ok}")
                 with _AGENT_LOCK:
@@ -7908,6 +7940,27 @@ _SUBMIT_NUDGE = ("SUBMIT NOW. You just filled the password field, so the form is
                  "form.requestSubmit() / button.click()). Do not screenshot, do "
                  "not dump the DOM, do not call cdp_network_requests. The submit "
                  "must be this next tool call.")
+
+_NETWORK_READ_TOOLS = ("cdp_network_requests", "cdp_get_response_body")
+
+
+def _is_network_read_call(name, args):
+    """Would this call actually read the request/response we care about?"""
+    if name in _NETWORK_READ_TOOLS:
+        return True
+    if name in ("cdp_evaluate", "run_command"):
+        blob = _args_blob(args)
+        # A JS read of performance entries counts: it is the same data.
+        return any(h in blob for h in ("performance.getentries", "getentriesbytype",
+                                       "performance.getentriesbyname"))
+    return False
+
+
+_READ_NUDGE = ("READ THE POST NOW. The form has been submitted, so the request "
+               "exists. Call cdp_network_requests now (filter on "
+               "url_contains 'authenticate', or filter_status '302'/'303') and "
+               "report its status code, URL and whether it has a body. Do not "
+               "re-fill the form, do not re-submit, do not screenshot.")
 
 
 def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
