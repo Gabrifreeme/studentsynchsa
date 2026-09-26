@@ -2265,6 +2265,47 @@ def _last_user_question(llm_messages):
     return "the original request"
 
 
+# Some providers occasionally emit their tool-call protocol as PLAIN TEXT
+# instead of a structured tool_calls field, e.g.
+#   <dots_function_call>\n<invoke name="web_fetch">...
+# That markup used to be returned to Chris verbatim as the chat reply, wiping
+# out work that had already succeeded (the tools ran, the reply was garbage).
+# Anything matching this is never a real answer, so it is detected and dropped
+# in favour of a grounded reply built from the tool evidence.
+_TOOL_MARKUP_RE = re.compile(
+    r'<(?:dots_function_call|function_call|invoke|parameter|tool_call|'
+    r'function_results?|tool_use)\b'
+    r'|</(?:invoke|parameter|function_call|dots_function_call|tool_call)>'
+    r'|<\|?\s*(?:tool_call|function_call|python_tag|tool|end_tool)\s*\|?>'
+    r'|\bfunctions\.[a-z_]+\s*\(', re.IGNORECASE)
+
+
+def _looks_like_tool_markup(text):
+    """True when model output is leaked tool-call syntax rather than an answer."""
+    t = str(text or '')
+    if not t.strip():
+        return False
+    return bool(_TOOL_MARKUP_RE.search(t))
+
+
+def _sanitize_reply(text):
+    """Clean a candidate reply. Returns the text, or None when the model
+    emitted tool markup instead of an answer and the caller must fall back to
+    a grounded/evidence reply rather than showing this to Chris."""
+    t = str(text or '').strip()
+    if not t:
+        return None
+    if not _looks_like_tool_markup(t):
+        return t
+    print("[reply-guard] dropped leaked tool-call markup (%d chars)" % len(t), flush=True)
+    try:
+        audit_write('reply', 'markup_guard', {'chars': len(t)}, False,
+                    'model emitted tool markup instead of an answer')
+    except Exception:
+        pass
+    return None
+
+
 def _evidence_fallback(evidence, names, max_chars=400, max_results=5):
     """No model available? Show the user just the actual findings, tersely.
 
@@ -2355,6 +2396,9 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
             got = None
         if got:
             text = (got[0] or "").strip() if isinstance(got, (tuple, list)) else str(got).strip()
+            # The grounded call can itself emit leaked tool markup; if so, fall
+            # through to the evidence fallback instead of showing it to Chris.
+            text = _sanitize_reply(text) if text else None
             if text:
                 return text
 
@@ -3005,7 +3049,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                               "the screen state.")
                     ok = False
                 else:
-                    ok, result = _call_tool(run_name, run_args)
+                    # A single bad tool call must never take down the whole run:
+                    # every result gathered so far is real work worth returning.
+                    try:
+                        ok, result = _call_tool(run_name, run_args)
+                    except Exception as e:
+                        ok = False
+                        result = ("tool %r failed: %s: %s"
+                                  % (run_name, type(e).__name__, e))
+                        audit_write("tool", run_name, run_args or {}, False,
+                                    "raised %s: %s" % (type(e).__name__, e))
+                        print("💥 tool %s raised %s: %s"
+                              % (run_name, type(e).__name__, e), flush=True)
                 if ok and run_name == "ui_dump":
                     # An explicit ui_dump's result is fed straight back to the
                     # model, so it now has real screen state to tap from.
@@ -3145,9 +3200,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = summary
             return summary
+        clean = _sanitize_reply(last_text)
+        if clean is None:
+            clean = _final_answer(llm_messages, names, last_screen, active,
+                                  user_message, chat_one=_chat_one)
         with _AGENT_LOCK:
-            _AGENT["last_reply"] = last_text
-        return last_text
+            _AGENT["last_reply"] = clean
+        return clean
 
     # No tools ran and no real text — nothing to summarize. But a file-open ask
     # must still open even when no model is available: resolve the hinted file
@@ -3183,6 +3242,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     summary = _final_answer(llm_messages, names, last_screen, active,
                             user_message, chat_one=_chat_one)
     summary = _normalize_reply(summary)
+    # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
+    if _looks_like_tool_markup(summary):
+        summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
     with _AGENT_LOCK:
         _AGENT["last_reply"] = summary
     return summary
@@ -6569,15 +6631,45 @@ _SUBTASK_PROBES = [
     ("current time", ("get_time",),              r"\bcurrent time\b|\bwhat time\b"),
     ("open/view user file", ("view_user_file", "open_user_file", "read_user_file"),
      r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b"),
+    # Broad question-type probes. These match almost any question, so they are
+    # only enforced on genuinely multi-step requests (see _BROAD_PROBES).
+    ("answer question", ("web_search", "webfetch", "curl"),
+     r"\b(?:what|who|when|where|which|whom|whose)\b\s+[\w'\- ]{2,40}\b(?:is|was|were|are|does|did|do)\b"
+     r"|\boldest\b|\blargest\b|\bsmallest\b|\bhighest\b|\binvented\b|\bfounded\b"),
+    ("price lookup", ("web_search",),
+     r"\b(?:price|closing price|close[ds]? at|index|stock|share price|exchange rate|rate of)\b"),
+    ("compare values", ("web_search",),
+     r"\bcompare[ds]?\b|\bversus\b|\bvs\.?\b|\bcompared to\b|\byear ago\b|\bthan last\b|\bchange in\b"),
 ]
+
+# Probes too generic to enforce on their own: "who was Nelson Mandela?" must not
+# leave the model being nagged forever about unanswered subtasks. They only
+# count when the request also contains at least one narrow, explicit step.
+_BROAD_PROBES = frozenset(("answer question", "price lookup", "compare values"))
 
 
 def _outstanding_subtasks(user_message: str, names: list[str]) -> list[str]:
     """Which requested subtasks have had no matching tool call yet."""
     text = (user_message or "").lower()
     done = set(names)
-    return [label for label, tools, pattern in _SUBTASK_PROBES
-            if re.search(pattern, text) and not (done & set(tools))]
+    matched = [label for label, tools, pattern in _SUBTASK_PROBES
+               if re.search(pattern, text) and not (done & set(tools))]
+    if not matched:
+        return []
+    # Enforce broad question probes only for multi-step requests.
+    detected = sum(1 for _l, _t, pat in _SUBTASK_PROBES if re.search(pat, text))
+    if detected < 2:
+        return [l for l in matched if l not in _BROAD_PROBES]
+    return matched
+
+
+# KNOWN LIMITATION: completion is keyed on tool name, so a single web_search
+# satisfies every question-type probe at once. That is deliberate and safe
+# (it can only under-nudge, never over-nudge) but it means the nudge cannot
+# distinguish "searched for housing" from "answered the Mandela question".
+# Broad probes therefore only bite when the model stalls BEFORE searching, e.g.
+# after a file step. The reply-leak guard in _sanitize_reply covers the case
+# where the research completed but the final answer was destroyed.
 
 
 def _draft_research_fallback(llm_messages, names, user_message):
@@ -7144,9 +7236,54 @@ def context_endpoint():
     })
 
 
+# Models routinely reach for snake_case / wrong-spelling variants of a tool
+# name. A miss used to raise KeyError straight out of _call_tool, which
+# propagated through the whole dispatch loop and out of /chat, throwing away
+# every tool result the run had already gathered. Resolve the common variants
+# and, for anything still unknown, return a normal tool error so the model can
+# correct itself instead of the request dying.
+_TOOL_ALIASES = {
+    "web_fetch": "webfetch", "webfetch_url": "webfetch", "fetch_url": "webfetch",
+    "web_search_tool": "web_search", "websearch": "web_search", "search_web": "web_search",
+    "google": "web_search", "browse": "webfetch", "browse_url": "webfetch",
+    "list_files": "list_user_files", "my_files": "list_user_files",
+    "open_file": "open_user_file", "view_file": "view_user_file",
+    "read_file": "read_user_file", "show_file": "view_user_file",
+    "screenshot": "ui_screenshot", "screen_dump": "ui_dump",
+    "tap": "ui_tap", "swipe": "ui_swipe", "type_text": "ui_type",
+    "press": "ui_key", "open_app": "ui_app_open",
+}
+
+
+def _resolve_tool_name(name):
+    """Map a requested tool name onto a registered one, or None if unknown."""
+    n = str(name or "").strip()
+    if n in TOOLS:
+        return n
+    alt = _TOOL_ALIASES.get(n) or _TOOL_ALIASES.get(n.lower())
+    if alt in TOOLS:
+        return alt
+    low = n.lower()
+    for t in TOOLS:
+        if t.lower() == low:
+            return t
+    return None
+
+
 def _call_tool(name, args):
     if _kill_armed():
         return False, "E-STOP is armed — no tools run."
+    resolved = _resolve_tool_name(name)
+    if resolved is None:
+        near = [t for t in TOOLS if str(name or "").lower() in t or t in str(name or "").lower()]
+        audit_write("tool", name, args or {}, False, "unknown tool name")
+        return False, (
+            "unknown tool %r. Valid tools: %s.%s"
+            % (name, ", ".join(sorted(TOOLS)[:40]),
+               (" Did you mean: %s?" % ", ".join(near)) if near else ""))
+    if resolved != name:
+        audit_write("tool", name, args or {}, True, "resolved alias -> %s" % resolved)
+        name = resolved
     fn, keys = TOOLS[name]
     args = args or {}
     missing = []
