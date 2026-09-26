@@ -2042,7 +2042,17 @@ def build_context_block(light=False):
                          + "\n".join(pb) + "]")
     except Exception:
         pass
-    return "\n".join(parts)
+    _ctx_text = "\n".join(parts)
+    # Record the size of the injected context so the per-request token
+    # breakdown can attribute it. Without this, "system_prompt_tokens" is one
+    # opaque number and there is no way to tell whether the prompt or the
+    # memory block is the thing that has to shrink.
+    try:
+        global _LAST_CONTEXT_TOKENS
+        _LAST_CONTEXT_TOKENS = _estimate_tokens(_ctx_text)
+    except Exception:
+        pass
+    return _ctx_text
 
 LAST_FILE_PATH = None
 
@@ -2338,9 +2348,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         body["tools"] = tools_schema
         body["tool_choice"] = tool_choice
 
+    _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
+                      note=("reduced" if name in REDUCED_MODE_PROVIDERS
+                            or name.startswith("OpenRouter") else "full"))
     spent = getattr(_PROV_TLS, "spent", 0.0)
     attempt = 0
     shrunk = False
+    cut = 0
     while True:
         attempt += 1
         try:
@@ -2440,13 +2454,39 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
             _PROV_TLS.spent = spent
             continue
 
+        # 413: the request is simply too big for this provider's input limit.
+        # React rather than just logging it: shed half the tool list and resend
+        # once, then drop tools entirely and try once more. Two attempts, no more,
+        # because a payload that is still too large after losing every tool is a
+        # prompt-size problem that retrying cannot fix.
+        if r.status_code == 413 and cut < 2 and tools_schema:
+            m = re.search(r"requested (\d+)", r.text, re.I)
+            lim = re.search(r"limit (\d+)", r.text, re.I)
+            prov = ("requested %s of %s" % (m.group(1), lim.group(1) if lim else "?")
+                    if m else "input limit exceeded")
+            if cut == 0:
+                tools_schema = _shrink_schema_further(tools_schema, 0.5)
+                body["tools"] = tools_schema
+                cut = 1
+            else:
+                tools_schema = []
+                body.pop("tools", None)
+                body.pop("tool_choice", None)
+                cut = 2
+            _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
+                              note="413 cut=%d (%s)" % (cut, prov))
+            print("✂️ %s 413 (%s): retrying with %d tools"
+                  % (name, prov, len(tools_schema or [])))
+            continue
+
         note = ""
         if r.status_code in (401, 403):
             note = "auth rejected - key expired/revoked or wrong endpoint"
         elif r.status_code == 404:
             note = "model slug not found or retired at this provider"
         elif r.status_code == 413:
-            note = "request too large - shrink the prompt or tool schema"
+            note = ("request still too large after dropping every tool - the system "
+                    "prompt itself exceeds this provider's input limit")
         _prov_record(name, model, r.status_code, reason, note)
         return None
 
@@ -3028,6 +3068,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if p not in providers:
                         providers.append(p)
                 for p in providers:
+                    _pname = p[0]
+                    # read_file only rides along when the task actually involves
+                    # files; otherwise it is dead weight in the schema.
+                    _want_files = bool(re.search(
+                        r"\b(file|files|folder|read|open|edit|save|document|"
+                        r"download|desktop|documents)\b", (user_message or ""), re.I))
                     if len(p) > 4 and p[4] == "compact":
                         # Ollama chosen via the model picker: use the compact schema
                         # and always route the pared-down local messages so the slow
@@ -3035,13 +3081,23 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         schema = ollama_domain_schema
                         msgs = _ollama_local_messages(llm_messages)
                         tc2 = tc
+                    elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
+                        # Reduced payload: the full one is rejected outright by
+                        # these free tiers (measured 8866-9541 input tokens vs a
+                        # 7000 ITPM cap and a ~151-token balance).
+                        _budget = (GROQ_REDUCED_BUDGET if _pname == "Groq"
+                                   else OPENROUTER_REDUCED_BUDGET)
+                        _base = _reduced_tool_pool(active_domain,
+                                                   net_domain_schema or full_domain_schema)
+                        schema = build_reduced_schema(_base, want_files=_want_files,
+                                                      budget=_budget)
+                        msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
+                        tc2 = tc
                     else:
                         schema = full_domain_schema
                         msgs = llm_messages
                         tc2 = tc
-                        if p[0] == "OpenRouter" and net_domain_schema:
-                            schema = net_domain_schema
-                        if p[0] == "Groq" and net_domain_schema:
+                        if p[0] in ("OpenRouter", "Groq") and net_domain_schema:
                             schema = net_domain_schema
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2)
@@ -3055,9 +3111,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         break
                 if got is None:
                     for model in OPENROUTER_FALLBACKS:
-                        or_schema = net_domain_schema if net_domain_schema else full_domain_schema
+                        # Same reduced payload as the primary OpenRouter attempt:
+                        # the free balance rejects the full prompt, so retrying
+                        # other slugs with it would just fail identically.
+                        or_schema = build_reduced_schema(
+                            _reduced_tool_pool(active_domain,
+                                               net_domain_schema or full_domain_schema),
+                            want_files=_want_files, budget=OPENROUTER_REDUCED_BUDGET)
+                        or_msgs = reduced_messages(llm_messages, active_domain,
+                                                   ctx_overlay)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                        OPENROUTER_API_KEY, model, llm_messages,
+                                        OPENROUTER_API_KEY, model, or_msgs,
                                         tools_schema=or_schema, tool_choice=tc)
                         if got is not None:
                             active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
@@ -7534,6 +7598,275 @@ def _fit_schema_to_budget(messages, tools_schema, max_tokens, budget=_LLM_INPUT_
     return tools
 
 
+# ===== Reduced-payload mode =====
+# Measured live: the full /chat payload is 8866-9541 input tokens. Groq's ITPM
+# for this org is 7000 per request and OpenRouter's remaining balance affords
+# ~151 prompt tokens, so every free provider rejected it. _fit_schema_to_budget
+# above existed for exactly this but was only wired into llm_reply(), never into
+# the /chat agent loop, and it could not have helped anyway: it sheds TOOLS but
+# keeps their multi-sentence descriptions, which were most of the payload.
+#
+# So reduced mode changes three things, not one:
+#   1. the tool list drops to a task-shaped subset,
+#   2. every description becomes one sentence,
+#   3. the system prompt loses the ITS persona, the mood blocks, the
+#      "Progress: X/Y" boilerplate and the long examples.
+# The full prompt stays the default - it is what makes ACEsi itself - and
+# reduced mode is opt-in per provider via REDUCED_MODE_PROVIDERS.
+_LAST_CONTEXT_TOKENS = 0
+
+# ~3.6 chars/token tracks BPE closely enough for budgeting. No tokenizer is
+# installed and pulling one in is not worth it. Always prefer the provider's own
+# figure when it reports one (Groq's 413 states the exact count).
+_TOK_CHARS = 3.6
+
+
+def _estimate_tokens(obj):
+    if isinstance(obj, str):
+        s = obj
+    else:
+        try:
+            s = json.dumps(obj, ensure_ascii=False)
+        except Exception:
+            s = str(obj)
+    return int(len(s) / _TOK_CHARS) + 1
+
+
+def _payload_tokens(messages, tools_schema, max_tokens):
+    return _estimate_tokens({"messages": messages, "tools": tools_schema or [],
+                             "max_tokens": max_tokens})
+
+
+def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
+    """kind=provider-tokens: say which PART of the payload is fat.
+
+    Without this, "8866 tokens" is a number with no owner, and the only way to
+    find out whether the schema or the memory block needs cutting is to guess.
+    """
+    try:
+        sysmsg = ""
+        for m in (messages or []):
+            if m.get("role") == "system":
+                sysmsg = m.get("content") or ""
+                break
+        hist = [m for m in (messages or []) if m.get("role") in ("user", "assistant")]
+        user = hist[-1].get("content") if hist else ""
+        hist_txt = "".join((m.get("content") or "") for m in hist[:-1]) if hist else ""
+        breakdown = {
+            "requested_input_tokens": _payload_tokens(messages, tools_schema, max_tokens),
+            "tools_schema_tokens": _estimate_tokens(tools_schema or []),
+            "system_prompt_tokens": _estimate_tokens(sysmsg),
+            "memory_tokens": int(_LAST_CONTEXT_TOKENS or 0),
+            "history_tokens": _estimate_tokens(hist_txt),
+            "user_message_tokens": _estimate_tokens(user),
+            "n_tools": len(tools_schema or []),
+            "note": note,
+        }
+        detail = " ".join("%s=%s" % (k, v) for k, v in breakdown.items())
+        audit_write("provider-tokens", name,
+                    {"model": model, "n_tools": breakdown["n_tools"]},
+                    True, detail[:180])
+        return breakdown
+    except Exception:
+        return {}
+
+
+# One sentence each. These replace the long originals ONLY in reduced mode.
+_SHORT_DESCRIPTIONS = {
+    # --- DevTools / network ---
+    "cdp_connect": "Attach to the Chrome/WebView DevTools target.",
+    "cdp_navigate": "Navigate the attached browser to a URL. Args: url, wait (bool, default true), wait_for ('load' or 'network_idle'), timeout (int, default 30).",
+    "cdp_evaluate": "Run JavaScript in the attached page and return the result.",
+    "cdp_network_requests": "List captured requests with status and headers. Args: filter_status (e.g. 404, '4xx'), filter_url (substring), limit (default 100).",
+    "cdp_get_response_body": "Read the body of a request cdp_network_requests already saw. Args: url_contains (substring), filter_status, max_chars (default 4000).",
+    "cdp_dom_state": "Read the attached page's title, URL and HTML.",
+    "cdp_console_logs": "Read console messages from the attached page.",
+    "cdp_status": "Report whether DevTools is attached, plus event counts.",
+    # --- on-device UI ---
+    "ui_app_open": "Launch an app on the connected Android device. Args: package.",
+    "ui_tap": "Tap a point or the centre of an element. Args: x,y or label.",
+    "ui_dump": "Dump the current screen as text with element bounds.",
+    "ui_type": "Type text into the focused field. Args: text.",
+    "ui_screenshot": "Capture a screenshot from the device.",
+    # --- shell / files ---
+    "run_command": "Run a shell command and return its output. Args: command.",
+    "read_file": "Read a file's contents. Args: path.",
+    "web_search": "Search the web. Args: query.",
+    "curl": "Fetch a URL and return the response. Args: url.",
+    "webfetch": "Fetch a URL and return readable text. Args: url.",
+    "list_user_files": "List files in a folder on this PC. Args: folder.",
+    "view_user_file": "Show a file from this PC inline in chat. Args: path or filename.",
+}
+
+# Shedding order under budget pressure: first listed is the last to go. The
+# network-inspection tools lead because reading a POST is the task that was
+# blocked; screen tools follow; shell and file access trail.
+_REDUCED_TOOL_ORDER = [
+    "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
+    "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
+    "cdp_status",
+    "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_screenshot",
+    "run_command", "read_file",
+]
+# Never shed these: without them a network or navigation task cannot be done at
+# all, so losing them would turn a working reduced schema into a useless one.
+_REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
+                      "cdp_network_requests", "cdp_get_response_body"}
+
+# The toolset a reduced browser task is actually required to carry. These are
+# protected from budget shedding for the same reason: a schema that silently
+# drops ui_screenshot or run_command still "fits the budget" but can no longer
+# finish the job, and the failure only shows up later as a confused agent.
+_REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
+    "ui_app_open", "ui_tap", "ui_dump", "ui_type", "ui_screenshot",
+    "run_command",
+}
+
+# Budgets are TOTAL input tokens (system prompt + schema + history), matching
+# how Groq's ITPM and OpenRouter's balance are actually metered.
+GROQ_REDUCED_BUDGET = 1500
+OPENROUTER_REDUCED_BUDGET = 3000
+
+# Providers that get the reduced payload. Groq and OpenRouter are on free tiers
+# that reject the full prompt outright; Cerebras and FreeLLM are reached with the
+# full one and fall back reactively via the 413 handler in _chat_one.
+REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter"}
+_REDUCED_ENV = os.environ.get("ACE_REDUCED_MODE", "")
+if _REDUCED_ENV:
+    REDUCED_MODE_PROVIDERS = {p.strip() for p in _REDUCED_ENV.split(",") if p.strip()}
+
+
+def _short_tool(t):
+    """Copy a tool schema with a one-sentence description."""
+    name = t["function"]["name"]
+    short = _SHORT_DESCRIPTIONS.get(name)
+    if not short:
+        return None
+    out = {"type": "function", "function": {
+        "name": name,
+        "description": short,
+        "parameters": t["function"].get("parameters", {"type": "object", "properties": {}}),
+    }}
+    # An empty properties object still costs tokens and confuses some providers.
+    params = out["function"]["parameters"]
+    if isinstance(params, dict) and not params.get("properties"):
+        params.pop("required", None)
+    return out
+
+
+def _reduced_tool_pool(active_domain, fallback_schema):
+    """Which schema the reduced builder picks tools from.
+
+    Reduced mode deliberately does NOT inherit the ace_config.yaml per-context
+    caps, because those were written for the full schema and are far too narrow
+    for a browser task: the 'ui' cap has no run_command/read_file, and the 'net'
+    cap has no ui_* or cdp_evaluate at all. A reduced payload that inherits
+    them silently loses the ability to finish the task.
+
+    So for browser domains the pool is the full TOOLS_SCHEMA and the builder's
+    own _REDUCED_TOOL_ORDER decides the shape. Every other domain keeps the
+    existing filtered behaviour, because there the cap is doing real work.
+    """
+    if active_domain in ("ui", "net"):
+        return TOOLS_SCHEMA
+    return fallback_schema
+
+
+def build_reduced_schema(base_schema, want_files=False, budget=None):
+    """Task-shaped tool subset with one-sentence descriptions, ordered so the
+    tools a network/UI task needs survive any budget-driven shedding.
+
+    base_schema is the already domain-filtered schema, so the domain classifier
+    still decides which family of tools is eligible; this only cuts it down to
+    the ones that matter and strips the prose.
+    """
+    by_name = {t["function"]["name"]: t for t in (base_schema or [])}
+    allowed = [n for n in _REDUCED_TOOL_ORDER if n in by_name]
+    if want_files and "read_file" in by_name and "read_file" not in allowed:
+        allowed.append("read_file")
+    tools = []
+    for n in allowed:
+        st = _short_tool(by_name[n])
+        if st:
+            tools.append(st)
+    # A tool the task explicitly needs is protected from budget shedding, the
+    # same way _REDUCED_MUST_KEEP protects the network tools. Without this,
+    # read_file sits last in the priority order and is the first thing dropped,
+    # so a file task silently loses the ability to read the file. run_command
+    # is protected too: it is the universal escape hatch for a browser task
+    # (cert bypass, dumps, anything with no dedicated tool), and it sits right
+    # before read_file in the order, so shedding from the tail kills it first.
+    # The budget is a target, not a hard wall: the real ceiling that matters is
+    # the TOTAL input payload, and shedding a required tool to stay under a
+    # schema-only number trades a measurable saving for an unmeasurable risk.
+    protected = set(_REDUCED_REQUIRED)
+    if want_files:
+        protected.add("read_file")
+    if budget:
+        # Shed from the tail, skipping anything protected.
+        i = len(tools) - 1
+        while i >= 0 and _estimate_tokens(tools) > budget:
+            nm = tools[i]["function"]["name"]
+            if nm not in protected:
+                tools.pop(i)
+            i -= 1
+    print("🪶 reduced schema: %d -> %d tools, ~%d tokens"
+          % (len(base_schema or []), len(tools), _estimate_tokens(tools)))
+    return tools
+
+
+# The reduced system prompt. Deliberately keeps only what makes a tool loop work:
+# the call format, the no-narration rule, and the "read the Network panel, not
+# screenshots" rule that the login-debug task depends on. Everything else - the
+# persona, ITS specifics, mood, journal, the Progress boilerplate, the worked
+# examples - is what the free tiers cannot pay for.
+_REDUCED_SYS = (
+    "You are ACEsi. You act through tools; never ask Chris to run commands yourself.\n"
+    "Emit ONE tool call per message as JSON: {\"tool\": \"<name>\", \"args\": {...}}.\n"
+    "Never narrate between calls (no 'I will', no commentary) - just call the next tool.\n"
+    "When the task is done, stop calling tools and reply with a short plain report of the result.\n"
+    "For anything about HTTP, status codes or request bodies, read the DevTools Network panel "
+    "with cdp_network_requests / cdp_get_response_body. A screenshot cannot show them, so never "
+    "guess a status code - read it.\n"
+    "A form must be submitted before its POST appears: fill the fields with cdp_evaluate, click "
+    "submit with cdp_evaluate, then read cdp_network_requests.\n"
+    "Never invent a result. If a tool fails, report what it actually returned."
+)
+
+
+def reduced_messages(messages, domain="", overlay=""):
+    """Swap the full persona for the compact protocol prompt, keeping the task
+    itself and the recent turn verbatim."""
+    hist = [m for m in (messages or []) if m.get("role") in ("user", "assistant")]
+    out = [{"role": "system", "content": _REDUCED_SYS}]
+    if domain:
+        out[0]["content"] += "\nActive task domain: %s." % domain
+    if overlay:
+        out[0]["content"] += "\n" + " ".join(overlay.split())[:400]
+    out.extend(hist[-4:])
+    return out
+
+
+def _shrink_schema_further(tools_schema, factor=0.5):
+    """Last-resort shrink for a 413: halve the tool list, keeping the earliest
+    (highest-priority) entries. Self-contained so _chat_one can call it without
+    needing the dispatch loop's context."""
+    tools = list(tools_schema or [])
+    if not tools:
+        return []
+    keep = max(1, int(len(tools) * factor))
+    keep_names = {t["function"]["name"] for t in tools[:keep]}
+    for n in _REDUCED_MUST_KEEP:
+        for t in tools:
+            if t["function"]["name"] == n:
+                keep_names.add(n)
+    out = [t for t in tools if t["function"]["name"] in keep_names]
+    # Preserve the original order.
+    order = {t["function"]["name"]: i for i, t in enumerate(tools)}
+    out.sort(key=lambda t: order[t["function"]["name"]])
+    return out
+
+
 class _DomainGate(Exception):
     pass
 
@@ -10203,6 +10536,98 @@ def notify_post():
     return jsonify({"ok": ok})
 
 # ===== Kill switch endpoints (web UI control from the PC) =====
+def _probe_json(url, headers=None, timeout=6):
+    """Cheap reachability probe. Returns (ok, detail, payload)."""
+    try:
+        r = requests.get(url, headers=headers or {}, timeout=timeout)
+        if r.status_code != 200:
+            return False, "HTTP %d: %s" % (r.status_code, _prov_reason(r.text)), None
+        try:
+            return True, "ok", r.json()
+        except Exception:
+            return True, "ok (non-JSON body)", None
+    except Exception as e:
+        return False, "%s: %s" % (type(e).__name__, str(e)[:120]), None
+
+
+def provider_health(probe=True):
+    """Per-provider status plus whatever quota the provider will tell us about.
+
+    Built because finding out a provider is dead mid-run wastes a whole test
+    cycle. OpenRouter publishes a credits endpoint, so the remaining balance is
+    reported exactly; the others expose no quota API, so they get an honest
+    reachability result and a measured latency instead of a made-up number.
+    """
+    out = {"ts": datetime.now().isoformat(), "reduced_mode_providers":
+           sorted(REDUCED_MODE_PROVIDERS), "providers": []}
+    for name, ep, key, mdl in _chat_providers():
+        rec = {"name": name, "model": mdl,
+               "has_key": bool(key),
+               "reduced_payload": name in REDUCED_MODE_PROVIDERS
+                                  or name.startswith("OpenRouter")}
+        if not key:
+            rec.update({"reachable": False, "detail": "no API key configured"})
+            out["providers"].append(rec)
+            continue
+        if not probe:
+            rec.update({"reachable": None, "detail": "probe skipped"})
+            out["providers"].append(rec)
+            continue
+        t0 = time.time()
+        if name == "OpenRouter":
+            # Real remaining balance, not a guess.
+            ok, detail, pay = _probe_json(
+                ep + "/credits", {"Authorization": "Bearer %s" % key})
+            rec["reachable"] = ok
+            rec["detail"] = detail
+            rec["latency_ms"] = int((time.time() - t0) * 1000)
+            if ok and isinstance(pay, dict):
+                d = pay.get("data") or {}
+                total, used = d.get("total_credits"), d.get("total_usage")
+                if isinstance(total, (int, float)):
+                    rec["total_credits"] = total
+                    rec["total_usage"] = used
+                    if isinstance(used, (int, float)):
+                        rec["remaining_credits"] = round(total - used, 4)
+        else:
+            ok, detail, _ = _probe_json(ep + "/models",
+                                        {"Authorization": "Bearer %s" % key})
+            rec["reachable"] = ok
+            rec["detail"] = detail
+            rec["latency_ms"] = int((time.time() - t0) * 1000)
+        out["providers"].append(rec)
+    if OLLAMA_ENABLED:
+        t0 = time.time()
+        ok, detail, pay = _probe_json(OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags",
+                                      timeout=4)
+        rec = {"name": "Ollama", "model": OLLAMA_CHAT_MODEL, "has_key": True,
+               "reduced_payload": False, "reachable": ok, "detail": detail,
+               "latency_ms": int((time.time() - t0) * 1000)}
+        if ok and isinstance(pay, dict):
+            rec["models"] = [m.get("name") for m in (pay.get("models") or [])][:10]
+        out["providers"].append(rec)
+    else:
+        out["providers"].append({
+            "name": "Ollama", "model": OLLAMA_CHAT_MODEL, "has_key": False,
+            "reduced_payload": False, "reachable": False,
+            "detail": "disabled (ACE_OLLAMA unset and no local server)"})
+    out["any_reachable"] = any(p.get("reachable") for p in out["providers"])
+    return out
+
+
+@app.route('/health/providers', methods=['GET'])
+def health_providers():
+    """So a test can be preceded by a quota check instead of a mid-run surprise.
+
+    ?probe=0 skips the network calls and just reports configuration.
+    """
+    try:
+        probe = (request.args.get("probe", "1") or "1") not in ("0", "false", "no")
+        return jsonify(provider_health(probe=probe))
+    except Exception as e:
+        return jsonify({"error": "%s: %s" % (type(e).__name__, e)}), 500
+
+
 @app.route('/kill/status', methods=['GET'])
 def kill_status():
     return jsonify(_kill_state())
