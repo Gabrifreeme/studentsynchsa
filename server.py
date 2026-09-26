@@ -3016,6 +3016,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # _awaiting_submit, which means "every field is in, submit now".
     _awaiting_field = False
     _field_nudges = 0
+    # Which fields are already in, so a repeat fill can be spotted.
+    _filled_fields = set()
+    _repeat_field_nudges = 0
     # Mirror of the above: once the form has actually been submitted, the next
     # call has to read the request. Without this the model submits and then
     # goes back to filling the form, which is the same stall one step later.
@@ -3265,6 +3268,28 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             # network panel now returns nothing useful and the model tends to
             # loop on that. Re-ask once or twice with an explicit next action
             # instead of letting it burn the round budget.
+            if tcs and _repeat_field_nudges < 3:
+                _cf = tcs[0]
+                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
+                    _cname, _cargs = _cf[0], _cf[1]
+                elif isinstance(_cf, dict):
+                    _cname = _cf.get("name") or _cf.get("tool") or ""
+                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
+                else:
+                    _cname, _cargs = "", {}
+                if _is_field_fill(_cname, _cargs):
+                    _fk = _field_key(_cargs)
+                    if _fk and _fk in _filled_fields:
+                        # Re-filling a field that is already in is a stall. The
+                        # field guard below cannot catch it, because a repeat IS
+                        # a field fill and so passes as "progress".
+                        _repeat_field_nudges += 1
+                        print("REPEAT-FIELD-GUARD: %s already filled but model "
+                              "re-filled it; nudging (n=%d)"
+                              % (_fk, _repeat_field_nudges), flush=True)
+                        llm_messages.append({"role": "user",
+                                             "content": _REPEAT_FIELD_NUDGE})
+                        continue
             if _awaiting_field and tcs and _field_nudges < 3:
                 # A fill happened and the next call is a read. There is no POST
                 # to read until the remaining fields are in and the form is
@@ -3433,7 +3458,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     for j, (nm, a) in enumerate(batch)]
             # Guard against degenerate loops (e.g. ui_type repeating the same
             # call dozens of times): bail when the same (tool,args) repeats 3+.
-            sig = tuple((nm, json.dumps(a or {}, sort_keys=True)) for nm, a in batch)
+            sig = _batch_sig(batch)
             if last_batch_sig == sig:
                 repeat_count += 1
             else:
@@ -3504,14 +3529,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _awaiting_read = True
                 elif _is_field_fill(run_name, run_args):
                     _awaiting_field = True
+                    _fk = _field_key(run_args)
+                    if _fk:
+                        _filled_fields.add(_fk)
                     # Only a password fill means every field is done, so only
                     # then is a submit the next required action. Demanding a
                     # submit after the USERNAME fill stopped the model filling
                     # the password at all, so the form submitted empty.
                     if _is_password_fill(run_name, run_args):
                         _awaiting_submit = True
-                    print("SUBMIT-GUARD: field filled via %s (submit required next: %s)"
-                          % (run_name, _awaiting_submit), flush=True)
+                    print("SUBMIT-GUARD: field filled via %s (field=%s, submit required next: %s)"
+                          % (run_name, _fk or "?", _awaiting_submit), flush=True)
                 elif _is_network_read_call(run_name, run_args):
                     _awaiting_read = False
                 tcid = "chat_t%d_%d" % (rnd, j)
@@ -8000,6 +8028,67 @@ _FIELD_NUDGE = ("FINISH THE FORM FIRST. You have filled one field, so the form "
                 "remaining field (the password, if you have not filled it), or "
                 "the cdp_evaluate that clicks submit. Do not call "
                 "cdp_network_requests, do not screenshot, do not dump the DOM.")
+
+_REPEAT_FIELD_NUDGE = ("STOP REPEATING THAT FILL. You have already filled this "
+                       "field; setting it again changes nothing and the run "
+                       "cannot finish. Do exactly one of these two things now: "
+                       "fill the NEXT unfilled field (the password, if the "
+                       "username is already in), or click submit. Do not call "
+                       "the same cdp_evaluate again.")
+
+
+def _field_key(args):
+    """Which form field is this call setting? username / password / email, else None.
+
+    Used to catch the model fixating on one field. gpt-oss-120b would set the
+    username ten times in a row and never touch the password, and because each
+    repeat was 'another fill' the field guard waved it through every time.
+    """
+    blob = _args_blob(args)
+    if any(h in blob for h in ("password", "passwd")):
+        return "password"
+    if "email" in blob:
+        return "email"
+    if any(h in blob for h in ("username", "user_name", "login", "#user")):
+        return "username"
+    return None
+
+
+def _norm_js(s):
+    """Canonicalise JS for identity comparison, ignoring cosmetic whitespace.
+
+    gpt-oss-120b re-issued the same fill nine times, changing only the spacing
+    around the assignment and the trailing semicolon, which made every repeat
+    look like a fresh call and defeated the identical-batch loop guard.
+
+    Whitespace inside string literals is preserved, so 'a b' and 'ab' stay
+    distinct; only whitespace in the surrounding syntax is dropped.
+    """
+    s = str(s or "")
+    out = []
+    quote = None
+    for ch in s:
+        if quote:
+            out.append(ch)
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+            out.append(ch)
+        elif not ch.isspace():
+            out.append(ch)
+    return "".join(out).rstrip(";")
+
+
+def _batch_sig(batch):
+    parts = []
+    for nm, a in batch:
+        if (nm == "cdp_evaluate" and isinstance(a, dict)
+                and isinstance(a.get("expr"), str)):
+            parts.append((nm, _norm_js(a["expr"])))
+        else:
+            parts.append((nm, json.dumps(a or {}, sort_keys=True)))
+    return tuple(parts)
 
 
 def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
