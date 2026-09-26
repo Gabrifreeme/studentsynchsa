@@ -2048,6 +2048,30 @@ def index():
 # absolute path, or a known file extension) are treated as file requests.
 # UI instructions like "open the app" / "read the notifications" fall through
 # to the LLM instead of being misrouted as file paths.
+# A local file path can never contain a URL scheme. "Open Chrome, navigate to
+# https://example.com/login ..." used to be captured as a file request because
+# the "/" inside "https://" satisfied the path-like test below, and the whole
+# message was then handed to open() as a filename, producing
+# "[Errno 22] Invalid argument". The file matcher runs BEFORE any domain
+# classifier, so a message containing a URL never reached the CDP routing at all.
+_URL_SCHEME_RE = re.compile(r'\b(?:https?|ftp|file|wss?)://', re.IGNORECASE)
+# Characters Windows forbids in a filename. Tested after stripping a drive
+# spec, since "C:\..." legitimately contains a colon.
+_WIN_ILLEGAL_RE = re.compile(r'[<>:"|?*\x00-\x1f]')
+
+
+def _plausible_path_tail(candidate):
+    """True when the final path segment looks like a filename rather than prose.
+
+    A real path ends in a filename; "Chrome, navigate to https://x/login. Then
+    log in ..." ends in a sentence.
+    """
+    seg = re.split(r'[/\\]', candidate or '')[-1].strip()
+    if not seg or len(seg) > 120:
+        return False
+    return re.search(r'\s', seg) is None
+
+
 def _match_file_request(message):
     m = re.match(
         r'^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|do\s+you\s+mind\s+)?'
@@ -2056,12 +2080,20 @@ def _match_file_request(message):
     if not m:
         return False, None, False
     tail = m.group(1).strip().strip('"\'')
+    # A URL in the target means this is a web/navigation instruction, not a
+    # local file. webfetch / view_web_image / cdp_navigate handle those.
+    if _URL_SCHEME_RE.search(tail):
+        return False, None, False
     # strip trailing "file"/"please" and leading "file:" / "the file:" phrasing
     tail = re.sub(r'\s+(?:file|please)\s*$', '', tail, flags=re.IGNORECASE).strip()
     tail = re.sub(r'^(?:the|this|that)?\s*file\s*[: ]?\s*', '', tail, flags=re.IGNORECASE).strip()
     # strip location phrases like "in my documents" / "on my computer"
     tail = re.sub(r'\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b', '', tail, flags=re.IGNORECASE)
     tail = re.sub(r'\bon\s+my\s+computer\b', '', tail, flags=re.IGNORECASE).strip()
+    # A filename cannot contain these; if the target does, it is prose that
+    # happens to start with "open"/"read".
+    if _WIN_ILLEGAL_RE.search(re.sub(r'^[A-Za-z]:[\\/]', '', tail)):
+        return False, None, False
     candidate = tail
     has_file_word = re.search(r'\bfile\b', message, re.IGNORECASE) is not None
     # "file manager/explorer" or "files app" are UI instructions, not documents
@@ -2070,7 +2102,8 @@ def _match_file_request(message):
         message, re.IGNORECASE) is None
     file_like = (
         os.path.isabs(candidate)
-        or bool(re.search(r'[/\\]', candidate))
+        # A separator only implies a path if the last segment is a filename.
+        or (bool(re.search(r'[/\\]', candidate)) and _plausible_path_tail(candidate))
         or (has_file_word and not_file_ui)
         or bool(re.search(
             r'(?:\.(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|'
@@ -6970,8 +7003,15 @@ def _explicit_tool_domain(user_message):
             # deterministic and stays on the more capable side.
             for cand in ("ui", "net", "code"):
                 if cand in doms:
+                    # Diagnostic: which tool the user named, and why this domain.
+                    # Fires only when a tool is actually named, so it stays quiet
+                    # on ordinary messages.
+                    print("[domain] explicit tool %r -> %s (tool domains: %s)"
+                          % (name, cand, sorted(doms)), flush=True)
                     return cand
             if "ctrl" in doms:
+                print("[domain] explicit tool %r -> ctrl (tool domains: %s)"
+                      % (name, sorted(doms)), flush=True)
                 best = best or "ctrl"
     return best
 
