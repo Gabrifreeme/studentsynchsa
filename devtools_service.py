@@ -413,18 +413,34 @@ class CdpSession:
                 self.console_logs = self.console_logs[-2000:]
         elif method in ("Network.requestWillBeSent",):
             rid = params.get("requestId")
+            req = params.get("request", {})
+            # A redirect re-uses the SAME requestId and never emits
+            # loadingFinished for the original hop, so the new request must not
+            # overwrite the old record. Without this, a login POST that answers
+            # 302 -> /secure vanished completely: only the final GET survived.
+            redirect = params.get("redirectResponse")
+            if redirect is not None and rid in self.network_reqs:
+                prev = self.network_reqs[rid]
+                prev["status"] = redirect.get("status")
+                prev["mimeType"] = redirect.get("mimeType")
+                prev["response_headers"] = redirect.get("headers") or {}
+                prev["state"] = "done"
+                prev["redirected_to"] = req.get("url")
+                self._rekey(prev)
+                self._inflight.pop(rid, None)
             self.network_reqs[rid] = {"requestId": rid,
-                                       "url": params.get("request", {}).get("url"),
-                                       "method": params.get("request", {}).get("method"),
+                                       "cdp_id": rid,
+                                       "url": req.get("url"),
+                                       "method": req.get("method"),
                                        "type": params.get("type"),
                                        "ts": params.get("timestamp"),
                                        "state": "pending",
+                                       "postData": (req.get("postData") or "")[:2000] or None,
                                        "response_headers": None}
-            # A redirect re-sends requestWillBeSent with the SAME requestId and a
-            # redirectResponse, and never emits loadingFinished for the original,
-            # so only count it as in-flight once.
+            # Only count it as in-flight once (see the redirect case above).
             self._inflight[rid] = time.time()
             self._last_net_activity = time.time()
+
         elif method == "Network.responseReceived":
             rid = params.get("requestId")
             resp = params.get("response", {})
@@ -452,6 +468,22 @@ class CdpSession:
                     rec["canceled"] = params.get("canceled")
         elif method == "Network.requestWillBeSentExtraInfo":
             pass
+
+    def _rekey(self, rec):
+        """Move an already-captured hop to its own key so the reused requestId
+        is free for the next hop. Both hops stay visible to callers, and
+        requestId/cdp_id keep pointing at the real CDP id so
+        Network.getResponseBody can still be called for this hop."""
+        old = rec.get("requestId")
+        n = 1
+        while True:
+            k = "%s#hop%d" % (old, n)
+            if k not in self.network_reqs:
+                if old in self.network_reqs and self.network_reqs[old] is rec:
+                    del self.network_reqs[old]
+                self.network_reqs[k] = rec
+                return
+            n += 1
 
     def network_idle(self, idle_ms=500):
         """True when no request is in flight AND nothing has hit the wire for
@@ -681,6 +713,53 @@ def _format_js_value(val, indent=None):
     if isinstance(v, str):
         return v
     return json.dumps(v, indent=indent)
+
+
+def get_response_body(url_contains=None, filter_status=None, max_chars=4000):
+    """Fetch the body of a captured response via Network.getResponseBody.
+
+    Chrome only retains a body while the response is still available, so this
+    legitimately fails for requests whose body was evicted (after a navigation,
+    or for large streamed responses). Say so plainly instead of returning "".
+    """
+    s = _get_session()
+    if not s:
+        return False, "no reachable CDP target"
+    with _lock:
+        reqs = [r for r in s.network_reqs.values()
+                if r.get("state") == "done" and r.get("status") is not None]
+    if url_contains:
+        needle = str(url_contains).lower()
+        reqs = [r for r in reqs if needle in (r.get("url") or "").lower()]
+    pred = _status_pred(filter_status)
+    if pred:
+        reqs = [r for r in reqs if pred(r.get("status"))]
+    if not reqs:
+        return False, ("no completed request matched (url_contains=%r, filter_status=%r). "
+                       "Bodies must be read before the page navigates away."
+                       % (url_contains, filter_status))
+    rec = reqs[-1]
+    cdp_id = rec.get("cdp_id") or rec.get("requestId")
+    mid = s._send("Network.getResponseBody", {"requestId": cdp_id})
+    resp = s._wait(mid, timeout=8) or {}
+    if resp.get("error"):
+        return False, ("could not read the body of %s %s (status %s): %s - Chrome only "
+                       "keeps a response body until it is evicted, so read it right "
+                       "after the request rather than after navigating."
+                       % (rec.get("method"), rec.get("url"), rec.get("status"),
+                          json.dumps(resp["error"])[:200]))
+    result = resp.get("result") or {}
+    body = result.get("body") or ""
+    if result.get("base64Encoded"):
+        try:
+            import base64
+            body = base64.b64decode(body).decode("utf-8", "replace")
+        except Exception:
+            return False, "response body was base64 and could not be decoded"
+    shown = body[:max_chars]
+    return True, ("%s %s (status %s), %d byte(s):\n%s%s"
+                  % (rec.get("method"), rec.get("url"), rec.get("status"),
+                     len(body), shown, "\n... (truncated)" if len(body) > max_chars else ""))
 
 
 def get_dom_state():

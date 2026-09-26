@@ -52,21 +52,24 @@ tool_caps:
             "ui_assert_text", "ui_assert_element", "ui_assert_visible",
             "ui_expect", "ui_test_run",
             "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
-            "cdp_dom_state", "cdp_network_requests", "cdp_status",
-            "curl", "restart", "notify",
-            "get_time", "web_search", "weather", "note"]
+             "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
+             "curl", "restart", "notify",
+             "get_time", "web_search", "weather", "note"]
   generic:
+
     allowed: ["ui", "code", "net", "ctrl"]
     tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "view_user_file", "grep", "write_file", "edit_file",
             "run_command", "git_status", "git_log", "git_commit", "git_branch",
             "git_merge", "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
-            "cdp_dom_state", "cdp_network_requests", "cdp_status",
-            "curl", "restart", "notify",
-            "get_time", "web_search", "weather", "note"]
+             "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
+             "curl", "restart", "notify",
+             "get_time", "web_search", "weather", "note"]
   web_only:
+
     allowed: ["ui", "net", "ctrl"]
     tools: ["cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
-            "cdp_dom_state", "cdp_network_requests", "cdp_status",
+             "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
+
             "curl", "restart", "notify",
             "get_time", "web_search", "weather", "note"]
 

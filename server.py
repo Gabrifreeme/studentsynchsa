@@ -5660,6 +5660,10 @@ def tool_cdp_console_logs():
 def tool_cdp_dom_state():
     return d.get_dom_state()
 
+def tool_cdp_get_response_body(url_contains=None, filter_status=None, max_chars=4000):
+    return d.get_response_body(url_contains=url_contains,
+                               filter_status=filter_status, max_chars=max_chars)
+
 def tool_cdp_network_requests(filter_status=None, filter_url=None, limit=100):
     return d.get_network_requests(filter_status=filter_status,
                                   filter_url=filter_url, limit=limit)
@@ -6238,6 +6242,7 @@ TOOLS = {
     "cdp_console_logs": (tool_cdp_console_logs, ()),
     "cdp_dom_state": (tool_cdp_dom_state, ()),
     "cdp_network_requests": (tool_cdp_network_requests, ()),
+    "cdp_get_response_body": (tool_cdp_get_response_body, ()),
     "cdp_status": (tool_cdp_status, ()),
     "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
     "view_web_image": (tool_view_web_image, ("url",)),
@@ -6429,8 +6434,15 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "cdp_dom_state",
         "description": "Snapshot the current DOM via CDP: page title, URL, and a slice of documentElement.outerHTML.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_get_response_body",
+        "description": "Fetch the body of a request already seen by cdp_network_requests, via CDP. Use it right after the request happens - Chrome evicts a response body once the page navigates, and this then says so rather than returning empty. Args: url_contains (substring of the URL, identifies which request), filter_status (e.g. 404), max_chars (default 4000).",
+        "parameters": {"type": "object", "properties": {
+            "url_contains": {"type": "string", "description": "Substring identifying which request's body to read, e.g. /authenticate"},
+            "filter_status": {"type": "string", "description": "Only consider requests with this status."},
+            "max_chars": {"type": "number", "description": "Truncate the body to this many characters. Default 4000.", "default": 4000}},
+            "required": []}}},
     {"type": "function", "function": {"name": "cdp_network_requests",
-        "description": "Return network request events captured by CDP (requestWillBeSent / responseReceived / loadingFinished / loadingFailed), with response headers. FILTER SERVER-SIDE on a busy page instead of pulling every request: filter_status (exact 404, a class like '4xx'/'5xx', or a list '404,500'), filter_url (case-insensitive substring), limit (default 100, returns the most recent matches). A request still in flight shows as 'pending' and one that never got a response as 'failed:<reason>', so an absent status is never ambiguous.",
+        "description": "Return network request events captured by CDP (requestWillBeSent / responseReceived / loadingFinished / loadingFailed), with response headers and POST data. FILTER SERVER-SIDE on a busy page instead of pulling every request: filter_status (exact 404, a class like '4xx'/'5xx', or a list '404,500'), filter_url (case-insensitive substring), limit (default 100, returns the most recent matches). Redirect hops are kept separately, so a POST that answers 303 still shows up. A request still in flight shows as 'pending' and one that never got a response as 'failed:<reason>', so an absent status is never ambiguous.",
         "parameters": {"type": "object", "properties": {
             "filter_status": {"type": "string", "description": "Only return requests with this status. Accepts 404, a class like '4xx', or a comma list '404,500'."},
             "filter_url": {"type": "string", "description": "Only return requests whose URL contains this text (case-insensitive)."},
@@ -6648,7 +6660,7 @@ _ICONS = {
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
     "todo_remove": "🗑️", "note": "📝",
     "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
-    "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊",
+    "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_get_response_body": "📄", "cdp_status": "📊",
     "curl": "🔗",
     "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
     "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
@@ -6952,7 +6964,7 @@ _TOOL_DOMAINS = {
     # _get_session), so a network-inspection task can use them without also
     # needing cdp_connect in its schema.
     "cdp_connect": "ui", "cdp_navigate": ("ui", "net"), "cdp_evaluate": "ui", "cdp_console_logs": "ui",
-    "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_status": "ui",
+    "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_get_response_body": ("ui", "net"), "cdp_status": "ui",
     # network / URL probes — the new curl tool isolates "is this URL up?" from
     # both code edits and on-device taps
     "curl": "net",
