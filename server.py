@@ -6968,6 +6968,44 @@ def _explicit_save_request(m):
         re.search(r'\b(?:write|put|store|copy)\b.*(?:to\s+)?(?:notes?/|\.(?:md|txt|json|csv)\b)', m))
 
 
+# A URL / DevTools / CDP / network-inspection ask is real on-device work where
+# the MODEL must pick the steps. It is not a deterministic "tap X then tap Y"
+# script. Two separate misroutes came from treating it as one:
+#   1. _execute_ui_script parsed "navigate to <url>" plus a link label as a
+#      blind ui_tap and ran it, answering with "steps executed" and never
+#      calling the model.
+#   2. _classify_message returned {"net"} for anything containing "status code",
+#      and the net domain carries no cdp_* tools - so even with the model
+#      driving, it could never have seen CDP.
+# NOTE: bare \bnetwork\b is deliberately NOT a trigger ("network settings" is a
+# legitimate tap target); the intent has to name requests/panel/inspection.
+_CDP_MODEL_TASK_RE = re.compile(
+    r'https?://'
+    r'|\bdev\s?tools?\b|\bchrome\s+dev\b'
+    r'|\bcdp[_ ]?[a-z_]*\b'
+    r'|\bf12\b'
+    r'|\bnetwork\s+(?:request|panel|tab|inspect|inspection|traffic|log|activity)'
+    r'|\bstatus\s+code\b'
+    r'|\bconsole\s+(?:log|message|error|warning)s?\b'
+    r'|\bdom\s+state\b'
+    r'|\bjavascript\s+console\b',
+    re.IGNORECASE)
+
+
+def _needs_model_driven_ui(user_message):
+    """True when a request must go to the model-driven loop (URL / DevTools /
+    CDP / network inspection) instead of the deterministic step parser."""
+    return bool(_CDP_MODEL_TASK_RE.search(user_message or ""))
+
+
+def _explicit_cdp_intent(m):
+    """True when the message explicitly names DevTools / CDP / F12. These are
+    on-device browser inspections, so they belong to the 'ui' domain where the
+    cdp_* tools live - not to 'net' just because "status code" appears."""
+    return bool(re.search(
+        r'\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b', m or ""))
+
+
 def _classify_message(user_message):
     """Decide which tool domain(s) a user message is asking about, so we can
     (a) surface the right context to the model and (b) refuse tools from a
@@ -7033,6 +7071,12 @@ def _classify_message(user_message):
         bool(re.search(_code_ext_re, m)) or \
         bool(re.search(r'\b(?:lib|src|test|assets)/[\w/]+\.\w+', m))
     domains = set()
+    # Explicit DevTools/CDP inspection is on-device browser work, and the cdp_*
+    # tools live in the 'ui' domain. This must win BEFORE either net_strong
+    # branch below, otherwise "tell me the status code" strips the whole CDP
+    # toolset out of the schema and the model cannot do the task at all.
+    if _explicit_cdp_intent(m):
+        return {"ui"}
     # A strong net request with no device ACTION is purely network work, even if
     # the URL hostname contains UI-ish words (e.g. ...univenierp...portal/...).
     if net_strong and not ui_action:
@@ -8660,6 +8704,16 @@ def _is_select_field(field):
 def _execute_ui_script(user_message):
     """Deterministic executor for explicit UI step lists. Returns a reply string
     if the message was handled (steps executed on the device), else None."""
+    # Bail out before parsing: a URL / DevTools / CDP / network-inspection ask
+    # is not a deterministic step list. Parsing it used to turn "navigate to
+    # <url>" and the '404' link label into a blind ui_tap, which then answered
+    # "Done - steps executed: ui_tap(...)" without ever opening a browser or
+    # invoking the model. Returning None hands the task to the model-driven
+    # loop, where the cdp_* tools are available.
+    if _needs_model_driven_ui(user_message):
+        print("🧠 ui_script bail: URL/DevTools/CDP task - deferring to the "
+              "model-driven loop", flush=True)
+        return None
     # Expand a saved-task shortcut ("do the ITS application again") into the
     # stored step list BEFORE parsing. ALWAYS try the shortcut first: the user's
     # message ("do the ITS application again but this time ...") also parses as
