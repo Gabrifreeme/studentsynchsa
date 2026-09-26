@@ -111,6 +111,15 @@ def _load_local_keys():
 
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "qwen/qwen3.8-27b"
+# Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
+# form and then reads the network panel instead of submitting, which prompting
+# did not fix. This is a config key, not a constant, so the model can be
+# swapped without a code change: set GROQ_MODEL_BROWSER in .env, or leave it
+# unset for the default. Note llama-3.3-70b-versatile is NOT served on this
+# account; gpt-oss-120b is the strongest tool-use model Groq offers here.
+GROQ_MODEL_BROWSER = os.environ.get("GROQ_MODEL_BROWSER", "openai/gpt-oss-120b")
+_BROWSER_DOMAINS = ("ui", "net")
+
 
 CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
 CEREBRAS_MODEL = "gpt-oss-120b"
@@ -2145,9 +2154,17 @@ def _match_file_request(message):
 # One tools-capable OpenAI-compatible chat completion. Returns (text, tool_calls)
 # or None. Used by /chat so ACEsi can actually execute ui_*/dev tools instead of
 # replying "please provide the commands".
-def _chat_providers():
+def _chat_providers(domain=""):
+    """The provider chain, with Groq's model chosen for the task.
+
+    Browser work gets GROQ_MODEL_BROWSER. The default chat model is fine for
+    conversation but unreliable at the one thing a browser task hinges on:
+    actually submitting a form. Returns (name, endpoint, key, model).
+    """
+    groq_model = (GROQ_MODEL_BROWSER if domain in _BROWSER_DOMAINS and
+                  GROQ_MODEL_BROWSER else GROQ_MODEL)
     return [
-        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
         ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
         ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
         ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
@@ -3070,7 +3087,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             if m != preferred_model:
                                 providers.append(("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, m))
                 # Then try the standard providers.
-                for p in _chat_providers():
+                for p in _chat_providers(active_domain):
                     if p not in providers:
                         providers.append(p)
                 for p in providers:
@@ -3429,9 +3446,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if _awaiting_submit:
                         print("SUBMIT-GUARD: submit seen via %s" % run_name, flush=True)
                     _awaiting_submit = False
-                elif _is_password_fill(run_name, run_args):
+                elif _is_field_fill(run_name, run_args):
                     _awaiting_submit = True
-                    print("SUBMIT-GUARD: password filled via %s; submit required next"
+                    print("SUBMIT-GUARD: field filled via %s; submit required next"
                           % run_name, flush=True)
                 tcid = "chat_t%d_%d" % (rnd, j)
                 print(f"🔧 /chat executed {run_name} ok={ok}")
@@ -7823,6 +7840,12 @@ def _short_tool(t):
 
 _SUBMIT_BLOBS = ("submit", "requestsubmit", ".click(", "click()", "dispatchevent")
 _PASSWORD_BLOBS = ("password", "passwd")
+# Any of these being set means "the form has a value in it now", which is the
+# moment the next call has to be the submit. Watching only for a password fill
+# missed the observed failure, where the model filled the USERNAME and then
+# read the network panel, skipping the password field altogether.
+_FIELD_BLOBS = ("password", "passwd", "username", "user_name", "email",
+                "login", "#user", "name=\"user")
 
 
 def _args_blob(args):
@@ -7858,6 +7881,25 @@ def _is_password_fill(name, args):
     if not any(h in blob for h in _PASSWORD_BLOBS):
         return False
     return not _is_form_submit_call(name, args)
+
+
+def _is_field_fill(name, args):
+    """Any tool call that puts a value into a form field, without submitting.
+
+    Reading a field back (`getElementById('username').value`) is deliberately
+    NOT a fill: it sets nothing, and treating it as one would have the guard
+    demand a submit in the middle of the model's own diagnostics.
+    """
+    if name not in ("cdp_evaluate", "run_command", "ui_type"):
+        return False
+    if _is_form_submit_call(name, args):
+        return False
+    blob = _args_blob(args)
+    if not any(h in blob for h in _FIELD_BLOBS):
+        return False
+    # A fill assigns; a read merely inspects.
+    return any(h in blob for h in (".value =", ".value=", "= '", "=\"",
+                                   "setvalue", "setattribute", "input.value"))
 
 
 _SUBMIT_NUDGE = ("SUBMIT NOW. You just filled the password field, so the form is "
@@ -10731,7 +10773,11 @@ def provider_health(probe=True):
     reachability result and a measured latency instead of a made-up number.
     """
     out = {"ts": datetime.now().isoformat(), "reduced_mode_providers":
-           sorted(REDUCED_MODE_PROVIDERS), "providers": []}
+           sorted(REDUCED_MODE_PROVIDERS),
+           "groq_model_chat": GROQ_MODEL,
+           "groq_model_browser": GROQ_MODEL_BROWSER,
+           "browser_domains": list(_BROWSER_DOMAINS),
+           "providers": []}
     for name, ep, key, mdl in _chat_providers():
         rec = {"name": name, "model": mdl,
                "has_key": bool(key),
