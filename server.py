@@ -2391,6 +2391,20 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
 
         reason = _prov_reason(r.text)
 
+        # Two 402s mean OPPOSITE things and need opposite fixes:
+        #   "...can only afford N [completion tokens]" -> shrink max_tokens, works.
+        #   "Prompt tokens limit exceeded: 8520 > 151"  -> the balance cannot even
+        #     cover the prompt. ACEsi's system prompt plus tool schema is ~8.5k
+        #     tokens, so no max_tokens change helps; this needs credits or a
+        #     different provider. Classify it so the two are never confused.
+        if r.status_code == 402 and re.search(r"prompt tokens limit exceeded", r.text, re.I):
+            m = re.search(r"(\d+)\s*>\s*(\d+)", r.text)
+            detail = ("need=%s affordable=%s" % (m.group(1), m.group(2))) if m else ""
+            _prov_record(name, model, 402, reason,
+                         "balance cannot cover the PROMPT itself - needs credits, "
+                         "not a smaller max_tokens" + (" [%s]" % detail if detail else ""))
+            return None
+
         # 402 "requires more credits, or fewer max_tokens ... can only afford N":
         # the provider states the exact budget, so spend it and try again.
         if r.status_code == 402 and not shrunk:
