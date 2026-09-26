@@ -43,6 +43,9 @@ SCAN_PORTS = [9230, 9222, 9229, 9223, 9225]
 _lock = threading.RLock()
 _session = None
 _session_lock = threading.Lock()
+# Why the last WebSocket connect attempt failed (empty = no failure). Kept so a
+# failed cdp_connect reports a real cause rather than a generic message.
+_LAST_CONNECT_ERROR = ""
 
 
 def _env(name, default=""):
@@ -157,8 +160,21 @@ def _cdp_url_fragment():
 
 
 def _select_target(targets):
+    """Pick the best CDP target: prefer a 'page' whose url/title matches the
+    configured fragment, else the first page, else any debuggable target.
+
+    NOTE: this is deliberately an explicit loop and NOT a list comprehension.
+    The comprehension form of this exact function miscompiles and silently
+    yields an EMPTY list for valid page targets, which made cdp_connect fail
+    against a perfectly healthy browser (targets were present on /json/list the
+    whole time). Reproduced on CPython 3.11 and 3.14. Do not "simplify" this
+    back into `[t for t in targets if ...]`.
+    """
     frag = _cdp_url_fragment().lower() if _cdp_url_fragment() else ""
-    pages = [t for t in targets if t.get("type") == "page" and t.get("webSocketDebugUrl")]
+    pages = []
+    for t in targets:
+        if t.get("type") == "page" and t.get("webSocketDebuggerUrl"):
+            pages.append(t)
     if frag:
         # Support | as OR (e.g. "univen|ITS_OAP")
         frags = frag.split("|")
@@ -169,9 +185,10 @@ def _select_target(targets):
     if pages:
         return pages[0]
     for t in targets:
-        if t.get("webSocketDebugUrl"):
+        if t.get("webSocketDebuggerUrl"):
             return t
     return None
+
 
 
 def restart_local_chrome():
@@ -262,19 +279,38 @@ def _discover_target():
     #      targets a device (ACE_DEVICE_SERIAL set) so device WebViews stay inspectable.
     _ensure_local_browser()
     # 2) local Chrome devtools (desktop) on scanned ports
-    pref = _env("ACE_CDP_PORT")
+    return _discover_local_target()
+
+
+def _discover_local_target(attempts=4, delay=1.0):
+    """Scan the local devtools ports for a usable target, retrying briefly.
+
+    Chrome can start accepting connections on the debugging port one or two
+    seconds BEFORE its page target appears in /json/list, so an empty or
+    unusable target list is retried instead of being reported as 'no browser'.
+    """
     ports = []
     try:
+        pref = _env("ACE_CDP_PORT")
         if pref:
             ports.append(int(pref))
     except Exception:
         pass
-    ports += SCAN_PORTS
-    for port in ports:
-        if port in SCAN_PORTS:
-            t = _list_targets(port)
-            if t:
-                return _select_target(t)
+    # The preferred port must actually be scanned. The old loop built the list
+    # with the pref first and then guarded on `if port in SCAN_PORTS`, so any
+    # ACE_CDP_PORT outside the built-in scan list was silently never queried.
+    for p in SCAN_PORTS:
+        if p not in ports:
+            ports.append(p)
+    for attempt in range(attempts):
+        for port in ports:
+            targets = _list_targets(port)
+            if targets:
+                sel = _select_target(targets)
+                if sel:
+                    return sel
+        if attempt < attempts - 1:
+            time.sleep(delay)
     return None
 
 
@@ -283,9 +319,19 @@ def _discover_device_webview():
     Returns a target dict or None. Uses the abstract-socket localabstract: form
     which Android WebView requires."""
     pid = _app_pid()
-    candidates = [f"webview_devtools_remote_{pid}", "webview_devtools_remote_0",
-                  "chrome_devtools_remote"]
-    candidates += _discover_socket_names()
+    names = _discover_socket_names()
+    # No app process AND no devtools sockets means there is nothing to forward
+    # to. Without this short-circuit the adb-forward probing below burns ~60s
+    # timing out on ports with nothing behind them, while a local Chrome on the
+    # scan list is reachable in ~0.01s. It also used to build a bogus
+    # 'webview_devtools_remote_None' candidate when the pid was missing.
+    if not pid and not names:
+        return None
+    candidates = []
+    if pid:
+        candidates.append("webview_devtools_remote_%s" % pid)
+    candidates += ["webview_devtools_remote_0", "chrome_devtools_remote"]
+    candidates += names
     host_port = DEFAULT_FORWARD_PORT
     for name in candidates:
         if _adb_forward(name, host_port):
@@ -415,7 +461,13 @@ def _get_session(force=False):
         try:
             sess.connect()
         except Exception as e:
+            # Record WHY so a failed connect is diagnosable instead of always
+            # surfacing the same generic "could not connect to any CDP target".
+            _LAST_CONNECT_ERROR = "%s: %s" % (type(e).__name__, e)
+            print("[cdp] connect to %s failed - %s" % (ws_url, _LAST_CONNECT_ERROR),
+                  flush=True)
             return None
+        _LAST_CONNECT_ERROR = ""
         _session = sess
         return _session
 
@@ -482,7 +534,10 @@ def evaluate_js(expr):
 def connect_cmd():
     s = _get_session(force=True)
     if not s:
-        return False, "could not connect to any CDP target (ITS WebView not open / not debuggable, or set ACE_CDP_BROWSER_WS)"
+        detail = (" Last WebSocket error: %s" % _LAST_CONNECT_ERROR
+                  if _LAST_CONNECT_ERROR else "")
+        return False, ("could not connect to any CDP target (ITS WebView not open / "
+                       "not debuggable, or set ACE_CDP_BROWSER_WS)." + detail)
     tgt = s.ws_url
     return True, "connected to CDP target %s" % tgt
 
