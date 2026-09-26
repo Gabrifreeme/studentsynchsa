@@ -17,7 +17,7 @@
 #   ACE_DEVICE_SERIAL    : adb serial (else first online device)
 #   ACE_DEVICE_PACKAGE   : app package for adb forward discovery
 
-import os, sys, json, time, threading, subprocess
+import os, sys, json, time, threading, subprocess, re
 import urllib.request
 import websocket
 
@@ -443,7 +443,8 @@ def _json_val(a):
 
 
 def _get_session(force=False):
-    global _session
+    global _session, _LAST_CONNECT_ERROR
+    _LAST_CONNECT_ERROR = ""
     with _session_lock:
         if _session is not None and not force and not getattr(_session, "_dead", False):
             return _session
@@ -463,11 +464,12 @@ def _get_session(force=False):
         except Exception as e:
             # Record WHY so a failed connect is diagnosable instead of always
             # surfacing the same generic "could not connect to any CDP target".
+            # NOTE: `global _LAST_CONNECT_ERROR` above is required, otherwise this
+            # assignment creates a function-local and connect_cmd() never sees it.
             _LAST_CONNECT_ERROR = "%s: %s" % (type(e).__name__, e)
             print("[cdp] connect to %s failed - %s" % (ws_url, _LAST_CONNECT_ERROR),
                   flush=True)
             return None
-        _LAST_CONNECT_ERROR = ""
         _session = sess
         return _session
 
@@ -498,6 +500,37 @@ def get_network_requests():
     return True, "\n".join(lines)
 
 
+def _unwrap_js_value(val):
+    """Decode a JS value that is itself a JSON string.
+
+    Page scripts usually report structured data via JSON.stringify(), so CDP
+    hands back a *string* that already contains JSON. Running json.dumps() on
+    it double-encodes: an array of links comes back as one quoted, escaped
+    blob (which is why a 12-link list printed one character per line). Decode
+    once here so callers can pretty-print the real structure.
+    """
+    if isinstance(val, str):
+        s = val.strip()
+        if len(s) > 1 and s[0] in "[{":
+            try:
+                return json.loads(s)
+            except Exception:
+                return val
+    return val
+
+
+def _format_js_value(val, indent=None):
+    """Render a JS return value for a model/tool caller.
+
+    Plain strings are passed through unquoted (a model asking for a URL should
+    get the URL, not a JSON string literal); real JSON structures are dumped.
+    """
+    v = _unwrap_js_value(val)
+    if isinstance(v, str):
+        return v
+    return json.dumps(v, indent=indent)
+
+
 def get_dom_state():
     s = _get_session()
     if not s:
@@ -508,7 +541,7 @@ def get_dom_state():
     resp = s._wait(mid, timeout=8)
     try:
         val = resp["result"]["result"]["value"]
-        return True, json.dumps(val, indent=2)[:3000]
+        return True, _format_js_value(val, indent=2)[:3000]
     except Exception:
         return False, "evaluate failed: %s" % json.dumps(resp)[:400]
 
@@ -522,13 +555,85 @@ def evaluate_js(expr):
     mid = s._send("Runtime.evaluate", {"expression": expr})
     resp = s._wait(mid, timeout=10)
     try:
-        r = resp["result"]["result"]
+        result = resp.get("result") or {}
+        # A thrown JS error is the normal failure mode while debugging a page,
+        # so report it directly instead of an opaque "evaluate failed".
+        exc = result.get("exceptionDetails")
+        if exc:
+            detail = exc.get("exception") or {}
+            return False, ("JS error: %s" % (detail.get("description")
+                                            or detail.get("value")
+                                            or json.dumps(exc)[:300]))
+        r = result["result"]
         val = r.get("value")
         if "value" in r:
-            return True, json.dumps(val)
+            return True, _format_js_value(val)
         return True, r.get("description", str(r))
     except Exception:
         return False, "evaluate failed: %s" % json.dumps(resp)[:500]
+
+
+def navigate_url(url, timeout=25):
+    """Navigate the attached page via CDP Page.navigate and wait for load.
+
+    Preferred over `evaluate_js("location.href=...")`: it uses the real browser
+    navigation path (so the Network panel records a proper Document request),
+    returns a loaderId, and cannot be defeated by a page that overwrites
+    location. Waits for document.readyState == 'complete' before returning, so
+    cdp_dom_state / cdp_network_requests see the new page.
+    """
+    if not url:
+        return False, "usage: navigate_url <url>"
+    s = _get_session()
+    if not s:
+        return False, "no reachable CDP target (start the ITS WebView / Chrome, or set ACE_CDP_BROWSER_WS)"
+    if "://" not in url:
+        url = "https://" + url
+    mid = s._send("Page.navigate", {"url": url})
+    resp = s._wait(mid, timeout=15) or {}
+    err = resp.get("error")
+    if err:
+        return False, "navigate to %s failed: %s" % (url, json.dumps(err)[:300])
+    res = resp.get("result") or {}
+    if res.get("errorText"):
+        return False, "navigate to %s failed: %s" % (url, res["errorText"])
+
+    deadline = time.time() + max(3, timeout)
+    state, href = "", ""
+    while time.time() < deadline:
+        time.sleep(0.5)
+        try:
+            r = s._wait(s._send("Runtime.evaluate", {"expression":
+                       "document.readyState + '|' + location.href"}), timeout=6)
+            raw = (r.get("result") or {}).get("result", {}).get("value", "")
+            state, _, href = str(raw).partition("|")
+        except Exception:
+            state, href = "", ""
+        # Require the new document, not a leftover readyState from the old page.
+        if state.strip() == "complete" and _same_page(href, url):
+            break
+
+    loader = res.get("loaderId", "?")
+    if state.strip() != "complete":
+        return True, ("navigated to %s (loaderId=%s) but the page had not finished "
+                      "loading after %ss (readyState=%s, href=%s)"
+                      % (url, loader, timeout, state or "?", href or "?"))
+    if not _same_page(href, url):
+        return True, ("navigated to %s (loaderId=%s) but the browser ended up at %s "
+                      "- the site may have redirected" % (url, loader, href or "?"))
+    return True, "navigated to %s (loaderId=%s, readyState=complete)" % (url, loader)
+
+
+def _same_page(href, url):
+    """Loose href comparison: ignore scheme case, 'www.', trailing slash, fragment."""
+    def norm(u):
+        u = (u or "").strip()
+        u = re.sub(r"^https?://", "", u, flags=re.I)
+        u = re.sub(r"^www\.", "", u, flags=re.I)
+        u = u.split("#")[0].rstrip("/")
+        return u.lower()
+    a, b = norm(href), norm(url)
+    return bool(a) and bool(b) and (a == b or a.startswith(b) or b.startswith(a))
 
 
 def connect_cmd():

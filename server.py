@@ -5610,6 +5610,11 @@ def tool_cdp_connect():
     ok, msg = d.connect_cmd()
     return ok, msg
 
+def tool_cdp_navigate(url):
+    if not url:
+        return False, "usage: cdp_navigate <url>"
+    return d.navigate_url(url)
+
 def tool_cdp_evaluate(expr):
     if not expr:
         return False, "usage: cdp_evaluate <expression>"
@@ -6193,6 +6198,7 @@ TOOLS = {
     "ui_test_run": (tool_ui_test_run, ("steps", "name")),
     "restart": (tool_restart, ("what",)),
     "cdp_connect": (tool_cdp_connect, ()),
+    "cdp_navigate": (tool_cdp_navigate, ("url",)),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
     "cdp_console_logs": (tool_cdp_console_logs, ()),
     "cdp_dom_state": (tool_cdp_dom_state, ()),
@@ -6370,8 +6376,11 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "cdp_connect",
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_navigate",
+        "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait until the page has loaded. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL, or a bare host such as example.com"}}, "required": ["url"]}}},
     {"type": "function", "function": {"name": "cdp_evaluate",
-        "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its JSON value. Args: expr.",
+        "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its value. Use it to click links or read page data, e.g. cdp_evaluate(\"document.querySelector('a').click()\"). Objects/arrays come back as readable JSON, plain strings unquoted. Args: expr.",
         "parameters": {"type": "object", "properties": {"expr": {"type": "string"}}, "required": ["expr"]}}},
     {"type": "function", "function": {"name": "cdp_console_logs",
         "description": "Return buffered console.log/console.error events captured by CDP since the connect. Args: none.",
@@ -6593,7 +6602,7 @@ _ICONS = {
     "run_command": "▶", "notify": "🔔", "web_search": "🔎", "webfetch": "🌐",
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
     "todo_remove": "🗑️", "note": "📝",
-    "cdp_connect": "🔌", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
+    "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
     "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_status": "📊",
     "curl": "🔗",
     "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
@@ -6770,6 +6779,8 @@ def _tool_desc(name, args):
         return "%s %s" % (name, a.get("path", "?"))
     if name == "run_command":
         return "%s `%s`" % (name, str(a.get("command", ""))[:80])
+    if name == "cdp_navigate":
+        return "%s %s" % (name, str(a.get("url", ""))[:80])
     if name == "cdp_evaluate":
         return "%s `%s`" % (name, str(a.get("expr", ""))[:80])
     if name == "git_commit":
@@ -6884,7 +6895,7 @@ _TOOL_DOMAINS = {
     "ui_assert_text": "ui", "ui_assert_element": "ui", "ui_assert_visible": "ui",
     "ui_expect": "ui", "ui_test_run": "ui",
     # on-device Chrome/WebView (still UI-side, but via CDP)
-    "cdp_connect": "ui", "cdp_evaluate": "ui", "cdp_console_logs": "ui",
+    "cdp_connect": "ui", "cdp_navigate": "ui", "cdp_evaluate": "ui", "cdp_console_logs": "ui",
     "cdp_dom_state": "ui", "cdp_network_requests": "ui", "cdp_status": "ui",
     # network / URL probes — the new curl tool isolates "is this URL up?" from
     # both code edits and on-device taps
@@ -7532,7 +7543,8 @@ def _nav_gate(user_message, names):
                     "shows")
         else:
             hint = ("you never actually navigated — no ui_tap / ui_swipe / "
-                    "ui_type / ui_key (or cdp_* for the WebView), so the screen "
+                    "ui_type / ui_key (or cdp_navigate / cdp_evaluate for the "
+                    "WebView), so the screen "
                     "was never changed")
         return ("You took a screenshot but %s. Work step by step: ui_app_open, "
                 "then ui_dump to READ the screen, then ui_tap/ui_swipe/ui_type/"
@@ -7616,6 +7628,12 @@ detail screen → tap the "↗ Online Portal" button → the ITS portal opens in
 in-app WebView. Once the WebView is open, ui_dump shows only the app chrome — read
 the portal itself with the cdp_* tools (cdp_connect, then cdp_dom_state /
 cdp_evaluate to confirm the URL/title), then ui_screenshot.
+
+To move a connected CDP page somewhere, use cdp_navigate(url) — it performs a
+real browser navigation and waits for load, so cdp_dom_state and
+cdp_network_requests then describe the new page. Do NOT fake navigation with
+evaluate_js("location.href=...") when you intend to inspect the Network panel,
+because a JS-driven redirect does not produce a proper Document request.
 
 CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
 allowed to announce a fix you have not actually applied. If tool outputs show
