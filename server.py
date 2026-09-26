@@ -18,6 +18,20 @@ from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 import devtools_service as d  # Chrome DevTools Protocol bridge (ITS WebView / local Chrome)
 
+# The server normally runs with stdout redirected to a file. Two things then go
+# wrong, and both were invisible while debugging a provider outage:
+#   1. Python block-buffers a redirected stdout, so print() output sat in an
+#      8 KB buffer and never reached the log until it happened to fill. The
+#      provider error lines existed on disk but only by accident.
+#   2. The ANSI code page is used, which would mangle emoji at write time.
+# Force line buffering and UTF-8 here rather than relying on the launcher, since
+# the server is also started by the ace_host watchdog and by hand.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass
+
 # ── Context system (ACEsi is general-purpose now) ───────────────────────────
 try:
     import ace_context
@@ -2151,9 +2165,144 @@ def _find_provider_for_model(preferred_model):
         return ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, preferred_model)
     return None
 
+# ===== Provider failure diagnostics =====
+# "no models available" used to be the whole story, which made a rate limit, an
+# expired key, a dead model slug and an empty wallet indistinguishable. Every
+# provider attempt now records WHY it failed, to stdout AND to audit.log, so the
+# next failure is diagnosable without reading source.
+#
+# Retry policy is deliberately not uniform:
+#   429 -> retried with backoff, EXCEPT when the body says the quota is spent
+#          for the day, which no amount of waiting fixes.
+#   402 "can only afford N tokens" -> retried once with max_tokens=N, which is
+#          exactly what the provider asks for.
+#   401/403/404 -> never retried. A bad key or a retired slug cannot heal.
+_PROV_TLS = threading.local()
+_PROV_429_RETRIES = 3
+_PROV_429_BASE_S = 2.0
+_PROV_429_CAP_S = 20.0
+# Never let retries stall a single /chat request for longer than this.
+_PROV_RETRY_BUDGET_S = 45.0
+
+# Substrings that mean "the quota is gone for the day" - retrying is pointless
+# and just burns the round timeout.
+_PROV_HARD_QUOTA_MARKS = (
+    "daily_quota_exhausted", "quota_exhausted", "daily rate limit",
+    "try again in 24", "exhausted your daily", "monthly limit",
+    "insufficient_quota", "billing_hard_limit",
+)
+
+
+def _prov_errors():
+    e = getattr(_PROV_TLS, "errors", None)
+    if e is None:
+        e = _PROV_TLS.errors = []
+    return e
+
+
+def _prov_reset():
+    _PROV_TLS.errors = []
+
+
+def _prov_spend():
+    _PROV_TLS.spent = 0.0
+
+
+def _prov_reason(text):
+    """Pull the human sentence out of a provider's JSON error body."""
+    t = (text or "").strip()
+    try:
+        j = json.loads(t)
+        err = j.get("error") if isinstance(j, dict) else None
+        if isinstance(err, dict):
+            t = err.get("message") or t
+        elif isinstance(err, str):
+            t = err
+        elif isinstance(j, dict) and j.get("message"):
+            t = j.get("message")
+    except Exception:
+        pass
+    t = " ".join(str(t).split())
+    return t[:200] or "(empty error body)"
+
+
+def _prov_affordable_tokens(text):
+    m = re.search(r"can only afford (\d+)", text or "")
+    return int(m.group(1)) if m else None
+
+
+def _prov_hard_quota(text):
+    low = (text or "").lower()
+    return any(m in low for m in _PROV_HARD_QUOTA_MARKS)
+
+
+def _prov_retry_wait(headers, text, attempt):
+    """Honour Retry-After / the provider's own cooldown hint before falling back
+    to exponential backoff. FreeLLM states 'cooldown reset ~5s' in the body,
+    which is far better information than a blind sleep."""
+    ra = (headers or {}).get("Retry-After") if headers else None
+    if ra:
+        try:
+            return max(0.0, min(float(ra), _PROV_429_CAP_S))
+        except (TypeError, ValueError):
+            pass
+    m = re.search(r"reset ~(\d+)s", text or "")
+    if m:
+        return max(0.0, min(float(m.group(1)) + 0.5, _PROV_429_CAP_S))
+    return min(_PROV_429_BASE_S * (2 ** (attempt - 1)), _PROV_429_CAP_S)
+
+
+def _prov_record(name, model, status, reason, note=""):
+    """One line in audit.log per provider attempt: who, which model, what code,
+    why. This is the line that answers 'rate limit, bad key, or no money?'."""
+    rec = {"provider": name, "model": model, "status": status,
+           "reason": reason, "note": note}
+    _prov_errors().append(rec)
+    try:
+        audit_write("provider", name,
+                    {"model": model, "status": status, "note": note},
+                    False, reason)
+    except Exception:
+        pass
+    label = "%s%s" % (name, (" (%s)" % model) if model else "")
+    print("❌ %s %s: %s%s" % (label, status, reason, (" [%s]" % note) if note else ""))
+    return rec
+
+
+def _prov_summary_lines():
+    errs = _prov_errors()
+    if not errs:
+        return []
+    seen, out = set(), []
+    for e in errs:
+        k = (e["provider"], e["status"], e["reason"][:60])
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append("  %s %s: %s" % (e["provider"], e["status"], e["reason"][:110]))
+    return out
+
+
+def _prov_log_summary(providers):
+    """One audit line naming every provider that was tried and why each failed.
+    A single grep of audit.log then answers 'is this rate limiting, an expired
+    key, a dead slug, or an empty wallet?'"""
+    errs = _prov_errors()
+    if not errs:
+        return
+    tried = [p[0] for p in providers]
+    detail = " | ".join("%s %s" % (e["provider"], e["status"]) for e in errs)
+    try:
+        audit_write("provider-chain", "all", {"tried": ",".join(tried)},
+                    False, detail[:180])
+    except Exception:
+        pass
+
+
 def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
               tools_schema=None, tool_choice="auto"):
     if not api_key:
+        _prov_record(name, model, "nokey", "no API key configured for this provider")
         return None
     headers = {"Content-Type": "application/json"}
     if api_key != "local":
@@ -2172,8 +2321,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     # thinking before any content token. 200 max_tokens leaves content empty and
     # the server then echoes reasoning fragments as the "reply". Give cloud
     # providers headroom; keep the small budget for the slow CPU Ollama.
-    # OpenRouter's free-tier balance caps completion tokens (this key currently
-    # affords ~390 at current rates) so keep it modest; Groq/Cerebras accept 800.
+    # OpenRouter's free-tier balance caps completion tokens, so start modest and
+    # let the 402 handler below shrink it to whatever the balance actually affords.
     if name.startswith("OpenRouter"):
         max_tokens = 512
     elif name == "Ollama":
@@ -2188,40 +2337,105 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     if tools_schema:
         body["tools"] = tools_schema
         body["tool_choice"] = tool_choice
-    try:
-        r = requests.post(f"{endpoint}/chat/completions",
-            headers=headers,
-            json=body,
-            timeout=timeout)
-        if r.status_code != 200:
-            print(f"❌ {name} {r.status_code}: {r.text[:160]}")
+
+    spent = getattr(_PROV_TLS, "spent", 0.0)
+    attempt = 0
+    shrunk = False
+    while True:
+        attempt += 1
+        try:
+            r = requests.post(f"{endpoint}/chat/completions",
+                headers=headers,
+                json=body,
+                timeout=timeout)
+        except requests.exceptions.Timeout:
+            _prov_record(name, model, "timeout", "no response in time",
+                         "timeout=%s" % (timeout,))
             return None
-        choice = r.json()["choices"][0]
-        msg = choice.get("message", {})
-        text = (msg.get("content") or msg.get("reasoning") or "").strip()
-        tcs = []
-        for tc in (msg.get("tool_calls") or []):
-            fn = tc.get("function") or {}
-            nm = fn.get("name")
-            am = fn.get("arguments")
-            if isinstance(am, str):
-                try:
-                    args = json.loads(am)
-                except Exception:
+        except Exception as e:
+            # Connection-level failures: name the host, because "connection
+            # refused at 127.0.0.1:11434" and "DNS failure" have different fixes.
+            _prov_record(name, model, type(e).__name__, str(e)[:180],
+                         "endpoint=%s" % endpoint)
+            return None
+
+        if r.status_code == 200:
+            try:
+                choice = r.json()["choices"][0]
+            except Exception as e:
+                _prov_record(name, model, 200, "200 but the body had no choices: %s" % e)
+                return None
+            msg = choice.get("message", {})
+            text = (msg.get("content") or msg.get("reasoning") or "").strip()
+            tcs = []
+            for tc in (msg.get("tool_calls") or []):
+                fn = tc.get("function") or {}
+                nm = fn.get("name")
+                am = fn.get("arguments")
+                if isinstance(am, str):
+                    try:
+                        args = json.loads(am)
+                    except Exception:
+                        args = {}
+                elif isinstance(am, dict):
+                    args = am
+                else:
                     args = {}
-            elif isinstance(am, dict):
-                args = am
-            else:
-                args = {}
-            if nm:
-                tcs.append((nm, args))
-        finish = choice.get("finish_reason") or "stop"
-        return text, tcs, finish
-    except requests.exceptions.Timeout:
-        print(f"⏱️ {name} timed out")
-    except Exception as e:
-        print(f"💥 {name} exc: {e}")
-    return None
+                if nm:
+                    tcs.append((nm, args))
+            finish = choice.get("finish_reason") or "stop"
+            if attempt > 1:
+                print("✅ %s recovered on attempt %d (max_tokens=%d)"
+                      % (name, attempt, max_tokens))
+            return text, tcs, finish
+
+        reason = _prov_reason(r.text)
+
+        # 402 "requires more credits, or fewer max_tokens ... can only afford N":
+        # the provider states the exact budget, so spend it and try again.
+        if r.status_code == 402 and not shrunk:
+            afford = _prov_affordable_tokens(r.text)
+            if afford is not None and 16 <= afford < max_tokens:
+                shrunk = True
+                max_tokens = afford
+                body["max_tokens"] = afford
+                print("💳 %s 402: balance affords only %d max_tokens, retrying smaller"
+                      % (name, afford))
+                continue
+
+        # 429: worth waiting out, unless the quota is gone for the day.
+        if r.status_code == 429 and attempt <= _PROV_429_RETRIES:
+            if _prov_hard_quota(r.text):
+                _prov_record(name, model, 429, reason,
+                             "daily/period quota exhausted - not retrying")
+                return None
+            if spent + 1 > _PROV_RETRY_BUDGET_S:
+                _prov_record(name, model, 429, reason, "retry budget exhausted")
+                return None
+            wait = _prov_retry_wait(getattr(r, "headers", None), r.text, attempt)
+            try:
+                audit_write("provider", name,
+                            {"model": model, "status": 429, "note": "retry in %.1fs" % wait},
+                            False, "rate limited, backing off: %s" % reason[:120])
+            except Exception:
+                pass
+            print("⏳ %s 429: waiting %.1fs before attempt %d (%s)"
+                  % (name, wait, attempt + 1, reason[:90]))
+            time.sleep(wait)
+            spent += wait
+            _PROV_TLS.spent = spent
+            continue
+
+        note = ""
+        if r.status_code in (401, 403):
+            note = "auth rejected - key expired/revoked or wrong endpoint"
+        elif r.status_code == 404:
+            note = "model slug not found or retired at this provider"
+        elif r.status_code == 413:
+            note = "request too large - shrink the prompt or tool schema"
+        _prov_record(name, model, r.status_code, reason, note)
+        return None
+
 
 
 def _ollama_local_messages(llm_messages):
@@ -2610,6 +2824,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     Rounds cap so a stuck model still terminates.
     Publishes live work-steps to _AGENT so the frontend (which polls
     /opencode/status) renders progress inline, exactly like run_agent does."""
+    # Fresh provider-failure diagnostics for THIS dispatch only.
+    _prov_reset()
+    _prov_spend()
     # --- Domain separation (checked BEFORE marking the agent running): keep UI /
     # code / network work in distinct contexts so ACEsi stops mixing them. One
     # concrete domain wins; more than one is ambiguous -> ASK FOR CLARIFICATION.
@@ -2797,12 +3014,6 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if p not in providers:
                         providers.append(p)
                 for p in providers:
-                    # If a preferred model is set, never skip it.
-                    if preferred_model and p[3] == preferred_model:
-                        pass
-                    # Groq is no longer skipped — with Ollama removed it's the
-                    # primary provider for net/research tasks. OpenRouter's free tier
-                    # can't pay for multi-round tool chains, so Groq must be tried.
                     if len(p) > 4 and p[4] == "compact":
                         # Ollama chosen via the model picker: use the compact schema
                         # and always route the pared-down local messages so the slow
@@ -2820,16 +3031,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             schema = net_domain_schema
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2)
-                    # FreeLLM's free routing is transiently failing (its internal
-                    # upstream providers reject intermittently with 400). Retry a
-                    # few times with a short pause before declaring it dead.
-                    if got is None and p[0] == "FreeLLM":
-                        for _ in range(3):
-                            time.sleep(2)
-                            got = _chat_one(p[0], p[1], p[2], p[3], msgs,
-                                            tools_schema=schema, tool_choice=tc2)
-                            if got is not None:
-                                break
+                    # No outer retry loop here any more: _chat_one owns 429
+                    # backoff and the 402 max_tokens shrink, and it refuses to
+                    # retry a daily-quota 429. The old wrapper blindly re-called
+                    # FreeLLM 3x with a flat 2s sleep, which could not fix
+                    # 'daily_quota_exhausted' and just burned the round budget.
                     if got is not None:
                         active = p
                         break
@@ -2867,6 +3073,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 if got is None:
                     print("[ACE-DISPATCH] All providers exhausted. tried=%s ollama=%s"
                           % ([p[0] for p in providers], OLLAMA_ENABLED))
+                    _prov_log_summary(providers)
                     break
             else:
                 tc = "required" if (_ui_task(user_message) and not names) else "auto"
@@ -3749,7 +3956,22 @@ def chat():
                 add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
             return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
-        return jsonify({"reply": "Error: no models available", "shot_ts": _LAST_SHOT["ts"]})
+        # Every provider failed. Say WHICH and WHY instead of the old opaque
+        # "no models available", which made a rate limit indistinguishable from
+        # an expired key. Details are already in audit.log; this is the short
+        # version so the failure is self-describing in the UI too.
+        _why = _prov_summary_lines()
+        if _why:
+            print("[ACE-DISPATCH] no models available. per-provider reasons:\n%s"
+                  % "\n".join(_why))
+            reply = ("Error: no models available. Every provider failed:\n"
+                     + "\n".join(_why)
+                     + "\n(Full detail in audit.log, kind=provider)")
+            save_conversation("assistant", reply)
+        else:
+            reply = ("Error: no models available, and no provider reported a reason "
+                     "(check server_stdout.txt and audit.log).")
+        return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
     except Exception as e:
         print(f"💥 Exception in /chat: {type(e).__name__}: {e}")
         import traceback
@@ -11183,7 +11405,65 @@ try:
 except Exception as e:
     print(f"⚠️ Deep-memory bootstrap failed: {e}")
 
+def _boot_banner():
+    """Print exactly what code this process loaded.
+
+    There is no way to tell from outside whether a restart picked up an edit,
+    because the server runs with no console and Flask's reloader is off. So the
+    first thing in stdout states the pid, the commit, the source mtimes and the
+    CDP tool inventory: if the tool you just added is missing from that list,
+    the process is running stale code.
+    """
+    import os as _os
+    import sys as _sys
+    import datetime as _dt
+    import subprocess as _sp
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    try:
+        head = (_sp.run(["git", "-C", here, "rev-parse", "--short", "HEAD"],
+                        capture_output=True, text=True, timeout=8
+                        ).stdout or "").strip() or "?"
+    except Exception:
+        head = "?"
+    # HEAD alone is misleading when the tree is dirty, which is the normal state
+    # while iterating. Count only tracked modifications: untracked scratch files
+    # would otherwise swamp the number (there are >100 in this repo) and hide
+    # whether the code actually being served differs from HEAD.
+    try:
+        dirty = (_sp.run(["git", "-C", here, "status", "--porcelain",
+                          "--untracked-files=no"],
+                         capture_output=True, text=True, timeout=8
+                         ).stdout or "").strip().splitlines()
+        head = "%s%s" % (head, "  (+%d modified)" % len(dirty) if dirty else "  (clean)")
+    except Exception:
+        pass
+    bar = "-" * 66
+    print(bar)
+    print("[boot] pid       : %d" % _os.getpid())
+    print("[boot] git HEAD  : %s" % head)
+    for fn in ("server.py", "devtools_service.py", "ace_config.yaml"):
+        try:
+            st = _os.stat(_os.path.join(here, fn))
+            print("[boot] %-10s: mtime=%s  %d bytes"
+                  % (fn, _dt.datetime.fromtimestamp(st.st_mtime).strftime("%H:%M:%S"),
+                     st.st_size))
+        except Exception as e:
+            print("[boot] %-10s: unavailable (%s)" % (fn, e))
+    try:
+        cdp = sorted(k for k in TOOLS if k.startswith("cdp_"))
+        print("[boot] cdp tools : %d  [%s]" % (len(cdp), ", ".join(cdp)))
+    except Exception as e:
+        print("[boot] cdp tools : unavailable (%s)" % e)
+    print("[boot] python    : %s" % _sys.version.split()[0])
+    print(bar)
+    try:
+        _sys.stdout.flush()
+    except Exception:
+        pass
+
+
 if __name__ == '__main__':
+    _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
     if _kill_armed():
         _st = _kill_state()
