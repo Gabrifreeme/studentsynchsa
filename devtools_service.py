@@ -351,6 +351,12 @@ class CdpSession:
         self._cond = threading.Condition()
         self.console_logs = []
         self.network_reqs = {}
+        # requestId -> start time, for requests that have not finished yet.
+        # A dict (not a counter) so a redirect reusing a requestId, a duplicate
+        # event, or a lost loadingFinished cannot corrupt the count.
+        self._inflight = {}
+        # Last time ANY network event arrived; the idle watermark.
+        self._last_net_activity = 0.0
         self._running = True
         self._dead = False
 
@@ -411,12 +417,64 @@ class CdpSession:
                                        "url": params.get("request", {}).get("url"),
                                        "method": params.get("request", {}).get("method"),
                                        "type": params.get("type"),
-                                       "ts": params.get("timestamp")}
+                                       "ts": params.get("timestamp"),
+                                       "state": "pending",
+                                       "response_headers": None}
+            # A redirect re-sends requestWillBeSent with the SAME requestId and a
+            # redirectResponse, and never emits loadingFinished for the original,
+            # so only count it as in-flight once.
+            self._inflight[rid] = time.time()
+            self._last_net_activity = time.time()
         elif method == "Network.responseReceived":
             rid = params.get("requestId")
+            resp = params.get("response", {})
             if rid in self.network_reqs:
-                self.network_reqs[rid]["status"] = params.get("response", {}).get("status")
-                self.network_reqs[rid]["mimeType"] = params.get("response", {}).get("mimeType")
+                self.network_reqs[rid]["status"] = resp.get("status")
+                self.network_reqs[rid]["mimeType"] = resp.get("mimeType")
+                self.network_reqs[rid]["protocol"] = resp.get("protocol")
+                self.network_reqs[rid]["remoteIPAddress"] = resp.get("remoteIPAddress")
+                self.network_reqs[rid]["fromDiskCache"] = resp.get("fromDiskCache")
+                # Needed to tell a real 4xx/5xx page from a transport failure, and
+                # to see where a redirect was sent.
+                self.network_reqs[rid]["response_headers"] = resp.get("headers") or {}
+        elif method in ("Network.loadingFinished", "Network.loadingFailed"):
+            rid = params.get("requestId")
+            self._inflight.pop(rid, None)
+            self._last_net_activity = time.time()
+            rec = self.network_reqs.get(rid)
+            if rec is not None:
+                rec["state"] = "done"
+                if method == "Network.loadingFailed":
+                    # Distinguish "failed before any response" from "still in
+                    # flight" - both used to render as a bare status of None.
+                    rec["state"] = "failed"
+                    rec["errorText"] = params.get("errorText")
+                    rec["canceled"] = params.get("canceled")
+        elif method == "Network.requestWillBeSentExtraInfo":
+            pass
+
+    def network_idle(self, idle_ms=500):
+        """True when no request is in flight AND nothing has hit the wire for
+        idle_ms. Polling pages therefore never look idle, and the caller's
+        timeout is what bounds the wait."""
+        with self._lock:
+            busy = len(self._inflight)
+            last = self._last_net_activity
+        if busy:
+            return False, "%d request(s) still in flight" % busy
+        quiet = (time.time() - last) * 1000.0
+        if quiet < float(idle_ms):
+            return False, "last network activity was %dms ago (need %dms)" % (
+                int(quiet), int(idle_ms))
+        return True, "no requests in flight for %dms" % int(idle_ms)
+
+    def reset_network_tracking(self):
+        """Drop in-flight state. Called before a navigation: requests belonging
+        to the page being replaced will never emit loadingFinished, so leaving
+        them counted would make network_idle() unreachable forever."""
+        with self._lock:
+            self._inflight.clear()
+            self._last_net_activity = time.time()
 
     def connect(self):
         # suppress_origin=True: the Android WebView devtools server rejects the
@@ -486,18 +544,112 @@ def get_console_logs():
     return True, "\n".join(lines[-80:])
 
 
-def get_network_requests():
+_DIAG_HEADERS = ("content-type", "content-length", "location", "server",
+                 "cache-control", "strict-transport-security", "date")
+
+
+def _status_pred(filter_status):
+    """Build a status matcher from 404, "404", "4xx", "404,500" or [404, "5xx"].
+
+    Returns None for no filter. Accepts the class form so a model can ask for
+    "any 4xx" without pulling every request into its context first.
+    """
+    if filter_status is None or filter_status == "":
+        return None
+    if isinstance(filter_status, (list, tuple, set)):
+        parts = list(filter_status)
+    else:
+        parts = str(filter_status).replace(" ", "").split(",")
+    exact, classes = set(), []
+    for p in parts:
+        if p == "":
+            continue
+        p = str(p).strip()
+        if re.fullmatch(r"[1-5]?[0-9]xx", p, re.I):
+            classes.append(int(p[0]))
+        else:
+            try:
+                exact.add(int(p))
+            except ValueError:
+                return None
+    if not exact and not classes:
+        return None
+
+    def pred(st):
+        if st is None:
+            return False
+        return st in exact or (int(st) // 100) in classes
+    return pred
+
+
+def _fmt_headers(headers):
+    """Compact diagnostic header summary.
+
+    Full headers are retained on the record; rendering all of them for a page
+    with 500 requests would blow the model's token budget, which is the reason
+    the filter parameters exist in the first place.
+    """
+    if not headers:
+        return ""
+    low = {str(k).lower(): v for k, v in headers.items()}
+    keep = [h for h in _DIAG_HEADERS if h in low]
+    keep += sorted(k for k in low if k.startswith("x-") and k not in keep)
+    out = []
+    for h in keep[:10]:
+        v = low[h]
+        if isinstance(v, list):
+            v = ", ".join(str(x) for x in v)
+        out.append("%s=%s" % (h, str(v)[:70]))
+    return " | ".join(out)
+
+
+def get_network_requests(filter_status=None, filter_url=None, limit=100):
     s = _get_session()
     if not s:
         return False, "no reachable CDP target"
     with _lock:
         reqs = list(s.network_reqs.values())
+    try:
+        limit = max(1, int(limit))
+    except Exception:
+        limit = 100
+
+    pred = _status_pred(filter_status)
+    if filter_url:
+        needle = str(filter_url).lower()
+        reqs = [r for r in reqs if needle in (r.get("url") or "").lower()]
+    if pred:
+        reqs = [r for r in reqs if pred(r.get("status"))]
     if not reqs:
-        return True, "(no network requests observed since connect)"
+        what = []
+        if filter_status is not None:
+            what.append("status=%s" % filter_status)
+        if filter_url:
+            what.append("url~%s" % filter_url)
+        return True, ("(no request matched %s — %d request(s) observed since connect)"
+                      % (", ".join(what) or "anything", len(s.network_reqs)))
+
+    total = len(reqs)
+    shown = reqs[-limit:]
     lines = []
-    for r in reqs[-80:]:
-        lines.append("%-7s %s %s %s" % (r.get("type"), r.get("method"), (r.get("url") or "")[:70], r.get("status")))
-    return True, "\n".join(lines)
+    for r in shown:
+        st = r.get("status")
+        state = r.get("state") or ("done" if st is not None else "pending")
+        # A bare "None" was ambiguous between "still loading" and "failed";
+        # name the state instead.
+        shown_status = st if st is not None else (
+            "failed:%s" % r.get("errorText") if state == "failed" else "pending")
+        line = "%-10s %-6s %-7s %s" % (r.get("type"), r.get("method"),
+                                        shown_status, (r.get("url") or "")[:90])
+        hdr = _fmt_headers(r.get("response_headers"))
+        if hdr:
+            line += "\n           headers: %s" % hdr
+        lines.append(line)
+    note = ""
+    if total > len(shown):
+        note = "\n(showing the most recent %d of %d matches; raise `limit` to see more)" % (
+            len(shown), total)
+    return True, "\n".join(lines) + note
 
 
 def _unwrap_js_value(val):
@@ -573,22 +725,39 @@ def evaluate_js(expr):
         return False, "evaluate failed: %s" % json.dumps(resp)[:500]
 
 
-def navigate_url(url, timeout=25):
-    """Navigate the attached page via CDP Page.navigate and wait for load.
+def navigate_url(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
+    """Navigate the attached page via CDP Page.navigate.
 
     Preferred over `evaluate_js("location.href=...")`: it uses the real browser
     navigation path (so the Network panel records a proper Document request),
     returns a loaderId, and cannot be defeated by a page that overwrites
-    location. Waits for document.readyState == 'complete' before returning, so
-    cdp_dom_state / cdp_network_requests see the new page.
+    location.
+
+    wait_for:
+      "load"         -> return once document.readyState == 'complete'
+      "network_idle" -> additionally wait until no request is in flight and
+                        nothing has hit the wire for idle_ms. Use this when the
+                        page has background polling (analytics, keep-alive, ad
+                        beacons, feature flags) and the request you care about
+                        is a late XHR: under "load" readyState fires first and
+                        the late request would be missed entirely.
+    wait=False -> fire Page.navigate and return immediately, without waiting.
+    timeout caps the wait, so a page that polls forever cannot hang.
     """
     if not url:
         return False, "usage: navigate_url <url>"
+    wait_for = (wait_for or "load").strip().lower()
+    if wait_for not in ("load", "network_idle"):
+        return False, 'wait_for must be "load" or "network_idle", got %r' % wait_for
     s = _get_session()
     if not s:
         return False, "no reachable CDP target (start the ITS WebView / Chrome, or set ACE_CDP_BROWSER_WS)"
     if "://" not in url:
         url = "https://" + url
+    # Requests belonging to the page being replaced will never emit
+    # loadingFinished, so clear them before navigating or network_idle() can
+    # never be reached.
+    s.reset_network_tracking()
     mid = s._send("Page.navigate", {"url": url})
     resp = s._wait(mid, timeout=15) or {}
     err = resp.get("error")
@@ -597,11 +766,23 @@ def navigate_url(url, timeout=25):
     res = resp.get("result") or {}
     if res.get("errorText"):
         return False, "navigate to %s failed: %s" % (url, res["errorText"])
+    loader = res.get("loaderId", "?")
+    if not wait:
+        return True, "navigating to %s (loaderId=%s, not waiting)" % (url, loader)
 
-    deadline = time.time() + max(3, timeout)
-    state, href = "", ""
-    while time.time() < deadline:
-        time.sleep(0.5)
+    try:
+        timeout = max(3, float(timeout))
+    except Exception:
+        timeout = 30.0
+    try:
+        idle_ms = max(50, float(idle_ms))
+    except Exception:
+        idle_ms = 500.0
+
+    deadline = time.time() + timeout
+    state, href, why = "", "", ""
+    while True:
+        time.sleep(0.4)
         try:
             r = s._wait(s._send("Runtime.evaluate", {"expression":
                        "document.readyState + '|' + location.href"}), timeout=6)
@@ -609,19 +790,40 @@ def navigate_url(url, timeout=25):
             state, _, href = str(raw).partition("|")
         except Exception:
             state, href = "", ""
-        # Require the new document, not a leftover readyState from the old page.
-        if state.strip() == "complete" and _same_page(href, url):
+        state = state.strip()
+        loaded = state == "complete" and _same_page(href, url)
+        if loaded:
+            if wait_for == "load":
+                break
+            ok_idle, why = s.network_idle(idle_ms)
+            if ok_idle:
+                break
+        elif wait_for == "network_idle" and not state:
+            # evaluate failed (execution context swapped mid-navigation); fall
+            # back to the network signal alone rather than spinning.
+            ok_idle, why = s.network_idle(idle_ms)
+            if ok_idle:
+                break
+        if time.time() >= deadline:
             break
 
-    loader = res.get("loaderId", "?")
-    if state.strip() != "complete":
+    if state != "complete":
         return True, ("navigated to %s (loaderId=%s) but the page had not finished "
                       "loading after %ss (readyState=%s, href=%s)"
                       % (url, loader, timeout, state or "?", href or "?"))
     if not _same_page(href, url):
         return True, ("navigated to %s (loaderId=%s) but the browser ended up at %s "
                       "- the site may have redirected" % (url, loader, href or "?"))
-    return True, "navigated to %s (loaderId=%s, readyState=complete)" % (url, loader)
+    if wait_for == "load":
+        return True, "navigated to %s (loaderId=%s, readyState=complete)" % (url, loader)
+    ok_idle, why = s.network_idle(idle_ms)
+    if ok_idle:
+        return True, ("navigated to %s (loaderId=%s, readyState=complete, %s)"
+                      % (url, loader, why))
+    return True, ("navigated to %s (loaderId=%s, readyState=complete) but the network "
+                  "never went idle within %ss (%s) - background requests are still "
+                  "in flight, so later requests may not be captured yet"
+                  % (url, loader, timeout, why))
 
 
 def _same_page(href, url):

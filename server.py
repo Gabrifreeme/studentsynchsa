@@ -5610,10 +5610,11 @@ def tool_cdp_connect():
     ok, msg = d.connect_cmd()
     return ok, msg
 
-def tool_cdp_navigate(url):
+def tool_cdp_navigate(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
     if not url:
         return False, "usage: cdp_navigate <url>"
-    return d.navigate_url(url)
+    return d.navigate_url(url, wait=wait, wait_for=wait_for,
+                          timeout=timeout, idle_ms=idle_ms)
 
 def tool_cdp_evaluate(expr):
     if not expr:
@@ -5626,8 +5627,9 @@ def tool_cdp_console_logs():
 def tool_cdp_dom_state():
     return d.get_dom_state()
 
-def tool_cdp_network_requests():
-    return d.get_network_requests()
+def tool_cdp_network_requests(filter_status=None, filter_url=None, limit=100):
+    return d.get_network_requests(filter_status=filter_status,
+                                  filter_url=filter_url, limit=limit)
 
 def tool_cdp_status():
     return True, d.status()
@@ -6377,8 +6379,14 @@ TOOLS_SCHEMA = [
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_navigate",
-        "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait until the page has loaded. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL, or a bare host such as example.com"}}, "required": ["url"]}}},
+        "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait for the page. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://), wait (default true; false returns immediately without waiting), wait_for ('load' = readyState complete, default; 'network_idle' = also wait until no request is in flight and nothing has hit the wire for idle_ms - USE THIS when the page has background polling and the request you care about may be a late XHR), timeout (default 30s, caps the wait), idle_ms (default 500). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL, or a bare host such as example.com"},
+            "wait": {"type": "boolean", "description": "Wait for the page before returning. Default true.", "default": True},
+            "wait_for": {"type": "string", "enum": ["load", "network_idle"], "description": "'load' waits for readyState=complete. 'network_idle' additionally waits for the network to fall quiet, which catches late background XHRs. Default 'load'.", "default": "load"},
+            "timeout": {"type": "number", "description": "Maximum seconds to wait, so a page that polls forever cannot hang. Default 30.", "default": 30},
+            "idle_ms": {"type": "number", "description": "Milliseconds of network silence required by wait_for='network_idle'. Default 500.", "default": 500}},
+            "required": ["url"]}}},
     {"type": "function", "function": {"name": "cdp_evaluate",
         "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its value. Use it to click links or read page data, e.g. cdp_evaluate(\"document.querySelector('a').click()\"). Objects/arrays come back as readable JSON, plain strings unquoted. Args: expr.",
         "parameters": {"type": "object", "properties": {"expr": {"type": "string"}}, "required": ["expr"]}}},
@@ -6389,8 +6397,12 @@ TOOLS_SCHEMA = [
         "description": "Snapshot the current DOM via CDP: page title, URL, and a slice of documentElement.outerHTML.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_network_requests",
-        "description": "Return buffered network request events captured by CDP (requestWillBeSent / responseReceived).",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
+        "description": "Return network request events captured by CDP (requestWillBeSent / responseReceived / loadingFinished / loadingFailed), with response headers. FILTER SERVER-SIDE on a busy page instead of pulling every request: filter_status (exact 404, a class like '4xx'/'5xx', or a list '404,500'), filter_url (case-insensitive substring), limit (default 100, returns the most recent matches). A request still in flight shows as 'pending' and one that never got a response as 'failed:<reason>', so an absent status is never ambiguous.",
+        "parameters": {"type": "object", "properties": {
+            "filter_status": {"type": "string", "description": "Only return requests with this status. Accepts 404, a class like '4xx', or a comma list '404,500'."},
+            "filter_url": {"type": "string", "description": "Only return requests whose URL contains this text (case-insensitive)."},
+            "limit": {"type": "number", "description": "Maximum entries to return, most recent first. Default 100.", "default": 100}},
+            "required": []}}},
     {"type": "function", "function": {"name": "cdp_status",
         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -6822,6 +6834,12 @@ for _t in TOOLS_SCHEMA:
 # read_file/write_file are included so web-research tasks that ALSO save findings to a
 # notes/*.md file can persist results; they're filtered out for pure net domain calls.
 NET_TOOLS_SCHEMA = [
+    {"type": "function", "function": {"name": "cdp_network_requests",
+        "description": "Network requests captured by CDP, with response headers. Filter server-side on a busy page: filter_status (404, '4xx', or '404,500'), filter_url (substring), limit. In-flight shows as 'pending', no-response as 'failed:<reason>'. Args: filter_status, filter_url, limit.",
+        "parameters": {"type": "object", "properties": {"filter_status": {"type": "string"}, "filter_url": {"type": "string"}, "limit": {"type": "number"}}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_navigate",
+        "description": "Open a URL in the attached Chrome/WebView via CDP and wait. wait_for='network_idle' also waits for background XHRs to settle. Args: url (REQUIRED), wait, wait_for ('load'|'network_idle'), timeout, idle_ms.",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "wait": {"type": "boolean"}, "wait_for": {"type": "string", "enum": ["load", "network_idle"]}, "timeout": {"type": "number"}, "idle_ms": {"type": "number"}}, "required": ["url"]}}},
     {"type": "function", "function": {"name": "curl",
         "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
         "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
@@ -6886,8 +6904,9 @@ NET_TOOLS_SCHEMA = [
 
 # Tool domain / context separation (ACEsi mixes UI, code, and network work, so
 # we keep them in distinct buckets and can restrict which domain a request is
-# allowed to touch). A tool lives in exactly one domain; the dispatch loop
-# consults ALLOWED_DOMAINS per request.
+# allowed to touch). A tool normally lives in exactly one domain, but a value
+# MAY be a tuple when a tool is legitimately reachable from two of them - the
+# dispatch loop consults ALLOWED_DOMAINS per request.
 _TOOL_DOMAINS = {
     # device UI work
     "ui_device": "ui", "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
@@ -6895,8 +6914,12 @@ _TOOL_DOMAINS = {
     "ui_assert_text": "ui", "ui_assert_element": "ui", "ui_assert_visible": "ui",
     "ui_expect": "ui", "ui_test_run": "ui",
     # on-device Chrome/WebView (still UI-side, but via CDP)
-    "cdp_connect": "ui", "cdp_navigate": "ui", "cdp_evaluate": "ui", "cdp_console_logs": "ui",
-    "cdp_dom_state": "ui", "cdp_network_requests": "ui", "cdp_status": "ui",
+    # cdp_navigate and cdp_network_requests are also reachable from the net
+    # domain: both are self-sufficient (they connect on demand via
+    # _get_session), so a network-inspection task can use them without also
+    # needing cdp_connect in its schema.
+    "cdp_connect": "ui", "cdp_navigate": ("ui", "net"), "cdp_evaluate": "ui", "cdp_console_logs": "ui",
+    "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_status": "ui",
     # network / URL probes — the new curl tool isolates "is this URL up?" from
     # both code edits and on-device taps
     "curl": "net",
@@ -6941,10 +6964,15 @@ def _explicit_tool_domain(user_message):
         # does NOT match the `note` tool (only a real "note" / "web_search" /
         # "curl" token does), and a domain hint can't be hijacked by a file path.
         if re.search(r'\b' + re.escape(name) + r'\b', m):
-            # Prefer a concrete work domain (ui/net/code) over 'ctrl'.
-            if dom != "ctrl":
-                return dom
-            best = best or dom
+            doms = _dom_set(dom)
+            # Prefer a concrete work domain (ui/net/code) over 'ctrl'. For a tool
+            # listed in two domains, pick in ui > net > code order so routing is
+            # deterministic and stays on the more capable side.
+            for cand in ("ui", "net", "code"):
+                if cand in doms:
+                    return cand
+            if "ctrl" in doms:
+                best = best or "ctrl"
     return best
 
 
@@ -7148,12 +7176,27 @@ def _classify_message(user_message):
     return domains or {"general"}
 
 
+def _dom_set(dom):
+    """Normalise a _TOOL_DOMAINS value to a set of domain names.
+
+    Most entries are a bare string ("ui"); a tool that is legitimately
+    reachable from two domains uses a tuple.
+    """
+    if isinstance(dom, str):
+        return {dom}
+    return set(dom or ())
+
+
+def _tool_domains(name):
+    return _dom_set(_TOOL_DOMAINS.get(name))
+
+
 def _domain_tool_names(domain):
     """Tool names allowed for a given domain (general = code + net + ctrl, i.e. the
     file/shell/web toolset but NOT on-device UI work)."""
     if domain == "general":
-        return {n for n, d in _TOOL_DOMAINS.items() if d in ("code", "net", "ctrl")}
-    return {n for n, d in _TOOL_DOMAINS.items() if d == domain}
+        return {n for n, d in _TOOL_DOMAINS.items() if _dom_set(d) & {"code", "net", "ctrl"}}
+    return {n for n, d in _TOOL_DOMAINS.items() if domain in _dom_set(d)}
 
 
 def _filter_tools_schema(schema, allowed_names):
