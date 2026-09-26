@@ -3089,9 +3089,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                    else OPENROUTER_REDUCED_BUDGET)
                         _base = _reduced_tool_pool(active_domain,
                                                    net_domain_schema or full_domain_schema)
-                        schema = build_reduced_schema(_base, want_files=_want_files,
-                                                      budget=_budget)
                         msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
+                        schema = build_reduced_schema(
+                            _base, want_files=_want_files,
+                            budget=_reduced_schema_budget(_budget, msgs, _base))
                         tc2 = tc
                     else:
                         schema = full_domain_schema
@@ -3165,8 +3166,23 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # rounds too (the full code+net+ctrl schema exceeds its budget).
                     if active[0].startswith("OpenRouter") and net_domain_schema:
                         fwd_schema = net_domain_schema
+                    fwd_msgs = llm_messages
+                    # Follow-up rounds must get the SAME reduced payload as the
+                    # opening round. Sending the full prompt here is what kept
+                    # hitting 413 after a successful first call: round 1 went
+                    # out at ~2.6k tokens and round 2 went back out at 9.5k.
+                    if (active[0] in REDUCED_MODE_PROVIDERS
+                            or active[0].startswith("OpenRouter")):
+                        _budget = (GROQ_REDUCED_BUDGET if active[0] == "Groq"
+                                   else OPENROUTER_REDUCED_BUDGET)
+                        fwd_msgs = reduced_messages(llm_messages, active_domain,
+                                                    ctx_overlay)
+                        fwd_schema = build_reduced_schema(
+                            _reduced_tool_pool(active_domain, fwd_schema),
+                            want_files=_want_files,
+                            budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
                     got = _chat_one(active[0], active[1], active[2], active[3],
-                                    llm_messages, tools_schema=fwd_schema,
+                                    fwd_msgs, tools_schema=fwd_schema,
                                     tool_choice=tc)
                 if got is None:
                     active = None
@@ -7652,20 +7668,31 @@ def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
         hist = [m for m in (messages or []) if m.get("role") in ("user", "assistant")]
         user = hist[-1].get("content") if hist else ""
         hist_txt = "".join((m.get("content") or "") for m in hist[:-1]) if hist else ""
+        # The context block normally rides inside the full system prompt, so in
+        # reduced mode it is already gone. Reporting its size anyway made the
+        # parts sum to far more than requested_input_tokens and looked like a
+        # bug in the estimate. Report 0 when it is not actually being sent, and
+        # keep the real figure in context_block_tokens for diagnosis.
+        mem_in_prompt = _estimate_tokens(sysmsg) >= int(_LAST_CONTEXT_TOKENS or 0) > 0
         breakdown = {
             "requested_input_tokens": _payload_tokens(messages, tools_schema, max_tokens),
             "tools_schema_tokens": _estimate_tokens(tools_schema or []),
             "system_prompt_tokens": _estimate_tokens(sysmsg),
-            "memory_tokens": int(_LAST_CONTEXT_TOKENS or 0),
+            "memory_tokens": int(_LAST_CONTEXT_TOKENS or 0) if mem_in_prompt else 0,
+            "context_block_tokens": int(_LAST_CONTEXT_TOKENS or 0),
+            "context_dropped": "yes" if not mem_in_prompt else "no",
             "history_tokens": _estimate_tokens(hist_txt),
             "user_message_tokens": _estimate_tokens(user),
             "n_tools": len(tools_schema or []),
             "note": note,
         }
         detail = " ".join("%s=%s" % (k, v) for k, v in breakdown.items())
+        # note goes in args, not detail: detail is length-capped, and a cap that
+        # silently amputates the reason field defeats the point of the record.
         audit_write("provider-tokens", name,
-                    {"model": model, "n_tools": breakdown["n_tools"]},
-                    True, detail[:180])
+                    {"model": model, "n_tools": breakdown["n_tools"],
+                     "note": note},
+                    True, detail[:420])
         return breakdown
     except Exception:
         return {}
@@ -7727,6 +7754,13 @@ _REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
 GROQ_REDUCED_BUDGET = 1500
 OPENROUTER_REDUCED_BUDGET = 3000
 
+# Floor for the schema budget. The required toolset below is ~1400 tokens on
+# its own, so a total-input budget cannot be honoured by stripping tools without
+# producing a schema that can no longer finish the task. Below this floor the
+# budget stops being a target, and the total lands where the required set puts
+# it (~1900-2200). That is still ~3x under Groq's measured 7000 ITPM cap.
+_REDUCED_SCHEMA_FLOOR = 1200
+
 # Providers that get the reduced payload. Groq and OpenRouter are on free tiers
 # that reject the full prompt outright; Cerebras and FreeLLM are reached with the
 # full one and fall back reactively via the 413 handler in _chat_one.
@@ -7752,6 +7786,20 @@ def _short_tool(t):
     if isinstance(params, dict) and not params.get("properties"):
         params.pop("required", None)
     return out
+
+
+def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
+                           reserve=0):
+    """Turn a TOTAL input budget into the schema budget actually available.
+
+    Passing the total straight through to the schema makes the number a lie: the
+    schema then has to carry the whole allowance while the system prompt and
+    history spend into it too. So subtract what the messages already cost, and
+    clamp to _REDUCED_SCHEMA_FLOOR so a long history cannot strip the tools the
+    task needs to finish.
+    """
+    used = _estimate_tokens(msgs) + int(reserve or 0)
+    return max(_REDUCED_SCHEMA_FLOOR, int(total_budget) - used)
 
 
 def _reduced_tool_pool(active_domain, fallback_schema):
@@ -7834,16 +7882,53 @@ _REDUCED_SYS = (
 )
 
 
-def reduced_messages(messages, domain="", overlay=""):
-    """Swap the full persona for the compact protocol prompt, keeping the task
-    itself and the recent turn verbatim."""
-    hist = [m for m in (messages or []) if m.get("role") in ("user", "assistant")]
+def _clip(text, limit):
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= limit else text[:limit] + " [...]"
+
+
+def reduced_messages(messages, domain="", overlay="", context_budget=400):
+    """Swap the full persona for the compact protocol prompt.
+
+    The full system prompt carries the whole injected context block (2.5k+
+    tokens of memory/prefs/ITS state), so replacing it is most of the saving.
+    What must survive are the things the model needs to act:
+      * the first user message, which IS the task,
+      * every tool result, or the loop goes blind after the first call,
+      * the most recent couple of turns for continuity.
+
+    An earlier version kept only the last 4 user/assistant messages, which
+    silently dropped both the original task and every tool result.
+    """
+    rest = [m for m in (messages or []) if m.get("role") != "system"]
+
+    first_user_at = None
+    for i, m in enumerate(rest):
+        if m.get("role") == "user":
+            first_user_at = i
+            break
+
+    keep = []
+    for i, m in enumerate(rest):
+        role = m.get("role")
+        if role == "tool":
+            keep.append({"role": "tool", "content": _clip(m.get("content"), 1200),
+                         "tool_call_id": m.get("tool_call_id"),
+                         "name": m.get("name")})
+        elif i == first_user_at:
+            keep.append({"role": "user", "content": _clip(m.get("content"), 900)})
+    # Recent conversational turns, minus anything already kept above.
+    tail = [m for i, m in enumerate(rest)
+            if m.get("role") in ("user", "assistant") and i != first_user_at]
+    for m in tail[-2:]:
+        keep.append({"role": m["role"], "content": _clip(m.get("content"), 600)})
+
     out = [{"role": "system", "content": _REDUCED_SYS}]
     if domain:
         out[0]["content"] += "\nActive task domain: %s." % domain
     if overlay:
-        out[0]["content"] += "\n" + " ".join(overlay.split())[:400]
-    out.extend(hist[-4:])
+        out[0]["content"] += "\n" + _clip(overlay, context_budget)
+    out.extend(keep)
     return out
 
 
