@@ -3155,6 +3155,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             schema = net_domain_schema
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2)
+                    if _no_cdp:
+                        # Log what the model can actually see, not what the
+                        # domain filter intended. A device task reported "I
+                        # don't have the CDP tools" while the ui_* tools were
+                        # present, and nothing in the log settled it either
+                        # way; the two lists have to be printed side by side.
+                        print("[cdp-strip] final schema (%d): %s"
+                              % (len(schema), [t["function"]["name"] for t in schema]))
                     # No outer retry loop here any more: _chat_one owns 429
                     # backoff and the 402 max_tokens shrink, and it refuses to
                     # retry a daily-quota 429. The old wrapper blindly re-called
