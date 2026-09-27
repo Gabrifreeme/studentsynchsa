@@ -960,6 +960,8 @@ def _normalize_tool_args(name, args):
             out[k] = _EMPTY_FOR_TYPE.get(schema.get(k), "")
         else:
             out[k] = v
+    print("[normalize] %s in=%s out=%s" % (name, json.dumps(args, default=str),
+                                           json.dumps(out, default=str)))
     return out
 
 
@@ -2482,6 +2484,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     while True:
         attempt += 1
         try:
+            # Pre-flight: the provider re-validates every recorded tool call on
+            # every request, so a null left in the history by an earlier turn
+            # poisons later requests even after that call has been executed.
+            # Fixing it only where the newest call is parsed is not enough.
+            if _normalize_tool_messages(msgs):
+                body["messages"] = msgs
+                print(f"🧹 {name}: rewrote null tool args to match the schema")
             r = requests.post(f"{endpoint}/chat/completions",
                 headers=headers,
                 json=body,
@@ -2520,7 +2529,12 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                 else:
                     args = {}
                 if nm:
-                    tcs.append((nm, args))
+                    # A model may fill an OPTIONAL parameter with null. Groq
+                    # validates tool calls against the declared schema and
+                    # rejects the WHOLE request for it ("/target: expected
+                    # string, but got null"), so a single null ends the run
+                    # whenever no other provider is available to fall back to.
+                    tcs.append((nm, _normalize_tool_args(nm, args)))
             finish = choice.get("finish_reason") or "stop"
             if attempt > 1:
                 print("✅ %s recovered on attempt %d (max_tokens=%d)"
@@ -2611,6 +2625,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         elif r.status_code == 413:
             note = ("request still too large after dropping every tool - the system "
                     "prompt itself exceeds this provider's input limit")
+        elif r.status_code == 400 and ("did not match schema" in r.text
+                                       or "expected" in r.text):
+            # Log what the model actually sent. The provider's message names
+            # the field but never its value, so without this the log cannot
+            # distinguish a null from an empty string or a wrong type.
+            _log_rejected_tool_args(name, msgs, r.text)
+            note = "tool call failed schema validation (null or wrong-typed argument)"
         _prov_record(name, model, r.status_code, reason, note)
         return None
 
@@ -9105,7 +9126,10 @@ HTTP request to inspect, no form to fill in the DOM, and no page to navigate.
 Every step happens on the device's own screen.
 
 You DO have these tools, and they are the only way to act:
-  ui_connect  - reach the phone (USB or wireless). Call this first.
+  ui_connect  - reach the phone (USB or wireless). Call this first ONLY if
+                ui_dump or ui_device says no device is connected. If they
+                already report a device, the phone is already attached: skip
+                ui_connect and go straight to ui_dump.
   ui_dump     - read the current screen as text, with tap(x,y) coordinates
                 for every element. ALWAYS dump before tapping: you cannot tap
                 a target you have not seen, and coordinates from an earlier
