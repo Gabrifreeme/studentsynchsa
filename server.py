@@ -3344,6 +3344,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 _recs = d.find_new_requests(before=_req_ids_before_submit,
                                             methods=("POST",), timeout=8.0,
                                             require_done=True)
+                # Log both outcomes. A capture that silently finds nothing looks
+                # identical to a submit that never happened, which is how a
+                # broken snapshot went unnoticed for a run.
+                print("READ-GUARD: capture looked for a POST after a submit "
+                      "(snapshot=%s ids, log now has %d ids) -> %d record(s)"
+                      % ("none" if _req_ids_before_submit is None
+                         else len(_req_ids_before_submit),
+                         len(d.request_ids()), len(_recs)), flush=True)
                 if _recs:
                     _read_captured = True
                     _awaiting_read = False
