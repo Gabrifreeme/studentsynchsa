@@ -5694,7 +5694,108 @@ _UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
             "esc": "111", "power": "26", "recents": "187"}
 
 
+# A phone with wireless debugging on is TWO entries in "adb devices" - the USB
+# serial and the mdns hostname adb registers for the same hardware. Every
+# device-scoped command then fails with "more than one device/emulator" because
+# adb cannot pick a target, even though there is only one phone. The wireless
+# alias embeds the real serial, so the two can be collapsed back into one.
+_ADB_WIRELESS_ALIAS_RE = re.compile(
+    # The random suffix is not hex - real aliases look like
+    # adb-R52N518ESBE-aQ93NA._adb-tls-connect._tcp - so match any non-dot
+    # token rather than a hex run, or the collapse silently never fires.
+    r'^adb-(?P<serial>.+?)-[^.\s]{4,}\._adb-tls-(?:connect|pairing)\._tcp$',
+    re.IGNORECASE)
+
+# Resolved target, cached briefly: the ui_* tools make a couple of dozen adb
+# calls per action and re-listing devices each time would dominate the runtime.
+# The cache holds the whole device entry, not just the serial, so the hit path
+# and the miss path return the same thing.
+_ADB_TARGET = {"entry": None, "at": 0.0}
+_ADB_TARGET_TTL = 20.0
+
+
+def _adb_physical_serial(serial):
+    """adb-R52N518ESBE-aQ93NA._adb-tls-connect._tcp -> R52N518ESBE"""
+    m = _ADB_WIRELESS_ALIAS_RE.match(serial or "")
+    return m.group("serial") if m else (serial or "")
+
+
+def _adb_same_physical_device(a, b):
+    return _adb_physical_serial(a) == _adb_physical_serial(b)
+
+
+def _adb_invalidate_target():
+    _ADB_TARGET["entry"] = None
+    _ADB_TARGET["at"] = 0.0
+
+
+def _pick_adb_device(online):
+    """Choose one device entry from the online ones.
+
+    An explicit ACE_ADB_TARGETS entry wins. Otherwise, when the list is one
+    phone seen over both USB and wireless, collapse to the USB entry. Only if
+    genuinely different phones are attached do we fall back to preferring USB.
+    """
+    online = list(online or [])
+    if not online:
+        return None
+    want = (os.environ.get("ACE_ADB_TARGETS") or "").strip()
+    if want:
+        named = [d for d in online
+                 if d[0] in want or _adb_physical_serial(d[0]) in want]
+        if named:
+            online = named
+    if len(online) > 1:
+        collapsed = []
+        for d in online:
+            if not any(_adb_same_physical_device(d[0], c[0]) for c in collapsed):
+                collapsed.append(d)
+        if len(collapsed) == 1:
+            return collapsed[0]
+        usb = [d for d in online if d[2] == "USB"]
+        return (usb or online)[0]
+    return online[0]
+
+
+def _resolve_adb_entry(devs=None, force=False):
+    """The device entry that device-scoped adb commands should target.
+
+    Always returns the (serial, state, transport) tuple or None, on both the
+    cache-hit and cache-miss paths.
+    """
+    import time as _time
+    now = _time.time()
+    if (not force and _ADB_TARGET["entry"]
+            and now - _ADB_TARGET["at"] < _ADB_TARGET_TTL):
+        return _ADB_TARGET["entry"]
+    if devs is None:
+        devs, _raw = _adb_connected_devices()
+    entry = _pick_adb_device([d for d in devs if d[1] == "device"])
+    _ADB_TARGET["entry"] = entry
+    _ADB_TARGET["at"] = now
+    return entry
+
+
+def _resolve_adb_target(force=False):
+    """The one serial that device-scoped adb commands should target, or None.
+
+    When the same phone is attached over both USB and wireless it appears
+    twice; adb then refuses every "shell" command. Pick one entry and pass it
+    with -s.
+    """
+    entry = _resolve_adb_entry(force=force)
+    return entry[0] if entry else None
+
+
 def _ui_adb(args, timeout=120, cap=3000):
+    args = list(args or [])
+    # "adb shell" without a target is ambiguous the moment a second entry
+    # exists, which a single phone with wireless debugging on guarantees. Only
+    # device-scoped commands get -s; devices/mdns/connect are adb-server-wide.
+    if args and args[0] == "shell" and "-s" not in args:
+        _serial = _resolve_adb_target()
+        if _serial:
+            args = ["-s", _serial] + args
     cmd = subprocess.list2cmdline(["adb"] + args)
     try:
         proc = _popen(cmd, shell=True, stdout=subprocess.PIPE,
@@ -5742,8 +5843,13 @@ def _adb_connected_devices():
             elif b.startswith("transport_id:"):
                 pass
         if not transport:
-            # A serial with host:port is a TCP/IP (wireless) connection.
-            transport = "TCP/IP" if ":" in serial else "USB"
+            # A wireless-debugging serial is an mdns hostname ending in
+            # ._adb-tls-connect._tcp and carries no colon, so a colon test alone
+            # labels it USB. A real host:port is TCP/IP too.
+            if "._adb-tls-" in serial.lower() or "." in serial:
+                transport = "TCP/IP"
+            else:
+                transport = "TCP/IP" if ":" in serial else "USB"
         out.append((serial, state, transport))
     return out, txt
 
@@ -5783,9 +5889,15 @@ def tool_ui_connect(target=None, wait=10):
     devs, raw = _adb_connected_devices()
     online = [d for d in devs if d[1] == "device"]
     if online:
-        serial, _state, transport = online[0]
-        return True, ("already connected: %s over %s\n%s"
-                      % (serial, transport, _device_facts(online[0])))
+        _adb_invalidate_target()
+        entry = _pick_adb_device(online)
+        transports = ", ".join(sorted({d[2] for d in online
+                                       if _adb_same_physical_device(d[0], entry[0])}))
+        return True, ("already connected: %s over %s\n%s\n(adb lists %d entr%s "
+                      "for this one device; targeting %s)\n%s"
+                      % (entry[0], transports, _devices_summary(online),
+                         len(online), "y" if len(online) == 1 else "ies",
+                         entry[0], _device_facts(entry)))
     tried = []
     candidates = []
     if target:
@@ -5817,13 +5929,15 @@ def tool_ui_connect(target=None, wait=10):
         ok, out = _ui_adb(["connect", cand], timeout=int(wait or 10) + 5, cap=1200)
         tried.append("  adb connect %s -> %s" % (cand, (out or "").strip() or "no output"))
         if ok and "connected to" in str(out).lower():
+            _adb_invalidate_target()
             devs2, _r2 = _adb_connected_devices()
             live = [d for d in devs2 if d[1] == "device"]
             if live:
-                serial, _s, transport = live[0]
-                return True, ("connected: %s over %s\n%s\n(attempt log)\n%s"
-                              % (serial, transport, _device_facts(live[0]),
-                                 "\n".join(tried)))
+                _adb_invalidate_target()
+                entry = _pick_adb_device(live)
+                return True, ("connected: %s over %s\n%s\n%s"
+                              % (entry[0], entry[2], _devices_summary(live),
+                                 _device_facts(entry)))
     detail = ("\n".join(tried) if tried else
               "no connection target to try: no wireless-debugging mDNS service was "
               "advertised and ACE_ADB_TARGETS is unset")
@@ -5832,6 +5946,26 @@ def tool_ui_connect(target=None, wait=10):
                    "adb said: %s\n%s\ndiagnosis: %s"
                    % (str(raw3 or raw or "").strip()[:400], detail,
                       _adb_diagnose(devs3, raw3 or raw)))
+
+
+def _devices_summary(devs):
+    """One line per physical device, collapsing the USB and wireless entries
+    for the same phone so 'adb devices' showing two rows does not read as two
+    phones, and so the chosen target is visible."""
+    lines, seen = [], []
+    for d in devs:
+        phys = _adb_physical_serial(d[0])
+        if phys in seen:
+            for _i, row in enumerate(lines):
+                if row.startswith(phys + " "):
+                    extra = d[2]
+                    lines[_i] = row.rstrip() + " (also reachable over %s as %s)" % (
+                        extra, d[0])
+                    break
+            continue
+        seen.append(phys)
+        lines.append("%s [%s] %s" % (phys, d[2], d[1]))
+    return "\n".join(lines)
 
 
 def _device_facts(entry):
@@ -5856,7 +5990,9 @@ def tool_ui_device():
     devs, raw = _adb_connected_devices()
     online = [d for d in devs if d[1] == "device"]
     if online:
-        return True, _device_facts(online[0])
+        _adb_invalidate_target()
+        return True, "%s\n\n%s" % (_devices_summary(online),
+                                   _device_facts(_resolve_adb_entry(devs)))
     # Nothing online: say so plainly, with the raw adb output and a diagnosis,
     # instead of returning an empty device list that reads like an answer.
     return False, ("NOT CONNECTED - no Android device is reachable.\n"
