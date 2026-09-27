@@ -2951,6 +2951,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # correctly reports it cannot do them.
     _registered = {t["function"]["name"] for t in TOOLS_SCHEMA}
     allowed_names = ace_dispatcher.widen_to_cover(user_message, allowed_names, _registered)
+    # A device task must never see a browser tool. Stripped here, at the one
+    # point allowed_names is final, so the Ollama, full and net schemas are all
+    # covered by one edit rather than three that can drift apart.
+    if _is_device_task(user_message):
+        _dropped_cdp = sorted(n for n in allowed_names if n.startswith("cdp_"))
+        allowed_names = {n for n in allowed_names if not n.startswith("cdp_")}
+        if _dropped_cdp:
+            print("[cdp-strip] device task: removed %s" % _dropped_cdp)
     _gaps = ace_dispatcher.find_gaps(user_message, allowed_names)
     if _gaps.has_gaps:
         with _AGENT_LOCK:
@@ -3117,6 +3125,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # Same idea for the phone: the connect tools are only worth
                     # their schema tokens when the task is about reaching a device.
                     _want_device = _needs_phone_link(user_message)
+                    _no_cdp = _is_device_task(user_message)
                     if len(p) > 4 and p[4] == "compact":
                         # Ollama chosen via the model picker: use the compact schema
                         # and always route the pared-down local messages so the slow
@@ -3135,6 +3144,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
                         schema = build_reduced_schema(
                             _base, want_files=_want_files, want_device=_want_device,
+                            drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, msgs, _base))
                         tc2 = tc
                     else:
@@ -3162,7 +3172,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             _reduced_tool_pool(active_domain,
                                                net_domain_schema or full_domain_schema),
                             want_files=_want_files, want_device=_want_device,
-                            budget=OPENROUTER_REDUCED_BUDGET)
+                            drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET)
                         or_msgs = reduced_messages(llm_messages, active_domain,
                                                    ctx_overlay)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
@@ -3224,6 +3234,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         fwd_schema = build_reduced_schema(
                             _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
+                            drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
@@ -6331,9 +6342,58 @@ def tool_cdp_navigate(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
     return d.navigate_url(url, wait=wait, wait_for=wait_for,
                           timeout=timeout, idle_ms=idle_ms)
 
+# jQuery pseudo-selectors and helpers that look like CSS/JS but are not valid in
+# querySelector. The model reaches for these when it wants "the element whose
+# text contains X", and every one of them throws a SyntaxError at best wasted a
+# round trip. :contains()/:has() in this position are jQuery-only; note that
+# :has() IS valid CSS but is frequently written the jQuery way, and :eq()/:first
+# are jQuery extensions, so all of them are worth naming back to the model.
+_JQUERY_ONLY_RE = re.compile(
+    r':contains\s*\('
+    r'|:eq\s*\('
+    r'|:gt\s*\('
+    r'|:lt\s*\('
+    # :even/:odd/:first/:last take no parentheses in jQuery, unlike the
+    # positional ones above, so anchoring them on "(" would miss "tr:even".
+    r'|:even\b'
+    r'|:odd\b'
+    r'|:first\b(?!-child)'
+    r'|:last\b(?!-child)'
+    r'|\$\s*\('
+    r'|\bjquery\b',
+    re.IGNORECASE)
+
+# A case-insensitive attribute match is `[attr*="value" i]` - the flag goes last.
+# The model also writes it as `[attr i*="value"]`, which is a syntax error.
+_BAD_ATTR_FLAG_RE = re.compile(r'\[\s*[^\]\s]*\s+[a-zA-Z]\s*\*?=')
+
+
+def _js_selector_problem(expr):
+    """Describe why a selector in this JS expression is invalid, or None.
+
+    Cheap textual checks. This is not a JavaScript parser and does not need to
+    be: the failure mode it prevents is a model looping on the same broken
+    selector ten times, and any of these hits is a certain SyntaxError.
+    """
+    if _JQUERY_ONLY_RE.search(expr or ""):
+        return ("That expression uses a jQuery-only selector, which is not valid "
+                "CSS. querySelector supports standard CSS only. To match by text, "
+                "either iterate (Array.from(document.querySelectorAll('button'))"
+                ".find(b => b.textContent.trim() === 'Label')) or use "
+                "[value*='Login'] for a literal substring in an attribute.")
+    if _BAD_ATTR_FLAG_RE.search(expr or ""):
+        return ("That expression puts the case-insensitive flag in the wrong "
+                "place inside an attribute selector. The correct form is "
+                "[attr*='value' i] - the 'i' flag comes last, after the value.")
+    return None
+
+
 def tool_cdp_evaluate(expr):
     if not expr:
         return False, "usage: cdp_evaluate <expression>"
+    problem = _js_selector_problem(expr)
+    if problem:
+        return False, problem
     return d.evaluate_js(expr)
 
 def tool_cdp_console_logs():
@@ -7814,6 +7874,56 @@ def _needs_phone_link(user_message):
     return bool(_PHONE_LINK_TASK_RE.search(user_message or ""))
 
 
+# Deliberately much broader than _PHONE_LINK_TASK_RE. That one is narrow on
+# purpose ("android" alone must not pull a task off the deterministic tap
+# path), but "is this a device task" is a different question and the answer
+# should be generous: a task that names a phone, an android target, an adb
+# command or any ui_* tool wants on-device tools, and a browser tool in that
+# schema is at best dead weight and at worst actively harmful.
+_DEVICE_TASK_RE = re.compile(
+    r'\bphone\b'
+    r'|\bandroid\b'
+    r'|\badb\b'
+    r'|\bui_tap\b'
+    r'|\bui_dump\b'
+    r'|\bui_type\b'
+    r'|\bui_app_open\b'
+    r'|\bui_swipe\b'
+    r'|\bui_screenshot\b'
+    r'|\bui_connect\b'
+    r'|\bui_assert\w*\b'
+    r'|\bui_expect\b'
+    r'|\bui_test_run\b'
+    r'|\bui_key\b'
+    r'|\bui_device\b'
+    r'|\bui_test\b'
+    r'|\bdo\s+not\s+use\s+cdp\b'
+    r'|\bno\s+cdp\b'
+    r'|\bnot\s+use\s+cdp\b'
+    r'|\bwithout\s+cdp\b'
+    r'|\bdevice\s+[A-Z0-9]{6,}\b',
+    re.IGNORECASE)
+
+
+def _is_device_task(user_message):
+    """True when the task is a device task, which must never be offered CDP
+    tools. Prompting a model not to call a tool is not a control: it ignores
+    the instruction and burns a dozen calls on a tool that cannot work. The
+    only reliable enforcement is to not put the tool in the list."""
+    return bool(_DEVICE_TASK_RE.search(user_message or ""))
+
+
+def _strip_cdp_tools(schema):
+    """Drop every cdp_* tool from a schema.
+
+    A prompt instruction is advisory; the tool list is binding. If cdp_evaluate
+    is not in the schema the model cannot call it, which is the only reliable
+    way to keep a phone task on the device tools.
+    """
+    return [t for t in (schema or [])
+            if not t["function"]["name"].startswith("cdp_")]
+
+
 def _needs_model_driven_ui(user_message):
     """True when a request must go to the model-driven loop (URL / DevTools /
     CDP / network inspection) instead of the deterministic step parser."""
@@ -8413,7 +8523,7 @@ def _reduced_tool_pool(active_domain, fallback_schema):
 
 
 def build_reduced_schema(base_schema, want_files=False, budget=None,
-                         want_device=False):
+                         want_device=False, drop_cdp=False):
     """Task-shaped tool subset with one-sentence descriptions, ordered so the
     tools a network/UI task needs survive any budget-driven shedding.
 
@@ -8421,6 +8531,11 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
     still decides which family of tools is eligible; this only cuts it down to
     the ones that matter and strips the prose.
     """
+    if drop_cdp:
+        # The reduced builder for a ui/net task is handed the full TOOLS_SCHEMA
+        # rather than the domain-filtered one, so removing cdp_* from
+        # allowed_names upstream does not reach this path.
+        base_schema = _strip_cdp_tools(base_schema)
     by_name = {t["function"]["name"]: t for t in (base_schema or [])}
     allowed = [n for n in _REDUCED_TOOL_ORDER if n in by_name]
     if want_files and "read_file" in by_name and "read_file" not in allowed:
@@ -10614,6 +10729,28 @@ def run_agent(user_message):
                 # Loop detection: if the same tool was called 3+ times,
                 # force a final answer instead of looping forever.
                 if calls_history:
+                    # A device task has no business calling a browser tool. It
+                    # is not always a straight line: the schema strip catches
+                    # the normal case, but a model can still reach a cdp_* tool
+                    # through a schema this run did not strip (another provider,
+                    # a retry with the full schema). Two in a row means the run
+                    # is off-domain and will only waste calls, so stop it and
+                    # name the mistake instead of burning ten more.
+                    if _is_device_task(user_message) and len(calls_history) >= 2:
+                        _tail = calls_history[-2:]
+                        if all(n.startswith("cdp_") for n in _tail):
+                            with _AGENT_LOCK:
+                                _AGENT["activity"] = "done"
+                                _AGENT["last_reply"] = (
+                                    "Stopped: this is a device task, but the run "
+                                    "called %s in a row. Browser/DevTools tools "
+                                    "cannot reach an Android phone. Use the device "
+                                    "tools instead: ui_connect to reach the phone, "
+                                    "then ui_dump to read the screen, then ui_tap "
+                                    "to interact." % " and ".join(_tail))
+                            messages.append({"role": "assistant", "content":
+                                             _AGENT["last_reply"]})
+                            return _AGENT["last_reply"]
                     from collections import Counter as _Counter
                     _counts = _Counter(calls_history)
                     _loop_tool = _counts.most_common(1)[0]
