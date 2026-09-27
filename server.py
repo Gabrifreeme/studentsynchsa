@@ -2597,24 +2597,32 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         # once, then drop tools entirely and try once more. Two attempts, no more,
         # because a payload that is still too large after losing every tool is a
         # prompt-size problem that retrying cannot fix.
-        if r.status_code == 413 and cut < 2 and tools_schema:
+        if r.status_code == 413 and cut < 3 and (tools_schema or msgs):
             m = re.search(r"requested (\d+)", r.text, re.I)
             lim = re.search(r"limit (\d+)", r.text, re.I)
             prov = ("requested %s of %s" % (m.group(1), lim.group(1) if lim else "?")
                     if m else "input limit exceeded")
+            # A 413 retry MUST be strictly smaller than the request that failed.
+            # Dropping tools alone is not enough and can even look like growth if
+            # the retry re-sent a full (unreduced) history: a 3014-token reduced
+            # request once "retried" as 16738 tokens and 413'd harder. So each
+            # cut removes tools AND messages, and the message shrink is the part
+            # that actually reclaims the system prompt and history budget.
             if cut == 0:
                 tools_schema = _shrink_schema_further(tools_schema, 0.5)
                 body["tools"] = tools_schema
-                cut = 1
-            else:
+            elif cut == 1:
                 tools_schema = []
                 body.pop("tools", None)
                 body.pop("tool_choice", None)
-                cut = 2
+            # Every cut from here also trims the conversation.
+            msgs = _shrink_messages_for_retry(msgs, cut)
+            body["messages"] = msgs
+            cut += 1
             _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
                               note="413 cut=%d (%s)" % (cut, prov))
-            print("✂️ %s 413 (%s): retrying with %d tools"
-                  % (name, prov, len(tools_schema or [])))
+            print("✂️ %s 413 (%s): retrying with %d tools, %d messages"
+                  % (name, prov, len(tools_schema or []), len(msgs)))
             continue
 
         note = ""
@@ -3194,6 +3202,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # ui_app_open (which changes the app) so the model must re-read before
     # tapping on a screen it has never seen.
     seen_screen = bool(opened_app)
+    # Swipe-loop detection. The tap guard catches repeated taps, but a model
+    # that cannot see the control it wants will instead swipe the same
+    # coordinates in the same direction half a dozen times, which changes
+    # nothing. Track the last swipe and the screen text it produced; three
+    # identical swipes with an unchanged screen is a no-op loop, not progress.
+    _swipe_sig = None
+    _swipe_n = 0
+    _swipe_screen = None
+    _last_dump_text = None
     dispatch_start = time.time()
     last_had_tools = False
     _stall_break = False
@@ -3356,7 +3373,6 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # rounds too (the full code+net+ctrl schema exceeds its budget).
                     if active[0].startswith("OpenRouter") and net_domain_schema:
                         fwd_schema = net_domain_schema
-                    fwd_msgs = llm_messages
                     # Follow-up rounds must get the SAME reduced payload as the
                     # opening round. Sending the full prompt here is what kept
                     # hitting 413 after a successful first call: round 1 went
@@ -3372,6 +3388,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
+                    else:
+                        fwd_msgs = llm_messages
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
                                     tool_choice=tc)
@@ -3736,6 +3754,20 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                               "the screen, then decide your tap coordinates from "
                               "the screen state.")
                     ok = False
+                elif run_name == "ui_swipe" and _swipe_n >= 2 and \
+                        _swipe_sig == (run_args.get("x1"), run_args.get("y1"),
+                                       run_args.get("x2"), run_args.get("y2")) and \
+                        _swipe_screen == _last_dump_text:
+                    # Same swipe, same direction, same screen: it is not working.
+                    result = ("BLOCKED: you have swiped %d times with identical "
+                              "coordinates and the screen has not changed. This is "
+                              "a no-op. Stop swiping. Read the latest ui_dump and act "
+                              "on what is actually visible - the control you want is "
+                              "already on the screen, you are looking for it in the "
+                              "wrong place." % (_swipe_n + 1))
+                    ok = False
+                    _swipe_n = 0
+                    _swipe_sig = None
                 else:
                     # A single bad tool call must never take down the whole run:
                     # every result gathered so far is real work worth returning.
@@ -3753,6 +3785,19 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # An explicit ui_dump's result is fed straight back to the
                     # model, so it now has real screen state to tap from.
                     seen_screen = True
+                    # The latest screen text is what the swipe guard compares
+                    # against: if a swipe does not change it, the swipe did
+                    # nothing and repeating it will not help.
+                    _last_dump_text = result
+                if run_name == "ui_swipe":
+                    _sig = (run_args.get("x1"), run_args.get("y1"),
+                            run_args.get("x2"), run_args.get("y2"))
+                    if _sig == _swipe_sig and _last_dump_text == _swipe_screen:
+                        _swipe_n += 1
+                    else:
+                        _swipe_n = 1
+                    _swipe_sig = _sig
+                    _swipe_screen = _last_dump_text
                 names.append(run_name)
                 # Keep the submit/read guards in step with what actually ran.
                 if _is_form_submit_call(run_name, run_args):
@@ -6242,8 +6287,29 @@ def _ui_dump_compact(xml, cap=3000):
         if m:
             x1, y1, x2, y2 = (int(v) for v in m[0])
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-        lines.append('%s @ tap(%s,%s)%s' % (label, cx, cy,
-                     " [CLICKABLE]" if n.get("clickable") == "true" else ""))
+        # Only advertise a tap point for nodes that can actually be acted on.
+        # Printing "label @ tap(x,y)" for every piece of text let the model
+        # treat a page heading as a button, which is how it ended up tapping
+        # "Academic Application Process" instead of the dropdown below it.
+        flags = []
+        for attr, tag in (("clickable", "CLICKABLE"), ("checkable", "CHECKABLE"),
+                          ("focusable", "FOCUSABLE"), ("long_clickable", "LONG_CLICKABLE")):
+            if n.get(attr) == "true":
+                flags.append(tag)
+        cls = n.get("class") or ""
+        for kind in ("Button", "CheckBox", "RadioButton", "Spinner", "ToggleButton",
+                     "Switch", "ImageButton", "AutoCompleteTextView", "Tab"):
+            if kind in cls and kind.upper() not in flags:
+                flags.append(kind.upper())
+        if n.get("clickable") == "true" and n.get("focusable") == "true":
+            if "FOCUSABLE" not in flags:
+                flags.append("FOCUSABLE")
+        tappable = bool(flags)
+        if tappable:
+            lines.append('%s @ tap(%s,%s) %s' % (label, cx, cy, " ".join(flags)))
+        else:
+            # Plain text: report it so the model can READ it, with no tap point.
+            lines.append('%s  [not tappable]' % label)
     total = len(lines)
     joined = "\n".join(lines)
     if len(joined) > cap:
@@ -9013,9 +9079,154 @@ _REDUCED_SYS = (
 )
 
 
+def _shrink_messages_for_retry(msgs, cut):
+    """Progressively drop conversation content after a 413.
+
+    cut 0: trim the overlay/context history, keep the task.
+    cut 1: keep only the system + task + the most recent tool result.
+    cut 2: task only - no system, no history, no tool results.
+
+    The goal is that the retry is SMALLER than what failed. Dropping tools while
+    leaving an 8.4k-token history and a 5.1k-token system prompt in place cannot
+    do that, and on a free tier with an 8k limit it guarantees a second 413.
+    """
+    msgs = list(msgs or ())
+    if not msgs:
+        return msgs
+    system = [m for m in msgs if m.get("role") == "system"]
+    users = [m for m in msgs if m.get("role") == "user"]
+    tools = [m for m in msgs if m.get("role") == "tool"]
+    asst = [m for m in msgs if m.get("role") == "assistant"]
+    if cut <= 0:
+        # Keep every message but clip the bulky ones. The system prompt and the
+        # assistant turns carry the bulk here, not just the tool results, so
+        # clipping only tool messages could leave the payload unchanged and the
+        # retry would 413 identically. Screen dumps stay whole via
+        # _clip_tool_result; everything else is halved.
+        out = []
+        for m in msgs:
+            role = m.get("role")
+            if role == "tool":
+                m = dict(m)
+                m["content"] = _clip_tool_result(m.get("name"), m.get("content"), 600)
+            elif role == "system":
+                m = dict(m)
+                c = str(m.get("content") or "")
+                # The protocol prompt is the part the model must keep; only
+                # clip a system message that is the huge injected context block.
+                m["content"] = c if len(c) <= 1200 else c[:1200] + " [...]"
+            elif role == "assistant" and m.get("tool_calls"):
+                m = dict(m)
+                m["content"] = ""
+            out.append(m)
+        return out
+    if cut == 1:
+        head = (system[:1] + users[:1])
+        tail = tools[-1:] + asst[-1:]
+        return head + tail
+    # cut 2: the task and nothing else.
+    return users[:1] or msgs[-1:]
+
+
 def _clip(text, limit):
     text = " ".join(str(text or "").split())
     return text if len(text) <= limit else text[:limit] + " [...]"
+
+
+# A screen dump is a list of actions, not prose. Clipping it mid-list is what
+# hid a "Do you already have a student number?" dropdown and its options, so
+# the model could not see the control it was supposed to tap and swiped six
+# times trying to scroll to something that was already on screen. A truncated
+# dump is worse than a large one: it looks complete and it is not.
+#
+# The budget is generous because every line is an action, but it is still a
+# budget: a full WebView page can run to hundreds of nodes, and on a 7000-ITPM
+# free tier an unbounded dump starves the next turn. Roughly 110 nodes' worth.
+_UI_DUMP_CLIP = 6500
+
+
+def _clip_tool_result(name, text, limit):
+    """Clip a tool result, but never cut a screen dump mid-node-list.
+
+    Anything carrying 'labeled nodes' is a ui_dump. A dump gets a far larger
+    budget than a prose result because every line is an action the model may
+    need, and it is cut on a node boundary with an explicit count of what was
+    dropped, so the model is never left acting on a list that silently ends
+    mid-way. That silent end is what hid the "--- Please select ---" dropdown
+    and caused a swipe loop.
+    """
+    if name == "ui_dump" or "labeled nodes" in str(text or ""):
+        return _clip_dump(text, max(_UI_DUMP_CLIP, limit))
+    return _clip(text, limit)
+
+
+def _clip_dump(text, limit):
+    """Keep every node line whole; drop only from the middle as a last resort.
+
+    Order of preference: the whole dump; failing that, the header plus every
+    node the model could act on (tappable controls, form controls, and the words
+    that mark a control) plus enough of the rest to keep the layout legible.
+    Whatever is dropped is counted explicitly, because a list that quietly ends
+    is what made the model believe a dropdown was off-screen.
+    """
+    raw = str(text or "")
+    flat = " ".join(raw.split())
+    if len(flat) <= limit:
+        # Fits: keep it whole, but restore the line structure. Collapsing to one
+        # line is smaller, and a dump the model has to re-parse as a single run
+        # of text is harder to read than the newline-separated form it was
+        # produced in.
+        return raw.strip()
+    lines = raw.split("\n")
+    # The header is the leading [context] line and the "N labeled nodes" count.
+    # Everything after the count is a node line. Splitting on the count line is
+    # the only reliable boundary; guessing from "@ tap(" merged the header into
+    # the first node.
+    head, nodes = [], []
+    seen_count = False
+    for ln in lines:
+        if not seen_count and ln.strip().endswith("labeled nodes"):
+            head.append(ln)
+            seen_count = True
+            continue
+        (nodes if seen_count else head).append(ln)
+    if not nodes:
+        return flat[:limit] + " [...]"
+    keep_words = ("select", "dropdown", "checkbox", "radio", "next", "submit",
+                  "accept", "agree", "confirm", "continue", "student number",
+                  "already have", "option", "spinner")
+    def _tier(ln):
+        """0 = a named form control, 1 = tappable, 2 = plain text.
+
+        The tiering matters when a page is mostly tappable: 396 anonymous
+        clickable rows would otherwise fill the budget and push the one line
+        that matters - the "--- Please select ---" dropdown - off the end, which
+        is the original bug in a new form.
+        """
+        low = ln.lower()
+        if any(w in low for w in keep_words):
+            return 0
+        if " @ tap(" in ln:
+            return 1
+        return 2
+    nodes_sorted = sorted(nodes, key=_tier)
+    out, size, kept_nodes = [], 0, 0
+    def _add(ln):
+        nonlocal size
+        out.append(ln)
+        size += len(ln) + 1
+    for ln in head:
+        _add(ln)
+    for ln in nodes_sorted:
+        if size + len(ln) > limit and kept_nodes >= 1:
+            break
+        _add(ln)
+        kept_nodes += 1
+    if kept_nodes < len(nodes):
+        out.append("...[%d of %d node(s) hidden to fit the token budget; the "
+                   "controls you can act on are all above - re-run ui_dump for "
+                   "the full screen]" % (len(nodes) - kept_nodes, len(nodes)))
+    return "\n".join(out)
 
 
 def reduced_messages(messages, domain="", overlay="", context_budget=400):
@@ -9043,7 +9254,9 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
     for i, m in enumerate(rest):
         role = m.get("role")
         if role == "tool":
-            keep.append({"role": "tool", "content": _clip(m.get("content"), 1200),
+            keep.append({"role": "tool",
+                         "content": _clip_tool_result(m.get("name"),
+                                                       m.get("content"), 1200),
                          "tool_call_id": m.get("tool_call_id"),
                          "name": m.get("name")})
         elif i == first_user_at:
