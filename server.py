@@ -5718,8 +5718,24 @@ _ADB_WIRELESS_ALIAS_RE = re.compile(
 # calls per action and re-listing devices each time would dominate the runtime.
 # The cache holds the whole device entry, not just the serial, so the hit path
 # and the miss path return the same thing.
-_ADB_TARGET = {"entry": None, "at": 0.0}
+_ADB_TARGET = {"entry": None, "at": 0.0, "size": None, "size_at": 0.0}
 _ADB_TARGET_TTL = 20.0
+# Screen geometry is display configuration, not device state: it does not
+# change while a run is in progress. Caching it is not the same as caching the
+# foreground app, which does and must be re-read every time.
+_ADB_SIZE_TTL = 300.0
+
+
+def _adb_screen_size():
+    import time as _time
+    now = _time.time()
+    if _ADB_TARGET["size"] and now - _ADB_TARGET["size_at"] < _ADB_SIZE_TTL:
+        return _ADB_TARGET["size"]
+    raw = str(_ui_adb(["shell", "wm", "size"], timeout=20)[1] or "").strip()
+    size = raw.replace("Physical size:", "").strip() or "?"
+    _ADB_TARGET["size"] = size
+    _ADB_TARGET["size_at"] = now
+    return size
 
 
 def _adb_physical_serial(serial):
@@ -5981,17 +5997,16 @@ def _device_facts(entry):
     serial = entry[0] if isinstance(entry, (tuple, list)) else str(entry)
     size = _ui_adb(["shell", "wm", "size"], timeout=20)[1]
     dens = _ui_adb(["shell", "wm", "density"], timeout=20)[1]
-    fg = ""
-    ok, acts = _ui_adb(["shell", "dumpsys", "activity", "activities"],
-                       timeout=45, cap=120000)
-    if ok:
-        for line in str(acts).splitlines():
-            if "topResumedActivity" in line or "ResumedActivity:" in line:
-                fg = line.strip()
-                if "ResumedActivity" in fg:
-                    break
-    return ("device id: %s\nscreen: %s\ndensity: %s\nforeground app: %s"
-            % (serial, str(size).strip(), str(dens).strip(), fg or "(unknown)"))
+    # "dumpsys window" focus, not the activity manager's resumed line. Chrome's
+    # window was still alive behind the app and the activity manager reported
+    # Chrome here while the window manager had the app in focus, which is how
+    # this came to say the wrong app was on screen.
+    pkg, act, _win = _foreground_app()
+    fg = "foreground=%s" % pkg if pkg else "(unknown)"
+    if act:
+        fg += " activity=%s" % act
+    return ("device id: %s\nscreen: %s\ndensity: %s\n%s"
+            % (serial, str(size).strip(), str(dens).strip(), fg))
 
 
 def tool_ui_device():
@@ -6108,17 +6123,132 @@ def _ui_dump_compact(xml, cap=3000):
     return "%d labeled nodes\n%s" % (total, joined)
 
 
+_FOCUS_WINDOW_RE = re.compile(
+    r'mCurrentFocus=Window\{(?P<id>[0-9a-fA-F]+)\s+u0\s+(?P<pkg>[^/}\s]+)/(?P<act>[^}\s]+)\}')
+_FOCUSED_APP_RE = re.compile(
+    r'mFocusedApp=ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)')
+# Activity-manager fallbacks, most authoritative first. On modern Android
+# topResumedActivity is the live one; mResumedActivity is the older spelling;
+# a bare ResumedActivity: line can be historical.
+_RESUMED_PATTERNS = ("topResumedActivity", "mResumedActivity:", "ResumedActivity:")
+_RESUMED_RE = re.compile(
+    r'(?:topResumedActivity|mResumedActivity|ResumedActivity)[:=]\s*'
+    r'ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)')
+
+
+def _foreground_app():
+    """(package, activity, window_id) for whatever is on screen right now.
+
+    Re-queried on every call and never cached. The phone's foreground changes
+    constantly, and a stale answer here is worse than no answer at all: it sends
+    the model off to look for a screen that is not there. "dumpsys window" is
+    the source of truth for focus, with the activity manager as a fallback.
+    """
+    ok, out = _ui_adb(["shell", "dumpsys", "window"], timeout=40, cap=200000)
+    if ok:
+        for line in str(out).splitlines():
+            m = _FOCUS_WINDOW_RE.search(line)
+            if m:
+                act = m.group("act")
+                if act.startswith(m.group("pkg") + "."):
+                    act = act[len(m.group("pkg")) + 1:]
+                return m.group("pkg"), act, m.group("id")
+        for line in str(out).splitlines():
+            m = _FOCUSED_APP_RE.search(line)
+            if m:
+                return m.group("pkg"), m.group("act"), ""
+    ok2, acts = _ui_adb(["shell", "dumpsys", "activity", "activities"],
+                        timeout=45, cap=200000)
+    if ok2:
+        for pat in _RESUMED_PATTERNS:
+            for line in str(acts).splitlines():
+                if pat in line:
+                    m = _RESUMED_RE.search(line)
+                    if m:
+                        return m.group("pkg"), m.group("act"), ""
+    return "", "", ""
+
+
+def _webview_url_quiet():
+    """Current WebView URL, but only if a CDP session is already attached.
+
+    Never opens a connection. This runs inside ui_dump, which is a device tool
+    on a device task where the browser tools are deliberately out of scope;
+    quietly dialling out to DevTools would be both slow and beside the point.
+    """
+    try:
+        s = getattr(d, "_session", None)
+        if s is None or getattr(s, "_dead", False):
+            return ""
+        mid = s._send("Runtime.evaluate", {"expression": "location.href"})
+        resp = s._wait(mid, timeout=3)
+        return str(resp["result"]["result"].get("value") or "").strip()
+    except Exception:
+        return ""
+
+
+def _has_webview():
+    """Is the foreground screen a WebView? From dumpsys, not from CDP.
+
+    The ITS portal is a Flutter WebView, so "is this a web page" is the
+    difference between ui_tap on screen coordinates and browser tools. It has to
+    be answerable without opening a DevTools session.
+    """
+    ok, out = _ui_adb(["shell", "dumpsys", "activity", "top"], timeout=40, cap=250000)
+    if not ok:
+        return False
+    low = str(out).lower()
+    # A bare "webview" substring matches any prose or node label that happens
+    # to contain the word, so require a real WebView class or plugin marker.
+    for marker in ("android.webkit", "android.widget.webview",
+                   "webviewflutter", "flutter_webview"):
+        if marker in low:
+            return True
+    return False
+
+
+def _device_context():
+    """The [context] header every ui_dump opens with.
+
+    Node labels on their own do not say which app they came from, so a model
+    reading them cannot tell an ITS page from a browser tab from a launcher.
+    That ambiguity is what produced a confident wrong answer about which screen
+    the phone was on.
+    """
+    devs, _raw = _adb_connected_devices()
+    entry = _resolve_adb_entry(devs)
+    if not entry:
+        return "[context] no Android device connected"
+    pkg, act, win = _foreground_app()
+    pkg = pkg or entry[0]
+    size = _adb_screen_size()
+    parts = ["foreground=%s" % pkg]
+    if act:
+        parts.append("activity=%s" % act)
+    parts.append("screen=%s" % size)
+    if _has_webview():
+        url = _webview_url_quiet()
+        parts.append("webview=yes")
+        # Only reported when a session already exists; saying so beats guessing.
+        parts.append("url=%s" % (url or "(no cdp session attached)"))
+    if win:
+        parts.append("window=%s" % win)
+    return "[context] " + " ".join(parts)
+
+
 def tool_ui_dump():
+    header = _device_context()
     _ui_adb(["shell", "uiautomator", "dump", "/sdcard/ui.xml"])
     ok, out = _ui_adb(["shell", "cat", "/sdcard/ui.xml"], cap=None)
     if not ok or "<hierarchy" not in out:
-        return False, "ui dump failed: %s" % out[:500]
+        return False, "%s\nui dump failed: %s" % (header, out[:500])
     try:
-        return True, _ui_dump_compact(out)
+        return True, "%s\n%s" % (header, _ui_dump_compact(out))
     except Exception as e:
         nodes = out.count("<node")
         trimmed = out[:3000] + ("\n..." if len(out) > 3000 else "")
-        return True, "%d visible nodes (compact parse failed: %s)\n%s" % (nodes, e, trimmed)
+        return True, ("%s\n%d visible nodes (compact parse failed: %s)\n%s"
+                      % (header, nodes, e, trimmed))
 
 
 def tool_ui_screenshot(name=None, save=False):
