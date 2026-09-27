@@ -8380,6 +8380,8 @@ _SHORT_DESCRIPTIONS = {
     "ui_device": "Report device id, screen size, density, foreground app, USB or TCP/IP.",
     "ui_app_open": "Launch an app on the connected Android device. Args: package.",
     "ui_tap": "Tap a point or the centre of an element. Args: x,y or label.",
+    "ui_swipe": "Scroll the screen. Args: x1,y1,x2,y2 or direction ('up'/'down').",
+    "ui_key": "Send a key such as BACK, HOME, ENTER. Args: key (name or code).",
     "ui_dump": "Dump the current screen as text with element bounds.",
     "ui_type": "Type text into the focused field. Args: text.",
     "ui_screenshot": "Capture a screenshot from the device.",
@@ -8401,7 +8403,8 @@ _REDUCED_TOOL_ORDER = [
     "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
     "cdp_status",
     "ui_connect", "ui_device",
-    "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_screenshot",
+    "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_swipe", "ui_key",
+    "ui_screenshot",
     "run_command", "read_file",
 ]
 # Never shed these: without them a network or navigation task cannot be done at
@@ -8424,7 +8427,8 @@ _REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
 # ui_connect was missing from the reduced pool altogether: the model was never
 # offered it, so it reached for `adb devices -l` through run_command and then
 # filled the rest of the run with browser tools it did have.
-_REDUCED_DEVICE_REQUIRED = {"ui_connect", "ui_device"}
+_REDUCED_DEVICE_REQUIRED = {"ui_connect", "ui_device", "ui_tap", "ui_dump",
+                            "ui_type", "ui_swipe", "ui_key"}
 
 # Budgets are TOTAL input tokens (system prompt + schema + history), matching
 # how Groq's ITPM and OpenRouter's balance are actually metered.
@@ -8782,13 +8786,98 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
     for m in tail[-2:]:
         keep.append({"role": m["role"], "content": _clip(m.get("content"), 600)})
 
-    out = [{"role": "system", "content": _REDUCED_SYS}]
+    # On a device task the CDP protocol is REPLACED, not appended to. The compact
+    # prompt names cdp_evaluate/cdp_network_requests as the way to do everything
+    # and never mentions a single ui_* tool, so a model whose CDP tools have just
+    # been stripped is left being told to use tools it has none of. Appending a
+    # correction underneath leaves both sets of instructions in the prompt and
+    # the CDP ones win, because they come first and are more specific.
+    _device = _is_device_task(_first_user_text(rest))
+    out = [{"role": "system", "content": _DEVICE_SYS if _device else _REDUCED_SYS}]
     if domain:
         out[0]["content"] += "\nActive task domain: %s." % domain
     if overlay:
         out[0]["content"] += "\n" + _clip(overlay, context_budget)
     out.extend(keep)
     return out
+
+
+def _first_user_text(messages):
+    for m in (messages or []):
+        if m.get("role") == "user":
+            return m.get("content") or ""
+    return ""
+
+
+# A model that was told to use CDP, then had CDP stripped, reports the task
+# impossible by naming the tools it no longer has. That is a stall, not an
+# answer, and it is worth one corrective: the tools it should be using are in
+# its schema, they are just not the ones the prompt talked about.
+_MISSING_TOOL_REFUSAL_RE = re.compile(
+    r"(?:don'?t|do not|do n'?t|cannot|can'?t|unable to|not able to|no longer|"
+    r"lack(?:ing)?|without|missing|haven'?t got|do not have|don'?t have)"
+    r"[^.]{0,80}?"
+    r"(?:cdp_|devtools|chrome devtools protocol|"
+    r"chrome|dev tools|websocket)"
+    r"|"
+    r"(?:cdp_[a-z_]+|devtools|chrome devtools protocol)[^.]{0,60}?"
+    r"(?:not available|unavailable|isn't available|not present|missing|"
+    r"cannot|can't|removed|disabled)",
+    re.IGNORECASE)
+
+
+def _device_tool_refusal(text):
+    """True when a reply on a device task is really a complaint about missing
+    browser tools."""
+    blob = str(text or "")
+    if not blob:
+        return False
+    if not _MISSING_TOOL_REFUSAL_RE.search(blob):
+        return False
+    return True
+
+
+_DEVICE_STALL_MSG = (
+    "You DO have the tools for this task, and they are the right ones - this is "
+    "a phone, not a web page, so there is no DevTools session, no DOM form and "
+    "no POST to inspect. The browser tools are deliberately not available and "
+    "you do not need them. Call ui_connect to reach the phone, then ui_dump to "
+    "read the screen (it gives you tap(x,y) coordinates for every element), "
+    "then ui_tap to act, and ui_dump again to verify. If the screen does not "
+    "contain what the task needs, say what IS on the screen instead of "
+    "reporting that a tool is missing. Do not apologise; act.")
+
+
+# Appended instead of _REDUCED_SYS's CDP protocol when the task is a device
+# task. It has to name the actual tools, because a model that was told to use
+# CDP and then had CDP removed will not infer the alternative on its own.
+_DEVICE_SYS = """
+THIS IS A DEVICE TASK. The phone is a real Android device, not a browser page.
+The DevTools/CDP tools are not available here and are not needed: there is no
+HTTP request to inspect, no form to fill in the DOM, and no page to navigate.
+Every step happens on the device's own screen.
+
+You DO have these tools, and they are the only way to act:
+  ui_connect  - reach the phone (USB or wireless). Call this first.
+  ui_dump     - read the current screen as text, with tap(x,y) coordinates
+                for every element. ALWAYS dump before tapping: you cannot tap
+                a target you have not seen, and coordinates from an earlier
+                screen are stale once the screen changes.
+  ui_screenshot - a picture of the screen, when text is not enough.
+  ui_tap      - tap a coordinate, or the centre of an element by its label.
+  ui_type     - type into the focused field.
+  ui_swipe    - scroll. Use it when the element you need is not on screen.
+  ui_key      - send a key such as BACK, HOME, ENTER.
+  ui_app_open - bring an app to the foreground.
+  ui_device   - device id, screen size, foreground app, USB or TCP/IP.
+  run_command - a shell command on this PC, e.g. "adb devices".
+
+To tap a checkbox, a "No" button or a "Next" button: ui_dump, find the label,
+tap its coordinates, then ui_dump again to confirm the screen changed. Do not
+report success from the plan alone - the dump is what tells you it worked.
+Never answer that the task cannot be done because a tool is missing. If a tool
+you need is genuinely absent, dump the screen and report what is actually there.
+""".strip()
 
 
 def _shrink_schema_further(tools_schema, factor=0.5):
@@ -10934,7 +11023,14 @@ def run_agent(user_message):
                         messages.append({"role": "assistant", "content": reply})
                         messages.append({"role": "user", "content": nav_push})
                         continue
-                    if used == 0 and _AGENT["corrective"] < corrective_max:
+                if _is_device_task(user_message) and _device_tool_refusal(final) \
+                        and _AGENT["corrective"] < corrective_max:
+                    with _AGENT_LOCK:
+                        _AGENT["corrective"] += 1
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "user", "content": _DEVICE_STALL_MSG})
+                    continue
+                if used == 0 and _AGENT["corrective"] < corrective_max:
                         with _AGENT_LOCK:
                             _AGENT["corrective"] += 1
                         messages.append({"role": "assistant", "content": reply})
