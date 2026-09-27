@@ -3335,22 +3335,6 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                           flush=True)
                     llm_messages.append({"role": "user", "content": _SUBMIT_NUDGE})
                     continue
-            if _awaiting_read and tcs and _read_nudges < 2:
-                _cf = tcs[0]
-                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
-                    _cname, _cargs = _cf[0], _cf[1]
-                elif isinstance(_cf, dict):
-                    _cname = _cf.get("name") or _cf.get("tool") or ""
-                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
-                else:
-                    _cname, _cargs = "", {}
-                if not _is_network_read_call(_cname, _cargs):
-                    _read_nudges += 1
-                    print("READ-GUARD: submit seen but next call was %s; "
-                          "nudging for the POST read (n=%d)" % (_cname, _read_nudges),
-                          flush=True)
-                    llm_messages.append({"role": "user", "content": _READ_NUDGE})
-                    continue
             if _awaiting_read and not _read_captured:
                 # Asking the model to go and read the request does not work: it
                 # has twice ignored the nudge and gone back to filling the form,
@@ -3404,6 +3388,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     print("READ-GUARD: captured %d POST(s) server-side; "
                           "handing the result to the model" % len(_recs), flush=True)
                     llm_messages.append({"role": "user", "content": _msg})
+                    continue
+            if _awaiting_read and tcs and _read_nudges < 2:
+                _cf = tcs[0]
+                if isinstance(_cf, (tuple, list)) and len(_cf) >= 2:
+                    _cname, _cargs = _cf[0], _cf[1]
+                elif isinstance(_cf, dict):
+                    _cname = _cf.get("name") or _cf.get("tool") or ""
+                    _cargs = _cf.get("args") or _cf.get("arguments") or {}
+                else:
+                    _cname, _cargs = "", {}
+                if not _is_network_read_call(_cname, _cargs):
+                    _read_nudges += 1
+                    print("READ-GUARD: submit seen but next call was %s; "
+                          "nudging for the POST read (n=%d)" % (_cname, _read_nudges),
+                          flush=True)
+                    llm_messages.append({"role": "user", "content": _READ_NUDGE})
                     continue
             if tcs:
                 # Snapshot the request log BEFORE a submit runs. The click
