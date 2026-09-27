@@ -935,6 +935,113 @@ def playbook_top(max_lines=6):
     return lines or ["(none yet)"]
 
 
+def _normalize_tool_args(name, args):
+    """Make one tool call's arguments match its declared schema.
+
+    A model may fill an OPTIONAL string parameter with null. OpenAI-compatible
+    providers accept that, but Groq validates the tool call against the schema
+    and rejects the whole request: "/target: expected string, but got null".
+    The 400 is fatal to the run, not a soft error, because a single bad
+    parameter takes down the entire request and with it every fallback provider
+    in the chain. So nulls are rewritten here to the empty value of their
+    declared type, which is what "no value supplied" means to every tool in
+    this file: they all test the parameter for truthiness, so "" / 0 / [] /
+    False / {} are all indistinguishable from the key being absent.
+
+    Applied to EVERY tool call, not just the one that happened to fail, since
+    Groq rejects the request the same way whichever parameter it is.
+    """
+    if not isinstance(args, dict):
+        return args
+    schema = _TOOL_PARAM_TYPES.get(name) or {}
+    out = {}
+    for k, v in args.items():
+        if v is None:
+            out[k] = _EMPTY_FOR_TYPE.get(schema.get(k), "")
+        else:
+            out[k] = v
+    return out
+
+
+# The empty value of each declared type. Every tool in this file tests its
+# parameters for truthiness, so these are all equivalent to the key being
+# absent, which is what an optional parameter with no value actually means.
+# This must be a VALUE, not the type name: substituting the literal "string"
+# for a null string would be worse than the null, since ui_connect would try
+# to reach a host called "string".
+_EMPTY_FOR_TYPE = {"string": "", "integer": 0, "number": 0,
+                   "boolean": False, "array": [], "object": {}}
+
+
+def _normalize_tool_messages(messages):
+    """Rewrite null arguments in every recorded tool call, in place.
+
+    The provider re-validates the tool calls already in the conversation on
+    every turn, so a null recorded in an earlier turn poisons later requests
+    even after that call has been executed. Cleaning only the newest call
+    would leave the history dirty, and the next turn would 400 again.
+    """
+    fixed = 0
+    for m in messages or ():
+        if not isinstance(m, dict) or m.get("role") != "assistant":
+            continue
+        for tc in (m.get("tool_calls") or ()):
+            fn = tc.get("function") or {}
+            nm = fn.get("name")
+            raw = fn.get("arguments")
+            if not nm or not isinstance(raw, str):
+                continue
+            try:
+                args = json.loads(raw)
+            except Exception:
+                continue
+            if not isinstance(args, dict) or not any(v is None for v in args.values()):
+                continue
+            fn["arguments"] = json.dumps(_normalize_tool_args(nm, args))
+            fixed += 1
+    return fixed
+
+
+_TOOL_PARAM_TYPES = {}
+
+
+def _index_tool_param_types():
+    """tool name -> {param: declared type}, read from the live schemas."""
+    global _TOOL_PARAM_TYPES
+    types = {}
+    for t in (TOOLS_SCHEMA or ()):
+        fn = t.get("function") or {}
+        nm = fn.get("name")
+        props = ((fn.get("parameters") or {}).get("properties") or {})
+        if nm:
+            types[nm] = {k: (v or {}).get("type", "string") for k, v in props.items()}
+    _TOOL_PARAM_TYPES = types
+    return types
+
+
+def _log_rejected_tool_args(provider, messages, error):
+    """Write the actual tool-call arguments a 400 rejected, to audit.log.
+
+    The provider's message names the offending field ("/target: expected
+    string, but got null") but never shows the value, so the log could not
+    distinguish a null from an empty string or a wrong type without this.
+    """
+    try:
+        for m in messages or ():
+            if not isinstance(m, dict) or m.get("role") != "assistant":
+                continue
+            for tc in (m.get("tool_calls") or ()):
+                fn = tc.get("function") or {}
+                raw = fn.get("arguments")
+                if not raw:
+                    continue
+                audit_write("provider-reject", "%s %s" % (provider, fn.get("name")),
+                            {"arguments": str(raw)[:120]},
+                            False, "400 schema: " + str(error)[:120])
+    except Exception:
+        pass
+
+
 def audit_write(kind, name, args, ok, result):
     """Append a tool-call audit line. Log calls to the audit/playbook files and
     to ntfy (so a kill post still shows in the console/browser even if the kill
@@ -7978,6 +8085,8 @@ NET_TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": ["what"]}}},
 ]
 
+_index_tool_param_types()
+
 # Tool domain / context separation (ACEsi mixes UI, code, and network work, so
 # we keep them in distinct buckets and can restrict which domain a request is
 # allowed to touch). A tool normally lives in exactly one domain, but a value
@@ -11293,6 +11402,12 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
         # retry instead of abandoning the task as "all providers unavailable".
         for attempt in range(3):
             try:
+                # Pre-flight: a tool call with a null argument is already in the
+                # history from an earlier turn and Groq re-validates the whole
+                # conversation on every request, so the 400 has to be fixed
+                # before the bytes go out, not after the response comes back.
+                if _normalize_tool_messages(messages):
+                    print(f"🧹 {name}: rewrote null tool args to match the schema")
                 r = requests.post(f"{endpoint}/chat/completions",
                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
                     json={"model": model, "messages": messages, "temperature": temperature,
@@ -11310,7 +11425,10 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                         except Exception:
                             args = {}
                         if nm:
-                            tcs.append((nm, args))
+                            # Normalize at the point of parsing too, so the
+                            # in-memory args used for execution and written into
+                            # history are the corrected ones.
+                            tcs.append((nm, _normalize_tool_args(nm, args)))
                     if tcs:
                         print(f"✅ llm_reply via {name} ({len(tcs)} tool_call(s))")
                         return text, tcs
@@ -11326,6 +11444,12 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                     print(f"⏳ {name} 429 rate limit; waiting {wait}s for the token window")
                     time.sleep(wait)
                     continue
+                # A 400 validation failure kills the whole request, so log what
+                # the model actually sent. Previously only the provider's error
+                # text was visible, which says the field but not its value.
+                if r.status_code == 400 and ("did not match schema" in r.text
+                                             or "expected" in r.text):
+                    _log_rejected_tool_args(name, messages, r.text)
                 print(f"❌ {name} {r.status_code}: {r.text[:160]}")
             except Exception as e:
                 print(f"❌ {name} exc: {e}")
