@@ -3724,6 +3724,16 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             llm_messages.append({"role": "assistant", "content": "" if tcs else (text or ""),
                                  "tool_calls": tids})
             for j, (name, args) in enumerate(batch):
+                # Abort must be honoured PER TOOL, not once per round. The model
+                # emits up to _BATCH_MAX calls at a time and this loop ran all of
+                # them regardless, so clicking abort mid-batch still fired the
+                # queued calls. Stopping then meant killing the server, which is
+                # the worst possible answer to "stop".
+                if _AGENT.get("abort"):
+                    print("⛔ %s skipped, user aborted" % name, flush=True)
+                    audit_write("tool", name, args or {}, False,
+                                "skipped: aborted by user")
+                    break
                 # RESEARCH+SAVE FLOW: research tasks write their findings via
                 # write_file. Redirect that to open_in_vscode so the findings are
                 # opened in Chris's editor (VS Code/VSCodium) as a review DRAFT —
@@ -11344,6 +11354,19 @@ def run_agent(user_message):
                     return
                 executed_any = False
                 for j, (name, args) in enumerate(batch):
+                    # Abort must be honoured PER TOOL, not once per round. The
+                    # model emits up to _BATCH_MAX calls at a time and this loop
+                    # ran all of them regardless, so clicking abort mid-batch
+                    # still fired the queued calls: the abort flag was only read
+                    # at the top of the round. Stopping then meant killing the
+                    # server, which is the worst possible answer to "stop".
+                    if _AGENT.get("abort"):
+                        result = "Stopped by user before this call ran."
+                        ok = False
+                        audit_write("tool", name, args or {}, False,
+                                    "skipped: aborted by user")
+                        print("⛔ %s skipped, user aborted" % name, flush=True)
+                        break
                     tcid = "call_%d_%d" % (i, j)
                     if name not in TOOLS:
                         sid = _agent_next_id()
