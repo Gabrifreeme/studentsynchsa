@@ -2545,7 +2545,7 @@ def _ollama_local_messages(llm_messages):
 
 
 _DEV_TOOLS = ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
-              "ui_dump", "ui_screenshot", "ui_device")
+              "ui_dump", "ui_screenshot", "ui_device", "ui_connect")
 
 
 def _collect_tool_evidence(llm_messages, max_chars=12000):
@@ -5704,12 +5704,149 @@ def _ui_adb(args, timeout=120, cap=3000):
         return False, str(e)
 
 
+def _adb_connected_devices():
+    """[(serial, state, transport)] for every entry adb knows about, online or not."""
+    out = []
+    ok, txt = _ui_adb(["devices", "-l"], timeout=25, cap=4000)
+    if not ok and not txt:
+        return out, txt
+    for line in str(txt).splitlines():
+        line = line.strip()
+        if not line or line.lower().startswith("list of devices"):
+            continue
+        if line.lower().startswith("*"):
+            continue
+        bits = line.split()
+        if len(bits) < 2:
+            continue
+        serial, state = bits[0], bits[1]
+        transport = ""
+        for b in bits[2:]:
+            if b.startswith("usb:"):
+                transport = "USB"
+            elif b.startswith("transport_id:"):
+                pass
+        if not transport:
+            # A serial with host:port is a TCP/IP (wireless) connection.
+            transport = "TCP/IP" if ":" in serial else "USB"
+        out.append((serial, state, transport))
+    return out, txt
+
+
+def _adb_diagnose(devices, raw):
+    """Turn adb's wording into the three things that actually go wrong, so the
+    answer says whether it is a cable, a driver, or an authorization problem."""
+    blob = " ".join("%s %s" % (s, st) for s, st, _ in devices) + " " + str(raw or "")
+    low = blob.lower()
+    for serial, state, _t in devices:
+        if state == "unauthorized":
+            return ("Authorization problem: %s is 'unauthorized'. Unlock the phone "
+                    "and accept the 'Allow USB debugging' prompt, then retry."
+                    % serial)
+        if state == "offline":
+            return ("%s is 'offline' - the adb link is up but not talking. Usually "
+                    "a stale TCP/IP session or a revoked RSA key; try 'adb kill-server' "
+                    "and reconnect." % serial)
+    if "unauthorized" in low:
+        return ("Authorization problem: a device is 'unauthorized'. Unlock the phone "
+                "and accept the 'Allow USB debugging' prompt, then retry.")
+    if "no devices/emulators" in low or not devices:
+        return ("No device visible to adb. In order of likelihood: (1) USB debugging "
+                "is off in Developer options, (2) the cable is charge-only or the port "
+                "is not a data port, (3) the Windows driver is missing or not signed - "
+                "check Device Manager for an unrecognised device with a warning icon. "
+                "For wireless: turn on Wireless debugging and pair, or run "
+                "'adb connect <host>:<port>'.")
+    if "offline" in low:
+        return "A device is offline - see the adb output above."
+    return "See the raw adb output above."
+
+
+def tool_ui_connect(target=None, wait=10):
+    """Reach an Android device. Reports what is connected, or tries to connect
+    over TCP/IP and reports exactly why it could not."""
+    devs, raw = _adb_connected_devices()
+    online = [d for d in devs if d[1] == "device"]
+    if online:
+        serial, _state, transport = online[0]
+        return True, ("already connected: %s over %s\n%s"
+                      % (serial, transport, _device_facts(online[0])))
+    tried = []
+    candidates = []
+    if target:
+        candidates.append(str(target).strip())
+    else:
+        # Wireless debugging advertises itself over mDNS; this is how the phone
+        # is found without a hard-coded IP (DHCP reassigns constantly).
+        ok, mdns = _ui_adb(["mdns", "services"], timeout=20, cap=3000)
+        if ok and mdns:
+            for line in str(mdns).splitlines():
+                low = line.lower()
+                if "adb" not in low or "connect" not in low:
+                    continue
+                for tok in str(line).replace("\t", " ").split():
+                    if ":" in tok and not tok.lower().endswith("._tcp."):
+                        host = tok.replace("._tcp.", "")
+                        if host.count(":") == 1 and not host.endswith(":"):
+                            candidates.append(host)
+        env = (os.environ.get("ACE_ADB_TARGETS") or "").replace(";", ",")
+        for part in env.split(","):
+            part = part.strip()
+            if part and ":" in part:
+                candidates.append(part)
+    seen = set()
+    for cand in candidates:
+        if cand in seen:
+            continue
+        seen.add(cand)
+        ok, out = _ui_adb(["connect", cand], timeout=int(wait or 10) + 5, cap=1200)
+        tried.append("  adb connect %s -> %s" % (cand, (out or "").strip() or "no output"))
+        if ok and "connected to" in str(out).lower():
+            devs2, _r2 = _adb_connected_devices()
+            live = [d for d in devs2 if d[1] == "device"]
+            if live:
+                serial, _s, transport = live[0]
+                return True, ("connected: %s over %s\n%s\n(attempt log)\n%s"
+                              % (serial, transport, _device_facts(live[0]),
+                                 "\n".join(tried)))
+    detail = ("\n".join(tried) if tried else
+              "no connection target to try: no wireless-debugging mDNS service was "
+              "advertised and ACE_ADB_TARGETS is unset")
+    devs3, raw3 = _adb_connected_devices()
+    return False, ("NOT CONNECTED - no Android device is reachable.\n"
+                   "adb said: %s\n%s\ndiagnosis: %s"
+                   % (str(raw3 or raw or "").strip()[:400], detail,
+                      _adb_diagnose(devs3, raw3 or raw)))
+
+
+def _device_facts(entry):
+    """device id, screen size, density and foreground app for one device."""
+    serial = entry[0] if isinstance(entry, (tuple, list)) else str(entry)
+    size = _ui_adb(["shell", "wm", "size"], timeout=20)[1]
+    dens = _ui_adb(["shell", "wm", "density"], timeout=20)[1]
+    fg = ""
+    ok, acts = _ui_adb(["shell", "dumpsys", "activity", "activities"],
+                       timeout=45, cap=120000)
+    if ok:
+        for line in str(acts).splitlines():
+            if "topResumedActivity" in line or "ResumedActivity:" in line:
+                fg = line.strip()
+                if "ResumedActivity" in fg:
+                    break
+    return ("device id: %s\nscreen: %s\ndensity: %s\nforeground app: %s"
+            % (serial, str(size).strip(), str(dens).strip(), fg or "(unknown)"))
+
+
 def tool_ui_device():
-    ok, out = _ui_adb(["devices"])
-    size = ""
-    ok2, size = _ui_adb(["shell", "wm", "size"])
-    ok3, dens = _ui_adb(["shell", "wm", "density"])
-    return True, "%s\nscreen: %s | density: %s" % (out, size, dens)
+    devs, raw = _adb_connected_devices()
+    online = [d for d in devs if d[1] == "device"]
+    if online:
+        return True, _device_facts(online[0])
+    # Nothing online: say so plainly, with the raw adb output and a diagnosis,
+    # instead of returning an empty device list that reads like an answer.
+    return False, ("NOT CONNECTED - no Android device is reachable.\n"
+                   "adb said: %s\ndiagnosis: %s"
+                   % (str(raw or "").strip()[:400], _adb_diagnose(devs, raw)))
 
 
 def tool_ui_app_open():
@@ -6764,6 +6901,7 @@ TOOLS = {
     "flutter_test": (tool_flutter_test, ("path",)),
     "flutter_analyze": (tool_flutter_analyze, ()),
     "ui_device": (tool_ui_device, ()),
+    "ui_connect": (tool_ui_connect, ("target", "wait")),
     "ui_app_open": (tool_ui_app_open, ()),
     "ui_tap": (tool_ui_tap, ("x", "y")),
     "ui_swipe": (tool_ui_swipe, ("x1", "y1", "x2", "y2", "duration")),
@@ -6878,8 +7016,16 @@ TOOLS_SCHEMA = [
         "description": "Static analysis via `flutter analyze`. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "ui_device",
-        "description": "Show connected Android devices, screen size and density. Args: none.",
+        "description": "Report the connected Android device: device id, screen size, density, foreground app, and whether it is USB or TCP/IP. If no device is connected this FAILS and explains whether it is a cable, driver, or authorization problem. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_connect",
+        "description": "Connect to an Android device. Call this FIRST for any 'connect to my phone' task. If a device is already online it reports device id, screen size, foreground app and transport. Otherwise it looks for a wireless-debugging (mDNS) target and runs 'adb connect', then reports the exact adb error and a diagnosis. Args: target (optional host:port to connect to), wait (optional seconds per attempt).",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "title": "target",
+                       "description": "OPTIONAL. host:port to connect to, e.g. 192.168.0.100:5555. Omit to auto-discover via mDNS."},
+            "wait": {"type": "integer", "title": "wait",
+                     "description": "OPTIONAL. Seconds to allow each adb connect attempt. Default 10."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "ui_app_open",
         "description": "Launch the StudentSyncSA app on the connected device. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -7091,8 +7237,14 @@ TOOLS_SCHEMA = [
 # Tool names MUST match TOOLS keys (the executor only accepts those).
 OLLAMA_TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "ui_device",
-        "description": "List connected Android devices + screen size/density.",
+        "description": "Device id, screen size, density, foreground app, USB or TCP/IP. Fails with a diagnosis if none connected.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_connect",
+        "description": "Connect to an Android device. Call FIRST for 'connect to my phone'. Auto-discovers over mDNS and runs adb connect; reports the exact adb error and diagnosis on failure. Args: target (optional host:port), wait (optional seconds).",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "title": "target", "description": "OPTIONAL host:port, e.g. 192.168.0.100:5555."},
+            "wait": {"type": "integer", "title": "wait", "description": "OPTIONAL seconds per attempt. Default 10."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "ui_app_open",
         "description": "Launch StudentSyncSA on the device. No args.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -7495,7 +7647,8 @@ NET_TOOLS_SCHEMA = [
 # dispatch loop consults ALLOWED_DOMAINS per request.
 _TOOL_DOMAINS = {
     # device UI work
-    "ui_device": "ui", "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
+    "ui_device": "ui", "ui_connect": "ui",
+    "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
     "ui_type": "ui", "ui_key": "ui", "ui_dump": "ui", "ui_screenshot": "ui",
     "ui_assert_text": "ui", "ui_assert_element": "ui", "ui_assert_visible": "ui",
     "ui_expect": "ui", "ui_test_run": "ui",
@@ -7622,6 +7775,39 @@ _CDP_MODEL_TASK_RE = re.compile(
     r'|\bdom\s+state\b'
     r'|\bjavascript\s+console\b',
     re.IGNORECASE)
+
+# Device CONNECTION and DIAGNOSIS asks must reach the model, not the
+# deterministic step parser. A phone-connect task parsed as a step list, ran
+# ui_dump with no phone attached, and answered "Done - steps executed:
+# ui_dump" with a scraped browser DOM.
+#
+# Scoped deliberately: these are connect/attach/diagnose intents, not the mere
+# word "android". A deterministic tap list for the app already on the phone
+# ("tap Login on the android app") is legitimate work for this executor, and
+# bailing on the bare noun would have broken the ITS flows this guard sits
+# next to. "connect to my phone", "adb", "device id", "USB or TCP/IP" are all
+# connection intent; "android" on its own is not.
+_PHONE_LINK_TASK_RE = re.compile(
+    r'\badb\b'
+    r'|\bscrcpy\b'
+    r'|\bauto[\s\-_]?connect\w*'
+    r'|\bwireless\s+debugging\b'
+    r'|\bdevice\s*(?:id|serial|list)\b'
+    r'|\bforeground\s+app\b'
+    r'|\busb\b'
+    r'|\btcp\s*/?\s*ip\b'
+    r'|\badb\s+over\s+(?:wi-?fi|network|usb)\b'
+    r'|\bconnect\s+(?:to\s+)?(?:my\s+|the\s+)?(?:android\s+)?(?:phone|device|tablet)\b'
+    r'|\b(?:phone|device|tablet)\s+(?:connect|attach|pair|enumeral)'
+    r'|\bunauthori[sz]ed\b'
+    r'|\bno\s+devices?/emulators\b',
+    re.IGNORECASE)
+
+
+def _needs_phone_link(user_message):
+    """True when the task is about reaching the device (connect / diagnose),
+    which the model-driven loop handles via the connect tools."""
+    return bool(_PHONE_LINK_TASK_RE.search(user_message or ""))
 
 
 def _needs_model_driven_ui(user_message):
@@ -9861,6 +10047,30 @@ def _is_select_field(field):
                           r'resreq|cellind|heard|custom-citz|citizen', field, re.IGNORECASE))
 
 
+def _enrich_webview(screen, adb_ok):
+    """Add the WebView's DOM form to a real Android screen dump.
+
+    Refuses when the ADB dump failed or was empty. Without this guard, a phone
+    task with no phone attached came back full of desktop-browser HTML: the ADB
+    dump failed, that failure was mistaken for "a sparse screen", and the
+    WebView form was scraped from whatever browser CDP happened to be attached
+    to - reported as if it were the phone's UI. A failed ADB dump is an error to
+    report, never a reason to go looking for a different screen.
+    """
+    if not adb_ok:
+        return screen
+    text = str(screen or "")
+    if not text.strip():
+        return screen
+    if text.count("tap(") > 2:
+        return screen
+    wv = _webview_dump()
+    if wv:
+        print("  ui_dump: WebView form detected (%d lines)" % len(wv.splitlines()))
+        return wv
+    return screen
+
+
 def _execute_ui_script(user_message):
     """Deterministic executor for explicit UI step lists. Returns a reply string
     if the message was handled (steps executed on the device), else None."""
@@ -9872,6 +10082,13 @@ def _execute_ui_script(user_message):
     # loop, where the cdp_* tools are available.
     if _needs_model_driven_ui(user_message):
         print("🧠 ui_script bail: URL/DevTools/CDP task - deferring to the "
+              "model-driven loop", flush=True)
+        return None
+    if _needs_phone_link(user_message):
+        # A connect/diagnose ask has no step list to execute. Parsing it produced
+        # a bare ui_dump, which with no phone attached reported browser DOM and
+        # answered "Done - steps executed: ui_dump".
+        print("📱 ui_script bail: device connect/diagnose task - deferring to the "
               "model-driven loop", flush=True)
         return None
     # Expand a saved-task shortcut ("do the ITS application again") into the
@@ -9907,14 +10124,15 @@ def _execute_ui_script(user_message):
             if ok:
                 screen = out
                 seen_screen = True
+            else:
+                # Surface the real ADB failure. Reporting it beats inventing a
+                # screen out of whatever browser is attached.
+                screen = "ui_dump FAILED: %s" % out
             done.append("ui_dump")
             # If the native dump is sparse (a WebView shows as a single node),
-            # enrich it with the WebView form so dropdowns/checkboxes are visible.
-            if screen.count("tap(") <= 2:
-                wv = _webview_dump()
-                if wv:
-                    screen = wv
-                    print("  ui_dump: WebView form detected (%d lines)" % len(wv.splitlines()))
+            # enrich it with the WebView form so dropdowns/checkboxes are
+            # visible. Only ever from a real hierarchy, never from a failure.
+            screen = _enrich_webview(screen, ok)
         elif action == "ui_screenshot":
             ok, out = _call_tool("ui_screenshot", {})
             done.append("ui_screenshot")
@@ -9931,9 +10149,7 @@ def _execute_ui_script(user_message):
                     _ok, _d = _ui_auto_dump()
                     if _ok:
                         screen = _d
-                    wv = _webview_dump()
-                    if wv:
-                        screen = wv
+                    screen = _enrich_webview(screen, _ok)
                     continue
             found = _dump_tap_point(screen, detail)
             pt = (found[0], found[1]) if found else None
@@ -9954,9 +10170,7 @@ def _execute_ui_script(user_message):
                     _ok, _d = _ui_auto_dump()
                     if _ok:
                         screen = _d
-                    wv = _webview_dump()
-                    if wv:
-                        screen = wv
+                    screen = _enrich_webview(screen, _ok)
                     continue
             if pt is None:
                 # Target is off-screen: scroll to find it (search down, then up).
@@ -10012,9 +10226,7 @@ def _execute_ui_script(user_message):
                     _ok, _d = _ui_auto_dump()
                     if _ok:
                         screen = _d
-                    wv = _webview_dump()
-                    if wv:
-                        screen = wv
+                    screen = _enrich_webview(screen, _ok)
                     continue
             found = _dump_tap_point(screen, field)
             pt = (found[0], found[1]) if found else None
@@ -10034,9 +10246,7 @@ def _execute_ui_script(user_message):
                     _ok, _d = _ui_auto_dump()
                     if _ok:
                         screen = _d
-                    wv = _webview_dump()
-                    if wv:
-                        screen = wv
+                    screen = _enrich_webview(screen, _ok)
                     continue
             if pt is None:
                 # Field is off-screen: scroll to find it (search down, then up).
@@ -10093,9 +10303,7 @@ def _execute_ui_script(user_message):
                 _ok, _d = _ui_auto_dump()
                 if _ok:
                     screen = _d
-                wv = _webview_dump()
-                if wv:
-                    screen = wv
+                screen = _enrich_webview(screen, _ok)
             continue
     # "read all the fields / information" — the form is usually taller than the
     # screen, so after the navigation steps scroll through it and collect every

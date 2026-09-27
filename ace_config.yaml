@@ -47,7 +47,8 @@ tool_caps:
             "run_command", "git_status", "git_log", "git_commit", "git_branch",
             "git_merge", "build_apk", "pub_add", "pub_remove", "pub_upgrade",
             "flutter_test", "flutter_analyze",
-            "ui_device", "ui_app_open", "ui_tap", "ui_swipe", "ui_type",
+              "ui_device", "ui_connect", "ui_app_open", "ui_tap", "ui_swipe", "ui_type",
+
             "ui_key", "ui_dump", "ui_screenshot",
             "ui_assert_text", "ui_assert_element", "ui_assert_visible",
             "ui_expect", "ui_test_run",
