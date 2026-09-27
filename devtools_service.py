@@ -538,6 +538,18 @@ def _get_session(force=False):
     with _session_lock:
         if _session is not None and not force and not getattr(_session, "_dead", False):
             return _session
+        # Carry the request history across a reconnect. A form submit that
+        # redirects tears down the WebSocket, the session is rebuilt, and the
+        # fresh one starts with an empty log - so the POST that caused the
+        # navigation is the one request that goes missing. Everything captured
+        # so far is a historical fact, so keep it and mark where it came from.
+        _carry = []
+        if _session is not None:
+            try:
+                with _lock:
+                    _carry = [dict(r) for r in _session.network_reqs.values()]
+            except Exception:
+                _carry = []
         if _session is not None:
             try:
                 _session.ws.close()
@@ -549,6 +561,15 @@ def _get_session(force=False):
             return None
         ws_url = tgt["webSocketDebuggerUrl"]
         sess = CdpSession(ws_url)
+        if _carry:
+            for _r in _carry:
+                _key = _r.get("requestId") or _r.get("cdp_id") or ("carried-%d" % id(_r))
+                if _key in sess.network_reqs:
+                    _key = "%s#carried" % _key
+                _r["carried_over"] = True
+                sess.network_reqs[_key] = _r
+            print("[cdp] carried %d request(s) across a reconnect" % len(_carry),
+                  flush=True)
         try:
             sess.connect()
         except Exception as e:
