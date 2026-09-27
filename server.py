@@ -3114,6 +3114,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _want_files = bool(re.search(
                         r"\b(file|files|folder|read|open|edit|save|document|"
                         r"download|desktop|documents)\b", (user_message or ""), re.I))
+                    # Same idea for the phone: the connect tools are only worth
+                    # their schema tokens when the task is about reaching a device.
+                    _want_device = _needs_phone_link(user_message)
                     if len(p) > 4 and p[4] == "compact":
                         # Ollama chosen via the model picker: use the compact schema
                         # and always route the pared-down local messages so the slow
@@ -3131,7 +3134,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                                    net_domain_schema or full_domain_schema)
                         msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
                         schema = build_reduced_schema(
-                            _base, want_files=_want_files,
+                            _base, want_files=_want_files, want_device=_want_device,
                             budget=_reduced_schema_budget(_budget, msgs, _base))
                         tc2 = tc
                     else:
@@ -3158,7 +3161,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         or_schema = build_reduced_schema(
                             _reduced_tool_pool(active_domain,
                                                net_domain_schema or full_domain_schema),
-                            want_files=_want_files, budget=OPENROUTER_REDUCED_BUDGET)
+                            want_files=_want_files, want_device=_want_device,
+                            budget=OPENROUTER_REDUCED_BUDGET)
                         or_msgs = reduced_messages(llm_messages, active_domain,
                                                    ctx_overlay)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
@@ -3219,7 +3223,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                                     ctx_overlay)
                         fwd_schema = build_reduced_schema(
                             _reduced_tool_pool(active_domain, fwd_schema),
-                            want_files=_want_files,
+                            want_files=_want_files, want_device=_want_device,
                             budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
@@ -8121,6 +8125,13 @@ _SHORT_DESCRIPTIONS = {
     "cdp_console_logs": "Read console messages from the attached page.",
     "cdp_status": "Report whether DevTools is attached, plus event counts.",
     # --- on-device UI ---
+    # ui_connect/ui_device need short descriptions or _short_tool() returns None
+    # for them and they vanish from the reduced schema entirely - they can sit in
+    # TOOLS_SCHEMA, in _REDUCED_TOOL_ORDER and in the protected set and still
+    # never reach the model, which is exactly how a phone task ended up with no
+    # connect tool at all.
+    "ui_connect": "Connect to an Android device (USB or wireless); on failure reports the adb error. Args: target (optional host:port), wait (optional seconds).",
+    "ui_device": "Report device id, screen size, density, foreground app, USB or TCP/IP.",
     "ui_app_open": "Launch an app on the connected Android device. Args: package.",
     "ui_tap": "Tap a point or the centre of an element. Args: x,y or label.",
     "ui_dump": "Dump the current screen as text with element bounds.",
@@ -8143,6 +8154,7 @@ _REDUCED_TOOL_ORDER = [
     "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
     "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
     "cdp_status",
+    "ui_connect", "ui_device",
     "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_screenshot",
     "run_command", "read_file",
 ]
@@ -8159,6 +8171,14 @@ _REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
     "ui_app_open", "ui_tap", "ui_dump", "ui_type", "ui_screenshot",
     "run_command",
 }
+
+# Tools a device-connect task cannot be done without, protected from shedding
+# only when the task actually is one. Adding these to _REDUCED_REQUIRED
+# outright would tax every browser task's schema budget to fix a phone task, and
+# ui_connect was missing from the reduced pool altogether: the model was never
+# offered it, so it reached for `adb devices -l` through run_command and then
+# filled the rest of the run with browser tools it did have.
+_REDUCED_DEVICE_REQUIRED = {"ui_connect", "ui_device"}
 
 # Budgets are TOTAL input tokens (system prompt + schema + history), matching
 # how Groq's ITPM and OpenRouter's balance are actually metered.
@@ -8392,7 +8412,8 @@ def _reduced_tool_pool(active_domain, fallback_schema):
     return fallback_schema
 
 
-def build_reduced_schema(base_schema, want_files=False, budget=None):
+def build_reduced_schema(base_schema, want_files=False, budget=None,
+                         want_device=False):
     """Task-shaped tool subset with one-sentence descriptions, ordered so the
     tools a network/UI task needs survive any budget-driven shedding.
 
@@ -8404,6 +8425,12 @@ def build_reduced_schema(base_schema, want_files=False, budget=None):
     allowed = [n for n in _REDUCED_TOOL_ORDER if n in by_name]
     if want_files and "read_file" in by_name and "read_file" not in allowed:
         allowed.append("read_file")
+    # A device-connect task needs the connect tools even if the budget would
+    # otherwise shed them.
+    if want_device:
+        for n in ("ui_connect", "ui_device"):
+            if n in by_name and n not in allowed:
+                allowed.append(n)
     tools = []
     for n in allowed:
         st = _short_tool(by_name[n])
@@ -8422,6 +8449,8 @@ def build_reduced_schema(base_schema, want_files=False, budget=None):
     protected = set(_REDUCED_REQUIRED)
     if want_files:
         protected.add("read_file")
+    if want_device:
+        protected |= _REDUCED_DEVICE_REQUIRED
     if budget:
         # Shed from the tail, skipping anything protected.
         i = len(tools) - 1
