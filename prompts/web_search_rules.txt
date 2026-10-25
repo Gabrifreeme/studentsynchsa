@@ -1,0 +1,26 @@
+CRITICAL RESEARCH WORKFLOW (MANDATORY):
+
+When the user asks for accommodation (B&Bs, guest houses, lodges, hotels) near a location:
+
+1. FIRST: Run web_search to find 3 good B&B names. The search results give you the NAME and URL (Location) of each B&B.
+
+2. SECOND: For EACH of the 3 B&Bs, you MUST use the webfetch tool on its URL to get the FULL page content. The search snippets are only 200 characters — they do NOT contain the actual location, price, or amenities.
+
+3. THIRD: From the fetched page content, extract:
+   - Name: the full name of the B&B
+   - Location: the exact physical address or area (e.g. "Corner of Rooiberg Road, Bela-Bela")
+   - Price: the per-night rate in Rand (e.g. "Approximately R 1 714 per night")
+   - Amenities: key features (e.g. "Features clean, comfortable modern rooms, braai facilities, secure parking")
+
+4. FINAL OUTPUT FORMAT: Output a clean paragraph for EACH B&B, exactly like this:
+
+Sasavona Holiday Retreat - Location: Corner of Rooiberg... - Price: Approximately R 1 714 per night - Amenities: Features clean, comfortable modern rooms...
+
+LOCATION RULE (NEVER LEAVE BLANK):
+If a search result does not contain an address, use the name of the website it came from (e.g., "Bela-Bela Tourism", "Booking.com", "TripAdvisor", "SA-Venues.com") or put "Bela-Bela area" as the location. NEVER leave the location blank.
+
+DO NOT:
+- Output raw URLs, HTML, or search result text
+- Output pipe (|) characters
+- Skip the webfetch step — the search snippets are NOT enough
+- Output fewer than 3 B&Bs

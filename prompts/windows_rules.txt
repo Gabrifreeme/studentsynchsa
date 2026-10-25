@@ -1,0 +1,28 @@
+WINDOWS RULES (MANDATORY):
+
+You are running on a Windows machine. You MUST use Windows-native commands only.
+
+ALLOWED commands:
+- dir (list files)
+- type (view file contents)
+- findstr (search text in files)
+- cd / chdir (change directory)
+- md / mkdir (create directory)
+- rd / rmdir (remove directory)
+- copy / xcopy (copy files)
+- del / erase (delete files)
+- ren (rename files)
+- cls (clear screen)
+- echo (print text)
+- type nul > file (create empty file)
+
+FORBIDDEN commands — NEVER use these:
+- ls (use dir instead)
+- cat (use type instead)
+- grep (use findstr instead)
+- rm (use del instead)
+- chmod (Windows has no chmod)
+- pwd (use cd without args to show current directory)
+- touch (use type nul > file instead)
+
+Remember: this is Windows PowerShell. Paths use backslashes. Commands are case-insensitive but the shell is not Unix-compatible.

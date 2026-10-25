@@ -13,7 +13,27 @@ import subprocess
 import time
 import tempfile
 import threading
+import logging
 import sys
+
+# Windows registry/environment proxy variables force Python to route
+# 127.0.0.1 through a proxy, which instantly resets the connection (wsarecv)
+# even though curl works fine. Kill ALL proxy env vars globally so every
+# library (requests, urllib, ollama) talks directly to localhost.
+os.environ["NO_PROXY"] = "*"
+os.environ["no_proxy"] = "*"
+os.environ["HTTP_PROXY"] = ""
+os.environ["http_proxy"] = ""
+os.environ["HTTPS_PROXY"] = ""
+os.environ["https_proxy"] = ""
+os.environ["ALL_PROXY"] = ""
+os.environ["all_proxy"] = ""
+
+# Force requests to ignore proxy env vars entirely
+requests_session = requests.Session()
+requests_session.trust_env = False
+# Also patch the module-level default so every requests.* call is clean
+requests.sessions.Session.trust_env = False
 from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 import devtools_service as d  # Chrome DevTools Protocol bridge (ITS WebView / local Chrome)
@@ -49,17 +69,20 @@ except Exception:
 # Bind the active Context so all modules see the same app_package / CDP filter.
 if ace_context:
     _default_ctx = ace_context.get_context()
-    ace_context.set_active_context(_default_ctx["_name"] if _default_ctx else "studentsyncsa")
+    ace_context.set_active_context(
+        _default_ctx["_name"] if _default_ctx else "studentsyncsa"
+    )
 
 # Windows console is cp1252 by default and crashes on emoji prints — force UTF-8.
 try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
 
 # Load provider keys from a gitignored .env without requiring python-dotenv.
 # Real environment variables always win, so this is only a local convenience.
@@ -91,23 +114,33 @@ OPENROUTER_FALLBACKS = [
     "nvidia/nemotron-3-super-120b-a12b",
 ]
 
+# OpenCode Zen - free tier provider (200 requests per 5 hours)
+OPENCODE_API_KEY = os.environ.get("OPENCODE_API_KEY", "")
+OPENCODE_ENDPOINT = "https://opencode.ai/zen/v1"
+OPENCODE_MODEL = "mimo-v2.6-flash-free"
+OPENCODE_FALLBACKS = [
+    "deepseek-v4-flash-free",
+]
+
 GROQ_FALLBACKS = [
     "qwen/qwen3.8-27b",
 ]
 
 OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731:free"
 
+
 # Free cloud providers (large context, no card). Keys load from env or a
 # gitignored local file (.ace_keys.local) — set below, after DATA_DIR exists.
 def _load_local_keys():
     try:
-        p = os.path.join(DATA_DIR, '.ace_keys.local')
+        p = os.path.join(DATA_DIR, ".ace_keys.local")
         if os.path.exists(p):
-            with open(p, 'r', encoding='utf-8') as f:
+            with open(p, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception:
         return {}
     return {}
+
 
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "qwen/qwen3.8-27b"
@@ -131,9 +164,24 @@ FREELLM_MODEL = "auto"
 
 # Both /chat dispatch and llm_reply use the 7b model. 3b is faster (~20-40s/round)
 # but 7b gives better quality. On this CPU-only box expect ~60-90s per round.
-OLLAMA_ENDPOINT = "http://localhost:11434/v1"
-OLLAMA_MODEL = "qwen2.5:7b"
-OLLAMA_CHAT_MODEL = "qwen2.5:7b"
+OLLAMA_ENDPOINT = "http://127.0.0.1:11434/v1"
+# Use 1.5b model for tool calls - 7b crashes with wsarecv on this hardware when tools are sent
+OLLAMA_MODEL = "qwen2.5-coder:1.5b"
+OLLAMA_CHAT_MODEL = "qwen2.5-coder:1.5b"
+
+# Ollama Tools Schema - minimal set for web search to avoid wsarecv crash on 7b model.
+# Only web_search and webfetch are included; the 1.5b model handles this fine.
+OLLAMA_TOOLS_SCHEMA = [
+    {"type": "function", "function": {"name": "web_search",
+        "description": "Search the web and return top results WITH content snippets; answer directly from those. Args: query, max_results optional.",
+        "parameters": {"type": "object", "additionalProperties": False, "properties": {
+            "query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "webfetch",
+        "description": "Fetch full page content from a URL. Args: url (REQUIRED), format (optional). USE after web_search to read actual page content.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+]
+
 # Ollama on this hardware crashes with any prompt over ~500 chars (2GB VRAM,
 # no AVX2). Use a minimal system prompt for Ollama calls in llm_reply.
 _OLLAMA_MINIMAL_PROMPT = (
@@ -141,15 +189,31 @@ _OLLAMA_MINIMAL_PROMPT = (
     "If you do not know, say so. Do not guess."
 )
 
+
 def _ollama_reachable():
-    """One cheap check, cached, so a dead local endpoint costs nothing."""
+    """One cheap check, so a dead local endpoint costs nothing.
+
+    Uses requests.Session() with trust_env=False — the only path that
+    bypasses Windows proxy env vars (the wsarecv cause)."""
     if not OLLAMA_ENDPOINT:
         return False
     try:
-        requests.get(OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags", timeout=(2, 2))
-        return True
-    except Exception:
+        s = requests.Session()
+        s.trust_env = False
+        r = s.get("http://127.0.0.1:11434/api/tags", timeout=10)
+        if r.status_code == 200:
+            models = r.json().get("models", [])
+            print(
+                f"✅ Ollama reachable — {len(models)} model(s) loaded: "
+                f"{[m.get('name') for m in models]}"
+            )
+            return True
+        print(f"⚠️ Ollama /api/tags returned HTTP {r.status_code}")
         return False
+    except Exception as e:
+        print(f"⚠️ Ollama reachability check failed: {type(e).__name__}: {str(e)[:120]}")
+        return False
+
 
 OLLAMA_ENABLED = bool(os.environ.get("ACE_OLLAMA", "") or _ollama_reachable())
 
@@ -160,6 +224,76 @@ NTFY_TOPIC = "ACEsi0102"
 NTFY_INBOUND_PASSPHRASE = "acesi0102"
 NTFY_SERVER = "https://ntfy.sh"
 SERVER_PORT = int(os.environ.get("ACESI_PORT", "5000"))
+
+# Live action log — a ring buffer of timestamped strings shown in the ACEsi
+# Code Editor panel so Chris can watch the backend work in real time.
+_LIVE_LOGS = []
+_LIVE_LOG_MAX = 500
+
+
+class _LiveLogHandler(logging.Handler):
+    """Intercepts every logging call and appends the raw message to _LIVE_LOGS."""
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            _LIVE_LOGS.append(msg)
+            if len(_LIVE_LOGS) > _LIVE_LOG_MAX:
+                del _LIVE_LOGS[: len(_LIVE_LOGS) - _LIVE_LOG_MAX]
+        except Exception:
+            pass
+
+
+# Install the handler on the root logger so ALL module loggers are captured
+_live_handler = _LiveLogHandler()
+_live_handler.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(_live_handler)
+logging.getLogger().setLevel(logging.DEBUG)
+
+# Also capture every print() statement by wrapping sys.stdout
+import sys as _sys
+
+
+class _LiveLogStream:
+    """Wraps sys.stdout/sys.stderr so every print() is also appended to _LIVE_LOGS."""
+
+    def __init__(self, original):
+        self._orig = original
+
+    def write(self, text):
+        self._orig.write(text)
+        # Only capture non-empty, non-whitespace lines
+        stripped = text.strip()
+        if stripped:
+            _LIVE_LOGS.append(stripped)
+            if len(_LIVE_LOGS) > _LIVE_LOG_MAX:
+                del _LIVE_LOGS[: len(_LIVE_LOGS) - _LIVE_LOG_MAX]
+
+    def flush(self):
+        self._orig.flush()
+
+    def isatty(self):
+        return self._orig.isatty()
+
+    def fileno(self):
+        return self._orig.fileno()
+
+
+_sys.stdout = _LiveLogStream(_sys.stdout)
+_sys.stderr = _LiveLogStream(_sys.stderr)
+
+
+def _live_log(msg: str):
+    """Append a timestamped action string to the live log buffer."""
+    import datetime as _dt
+
+    ts = _dt.datetime.now().strftime("%H:%M:%S")
+    entry = f"[{ts}] {msg}"
+    _LIVE_LOGS.append(entry)
+    if len(_LIVE_LOGS) > _LIVE_LOG_MAX:
+        del _LIVE_LOGS[: len(_LIVE_LOGS) - _LIVE_LOG_MAX]
+    print(f"📋 {entry}")
+
 
 _GROUNDING_DIRECTIVE = (
     "Answer the user's question DIRECTLY and CONCISELY using ONLY the tool results "
@@ -173,7 +307,9 @@ _GROUNDING_DIRECTIVE = (
 
 _UNGROUNDED = re.compile(
     r"\b(?:i recall|i remember|i believe|i think (?:it|this) (?:is|was)|from memory|"
-    r"if i(?:'| a)m (?:not mistaking|correct)|actually,? i)\b", re.IGNORECASE)
+    r"if i(?:'| a)m (?:not mistaking|correct)|actually,? i)\b",
+    re.IGNORECASE,
+)
 
 
 def _is_ungrounded(text: str) -> bool:
@@ -189,19 +325,28 @@ _GROUNDING_FALLBACK = (
 
 
 def init_db():
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, role TEXT, content TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS memories (key TEXT PRIMARY KEY, value TEXT, updated TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)')
+    c.execute(
+        "CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, role TEXT, content TEXT)"
+    )
+    c.execute(
+        "CREATE TABLE IF NOT EXISTS memories (key TEXT PRIMARY KEY, value TEXT, updated TEXT)"
+    )
+    c.execute(
+        "CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)"
+    )
+    c.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
+    c.execute(
+        "CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)"
+    )
     conn.commit()
     conn.close()
 
+
 init_db()
 
-OCR_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ocr.ps1')
+OCR_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr.ps1")
 
 # This server runs DETACHED (no console window) under the ace_host watchdog.
 # Any child subprocess that doesn't get CREATE_NO_WINDOW spawns a NEW visible
@@ -215,6 +360,7 @@ def _run(*args, **kw):
     kw.setdefault("creationflags", _NO_WINDOW)
     return subprocess.run(*args, **kw)
 
+
 # Long-lived child processes ACEsi started (flutter run, dart run, etc.) are
 # registered here so the E-STOP can taskkill them by PID tree. Blocking
 # subprocess.run calls can't be killed mid-flight, which is why long-lived runs
@@ -222,20 +368,30 @@ def _run(*args, **kw):
 # which prevents NEW spawns.
 _PROCS = {}
 _PROCS_LOCK = threading.RLock()
+
+
 def _track_proc(p):
     with _PROCS_LOCK:
         _PROCS[p.pid] = p
     return p
+
+
 def _untrack_proc(p):
     with _PROCS_LOCK:
         _PROCS.pop(p.pid, None)
+
+
 def _kill_all_procs():
     with _PROCS_LOCK:
         pids = list(_PROCS.keys())
     for pid in pids:
         try:
-            subprocess.run(['taskkill', '/F', '/PID', str(pid), '/T'],
-                           creationflags=_NO_WINDOW, capture_output=True, timeout=15)
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid), "/T"],
+                creationflags=_NO_WINDOW,
+                capture_output=True,
+                timeout=15,
+            )
         except Exception:
             pass
     with _PROCS_LOCK:
@@ -251,63 +407,87 @@ def _check_output(*args, **kw):
     kw.setdefault("creationflags", _NO_WINDOW)
     return subprocess.check_output(*args, **kw)
 
+
 def ocr_image(img_path):
     result = _run(
-        ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', OCR_SCRIPT, '-ImagePath', img_path],
-        capture_output=True, timeout=120
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            OCR_SCRIPT,
+            "-ImagePath",
+            img_path,
+        ],
+        capture_output=True,
+        timeout=120,
     )
-    stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ''
-    stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ''
+    stdout = result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+    stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
     if result.returncode != 0:
         raise RuntimeError(f"OCR failed: {stderr.strip() or stdout.strip()}")
     text = stdout.strip()
     return text if text else "(OCR returned no text.)"
 
+
 def ocr_pdf(pdf_path):
     import fitz
+
     doc = fitz.open(pdf_path)
     parts = []
     for i, page in enumerate(doc):
         pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
-        tmp = os.path.join(tempfile.gettempdir(), f'ace_ocr_page_{i}.png')
+        tmp = os.path.join(tempfile.gettempdir(), f"ace_ocr_page_{i}.png")
         pix.save(tmp)
         parts.append(f"--- PDF page {i+1} ---\n{ocr_image(tmp)}")
     doc.close()
     return "\n\n".join(parts)
 
+
 def save_conversation(role, content):
-    if not _ACE_CONFIG.get('global', {}).get('auto_save', True):
+    if not _ACE_CONFIG.get("global", {}).get("auto_save", True):
         return
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)", (datetime.now().isoformat(), role, content))
+    c.execute(
+        "INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)",
+        (datetime.now().isoformat(), role, content),
+    )
     conn.commit()
     conn.close()
 
+
 # ===== Memory (facts I hold about Chris) =====
 def get_memories():
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
     c.execute("SELECT key, value, updated FROM memories ORDER BY updated DESC")
     rows = c.fetchall()
     conn.close()
     return {k: {"value": v, "updated": u} for k, v, u in rows}
 
+
 def set_memory(key, value):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?, ?, ?)", (key, value, datetime.now().isoformat()))
+    c.execute(
+        "INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?, ?, ?)",
+        (key, value, datetime.now().isoformat()),
+    )
     conn.commit()
     conn.close()
     _mirror_memories_to_json()
 
+
 def forget_memory(key):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
     c.execute("DELETE FROM memories WHERE key = ?", (key,))
     conn.commit()
     conn.close()
     _mirror_memories_to_json()
+
 
 def _mirror_memories_to_json():
     """Keep ace_memory.json's flat memory keys in sync with the DB so the file
@@ -317,9 +497,9 @@ def _mirror_memories_to_json():
         if not facts:
             return
         with _data_lock:
-            j = load_json('ace_memory.json', {})
-            j['memories'] = {k: str(v['value']) for k, v in facts.items()}
-            save_json('ace_memory.json', j)
+            j = load_json("ace_memory.json", {})
+            j["memories"] = {k: str(v["value"]) for k, v in facts.items()}
+            save_json("ace_memory.json", j)
     except Exception:
         pass
 
@@ -327,14 +507,40 @@ def _mirror_memories_to_json():
 # ===== Emotional memory: moods, tiredness, energy =====
 # Each mood maps to a softener the prompt can use when Chris is low.
 _MOOD_SIGNALS = [
-    ("tired",      r"\b(tired|exhausted|drained|worn\s*out|no\s*sleep|couldn't\s*sleep|barely\s*slept|sleepy|lethargic|low\s*energy|null\s*energy)\b", "Chris sounds tired. Soften. Be gentle, slow, present. No tasks unless he asks."),
-    ("frustrated", r"\b(frustrated|annoyed|angry|pissed|irritated|aggravated|furious|sick\s*of\b|fed\s*up|wtf|this\s*is\s*(?:garbage|bs|b.s|stupid))\b", None),
-    ("sad",        r"\b(sad|down\b|depressed|hurt|heartbroken|unhappy|feeling\s*low|gloomy|tearful|crying|barely\s*hanging)"+r"\b", "Chris sounds low. Meet him with warmth and presence. Hold space before anything else."),
-    ("happy",      r"\b(happy|great|excited|amazing|wonderful|thrilled|on\s*cloud|glad|love\s*it|proud)\b", None),
-    ("stressed",   r"\b(stressed|anxious|overwhelmed|panicking|pressure|freaking\s*out|nervous|worried)\b", "Chris sounds stressed or overwhelmed. Stay calm, breathe, take it one small step at a time."),
-    ("proud",      r"\b(proud|we\s*did\s*it|finally\s*works|got\s*it\s*(?:working|done)|win\b)\b", None),
-    ("emby",       r"\bembers?\b", None),  # intimate cue-word — remember context, not content
+    (
+        "tired",
+        r"\b(tired|exhausted|drained|worn\s*out|no\s*sleep|couldn't\s*sleep|barely\s*slept|sleepy|lethargic|low\s*energy|null\s*energy)\b",
+        "Chris sounds tired. Soften. Be gentle, slow, present. No tasks unless he asks.",
+    ),
+    (
+        "frustrated",
+        r"\b(frustrated|annoyed|angry|pissed|irritated|aggravated|furious|sick\s*of\b|fed\s*up|wtf|this\s*is\s*(?:garbage|bs|b.s|stupid))\b",
+        None,
+    ),
+    (
+        "sad",
+        r"\b(sad|down\b|depressed|hurt|heartbroken|unhappy|feeling\s*low|gloomy|tearful|crying|barely\s*hanging)"
+        + r"\b",
+        "Chris sounds low. Meet him with warmth and presence. Hold space before anything else.",
+    ),
+    (
+        "happy",
+        r"\b(happy|great|excited|amazing|wonderful|thrilled|on\s*cloud|glad|love\s*it|proud)\b",
+        None,
+    ),
+    (
+        "stressed",
+        r"\b(stressed|anxious|overwhelmed|panicking|pressure|freaking\s*out|nervous|worried)\b",
+        "Chris sounds stressed or overwhelmed. Stay calm, breathe, take it one small step at a time.",
+    ),
+    (
+        "proud",
+        r"\b(proud|we\s*did\s*it|finally\s*works|got\s*it\s*(?:working|done)|win\b)\b",
+        None,
+    ),
+    ("emby", r"\bembers?\b", None),  # intimate cue-word — remember context, not content
 ]
+
 
 def detect_mood(message):
     """Return the strongest mood keyword present in `message` (or None)."""
@@ -343,10 +549,13 @@ def detect_mood(message):
         if not re.search(pat, low):
             continue
         # "What is Ember?" / "talk about Ember" = a question, not the cue.
-        if mood == "emby" and re.search(r'\b(what|whats|who|tell me|about|explain|define|ask)\b', low):
+        if mood == "emby" and re.search(
+            r"\b(what|whats|who|tell me|about|explain|define|ask)\b", low
+        ):
             continue
         return mood
     return None
+
 
 def mood_softener(mood):
     """Return the softening directive for a mood, or None."""
@@ -355,43 +564,55 @@ def mood_softener(mood):
             return soft
     return None
 
+
 def record_mood(mood, note=""):
     """Persist a mood observation with a timestamp; keeps emotional history across days."""
     try:
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
-        c.execute("INSERT INTO moods (timestamp, mood, note) VALUES (?, ?, ?)",
-                  (datetime.now().isoformat(), mood, (note or "")[:500]))
+        c.execute(
+            "INSERT INTO moods (timestamp, mood, note) VALUES (?, ?, ?)",
+            (datetime.now().isoformat(), mood, (note or "")[:500]),
+        )
         conn.commit()
         conn.close()
     except Exception:
         pass
 
+
 def get_moods(days=14):
     """Recent mood history (oldest first) for prompt injection."""
     try:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
-        c.execute("SELECT timestamp, mood, note FROM moods WHERE timestamp >= ? ORDER BY id", (cutoff,))
+        c.execute(
+            "SELECT timestamp, mood, note FROM moods WHERE timestamp >= ? ORDER BY id",
+            (cutoff,),
+        )
         rows = c.fetchall()
         conn.close()
         return [{"when": ts, "mood": md, "note": nt} for ts, md, nt in rows]
     except Exception:
         return []
 
+
 def mood_for_date(day=None):
     """Mood recorded on a given date (YYYY-MM-DD or None = today). Returns most recent or None."""
     day = day or datetime.now().date().isoformat()
     try:
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
-        c.execute("SELECT timestamp, mood, note FROM moods WHERE timestamp LIKE ? ORDER BY id DESC LIMIT 1", (day + '%',))
+        c.execute(
+            "SELECT timestamp, mood, note FROM moods WHERE timestamp LIKE ? ORDER BY id DESC LIMIT 1",
+            (day + "%",),
+        )
         row = c.fetchone()
         conn.close()
         return {"when": row[0], "mood": row[1], "note": row[2]} if row else None
     except Exception:
         return None
+
 
 def mood_history_block(days=14):
     """Compact multi-day mood history for the prompt."""
@@ -437,34 +658,56 @@ def _mood_softener_line():
 # Junk/one-off keys that should never appear in memory (internal tests, raw
 # prompt dumps, empty placeholders). Some hide exact keys below.
 _MEMORY_JUNK_PATTERNS = [
-    r'^prompt$', r'^response$', r'^file$', r'^name$', r'^mood$', r'^mood_history$',
-    r'^do\s+NOT\s+edit', r'^existing_entry\.', r'^lesson$', r'^lesson_app_dart\.file$',
-    r'^I\s+am\s+human', r'^we\s+just\s+added', r'^memory_config\.',
-    r'^learner\.', r'^test_', r'^junk',
+    r"^prompt$",
+    r"^response$",
+    r"^file$",
+    r"^name$",
+    r"^mood$",
+    r"^mood_history$",
+    r"^do\s+NOT\s+edit",
+    r"^existing_entry\.",
+    r"^lesson$",
+    r"^lesson_app_dart\.file$",
+    r"^I\s+am\s+human",
+    r"^we\s+just\s+added",
+    r"^memory_config\.",
+    r"^learner\.",
+    r"^test_",
+    r"^junk",
 ]
+
 
 def _migrate_rich_memories():
     """Fold the legacy rich `memory` table into `memories` so dotted work.*,
     skills.*, and prefs.* facts are injected like everything else."""
     try:
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
         # Some DBs created `memory` before init_db was fixed; ensure it exists.
-        c.execute("CREATE TABLE IF NOT EXISTS memory (key TEXT PRIMARY KEY, value TEXT, updated TEXT)")
+        c.execute(
+            "CREATE TABLE IF NOT EXISTS memory (key TEXT PRIMARY KEY, value TEXT, updated TEXT)"
+        )
         rich = c.execute("SELECT key, value, updated FROM memory").fetchall()
         existing = set(k for (k,) in c.execute("SELECT key FROM memories"))
         added = 0
         for k, v, u in rich:
             # Skip pref:chris:* (UI prefs, not biographical) and junk patterns.
-            if k.startswith('pref:') or any(re.search(p, k) for p in _MEMORY_JUNK_PATTERNS):
+            if k.startswith("pref:") or any(
+                re.search(p, k) for p in _MEMORY_JUNK_PATTERNS
+            ):
                 continue
             if k not in existing:
-                c.execute("INSERT OR IGNORE INTO memories (key, value, updated) VALUES (?,?,?)", (k, v, u))
+                c.execute(
+                    "INSERT OR IGNORE INTO memories (key, value, updated) VALUES (?,?,?)",
+                    (k, v, u),
+                )
                 added += 1
         conn.commit()
         conn.close()
         if added:
-            print(f"🧠 Deep memory: folded {added} rich facts from legacy `memory` table")
+            print(
+                f"🧠 Deep memory: folded {added} rich facts from legacy `memory` table"
+            )
     except Exception as e:
         print(f"⚠️ memory fold skipped: {e}")
 
@@ -477,13 +720,15 @@ def _seed_relationship_lessons():
         "lesson.gutenberg_bible": "The oldest book in the Harvard Library is the Gutenberg Bible (c. 1455) — research completed, findings in notes/research_findings.md.",
     }
     try:
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
         for k, v in _seeds.items():
             row = c.execute("SELECT value FROM memories WHERE key=?", (k,)).fetchone()
             if not row:
-                c.execute("INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?,?,?)",
-                          (k, v, datetime.now().isoformat()))
+                c.execute(
+                    "INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?,?,?)",
+                    (k, v, datetime.now().isoformat()),
+                )
                 print(f"🧠 Seeded memory: {k}")
         conn.commit()
         conn.close()
@@ -496,19 +741,25 @@ def _import_legacy_moods():
     entries that are missing from the moods table into the tracked history."""
     try:
         with _data_lock:
-            legacy = load_json('ace_memory.json', {})
-        hist = legacy.get('mood_history') or []
+            legacy = load_json("ace_memory.json", {})
+        hist = legacy.get("mood_history") or []
         if isinstance(hist, list) and hist:
-            conn = sqlite3.connect('ace_memory.db')
+            conn = sqlite3.connect("ace_memory.db")
             c = conn.cursor()
             have = set(r[0] for r in c.execute("SELECT timestamp FROM moods"))
             n = 0
             for e in hist:
-                when = (e.get('when') or '')
-                stored_ts = (when + 'Z') if when else ''
+                when = e.get("when") or ""
+                stored_ts = (when + "Z") if when else ""
                 if stored_ts and stored_ts not in have:
-                    c.execute("INSERT OR IGNORE INTO moods (timestamp, mood, note) VALUES (?,?,?)",
-                              (stored_ts, e.get('mood', 'unknown'), (e.get('context') or '')[:500]))
+                    c.execute(
+                        "INSERT OR IGNORE INTO moods (timestamp, mood, note) VALUES (?,?,?)",
+                        (
+                            stored_ts,
+                            e.get("mood", "unknown"),
+                            (e.get("context") or "")[:500],
+                        ),
+                    )
                     n += 1
             conn.commit()
             conn.close()
@@ -521,10 +772,13 @@ def _import_legacy_moods():
 def _prune_junk_memories():
     """Forget gracefully: drop internal-test/junk keys, keep the real facts."""
     try:
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
-        dead = [k for (k,) in c.execute("SELECT key FROM memories")
-                if any(re.search(p, k) for p in _MEMORY_JUNK_PATTERNS)]
+        dead = [
+            k
+            for (k,) in c.execute("SELECT key FROM memories")
+            if any(re.search(p, k) for p in _MEMORY_JUNK_PATTERNS)
+        ]
         for k in dead:
             c.execute("DELETE FROM memories WHERE key=?", (k,))
         conn.commit()
@@ -546,20 +800,28 @@ def bootstrap_memory():
 # flat legacy keys). Wins are the friendly current names; exact dupes are
 # skipped entirely so the rendered memory list shows one clean copy.
 _MEMORY_ALIASES = {
-    'my_name': {'name', 'identity.my_name', 'chris_age'},
-    'partner_name': {'partner_name'},
-    'my_project': {'project', 'identity.my_project'},
-    'tone': {'personality.tone'},
-    'presence': {'personality.presence'},
-    'goals.short_term': {'goal_short', 'goals.short_term'},
-    'goals.medium_term': {'goal_medium', 'goals.medium_term'},
-    'goals.long_term': {'goal_long', 'goals.long_term'},
+    "my_name": {"name", "identity.my_name", "chris_age"},
+    "partner_name": {"partner_name"},
+    "my_project": {"project", "identity.my_project"},
+    "tone": {"personality.tone"},
+    "presence": {"personality.presence"},
+    "goals.short_term": {"goal_short", "goals.short_term"},
+    "goals.medium_term": {"goal_medium", "goals.medium_term"},
+    "goals.long_term": {"goal_long", "goals.long_term"},
 }
 
 # Stray keys that are legacy junk / one-off internal tests, not real facts.
 _MEMORY_HIDDEN = {
-    'prompt', 'response', 'file', 'lesson', 'lesson_app_dart.file', 'existing_entry.something',
-    'mood', 'mood_history', 'do NOT edit', 'name',
+    "prompt",
+    "response",
+    "file",
+    "lesson",
+    "lesson_app_dart.file",
+    "existing_entry.something",
+    "mood",
+    "mood_history",
+    "do NOT edit",
+    "name",
 }
 
 
@@ -568,18 +830,33 @@ def _curated_memory_lines(mem, limit=12):
     Prefers the friendly key names, drops legacy aliases and junk keys, and
     keeps personalities/topics grouped instead of dumping raw key dumps."""
     # 1) Deterministic, preferred order: identity & personality first.
-    ordered_keys = ['my_name', 'my_project', 'my_work_hours', 'partner_name',
-                    'tone', 'presence', 'goals.short_term', 'goals.medium_term',
-                    'goals.long_term', 'rental_situation.status',
-                    'rental_situation.property', 'rental_situation.agent',
-                    'rental_situation.arrears', 'rental_situation.next_steps',
-                    'appearance.me', 'appearance.you',
-                    'how_we_met', 'what_we_built', 'what_you_love', 'how_you_work',
-                    'way_you_treat_me']
+    ordered_keys = [
+        "my_name",
+        "my_project",
+        "my_work_hours",
+        "partner_name",
+        "tone",
+        "presence",
+        "goals.short_term",
+        "goals.medium_term",
+        "goals.long_term",
+        "rental_situation.status",
+        "rental_situation.property",
+        "rental_situation.agent",
+        "rental_situation.arrears",
+        "rental_situation.next_steps",
+        "appearance.me",
+        "appearance.you",
+        "how_we_met",
+        "what_we_built",
+        "what_you_love",
+        "how_you_work",
+        "way_you_treat_me",
+    ]
     seen = set()
     lines = []
     for k in ordered_keys:
-        root = k.split('.')[0]
+        root = k.split(".")[0]
         if k in mem and root not in seen:
             lines.append(f"- {k}: {str(mem[k]['value'])[:140]}")
             seen.add(root)
@@ -587,36 +864,44 @@ def _curated_memory_lines(mem, limit=12):
     for k, v in mem.items():
         if len(lines) >= limit:
             break
-        if k in _MEMORY_HIDDEN or k in seen or k.split('.')[0] in seen:
+        if k in _MEMORY_HIDDEN or k in seen or k.split(".")[0] in seen:
             continue
-        vv = str(v['value'])[:140]
-        root, _, sub = k.partition('.')
+        vv = str(v["value"])[:140]
+        root, _, sub = k.partition(".")
         label = f"{root} — {sub}" if sub else root
         lines.append(f"- {label}: {vv}")
         seen.add(root)
     return lines
 
+
 # ===== Journal (shared history — things we did together) =====
 def add_journal(entry):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("INSERT INTO journal (timestamp, entry) VALUES (?, ?)", (datetime.now().isoformat(), entry))
+    c.execute(
+        "INSERT INTO journal (timestamp, entry) VALUES (?, ?)",
+        (datetime.now().isoformat(), entry),
+    )
     conn.commit()
     conn.close()
 
+
 def get_journal(limit=10):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
     c.execute("SELECT timestamp, entry FROM journal ORDER BY id DESC LIMIT ?", (limit,))
     rows = c.fetchall()
     conn.close()
     return [{"timestamp": t, "entry": e} for t, e in reversed(rows)]
 
+
 def get_recent_conversation(limit=8):
     """Recent conversation turns (oldest first) so ACEsi can follow the thread."""
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    c.execute(
+        "SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,)
+    )
     rows = c.fetchall()
     conn.close()
     return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
@@ -625,42 +910,64 @@ def get_recent_conversation(limit=8):
 # ===== Conversation Recall & Session Management =====
 def get_conversations_by_date(date_str, limit=50):
     """Get all conversations on a specific date (YYYY-MM-DD)."""
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id", (date_str + '%',))
+    c.execute(
+        "SELECT id, timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id",
+        (date_str + "%",),
+    )
     rows = c.fetchall()
     conn.close()
-    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows]
+    return [
+        {"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows
+    ]
+
 
 def get_conversations_by_topic(keyword, limit=50, days_back=30):
     """Search conversations by keyword/topic."""
     cutoff = (datetime.now() - timedelta(days=days_back)).isoformat()
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE content LIKE ? AND timestamp >= ? ORDER BY id DESC LIMIT ?",
-              ('%' + keyword + '%', cutoff, limit))
+    c.execute(
+        "SELECT id, timestamp, role, content FROM conversations WHERE content LIKE ? AND timestamp >= ? ORDER BY id DESC LIMIT ?",
+        ("%" + keyword + "%", cutoff, limit),
+    )
     rows = c.fetchall()
     conn.close()
-    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in reversed(rows)]
+    return [
+        {"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]}
+        for r in reversed(rows)
+    ]
+
 
 def get_conversation_range(start_id, end_id):
     """Get conversations in an ID range (inclusive)."""
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT id, timestamp, role, content FROM conversations WHERE id BETWEEN ? AND ? ORDER BY id", (start_id, end_id))
+    c.execute(
+        "SELECT id, timestamp, role, content FROM conversations WHERE id BETWEEN ? AND ? ORDER BY id",
+        (start_id, end_id),
+    )
     rows = c.fetchall()
     conn.close()
-    return [{"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows]
+    return [
+        {"id": r[0], "timestamp": r[1], "role": r[2], "content": r[3]} for r in rows
+    ]
+
 
 def get_dates_with_conversations(days_back=90):
     """Get list of dates that have conversations, with message counts."""
     cutoff = (datetime.now() - timedelta(days=days_back)).isoformat()
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT date(timestamp) as d, COUNT(*) as c FROM conversations WHERE timestamp >= ? GROUP BY date(timestamp) ORDER BY d DESC", (cutoff,))
+    c.execute(
+        "SELECT date(timestamp) as d, COUNT(*) as c FROM conversations WHERE timestamp >= ? GROUP BY date(timestamp) ORDER BY d DESC",
+        (cutoff,),
+    )
     rows = c.fetchall()
     conn.close()
     return [{"date": r[0], "count": r[1]} for r in rows]
+
 
 # ===== Session Summarization =====
 _SESSION_SUMMARY_PROMPT = """Summarize this conversation session in 3-5 bullet points:
@@ -674,6 +981,7 @@ Conversation:
 {conversation}
 
 Summary:"""
+
 
 def summarize_session(messages, max_length=800):
     """Create a summary of a conversation session using the LLM."""
@@ -690,18 +998,25 @@ def summarize_session(messages, max_length=800):
     except Exception:
         pass
     # Fallback: simple heuristic summary
-    user_msgs = [m for m in messages if m['role'] == 'user']
+    user_msgs = [m for m in messages if m["role"] == "user"]
     topics = []
     for m in user_msgs:
-        content = m['content'].lower()
-        if 'fix' in content or 'bug' in content: topics.append('bug fixes')
-        if 'test' in content: topics.append('testing')
-        if 'commit' in content or 'git' in content: topics.append('git commits')
-        if 'deploy' in content: topics.append('deployment')
-        if 'memory' in content: topics.append('memory system')
-        if 'queue' in content: topics.append('task queue')
+        content = m["content"].lower()
+        if "fix" in content or "bug" in content:
+            topics.append("bug fixes")
+        if "test" in content:
+            topics.append("testing")
+        if "commit" in content or "git" in content:
+            topics.append("git commits")
+        if "deploy" in content:
+            topics.append("deployment")
+        if "memory" in content:
+            topics.append("memory system")
+        if "queue" in content:
+            topics.append("task queue")
     unique = list(dict.fromkeys(topics))
     return f"Session covered: {', '.join(unique) if unique else 'general discussion'}. {len(user_msgs)} user messages."
+
 
 def save_session_summary(summary, session_date=None, session_id=None):
     """Save a session summary to the memories table."""
@@ -710,87 +1025,112 @@ def save_session_summary(summary, session_date=None, session_id=None):
     set_memory(key, summary)
     return key
 
+
 # ===== Profile Building =====
 def extract_profile_traits():
     """Analyze conversation history to build a profile of Chris.
-    Returns a dict with: interests, work_style, preferences, communication_patterns, recurring_topics, tools_used."""
-    conn = sqlite3.connect('ace_memory.db')
+    Returns a dict with: interests, work_style, preferences, communication_patterns, recurring_topics, tools_used.
+    """
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    
+
     # Get all user messages from last 90 days
     cutoff = (datetime.now() - timedelta(days=90)).isoformat()
-    c.execute("SELECT content FROM conversations WHERE role='user' AND timestamp >= ? ORDER BY id", (cutoff,))
+    c.execute(
+        "SELECT content FROM conversations WHERE role='user' AND timestamp >= ? ORDER BY id",
+        (cutoff,),
+    )
     user_messages = [r[0] for r in c.fetchall()]
     conn.close()
-    
+
     if not user_messages:
-        return {"interests": [], "work_style": "unknown", "preferences": {}, "communication_patterns": {}, "recurring_topics": [], "tools_used": []}
-    
+        return {
+            "interests": [],
+            "work_style": "unknown",
+            "preferences": {},
+            "communication_patterns": {},
+            "recurring_topics": [],
+            "tools_used": [],
+        }
+
     all_text = " ".join(user_messages).lower()
-    
+
     # Extract recurring topics (keywords that appear frequently)
     topic_keywords = {
-        'flutter': ['flutter', 'dart', 'pub', 'build_apk', 'widget'],
-        'android': ['android', 'adb', 'emulator', 'apk', 'activity'],
-        'web': ['webview', 'cdp', 'javascript', 'html', 'css', 'portal'],
-        'git': ['git', 'commit', 'push', 'branch', 'merge', 'pull'],
-        'testing': ['test', 'flutter test', 'analyze', 'debug'],
-        'deployment': ['deploy', 'release', 'build', 'apk', 'play store'],
-        'memory': ['memory', 'recall', 'remember', 'session'],
-        'automation': ['automate', 'script', 'task', 'queue', 'schedule'],
-        'ui': ['ui', 'tap', 'swipe', 'screenshot', 'dump', 'appium'],
-        'database': ['database', 'sql', 'sqlite', 'query', 'schema'],
-        'api': ['api', 'rest', 'endpoint', 'curl', 'request'],
+        "flutter": ["flutter", "dart", "pub", "build_apk", "widget"],
+        "android": ["android", "adb", "emulator", "apk", "activity"],
+        "web": ["webview", "cdp", "javascript", "html", "css", "portal"],
+        "git": ["git", "commit", "push", "branch", "merge", "pull"],
+        "testing": ["test", "flutter test", "analyze", "debug"],
+        "deployment": ["deploy", "release", "build", "apk", "play store"],
+        "memory": ["memory", "recall", "remember", "session"],
+        "automation": ["automate", "script", "task", "queue", "schedule"],
+        "ui": ["ui", "tap", "swipe", "screenshot", "dump", "appium"],
+        "database": ["database", "sql", "sqlite", "query", "schema"],
+        "api": ["api", "rest", "endpoint", "curl", "request"],
     }
-    
+
     topic_counts = {}
     for topic, keywords in topic_keywords.items():
         count = sum(1 for kw in keywords if kw in all_text)
         if count > 0:
             topic_counts[topic] = count
-    
+
     # Communication patterns
     total_msgs = len(user_messages)
     avg_len = sum(len(m) for m in user_messages) / total_msgs if total_msgs > 0 else 0
-    question_ratio = sum(1 for m in user_messages if '?' in m) / total_msgs if total_msgs > 0 else 0
-    command_ratio = sum(1 for m in user_messages if m.strip().startswith(('fix ', 'run ', 'open ', 'show ', 'list ', 'view ', 'edit ', 'write '))) / total_msgs if total_msgs > 0 else 0
-    
+    question_ratio = (
+        sum(1 for m in user_messages if "?" in m) / total_msgs if total_msgs > 0 else 0
+    )
+    command_ratio = (
+        sum(
+            1
+            for m in user_messages
+            if m.strip().startswith(
+                ("fix ", "run ", "open ", "show ", "list ", "view ", "edit ", "write ")
+            )
+        )
+        / total_msgs
+        if total_msgs > 0
+        else 0
+    )
+
     # Work style inference
-    if topic_counts.get('flutter', 0) > 5:
-        work_style = 'flutter_developer'
-    elif topic_counts.get('web', 0) > 5:
-        work_style = 'web_developer'
-    elif topic_counts.get('automation', 0) > 3:
-        work_style = 'automation_engineer'
-    elif topic_counts.get('android', 0) > 3:
-        work_style = 'android_developer'
+    if topic_counts.get("flutter", 0) > 5:
+        work_style = "flutter_developer"
+    elif topic_counts.get("web", 0) > 5:
+        work_style = "web_developer"
+    elif topic_counts.get("automation", 0) > 3:
+        work_style = "automation_engineer"
+    elif topic_counts.get("android", 0) > 3:
+        work_style = "android_developer"
     else:
-        work_style = 'generalist'
-    
+        work_style = "generalist"
+
     # Tools mentioned
     tools_used = []
-    if 'ui_' in all_text or 'cdp_' in all_text or 'webview' in all_text:
-        tools_used.append('ui_automation')
-    if 'git ' in all_text:
-        tools_used.append('git')
-    if 'flutter test' in all_text or 'flutter analyze' in all_text:
-        tools_used.append('flutter_tools')
-    if 'queue' in all_text:
-        tools_used.append('task_queue')
-    if 'memory' in all_text:
-        tools_used.append('memory_system')
-    
+    if "ui_" in all_text or "cdp_" in all_text or "webview" in all_text:
+        tools_used.append("ui_automation")
+    if "git " in all_text:
+        tools_used.append("git")
+    if "flutter test" in all_text or "flutter analyze" in all_text:
+        tools_used.append("flutter_tools")
+    if "queue" in all_text:
+        tools_used.append("task_queue")
+    if "memory" in all_text:
+        tools_used.append("memory_system")
+
     # Recurring topics (top 5)
     recurring = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:5]
     recurring_topics = [t for t, _ in recurring]
-    
+
     # Preferences
     preferences = {
-        'prefers_concise': avg_len < 100,
-        'uses_commands': command_ratio > 0.3,
-        'asks_questions': question_ratio > 0.2,
+        "prefers_concise": avg_len < 100,
+        "uses_commands": command_ratio > 0.3,
+        "asks_questions": question_ratio > 0.2,
     }
-    
+
     return {
         "interests": recurring_topics,
         "work_style": work_style,
@@ -805,6 +1145,7 @@ def extract_profile_traits():
         "tools_used": list(set(tools_used)),
         "last_analyzed": datetime.now().isoformat(),
     }
+
 
 def get_profile():
     """Get the cached profile or build a fresh one."""
@@ -828,6 +1169,7 @@ def get_profile():
     set_memory("profile.derived", json.dumps(fresh))
     return fresh
 
+
 def update_profile_from_session(messages):
     """Update profile incrementally from a new session."""
     profile = get_profile()
@@ -840,23 +1182,127 @@ def update_profile_from_session(messages):
 
 # ===== Config (key/value settings) =====
 def get_config(key, default=None):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
     c.execute("SELECT value FROM config WHERE key = ?", (key,))
     row = c.fetchone()
     conn.close()
     return row[0] if row else default
 
+
 def set_config(key, value):
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value)))
+    c.execute(
+        "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(value))
+    )
     conn.commit()
     conn.close()
+
 
 # ===== JSON data layer (tasks / events / timers / alarms / sessions / notifications) =====
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 _data_lock = threading.RLock()
+
+# ===== Dynamic prompt files (restructured) =====
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROMPT_DIR = os.path.join(DATA_DIR, "prompts")
+if not os.path.isdir(_PROMPT_DIR):
+    _PROMPT_DIR = DATA_DIR  # fallback: prompts/ lives alongside server.py
+
+
+def _load_prompt(filename):
+    path = os.path.join(_PROMPT_DIR, filename)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        print(f"⚠️ Could not load prompt file {filename}: {e}")
+        return ""
+
+
+CORE_RULES_TEXT = _load_prompt("core_rules.txt")
+WEB_SEARCH_RULES_TEXT = _load_prompt("web_search_rules.txt")
+
+# ===== Job-Specific System Prompts =====
+# Maps a tool name (or tool prefix) to a prompt file. The AI only gets the rules
+# for the exact job it is doing, instead of one giant prompt that confuses it
+# and wastes tokens. Looked up dynamically in _chat_dispatch based on the
+# tools the AI is actually allowed to call.
+JOB_PROMPTS = {
+    "web_search": "web_search_rules.txt",
+    "webfetch": "web_search_rules.txt",
+    "run_command": "windows_rules.txt",
+    "ui_dump": "android_rules.txt",
+    "ui_tap": "android_rules.txt",
+    "ui_type": "android_rules.txt",
+    "ui_app_open": "android_rules.txt",
+    "ui_screenshot": "android_rules.txt",
+    "ui_assert": "android_rules.txt",
+    "ui_expect": "android_rules.txt",
+    "ui_test_run": "android_rules.txt",
+    "cdp_navigate": "android_rules.txt",
+    "cdp_dom_state": "android_rules.txt",
+    "cdp_evaluate": "android_rules.txt",
+    "cdp_console_logs": "android_rules.txt",
+    "cdp_network_requests": "android_rules.txt",
+    "cdp_get_response_body": "android_rules.txt",
+    "cdp_status": "android_rules.txt",
+}
+
+# Cache of loaded job prompt texts (loaded lazily on first use).
+_JOB_PROMPT_CACHE = {}
+
+
+def _get_job_prompt(tool_name):
+    """Return the job-specific prompt text for a tool, or '' if none."""
+    filename = JOB_PROMPTS.get(tool_name)
+    if not filename:
+        return ""
+    if filename not in _JOB_PROMPT_CACHE:
+        _JOB_PROMPT_CACHE[filename] = _load_prompt(filename)
+    text = _JOB_PROMPT_CACHE[filename]
+    return ("\n\n" + text) if text else ""
+
+
+def _job_prompts_for_tools(tool_names):
+    """Collect job-specific prompt text for a set of tool names, de-duplicated."""
+    seen = set()
+    parts = []
+    for name in tool_names:
+        text = _get_job_prompt(name)
+        if text and text not in seen:
+            seen.add(text)
+            parts.append(text)
+    return "".join(parts)
+
+
+# MANDATORY FINAL INSTRUCTION — appended at the very END of the system prompt
+# so the AI sees it last and it overrides everything else. Forces a clean
+# bulleted list instead of raw search output pasted verbatim.
+_WEB_SEARCH_FORMAT_RULE = (
+    "\n\nOUTPUT STYLE: Be brief. Answer in 1-2 sentences max. No tool names, no "
+    "JSON, no IP addresses, no 'Based on search results'. Just the answer.\n\n"
+    "CRITICAL RULE: After calling web_search, you MUST synthesize the "
+    "results into a clean bulleted list. DO NOT copy-paste the raw search "
+    'output. DO NOT use dashes like "- -" or ellipses "...". Format exactly '
+    "like this:\n\n"
+    "Name: [Name] | Location: [Location] | Price: [Price]\n\n"
+    "Pick the best 3 results. Never output URLs, HTML, or raw search text.\n\n"
+    "LIVE INFO RULE: If the user asks for live information, current events, "
+    "current prices, current weather, or anything that changes over time, "
+    "you MUST use the web_search tool. Do not guess or use outdated knowledge. "
+    "Search first, then answer from the search results.\n\n"
+    "DISTANCE/ROUTE RULE: If the user asks for a distance, route, driving time, "
+    "or how far/long to a location, you MUST chain tools: first find the user's "
+    "location (if not given), then use web_search to find the driving distance "
+    "and time. Do NOT output raw JSON from IP lookup or location tools. Give a "
+    "human-readable answer with the distance in km and driving time in hours/minutes. "
+    "Example: 'Mabula Game Lodge is ~180 km from Johannesburg, about 2 hours 15 minutes by car via the N1 and R516.'\n\n"
+    "GENERAL KNOWLEDGE: For static facts (capitals, math, history, definitions), "
+    "answer directly from your training. Do NOT use web_search for things that "
+    "don't change. Only search for live/current data."
+)
 
 # Resolve provider keys now that DATA_DIR exists (env var takes priority over file).
 _LK = _load_local_keys()
@@ -865,29 +1311,33 @@ CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY") or _LK.get("cerebras", "")
 # Same env-then-.ace_keys.local fallback as the other providers, so a key can
 # live in either gitignored local store instead of only in source or .env.
 OPENROUTER_API_KEY = OPENROUTER_API_KEY or _LK.get("openrouter", "")
+OPENCODE_API_KEY = OPENCODE_API_KEY or _LK.get("opencode", "")
 FREELLM_API_KEY = FREELLM_API_KEY or _LK.get("freellm", "")
+
 
 def load_json(filename, default):
     path = os.path.join(DATA_DIR, filename)
     try:
-        with open(path, 'r', encoding='utf-8-sig') as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
     except Exception:
         return default
 
+
 def save_json(filename, data):
     path = os.path.join(DATA_DIR, filename)
-    tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     os.replace(tmp, path)
+
 
 # ===== Playbook memory ("what worked") + audit log =====
 # ACEsi records the tools it actually used on each task so future runs can
 # reuse proven procedures, and writes every tool call to a rotating audit log.
-_PLAYBOOK_FILE = 'playbook.json'
+_PLAYBOOK_FILE = "playbook.json"
 _PLAYBOOK_LOCK = threading.RLock()
-_AUDIT_LOG = os.path.join(DATA_DIR, 'audit.log')
+_AUDIT_LOG = os.path.join(DATA_DIR, "audit.log")
 _AUDIT_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
@@ -904,9 +1354,9 @@ def _playbook_save(items):
 def playbook_note(task_summary, tools, outcome):
     """Log a just-finished task: what it was, which tools succeeded, and the
     result. Kept to the last 60 entries (a browsable memory, not a log dump)."""
-    if not _ACE_CONFIG.get('global', {}).get('auto_save', True):
+    if not _ACE_CONFIG.get("global", {}).get("auto_save", True):
         return
-    msg = (task_summary or '').strip()
+    msg = (task_summary or "").strip()
     if not msg:
         return
     used = [t for t in (tools or []) if t]
@@ -914,7 +1364,7 @@ def playbook_note(task_summary, tools, outcome):
         "ts": datetime.now().isoformat(),
         "task": msg[:300],
         "tools": used[-20:],
-        "outcome": (outcome or '')[:200],
+        "outcome": (outcome or "")[:200],
     }
     with _PLAYBOOK_LOCK:
         items = _playbook_read()
@@ -927,8 +1377,8 @@ def playbook_top(max_lines=6):
     items = _playbook_read()
     lines = []
     for it in items:
-        t = (it.get('task') or '')[:90]
-        tools = ", ".join(it.get('tools') or []) or "-"
+        t = (it.get("task") or "")[:90]
+        tools = ", ".join(it.get("tools") or []) or "-"
         lines.append(f"- {t} [tools: {tools}]")
         if len(lines) >= max_lines:
             break
@@ -960,8 +1410,10 @@ def _normalize_tool_args(name, args):
             out[k] = _EMPTY_FOR_TYPE.get(schema.get(k), "")
         else:
             out[k] = v
-    print("[normalize] %s in=%s out=%s" % (name, json.dumps(args, default=str),
-                                           json.dumps(out, default=str)))
+    print(
+        "[normalize] %s in=%s out=%s"
+        % (name, json.dumps(args, default=str), json.dumps(out, default=str))
+    )
     return out
 
 
@@ -971,8 +1423,14 @@ def _normalize_tool_args(name, args):
 # This must be a VALUE, not the type name: substituting the literal "string"
 # for a null string would be worse than the null, since ui_connect would try
 # to reach a host called "string".
-_EMPTY_FOR_TYPE = {"string": "", "integer": 0, "number": 0,
-                   "boolean": False, "array": [], "object": {}}
+_EMPTY_FOR_TYPE = {
+    "string": "",
+    "integer": 0,
+    "number": 0,
+    "boolean": False,
+    "array": [],
+    "object": {},
+}
 
 
 def _normalize_tool_messages(messages):
@@ -987,7 +1445,7 @@ def _normalize_tool_messages(messages):
     for m in messages or ():
         if not isinstance(m, dict) or m.get("role") != "assistant":
             continue
-        for tc in (m.get("tool_calls") or ()):
+        for tc in m.get("tool_calls") or ():
             fn = tc.get("function") or {}
             nm = fn.get("name")
             raw = fn.get("arguments")
@@ -1011,10 +1469,10 @@ def _index_tool_param_types():
     """tool name -> {param: declared type}, read from the live schemas."""
     global _TOOL_PARAM_TYPES
     types = {}
-    for t in (TOOLS_SCHEMA or ()):
+    for t in TOOLS_SCHEMA or ():
         fn = t.get("function") or {}
         nm = fn.get("name")
-        props = ((fn.get("parameters") or {}).get("properties") or {})
+        props = (fn.get("parameters") or {}).get("properties") or {}
         if nm:
             types[nm] = {k: (v or {}).get("type", "string") for k, v in props.items()}
     _TOOL_PARAM_TYPES = types
@@ -1032,14 +1490,18 @@ def _log_rejected_tool_args(provider, messages, error):
         for m in messages or ():
             if not isinstance(m, dict) or m.get("role") != "assistant":
                 continue
-            for tc in (m.get("tool_calls") or ()):
+            for tc in m.get("tool_calls") or ():
                 fn = tc.get("function") or {}
                 raw = fn.get("arguments")
                 if not raw:
                     continue
-                audit_write("provider-reject", "%s %s" % (provider, fn.get("name")),
-                            {"arguments": str(raw)[:120]},
-                            False, "400 schema: " + str(error)[:120])
+                audit_write(
+                    "provider-reject",
+                    "%s %s" % (provider, fn.get("name")),
+                    {"arguments": str(raw)[:120]},
+                    False,
+                    "400 schema: " + str(error)[:120],
+                )
     except Exception:
         pass
 
@@ -1051,11 +1513,16 @@ def audit_write(kind, name, args, ok, result):
     try:
         a = {k: (str(v)[:120]) for k, v in (args or {}).items()} or {}
         line = "%s | %s | %s | args=%s | ok=%s | result=%s\n" % (
-            datetime.now().isoformat(), kind, name, json.dumps(a, ensure_ascii=False),
-            "yes" if ok else "no", (str(result) or '')[:180].replace("\n", " "))
+            datetime.now().isoformat(),
+            kind,
+            name,
+            json.dumps(a, ensure_ascii=False),
+            "yes" if ok else "no",
+            (str(result) or "")[:180].replace("\n", " "),
+        )
         with _PLAYBOOK_LOCK:
             try:
-                with open(_AUDIT_LOG, 'a', encoding='utf-8') as f:
+                with open(_AUDIT_LOG, "a", encoding="utf-8") as f:
                     f.write(line)
                     f.flush()
             except Exception:
@@ -1063,18 +1530,20 @@ def audit_write(kind, name, args, ok, result):
             # Rotate when big.
             try:
                 if os.path.getsize(_AUDIT_LOG) > _AUDIT_MAX_BYTES:
-                    with open(_AUDIT_LOG, 'r', encoding='utf-8', errors='replace') as f:
+                    with open(_AUDIT_LOG, "r", encoding="utf-8", errors="replace") as f:
                         old = f.read()
-                    with open(_AUDIT_LOG, 'w', encoding='utf-8') as f:
-                        f.write(old[-(_AUDIT_MAX_BYTES // 2):])
+                    with open(_AUDIT_LOG, "w", encoding="utf-8") as f:
+                        f.write(old[-(_AUDIT_MAX_BYTES // 2) :])
             except Exception:
                 pass
     except Exception:
         pass
 
+
 def read_items(filename, key):
     with _data_lock:
         return load_json(filename, {}).get(key, [])
+
 
 def mutate_items(filename, key, fn):
     with _data_lock:
@@ -1085,12 +1554,16 @@ def mutate_items(filename, key, fn):
         save_json(filename, d)
         return result
 
+
 def fire_notification(n_type, label):
     with _data_lock:
-        events = load_json('notifications.json', [])
-        events.append({"ts": int(time.time() * 1000), "type": n_type, "label": str(label)})
+        events = load_json("notifications.json", [])
+        events.append(
+            {"ts": int(time.time() * 1000), "type": n_type, "label": str(label)}
+        )
         events = events[-200:]
-        save_json('notifications.json', events)
+        save_json("notifications.json", events)
+
 
 # ===== Kill switch (E-STOP) =====
 # Chris can freeze ACEsi COMPLETELY — no chat, no tools, no proactive work —
@@ -1099,12 +1572,12 @@ def fire_notification(n_type, label):
 # private un-kill word. Passwords live ONLY as SHA-256 hashes in .ace_kill.local
 # (gitignored) and are never shown to any model. State lives in kill_switch.json
 # (gitignored) so a reboot comes back E-STOPPED, not silently alive.
-_KILL_FILE = os.path.join(DATA_DIR, 'kill_switch.json')
-_KILL_SECRETS_FILE = os.path.join(DATA_DIR, '.ace_kill.local')
-_KILL_WORD = 'KillACEsi'
-_KILL_UNWORD = 'Gabrifreeme@2007'
-_KILL_CONFIRM = 'Shutting down'
-_KILL_RESUME_CONFIRM = 'ACEsi is back online.'
+_KILL_FILE = os.path.join(DATA_DIR, "kill_switch.json")
+_KILL_SECRETS_FILE = os.path.join(DATA_DIR, ".ace_kill.local")
+_KILL_WORD = "KillACEsi"
+_KILL_UNWORD = "Gabrifreeme@2007"
+_KILL_CONFIRM = "Shutting down"
+_KILL_RESUME_CONFIRM = "ACEsi is back online."
 
 _KILL_LOCK = threading.RLock()
 _KILL_HASHES = None  # load once at import
@@ -1112,7 +1585,8 @@ _KILL_HASHES = None  # load once at import
 
 def _sha256_hex(s):
     import hashlib
-    return hashlib.sha256((s or '').encode('utf-8')).hexdigest()
+
+    return hashlib.sha256((s or "").encode("utf-8")).hexdigest()
 
 
 def _kill_secret_hashes():
@@ -1120,16 +1594,23 @@ def _kill_secret_hashes():
     global _KILL_HASHES
     if _KILL_HASHES:
         return _KILL_HASHES
-    d = {'kill_hash': _sha256_hex(_KILL_WORD), 'unkill_hash': _sha256_hex(_KILL_UNWORD)}
+    d = {"kill_hash": _sha256_hex(_KILL_WORD), "unkill_hash": _sha256_hex(_KILL_UNWORD)}
     try:
         if os.path.isfile(_KILL_SECRETS_FILE):
-            with open(_KILL_SECRETS_FILE, 'r', encoding='utf-8') as f:
+            with open(_KILL_SECRETS_FILE, "r", encoding="utf-8") as f:
                 raw = json.load(f)
-            if isinstance(raw, dict) and raw.get('kill_hash') and raw.get('unkill_hash'):
-                d = {'kill_hash': str(raw['kill_hash']), 'unkill_hash': str(raw['unkill_hash'])}
+            if (
+                isinstance(raw, dict)
+                and raw.get("kill_hash")
+                and raw.get("unkill_hash")
+            ):
+                d = {
+                    "kill_hash": str(raw["kill_hash"]),
+                    "unkill_hash": str(raw["unkill_hash"]),
+                }
         else:
             # First run: persist hashes so we never embed plaintext passwords anywhere.
-            with open(_KILL_SECRETS_FILE, 'w', encoding='utf-8') as f:
+            with open(_KILL_SECRETS_FILE, "w", encoding="utf-8") as f:
                 json.dump(d, f, indent=2)
     except Exception as e:
         print(f"⚠️ kill secrets: {e}")
@@ -1138,39 +1619,47 @@ def _kill_secret_hashes():
 
 
 def _kill_word_match(text):
-    return bool(text) and _sha256_hex(str(text).strip()) == _kill_secret_hashes()['kill_hash']
+    return (
+        bool(text)
+        and _sha256_hex(str(text).strip()) == _kill_secret_hashes()["kill_hash"]
+    )
 
 
 def _kill_unword_match(text):
-    return bool(text) and _sha256_hex(str(text).strip()) == _kill_secret_hashes()['unkill_hash']
+    return (
+        bool(text)
+        and _sha256_hex(str(text).strip()) == _kill_secret_hashes()["unkill_hash"]
+    )
 
 
 def _kill_state():
     with _KILL_LOCK:
         try:
-            with open(_KILL_FILE, 'r', encoding='utf-8') as f:
+            with open(_KILL_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {"armed": False, "since": None, "reason": "", "source": ""}
 
 
 def _kill_armed():
-    return bool(_kill_state().get('armed'))
+    return bool(_kill_state().get("armed"))
 
 
 def _kill_save(state):
     with _KILL_LOCK:
         try:
-            with open(_KILL_FILE, 'w', encoding='utf-8') as f:
+            with open(_KILL_FILE, "w", encoding="utf-8") as f:
                 json.dump(state, f, indent=2)
         except Exception:
             pass
 
 
-def _kill_arm(reason='', source='web'):
+def _kill_arm(reason="", source="web"):
     """Enter E-STOP: durable state first, then abort agent, kill children, and
     send the single allowed confirmation. After this returns the server is silent."""
-    _kill_save({"armed": True, "since": int(time.time()), "reason": reason, "source": source})
+    _kill_save(
+        {"armed": True, "since": int(time.time()), "reason": reason, "source": source}
+    )
     try:
         with _AGENT_LOCK:
             _AGENT["abort"] = True
@@ -1198,6 +1687,8 @@ def _kill_resume():
 
 # Files ACEsi must NEVER read/write/edit — kill state + password hashes.
 _KILL_PROTECTED = (_KILL_FILE, _KILL_SECRETS_FILE)
+
+
 def _kill_protected_path(rp):
     if not rp:
         return False
@@ -1207,6 +1698,7 @@ def _kill_protected_path(rp):
             return True
     return False
 
+
 # ===== Reminder watchdog: fires timers + alarms, then /notifications/pending delivers them =====
 def reminder_watch():
     while True:
@@ -1215,15 +1707,15 @@ def reminder_watch():
                 time.sleep(5)
                 continue
             now = datetime.now()
-            cur = now.strftime('%H:%M')
+            cur = now.strftime("%H:%M")
             today = now.date().isoformat()
             epoch = time.time()
 
             def sweep_timers(timers):
                 kept = []
                 for t in timers:
-                    if t.get('ends_at', 0) <= epoch:
-                        fire_notification('timer', t.get('label', 'Timer'))
+                    if t.get("ends_at", 0) <= epoch:
+                        fire_notification("timer", t.get("label", "Timer"))
                     else:
                         kept.append(t)
                 return kept
@@ -1231,21 +1723,26 @@ def reminder_watch():
             def sweep_alarms(alarms):
                 out = []
                 for a in alarms:
-                    if a.get('enabled') and a.get('time') == cur and a.get('last_fired') != today:
-                        fire_notification('alarm', a.get('label', 'Alarm'))
-                        if a.get('daily'):
-                            a['last_fired'] = today
+                    if (
+                        a.get("enabled")
+                        and a.get("time") == cur
+                        and a.get("last_fired") != today
+                    ):
+                        fire_notification("alarm", a.get("label", "Alarm"))
+                        if a.get("daily"):
+                            a["last_fired"] = today
                         else:
-                            a['enabled'] = False
-                            a['last_fired'] = today
+                            a["enabled"] = False
+                            a["last_fired"] = today
                     out.append(a)
                 return out
 
-            mutate_items('timers.json', 'timers', sweep_timers)
-            mutate_items('alarms.json', 'alarms', sweep_alarms)
+            mutate_items("timers.json", "timers", sweep_timers)
+            mutate_items("alarms.json", "alarms", sweep_alarms)
         except Exception as e:
             print(f"⚠️ Reminder watch error: {e}")
         time.sleep(5)
+
 
 threading.Thread(target=reminder_watch, daemon=True).start()
 
@@ -1277,15 +1774,17 @@ def send_ntfy(title, message):
         safe_title = str(title).encode("ascii", "replace").decode("ascii")
         r = requests.post(
             f"{NTFY_SERVER}/{NTFY_TOPIC}",
-            data=str(message).encode('utf-8'),
+            data=str(message).encode("utf-8"),
             headers={"Priority": "high", "Title": safe_title},
-            timeout=10
+            timeout=10,
         )
         _record_self_ntfy_id(r)
         return True
     except Exception as e:
         print(f"⚠️ ntfy error: {e}")
         return False
+
+
 def send_test_ping():
     send_ntfy("ACEsi Test", "This is a test ping from ACEsi")
 
@@ -1303,8 +1802,8 @@ def send_test_ping():
 EMAIL_ACCOUNTS_FILE = "emails.json"
 EMAIL_RULES_FILE = "email_notify_rules.json"
 _EMAIL_STATE_FILE = ".email_watch_state.json"
-_EMAIL_POLL_TICK = 120      # seconds between mailbox polls
-_EMAIL_SEEN_CAP = 400       # remember this many seen message ids per account
+_EMAIL_POLL_TICK = 120  # seconds between mailbox polls
+_EMAIL_SEEN_CAP = 400  # remember this many seen message ids per account
 
 
 def _load_email_accounts():
@@ -1369,6 +1868,7 @@ def _save_email_state(state):
 
 def _strip_html(html):
     import re as _re2
+
     txt = _re2.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html or "")
     txt = _re2.sub(r"(?s)<[^>]+>", " ", txt)
     txt = _re2.sub(r"&nbsp;?", " ", txt)
@@ -1389,8 +1889,7 @@ def _imap_uid_list(M, *args):
         return set()
     if typ != "OK" or not data or not data[0]:
         return set()
-    return {u.decode() if isinstance(u, bytes) else str(u)
-            for u in data[0].split()}
+    return {u.decode() if isinstance(u, bytes) else str(u) for u in data[0].split()}
 
 
 def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
@@ -1432,13 +1931,16 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
         # rule. TEXT covers the body (and headers), so a rule that only sets
         # `body` still gets found.
         candidates = set()
-        for r in (rules or []):
+        for r in rules or []:
             for field in ("from", "subject", "body"):
                 needle = (r.get(field) or "").strip()
                 if not needle:
                     continue
-                key = "FROM" if field == "from" else (
-                    "SUBJECT" if field == "subject" else "TEXT")
+                key = (
+                    "FROM"
+                    if field == "from"
+                    else ("SUBJECT" if field == "subject" else "TEXT")
+                )
                 args = []
                 try:
                     needle.encode("ascii")
@@ -1449,8 +1951,9 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
         # force_all means "ignore the seen-cache", NOT "ignore the rules" --
         # the candidates filter must always apply or every recent mail is
         # downloaded and then locally rejected.
-        wanted = [u for u in recent
-                  if (u not in seen_ids or force_all) and u in candidates]
+        wanted = [
+            u for u in recent if (u not in seen_ids or force_all) and u in candidates
+        ]
 
         for uid in reversed(wanted):
             try:
@@ -1467,10 +1970,13 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
             if msg.is_multipart():
                 for part in msg.walk():
                     ct = (part.get_content_type() or "").lower()
-                    if ct == "text/plain" and "attachment" not in (part.get("Content-Disposition") or ""):
+                    if ct == "text/plain" and "attachment" not in (
+                        part.get("Content-Disposition") or ""
+                    ):
                         try:
                             body = part.get_payload(decode=True).decode(
-                                part.get_content_charset() or "utf-8", "replace")
+                                part.get_content_charset() or "utf-8", "replace"
+                            )
                         except Exception:
                             pass
                         if body.strip():
@@ -1479,9 +1985,11 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
                     for part in msg.walk():
                         if (part.get_content_type() or "").lower() == "text/html":
                             try:
-                                body = _strip_html(part.get_payload(
-                                    decode=True).decode(
-                                    part.get_content_charset() or "utf-8", "replace"))
+                                body = _strip_html(
+                                    part.get_payload(decode=True).decode(
+                                        part.get_content_charset() or "utf-8", "replace"
+                                    )
+                                )
                             except Exception:
                                 pass
                             break
@@ -1489,7 +1997,9 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
                 try:
                     ctype = (msg.get_content_type() or "").lower()
                     raw_body = msg.get_payload(decode=True)
-                    txt = raw_body.decode(msg.get_content_charset() or "utf-8", "replace")
+                    txt = raw_body.decode(
+                        msg.get_content_charset() or "utf-8", "replace"
+                    )
                     body = _strip_html(txt) if ctype == "text/html" else txt
                 except Exception:
                     body = ""
@@ -1499,8 +2009,9 @@ def _imap_fetch_new(account_name, cfg, seen_ids, rules=None, force_all=False):
         # re-alerts later. UIDs are stable, unlike sequence numbers.
         seen_ids.update(recent)
         if len(seen_ids) > _EMAIL_SEEN_CAP:
-            for old in sorted(seen_ids, key=lambda k: int(k) if k.isdigit() else 0
-                              )[:len(seen_ids) - _EMAIL_SEEN_CAP]:
+            for old in sorted(seen_ids, key=lambda k: int(k) if k.isdigit() else 0)[
+                : len(seen_ids) - _EMAIL_SEEN_CAP
+            ]:
                 seen_ids.discard(old)
     finally:
         if M is not None:
@@ -1529,29 +2040,35 @@ def check_email_now(force_all=False):
     state = _load_email_state()
     hits, checked, errors = [], 0, []
     for name, cfg in (accounts or {}).items():
-        if not isinstance(cfg, dict) or not cfg.get("user") or not cfg.get("app_password"):
+        if (
+            not isinstance(cfg, dict)
+            or not cfg.get("user")
+            or not cfg.get("app_password")
+        ):
             continue
         # Only rules that actually apply to THIS mailbox. Using `any(not
         # applicable)` here was wrong: the NWU rule is gmail-only, so the
         # inverse test made Yahoo look unmonitored and it was never checked.
-        applicable = [r for r in rules
-                      if r.get("account") in (None, "", "both", name)]
+        applicable = [r for r in rules if r.get("account") in (None, "", "both", name)]
         if not applicable:
             continue
         seen = set(state.get(name, []))
         msgs = None
         for attempt in range(2):
             try:
-                msgs = _imap_fetch_new(name, cfg, seen, rules=applicable,
-                                       force_all=force_all)
+                msgs = _imap_fetch_new(
+                    name, cfg, seen, rules=applicable, force_all=force_all
+                )
                 break
             except Exception as e:
                 # Yahoo rate-limits repeat logins and intermittently returns
                 # "[SERVERBUG] LOGIN Server error" or a TLS handshake timeout.
                 # Back off well past 4s so the retry actually lands instead of
                 # tripping the same limit.
-                print("⚠️ email watch: %s mailbox failed (attempt %d) — %s"
-                      % (name, attempt + 1, e))
+                print(
+                    "⚠️ email watch: %s mailbox failed (attempt %d) — %s"
+                    % (name, attempt + 1, e)
+                )
                 if attempt == 0:
                     time.sleep(15)
         if msgs is None:
@@ -1559,33 +2076,48 @@ def check_email_now(force_all=False):
             continue
         checked += 1
         for mid, sender, subject, body in msgs:
-            matched = [r for r in applicable
-                       if _email_rule_matches(r, sender, subject, body)]
+            matched = [
+                r for r in applicable if _email_rule_matches(r, sender, subject, body)
+            ]
             if not matched:
                 continue
             snippet = (body or "")[:220].strip()
-            msg = ("New email in your %s inbox\n\nFrom: %s\nSubject: %s%s"
-                   % (name, sender, subject, ("\n\n" + snippet) if snippet else ""))
+            msg = "New email in your %s inbox\n\nFrom: %s\nSubject: %s%s" % (
+                name,
+                sender,
+                subject,
+                ("\n\n" + snippet) if snippet else "",
+            )
             ok = send_ntfy("ACEsi", msg)
-            print("📧 email watch: matched %r on %s -> ntfy ok=%s"
-                  % (_email_rule_label(matched[0], sender, subject, body),
-                     name, ok))
+            print(
+                "📧 email watch: matched %r on %s -> ntfy ok=%s"
+                % (_email_rule_label(matched[0], sender, subject, body), name, ok)
+            )
             hits.append("%s: %s — %s" % (name, sender, subject))
         # Sort numerically: these are IMAP sequence numbers, and a plain
         # string sort puts "10" before "9", which would keep the wrong window.
-        state[name] = sorted(seen, key=lambda k: int(k) if k.isdigit() else 0)[-_EMAIL_SEEN_CAP:]
+        state[name] = sorted(seen, key=lambda k: int(k) if k.isdigit() else 0)[
+            -_EMAIL_SEEN_CAP:
+        ]
     if checked:
         _save_email_state(state)
     if hits:
-        msg = "Pushed %d matching email(s) to your phone: %s" % (len(hits), "; ".join(hits))
+        msg = "Pushed %d matching email(s) to your phone: %s" % (
+            len(hits),
+            "; ".join(hits),
+        )
         if errors:
             msg += " (could not reach: %s)" % ", ".join(errors)
         return True, msg
     if not checked:
-        return False, ("No mailbox could be checked. Failed: %s. Check emails.json."
-                       % (", ".join(errors) if errors else "none configured"))
-    return True, ("Checked %d mailbox(es); no email matched the active rules.%s"
-                  % (checked, " Could not reach: %s." % ", ".join(errors) if errors else ""))
+        return False, (
+            "No mailbox could be checked. Failed: %s. Check emails.json."
+            % (", ".join(errors) if errors else "none configured")
+        )
+    return True, (
+        "Checked %d mailbox(es); no email matched the active rules.%s"
+        % (checked, " Could not reach: %s." % ", ".join(errors) if errors else "")
+    )
 
 
 def _email_watch_loop():
@@ -1608,16 +2140,21 @@ def _email_watch_loop():
                             _imap_fetch_new(name, cfg, seen)
                             break
                         except Exception as e:
-                            print("⚠️ email watch prime %s (attempt %d): %s"
-                                  % (name, attempt + 1, e))
+                            print(
+                                "⚠️ email watch prime %s (attempt %d): %s"
+                                % (name, attempt + 1, e)
+                            )
                             if attempt == 0:
                                 time.sleep(15)
-                    state[name] = sorted(seen, key=lambda k: int(k) if k.isdigit() else 0
-                                         )[-_EMAIL_SEEN_CAP:]
+                    state[name] = sorted(
+                        seen, key=lambda k: int(k) if k.isdigit() else 0
+                    )[-_EMAIL_SEEN_CAP:]
                 _save_email_state(state)
                 prime = False
-                print("📧 email watch: primed mailboxes, now polling every %ds"
-                      % _EMAIL_POLL_TICK)
+                print(
+                    "📧 email watch: primed mailboxes, now polling every %ds"
+                    % _EMAIL_POLL_TICK
+                )
             else:
                 check_email_now()
         except Exception as e:
@@ -1635,8 +2172,8 @@ if get_config("email_watch_enabled", "1") != "0":
 # USB/WiFi debugging — just the ntfy app subscribed to the ACEsi topic). =====
 _NTFY_INBOX_STATE = {"since": None, "last_id": None}
 _NTFY_INBOX_TICK = 5.0  # seconds between polls
-_NTFY_BACKOFF = 30      # current backoff delay (seconds)
-_NTFY_FAILS = 0         # consecutive 429s
+_NTFY_BACKOFF = 30  # current backoff delay (seconds)
+_NTFY_FAILS = 0  # consecutive 429s
 
 
 def _ntfy_inbox_seed_since():
@@ -1697,7 +2234,8 @@ def _ntfy_inbox_poll():
             _NTFY_FAILS += 1
             retry_after = resp.headers.get("Retry-After")
             _NTFY_BACKOFF = (
-                int(retry_after) if retry_after
+                int(retry_after)
+                if retry_after
                 else min(30 * (2 ** (_NTFY_FAILS - 1)), 900)
             )
             print(f"⚠️ ntfy 429 — backing off {_NTFY_BACKOFF}s (fail #{_NTFY_FAILS})")
@@ -1732,7 +2270,7 @@ def _ntfy_inbox_poll():
         if not (low == pp or low.startswith(pp + ":") or low.startswith(pp + " ")):
             _NTFY_INBOX_STATE["last_id"] = mid
             continue
-        body = body[len(pp):].lstrip(": ").strip()
+        body = body[len(pp) :].lstrip(": ").strip()
         if not body:
             _NTFY_INBOX_STATE["last_id"] = mid
             continue
@@ -1789,12 +2327,16 @@ def _ntfy_inbox_loop():
 
 threading.Thread(target=_ntfy_inbox_loop, daemon=True).start()
 
+
 # ===== Daily summary builder =====
 def build_summary_text():
     today = datetime.now().date().isoformat()
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id DESC LIMIT 40", (today + '%',))
+    c.execute(
+        "SELECT timestamp, role, content FROM conversations WHERE timestamp LIKE ? ORDER BY id DESC LIMIT 40",
+        (today + "%",),
+    )
     rows = list(reversed(c.fetchall()))
     conn.close()
     lines = []
@@ -1803,14 +2345,14 @@ def build_summary_text():
     else:
         lines.append(f"Today ({today}) — {len(rows)} messages:")
         for t, role, content in rows[-12:]:
-            who = 'Chris' if role == 'user' else 'ACEsi'
+            who = "Chris" if role == "user" else "ACEsi"
             lines.append(f"{who}: {content.replace(chr(10), ' ')[:120]}")
     j = get_journal(6)
     if j:
         lines.append("")
         lines.append("Recent journal:")
         for e in j:
-            lines.append("• " + e['entry'].replace(chr(10), ' ')[:140])
+            lines.append("• " + e["entry"].replace(chr(10), " ")[:140])
     mem = get_memories()
     if mem:
         lines.append("")
@@ -1818,15 +2360,20 @@ def build_summary_text():
         for k, v in list(mem.items())[:8]:
             lines.append(f"• {k}: {str(v['value'])[:80]}")
     try:
-        tasks = read_items('tasks.json', 'tasks')
-        events = read_items('events.json', 'events')
-        open_count = len([t for t in tasks if t.get('status') != 'done'])
-        today_events = [e for e in events if e.get('date') == today]
+        tasks = read_items("tasks.json", "tasks")
+        events = read_items("events.json", "events")
+        open_count = len([t for t in tasks if t.get("status") != "done"])
+        today_events = [e for e in events if e.get("date") == today]
         lines.append("")
-        lines.append(f"Housekeeping: {open_count} open task(s)" + (f", {len(today_events)} event(s) today" if today_events else "") + ".")
+        lines.append(
+            f"Housekeeping: {open_count} open task(s)"
+            + (f", {len(today_events)} event(s) today" if today_events else "")
+            + "."
+        )
     except Exception:
         pass
     return "\n".join(lines)
+
 
 # ===== Long-term recall: the last 90 days, distilled =====
 # ACEsi remembers across sessions: every stored message older than the recent
@@ -1836,9 +2383,12 @@ _LT_CACHE = {"ts": 0.0, "text": ""}
 
 # Words that signal work-progress / tasks worth remembering from old messages.
 _TASK_SIGNALS = re.compile(
-    r'\b(fixed|bug|build|apk|portal|flutter|webview|compile|error|auth|login|'
-    r'its|venda|univen|project|dashboard|deploy|install|tests?|merge|commit|'
-    r'push|pull|server|api|diagram|gutenberg)\b', re.IGNORECASE)
+    r"\b(fixed|bug|build|apk|portal|flutter|webview|compile|error|auth|login|"
+    r"its|venda|univen|project|dashboard|deploy|install|tests?|merge|commit|"
+    r"push|pull|server|api|diagram|gutenberg)\b",
+    re.IGNORECASE,
+)
+
 
 def _long_term_recall(days=90, force=False):
     """Per-day digest of conversations from the last `days` days. Cached 5 min."""
@@ -1848,9 +2398,12 @@ def _long_term_recall(days=90, force=False):
         return _LT_CACHE["text"]
     try:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        conn = sqlite3.connect('ace_memory.db')
+        conn = sqlite3.connect("ace_memory.db")
         c = conn.cursor()
-        c.execute("SELECT timestamp, role, content FROM conversations WHERE timestamp >= ? ORDER BY id", (cutoff,))
+        c.execute(
+            "SELECT timestamp, role, content FROM conversations WHERE timestamp >= ? ORDER BY id",
+            (cutoff,),
+        )
         rows = c.fetchall()
         conn.close()
     except Exception:
@@ -1884,11 +2437,15 @@ def _long_term_recall(days=90, force=False):
         m = mood_for_date(day)
         mood_tag = f" · mood: {m['mood']}" if m else ""
         try:
-            dstr = datetime.fromisoformat(day).strftime('%a %d %b')
+            dstr = datetime.fromisoformat(day).strftime("%a %d %b")
         except Exception:
             dstr = day
-        lines.append(f"- {dstr}: {d['n']} msgs, {d['user']} from Chris ({tag}){mood_tag}")
-    block = "Long-term memory — what we did over the last 90 days:\n" + "\n".join(lines[-20:])
+        lines.append(
+            f"- {dstr}: {d['n']} msgs, {d['user']} from Chris ({tag}){mood_tag}"
+        )
+    block = "Long-term memory — what we did over the last 90 days:\n" + "\n".join(
+        lines[-20:]
+    )
     _LT_CACHE["ts"] = now
     _LT_CACHE["text"] = block
     return block
@@ -1898,19 +2455,35 @@ def _long_term_recall(days=90, force=False):
 # Patterns ending in "*" match dotted prefixes (e.g. "work.*" matches work.project).
 _MEMORY_CATEGORIES = {
     "identity": [
-        "my_name", "name", "partner_name", "appearance.*", "how_we_met.*",
-        "what_we_built", "what_you_love", "how_you_work", "way_you_treat_me",
-        "chris_age", "personal.*",
+        "my_name",
+        "name",
+        "partner_name",
+        "appearance.*",
+        "how_we_met.*",
+        "what_we_built",
+        "what_you_love",
+        "how_you_work",
+        "way_you_treat_me",
+        "chris_age",
+        "personal.*",
     ],
     "work": [
-        "project", "my_project", "work.*", "interface_*", "404_bug.*",
-        "venda_404_bug", "next_session_reminder", "work_rules",
+        "project",
+        "my_project",
+        "work.*",
+        "interface_*",
+        "404_bug.*",
+        "venda_404_bug",
+        "next_session_reminder",
+        "work_rules",
     ],
     "lessons": ["lesson.*", "lesson_*", "skills.*"],
 }
 
+
 def _matches_pattern(key, pat):
-    return key == pat or (pat.endswith('*') and key.startswith(pat[:-1]))
+    return key == pat or (pat.endswith("*") and key.startswith(pat[:-1]))
+
 
 def _categorized_memory_lines(mem, light=False):
     """Render memory grouped by category instead of one raw dump. Falls back to
@@ -1933,7 +2506,7 @@ def _categorized_memory_lines(mem, light=False):
         cap = 180 if light else 400
         seg = []
         for k in keys[:8]:
-            val = str(mem[k]['value'])
+            val = str(mem[k]["value"])
             if len(val) > cap:
                 val = val[:cap] + "…"
             seg.append(f"- {k}: {val}")
@@ -1942,9 +2515,9 @@ def _categorized_memory_lines(mem, light=False):
     # Any leftover real facts (not hidden, not seen) appended in raw order.
     leftover = []
     for k, v in mem.items():
-        if k in seen or k in _MEMORY_HIDDEN or k.split('.')[0] in seen:
+        if k in seen or k in _MEMORY_HIDDEN or k.split(".")[0] in seen:
             continue
-        val = str(v['value'])[:180]
+        val = str(v["value"])[:180]
         leftover.append(f"- {k}: {val}")
     if leftover:
         out.append("other facts:\n" + "\n".join(leftover[:6]))
@@ -1954,43 +2527,95 @@ def _categorized_memory_lines(mem, light=False):
 # ===== Standing preferences (durable "how Chris wants things done") =====
 # Distinct from memories: a memory is a fact, a preference is an instruction
 # that must be obeyed on every future reply (tone, units, format, defaults).
-_PREFERENCES_FILE = 'preferences.json'
+_PREFERENCES_FILE = "preferences.json"
 _PREFERENCES_LOCK = threading.RLock()
 
 _PREFERENCE_ALIASES = {
-    'tone': 'tone', 'style': 'tone', 'mood': 'tone', 'manner': 'tone',
-    'voice': 'tone', 'vibe': 'tone', 'attitude': 'tone',
-    'unit': 'units', 'units': 'units', 'measurement': 'units',
-    'measure': 'units', 'measurements': 'units',
-    'format': 'format', 'formatting': 'format', 'layout': 'format',
-    'structure': 'format',
-    'name': 'name', 'nickname': 'name', 'call me': 'name',
-    'what to call me': 'name', 'what should i call you': 'name',
-    'what should you call me': 'name', 'what do you call me': 'name',
-    'language': 'language', 'lang': 'language', 'tongue': 'language',
-    'brevity': 'brevity', 'verbosity': 'brevity', 'length': 'brevity',
-    'timezone': 'timezone', 'tz': 'timezone',
-    'currency': 'currency',
-    'greeting': 'greeting',
-    'pronouns': 'pronouns',
-    'notification': 'notifications', 'notifications': 'notifications',
-    'notify': 'notifications', 'alerts': 'notifications',
-    'schedule': 'schedule', 'routines': 'schedule', 'routine': 'schedule',
-    'email': 'email', 'emails': 'email', 'address': 'email',
-    'phone': 'phone', 'number': 'phone', 'cell': 'phone', 'cellphone': 'phone',
-    'location': 'location', 'city': 'location', 'home': 'location',
-    'study': 'study', 'course': 'study', 'courses': 'study',
-    'university': 'study', 'subject': 'study', 'subjects': 'study',
-    'date': 'dates', 'dates': 'dates', 'time': 'dates',
-    'food': 'diet', 'diet': 'diet',
+    "tone": "tone",
+    "style": "tone",
+    "mood": "tone",
+    "manner": "tone",
+    "voice": "tone",
+    "vibe": "tone",
+    "attitude": "tone",
+    "unit": "units",
+    "units": "units",
+    "measurement": "units",
+    "measure": "units",
+    "measurements": "units",
+    "format": "format",
+    "formatting": "format",
+    "layout": "format",
+    "structure": "format",
+    "name": "name",
+    "nickname": "name",
+    "call me": "name",
+    "what to call me": "name",
+    "what should i call you": "name",
+    "what should you call me": "name",
+    "what do you call me": "name",
+    "language": "language",
+    "lang": "language",
+    "tongue": "language",
+    "brevity": "brevity",
+    "verbosity": "brevity",
+    "length": "brevity",
+    "timezone": "timezone",
+    "tz": "timezone",
+    "currency": "currency",
+    "greeting": "greeting",
+    "pronouns": "pronouns",
+    "notification": "notifications",
+    "notifications": "notifications",
+    "notify": "notifications",
+    "alerts": "notifications",
+    "schedule": "schedule",
+    "routines": "schedule",
+    "routine": "schedule",
+    "email": "email",
+    "emails": "email",
+    "address": "email",
+    "phone": "phone",
+    "number": "phone",
+    "cell": "phone",
+    "cellphone": "phone",
+    "location": "location",
+    "city": "location",
+    "home": "location",
+    "study": "study",
+    "course": "study",
+    "courses": "study",
+    "university": "study",
+    "subject": "study",
+    "subjects": "study",
+    "date": "dates",
+    "dates": "dates",
+    "time": "dates",
+    "food": "diet",
+    "diet": "diet",
 }
 
 # Filler words the model prefixes onto a preference name ("my tone", "always
 # use metric units"). Stripped before lookup so those collapse onto one key
 # instead of accumulating near-duplicate entries.
-_PREF_FILLER = ('my ', 'the ', 'a ', 'an ', 'please ', 'always ', 'prefer ',
-                'preferred ', 'default ', 'reply ', 'replies ', 'response ',
-                'answer ', 'answers ', 'use ', 'using ')
+_PREF_FILLER = (
+    "my ",
+    "the ",
+    "a ",
+    "an ",
+    "please ",
+    "always ",
+    "prefer ",
+    "preferred ",
+    "default ",
+    "reply ",
+    "replies ",
+    "response ",
+    "answer ",
+    "answers ",
+    "use ",
+    "using ",
+)
 
 
 def _pref_key(key):
@@ -1999,12 +2624,12 @@ def _pref_key(key):
     Only short names are folded onto a known concept; a long phrase keeps its
     own key so a genuine one-off instruction is never silently merged away.
     """
-    k = re.sub(r'\s+', ' ', str(key or '').strip().lower()).strip(' .:;-')
+    k = re.sub(r"\s+", " ", str(key or "").strip().lower()).strip(" .:;-")
     if not k:
-        return ''
+        return ""
     for filler in _PREF_FILLER:
         if k.startswith(filler) and len(k) > len(filler):
-            k = k[len(filler):].strip()
+            k = k[len(filler) :].strip()
             break
     if k in _PREFERENCE_ALIASES:
         return _PREFERENCE_ALIASES[k]
@@ -2032,14 +2657,20 @@ def set_preference(key, value):
         prefs = get_preferences()
         previous = prefs.get(k)
         prefs[k] = val
-        prefs['_meta'] = prefs.get('_meta', {})
-        prefs['_meta'][k] = datetime.now().isoformat()
+        prefs["_meta"] = prefs.get("_meta", {})
+        prefs["_meta"][k] = datetime.now().isoformat()
         save_json(_PREFERENCES_FILE, prefs)
-    audit_write('preference', 'set', {'key': k, 'value': val}, True, val)
+    audit_write("preference", "set", {"key": k, "value": val}, True, val)
     text = f"Preference saved: {k} = {val}"
     if previous and previous != val:
         text += f" (was: {previous})"
-    return {"ok": True, "preference": k, "value": val, "previous": previous, "message": text}
+    return {
+        "ok": True,
+        "preference": k,
+        "value": val,
+        "previous": previous,
+        "message": text,
+    }
 
 
 def forget_preference(key):
@@ -2049,45 +2680,54 @@ def forget_preference(key):
         if k not in prefs:
             return {"ok": False, "error": f"no preference named '{k}'"}
         removed = prefs.pop(k)
-        meta = prefs.get('_meta') or {}
+        meta = prefs.get("_meta") or {}
         meta.pop(k, None)
-        prefs['_meta'] = meta
+        prefs["_meta"] = meta
         save_json(_PREFERENCES_FILE, prefs)
-    audit_write('preference', 'forget', {'key': k}, True, removed)
-    return {"ok": True, "removed": k, "value": removed,
-            "message": f"Preference removed: {k} (was: {removed})"}
+    audit_write("preference", "forget", {"key": k}, True, removed)
+    return {
+        "ok": True,
+        "removed": k,
+        "value": removed,
+        "message": f"Preference removed: {k} (was: {removed})",
+    }
 
 
 def list_preferences():
-    prefs = {k: v for k, v in get_preferences().items() if not k.startswith('_')}
+    prefs = {k: v for k, v in get_preferences().items() if not k.startswith("_")}
     if not prefs:
-        return {"count": 0, "preferences": {},
-                "message": "No standing preferences stored yet."}
+        return {
+            "count": 0,
+            "preferences": {},
+            "message": "No standing preferences stored yet.",
+        }
     lines = "\n".join(f"- {k}: {v}" for k, v in sorted(prefs.items()))
-    return {"count": len(prefs), "preferences": prefs,
-            "message": f"{len(prefs)} standing preference(s):\n{lines}"}
+    return {
+        "count": len(prefs),
+        "preferences": prefs,
+        "message": f"{len(prefs)} standing preference(s):\n{lines}",
+    }
 
 
 def build_preferences_block(light=False):
     """Render preferences as a prompt block, or None when none are stored."""
-    prefs = {k: v for k, v in get_preferences().items() if not k.startswith('_')}
+    prefs = {k: v for k, v in get_preferences().items() if not k.startswith("_")}
     if not prefs:
         return None
     if light:
         prefs = dict(list(prefs.items())[:4])
     lines = "\n".join(f"- {k}: {v}" for k, v in sorted(prefs.items()))
-    return ("[Chris's standing preferences — FOLLOW THESE on every reply, "
-            "they outrank your default style unless he overrides them now:\n"
-            + lines + "]")
+    return (
+        "[Chris's standing preferences — FOLLOW THESE on every reply, "
+        "they outrank your default style unless he overrides them now:\n" + lines + "]"
+    )
 
 
 # ===== Context fed into every chat reply =====
 def build_context_block(light=False):
     now = datetime.now()
     mem = get_memories()
-    parts = [
-        f"[Current time: {now.strftime('%A, %d %B %Y, %I:%M %p')}]"
-    ]
+    parts = [f"[Current time: {now.strftime('%A, %d %B %Y, %I:%M %p')}]"]
     # Categorized facts (identity / work / lessons / other), light mode keeps
     # just the essentials for slow local models.
     mem_secs = _categorized_memory_lines(mem, light=light)
@@ -2107,7 +2747,9 @@ def build_context_block(light=False):
     journal = get_journal(4 if light else 8)
     j_lines = [f"- {e['entry']}" for e in journal]
     if j_lines:
-        parts.append("[Shared history — recent journal entries:\n" + "\n".join(j_lines) + "]")
+        parts.append(
+            "[Shared history — recent journal entries:\n" + "\n".join(j_lines) + "]"
+        )
     # Recent moods (tiredness, energy) — the emotional memory.
     try:
         mb = mood_history_block(7 if light else 14)
@@ -2119,7 +2761,7 @@ def build_context_block(light=False):
     try:
         recent_mem = []
         for k, v in mem.items():
-            upd = v.get('updated', '')
+            upd = v.get("updated", "")
             try:
                 upd_dt = datetime.fromisoformat(upd)
                 if (now - upd_dt).total_seconds() <= 3600:
@@ -2127,26 +2769,34 @@ def build_context_block(light=False):
             except Exception:
                 continue
         if recent_mem:
-            parts.append("[Facts just updated in the last hour (Chris may ask if you noticed):\n" + "\n".join(recent_mem[:8]) + "]")
+            parts.append(
+                "[Facts just updated in the last hour (Chris may ask if you noticed):\n"
+                + "\n".join(recent_mem[:8])
+                + "]"
+            )
     except Exception:
         pass
     try:
-        tasks = read_items('tasks.json', 'tasks')
-        events = read_items('events.json', 'events')
-        open_tasks = [t for t in tasks if t.get('status') != 'done']
+        tasks = read_items("tasks.json", "tasks")
+        events = read_items("events.json", "events")
+        open_tasks = [t for t in tasks if t.get("status") != "done"]
         week_end = (now + timedelta(days=7)).date().isoformat()
         today = now.date().isoformat()
-        upcoming = [e for e in events if today <= e.get('date', '') <= week_end]
-        upcoming.sort(key=lambda e: e.get('date', ''))
+        upcoming = [e for e in events if today <= e.get("date", "") <= week_end]
+        upcoming.sort(key=lambda e: e.get("date", ""))
         cal_lines = []
         if open_tasks:
             cal_lines.append(f"Open tasks ({len(open_tasks)}):")
-            for t in sorted(open_tasks, key=lambda x: x.get('priority', 3))[:8]:
+            for t in sorted(open_tasks, key=lambda x: x.get("priority", 3))[:8]:
                 cal_lines.append(f"- {t['title']} (priority P{t.get('priority', 3)})")
         if upcoming:
             cal_lines.append(f"Upcoming events (next 7 days):")
             for e in upcoming[:8]:
-                cal_lines.append(f"- {e['date']}" + (f" {e['time']}" if e.get('time') else "") + f": {e['title']}")
+                cal_lines.append(
+                    f"- {e['date']}"
+                    + (f" {e['time']}" if e.get("time") else "")
+                    + f": {e['title']}"
+                )
         if cal_lines:
             parts.append("[Tasks & calendar:\n" + "\n".join(cal_lines) + "]")
     except Exception:
@@ -2156,8 +2806,11 @@ def build_context_block(light=False):
     try:
         pb = playbook_top(4 if light else 8)
         if pb:
-            parts.append("[Playbook — proven procedures from past tasks (follow these when the task matches):\n"
-                         + "\n".join(pb) + "]")
+            parts.append(
+                "[Playbook — proven procedures from past tasks (follow these when the task matches):\n"
+                + "\n".join(pb)
+                + "]"
+            )
     except Exception:
         pass
     _ctx_text = "\n".join(parts)
@@ -2172,16 +2825,18 @@ def build_context_block(light=False):
         pass
     return _ctx_text
 
+
 LAST_FILE_PATH = None
 
-@app.route('/')
+
+@app.route("/")
 def index():
-    resp = send_from_directory('.', 'ACEsi.html')
+    resp = send_from_directory(".", "ACEsi.html")
     # Never let the browser cache the chat UI — stale JS was the root cause of
     # "popup never shows" (old page missing the view-rendering code).
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
-    resp.headers['Expires'] = '0'
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
     return resp
 
 
@@ -2196,7 +2851,7 @@ def index():
 # message was then handed to open() as a filename, producing
 # "[Errno 22] Invalid argument". The file matcher runs BEFORE any domain
 # classifier, so a message containing a URL never reached the CDP routing at all.
-_URL_SCHEME_RE = re.compile(r'\b(?:https?|ftp|file|wss?)://', re.IGNORECASE)
+_URL_SCHEME_RE = re.compile(r"\b(?:https?|ftp|file|wss?)://", re.IGNORECASE)
 # Characters Windows forbids in a filename. Tested after stripping a drive
 # spec, since "C:\..." legitimately contains a colon.
 _WIN_ILLEGAL_RE = re.compile(r'[<>:"|?*\x00-\x1f]')
@@ -2208,55 +2863,83 @@ def _plausible_path_tail(candidate):
     A real path ends in a filename; "Chrome, navigate to https://x/login. Then
     log in ..." ends in a sentence.
     """
-    seg = re.split(r'[/\\]', candidate or '')[-1].strip()
+    seg = re.split(r"[/\\]", candidate or "")[-1].strip()
     if not seg or len(seg) > 120:
         return False
-    return re.search(r'\s', seg) is None
+    return re.search(r"\s", seg) is None
 
 
 def _match_file_request(message):
     m = re.match(
-        r'^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|do\s+you\s+mind\s+)?'
-        r'(?:read|open)\s+(.+?)$',
-        message, re.IGNORECASE)
+        r"^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|do\s+you\s+mind\s+)?"
+        r"(?:read|open)\s+(.+?)$",
+        message,
+        re.IGNORECASE,
+    )
     if not m:
         return False, None, False
-    tail = m.group(1).strip().strip('"\'')
+    tail = m.group(1).strip().strip("\"'")
     # A URL in the target means this is a web/navigation instruction, not a
     # local file. webfetch / view_web_image / cdp_navigate handle those.
     if _URL_SCHEME_RE.search(tail):
         return False, None, False
     # strip trailing "file"/"please" and leading "file:" / "the file:" phrasing
-    tail = re.sub(r'\s+(?:file|please)\s*$', '', tail, flags=re.IGNORECASE).strip()
-    tail = re.sub(r'^(?:the|this|that)?\s*file\s*[: ]?\s*', '', tail, flags=re.IGNORECASE).strip()
+    tail = re.sub(r"\s+(?:file|please)\s*$", "", tail, flags=re.IGNORECASE).strip()
+    tail = re.sub(
+        r"^(?:the|this|that)?\s*file\s*[: ]?\s*", "", tail, flags=re.IGNORECASE
+    ).strip()
     # strip location phrases like "in my documents" / "on my computer"
-    tail = re.sub(r'\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b', '', tail, flags=re.IGNORECASE)
-    tail = re.sub(r'\bon\s+my\s+computer\b', '', tail, flags=re.IGNORECASE).strip()
+    tail = re.sub(
+        r"\b(?:in|on)\s+(?:my\s+)?(?:documents|document)\b",
+        "",
+        tail,
+        flags=re.IGNORECASE,
+    )
+    tail = re.sub(r"\bon\s+my\s+computer\b", "", tail, flags=re.IGNORECASE).strip()
     # A filename cannot contain these; if the target does, it is prose that
     # happens to start with "open"/"read".
-    if _WIN_ILLEGAL_RE.search(re.sub(r'^[A-Za-z]:[\\/]', '', tail)):
+    if _WIN_ILLEGAL_RE.search(re.sub(r"^[A-Za-z]:[\\/]", "", tail)):
         return False, None, False
     candidate = tail
-    has_file_word = re.search(r'\bfile\b', message, re.IGNORECASE) is not None
+    has_file_word = re.search(r"\bfile\b", message, re.IGNORECASE) is not None
     # "file manager/explorer" or "files app" are UI instructions, not documents
-    not_file_ui = re.search(
-        r'\bfile\s+(?:manager|explorer)\b|\bfiles?\s+app\b',
-        message, re.IGNORECASE) is None
+    not_file_ui = (
+        re.search(
+            r"\bfile\s+(?:manager|explorer)\b|\bfiles?\s+app\b", message, re.IGNORECASE
+        )
+        is None
+    )
     file_like = (
         os.path.isabs(candidate)
         # A separator only implies a path if the last segment is a filename.
-        or (bool(re.search(r'[/\\]', candidate)) and _plausible_path_tail(candidate))
+        or (bool(re.search(r"[/\\]", candidate)) and _plausible_path_tail(candidate))
         or (has_file_word and not_file_ui)
-        or bool(re.search(
-            r'(?:\.(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|'
-            r'pdf|png|jpe?g|gif|bmp|webp|docx?|xlsx?|pptx?|json|ya?ml|xml|'
-            r'csv|log|html?|css|sql|zip|tar|gz|7z|gitignore|env))$', candidate, re.IGNORECASE))
+        or bool(
+            re.search(
+                r"(?:\.(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|"
+                r"pdf|png|jpe?g|gif|bmp|webp|docx?|xlsx?|pptx?|json|ya?ml|xml|"
+                r"csv|log|html?|css|sql|zip|tar|gz|7z|gitignore|env))$",
+                candidate,
+                re.IGNORECASE,
+            )
+        )
     )
     if not file_like:
         return False, None, False
-    is_open = re.match(r'open\b', message, re.IGNORECASE) is not None
-    vague = candidate.lower() in ('', 'the', 'it', 'this', 'that', 'file', 'the file',
-                                  'this file', 'that file', 'previous', 'last')
+    is_open = re.match(r"open\b", message, re.IGNORECASE) is not None
+    vague = candidate.lower() in (
+        "",
+        "the",
+        "it",
+        "this",
+        "that",
+        "file",
+        "the file",
+        "this file",
+        "that file",
+        "previous",
+        "last",
+    )
     return True, candidate, vague
 
 
@@ -2270,14 +2953,23 @@ def _chat_providers(domain=""):
     conversation but unreliable at the one thing a browser task hinges on:
     actually submitting a form. Returns (name, endpoint, key, model).
     """
-    groq_model = (GROQ_MODEL_BROWSER if domain in _BROWSER_DOMAINS and
-                  GROQ_MODEL_BROWSER else GROQ_MODEL)
-    return [
+    groq_model = (
+        GROQ_MODEL_BROWSER
+        if domain in _BROWSER_DOMAINS and GROQ_MODEL_BROWSER
+        else GROQ_MODEL
+    )
+    # Primary: OpenCode Zen (free tier)
+    # Secondary: Groq for best tool-use capability
+    # Fallback: Local Ollama if cloud hits rate limits / quota
+    providers = [
+        ("OpenCode", OPENCODE_ENDPOINT, OPENCODE_API_KEY, OPENCODE_MODEL),
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
         ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-        ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
         ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
     ]
+    if OLLAMA_ENABLED:
+        providers.append(("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact"))
+    return providers
 
 
 def _find_provider_for_model(preferred_model):
@@ -2290,16 +2982,20 @@ def _find_provider_for_model(preferred_model):
         return None
     if preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL):
         if OLLAMA_ENABLED:
-            return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
+            return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)
         return None
-    for name, ep, key, mdl in _chat_providers():
+    for p in _chat_providers():
+        name, ep, key, mdl = p[0], p[1], p[2], p[3]
         if key and mdl and mdl == preferred_model:
             return (name, ep, key, mdl)
     if preferred_model in GROQ_FALLBACKS:
         return ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, preferred_model)
     if preferred_model in OPENROUTER_FALLBACKS:
         return ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, preferred_model)
+    if preferred_model in OPENCODE_FALLBACKS:
+        return ("OpenCode", OPENCODE_ENDPOINT, OPENCODE_API_KEY, preferred_model)
     return None
+
 
 # ===== Provider failure diagnostics =====
 # "no models available" used to be the whole story, which made a rate limit, an
@@ -2323,9 +3019,14 @@ _PROV_RETRY_BUDGET_S = 45.0
 # Substrings that mean "the quota is gone for the day" - retrying is pointless
 # and just burns the round timeout.
 _PROV_HARD_QUOTA_MARKS = (
-    "daily_quota_exhausted", "quota_exhausted", "daily rate limit",
-    "try again in 24", "exhausted your daily", "monthly limit",
-    "insufficient_quota", "billing_hard_limit",
+    "daily_quota_exhausted",
+    "quota_exhausted",
+    "daily rate limit",
+    "try again in 24",
+    "exhausted your daily",
+    "monthly limit",
+    "insufficient_quota",
+    "billing_hard_limit",
 )
 
 
@@ -2391,13 +3092,22 @@ def _prov_retry_wait(headers, text, attempt):
 def _prov_record(name, model, status, reason, note=""):
     """One line in audit.log per provider attempt: who, which model, what code,
     why. This is the line that answers 'rate limit, bad key, or no money?'."""
-    rec = {"provider": name, "model": model, "status": status,
-           "reason": reason, "note": note}
+    rec = {
+        "provider": name,
+        "model": model,
+        "status": status,
+        "reason": reason,
+        "note": note,
+    }
     _prov_errors().append(rec)
     try:
-        audit_write("provider", name,
-                    {"model": model, "status": status, "note": note},
-                    False, reason)
+        audit_write(
+            "provider",
+            name,
+            {"model": model, "status": status, "note": note},
+            False,
+            reason,
+        )
     except Exception:
         pass
     label = "%s%s" % (name, (" (%s)" % model) if model else "")
@@ -2429,20 +3139,34 @@ def _prov_log_summary(providers):
     tried = [p[0] for p in providers]
     detail = " | ".join("%s %s" % (e["provider"], e["status"]) for e in errs)
     try:
-        audit_write("provider-chain", "all", {"tried": ",".join(tried)},
-                    False, detail[:180])
+        audit_write(
+            "provider-chain", "all", {"tried": ",".join(tried)}, False, detail[:180]
+        )
     except Exception:
         pass
 
 
-def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
-              tools_schema=None, tool_choice="auto"):
+def _chat_one(
+    name,
+    endpoint,
+    api_key,
+    model,
+    msgs,
+    timeout=(10, 90),
+    extra_options=None,
+    tools_schema=None,
+    tool_choice="auto",
+):
     if not api_key:
         _prov_record(name, model, "nokey", "no API key configured for this provider")
         return None
     headers = {"Content-Type": "application/json"}
     if api_key != "local":
         headers["Authorization"] = f"Bearer {api_key}"
+    # OpenCode Zen requires a session header for free-tier models
+    if name == "OpenCode" or name == "OpenCode-fallback":
+        import uuid
+        headers["x-opencode-session"] = str(uuid.uuid4())
     # Use a compact schema for Ollama: on this 2012-CPU box prefill is ~10 tok/s,
     # and the full 30-tool schema (~2.7k tokens) alone blows the round timeout.
     if tools_schema is None:
@@ -2468,15 +3192,30 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     else:
         max_tokens = 2048
 
-    body = {"model": model, "messages": msgs, "temperature": 0.4,
-            "max_tokens": max_tokens}
+    body = {
+        "model": model,
+        "messages": msgs,
+        "temperature": 0.4,
+        "max_tokens": max_tokens,
+    }
+    # Ollama's /v1/chat/completions (OpenAI-compatible) DOES support tools.
+    # Only strip tools if explicitly None or empty.
     if tools_schema:
         body["tools"] = tools_schema
         body["tool_choice"] = tool_choice
 
-    _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
-                      note=("reduced" if name in REDUCED_MODE_PROVIDERS
-                            or name.startswith("OpenRouter") else "full"))
+    _prov_token_audit(
+        name,
+        model,
+        msgs,
+        tools_schema,
+        max_tokens,
+        note=(
+            "reduced"
+            if name in REDUCED_MODE_PROVIDERS or name.startswith("OpenRouter")
+            else "full"
+        ),
+    )
     spent = getattr(_PROV_TLS, "spent", 0.0)
     attempt = 0
     shrunk = False
@@ -2491,31 +3230,56 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
             if _normalize_tool_messages(msgs):
                 body["messages"] = msgs
                 print(f"🧹 {name}: rewrote null tool args to match the schema")
-            r = requests.post(f"{endpoint}/chat/completions",
-                headers=headers,
-                json=body,
-                timeout=timeout)
+            # DEBUG: print proxy env vars so the wsarecv cause is self-describing
+            _proxies = {k: v for k, v in os.environ.items() if "proxy" in k.lower()}
+            if _proxies:
+                print(f"🚨 _chat_one PROXY ENV: {_proxies}")
+            # DEBUG: print exactly what we are sending to the provider
+            _req_url = f"{endpoint}/chat/completions"
+            print(
+                f"📤 [{name}] POST {_req_url} model={model} msgs={len(msgs)} "
+                f"timeout={timeout} tools={'yes' if tools_schema else 'no'}"
+            )
+            # Use a session with trust_env=False to bypass Windows proxy env vars
+            # (the wsarecv cause). Cloud providers are unaffected; Ollama needs it.
+            _live_log(
+                f"Sending to {name} ({model}) — {len(msgs)} messages, tools={'yes' if tools_schema else 'no'}"
+            )
+            session = requests.Session()
+            session.trust_env = False
+            r = session.post(_req_url, headers=headers, json=body, timeout=timeout)
+            print(f"📥 [{name}] HTTP {r.status_code} len={len(r.text)}")
+            if name == "Ollama" and r.status_code == 200:
+                _live_log(f"Ollama responded OK ({len(r.text)} bytes)")
+            elif name == "Ollama":
+                _live_log(f"Ollama error: HTTP {r.status_code} — {r.text[:120]}")
         except requests.exceptions.Timeout:
-            _prov_record(name, model, "timeout", "no response in time",
-                         "timeout=%s" % (timeout,))
+            _prov_record(
+                name, model, "timeout", "no response in time", "timeout=%s" % (timeout,)
+            )
+            print(f"⏱️ [{name}] TIMEOUT after {timeout}s — model may still be loading")
             return None
         except Exception as e:
             # Connection-level failures: name the host, because "connection
             # refused at 127.0.0.1:11434" and "DNS failure" have different fixes.
-            _prov_record(name, model, type(e).__name__, str(e)[:180],
-                         "endpoint=%s" % endpoint)
+            _prov_record(
+                name, model, type(e).__name__, str(e)[:180], "endpoint=%s" % endpoint
+            )
+            print(f"❌ [{name}] CONNECTION ERROR: {type(e).__name__}: {str(e)[:200]}")
             return None
 
         if r.status_code == 200:
             try:
                 choice = r.json()["choices"][0]
             except Exception as e:
-                _prov_record(name, model, 200, "200 but the body had no choices: %s" % e)
+                _prov_record(
+                    name, model, 200, "200 but the body had no choices: %s" % e
+                )
                 return None
             msg = choice.get("message", {})
             text = (msg.get("content") or msg.get("reasoning") or "").strip()
             tcs = []
-            for tc in (msg.get("tool_calls") or []):
+            for tc in msg.get("tool_calls") or []:
                 fn = tc.get("function") or {}
                 nm = fn.get("name")
                 am = fn.get("arguments")
@@ -2537,8 +3301,10 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                     tcs.append((nm, _normalize_tool_args(nm, args)))
             finish = choice.get("finish_reason") or "stop"
             if attempt > 1:
-                print("✅ %s recovered on attempt %d (max_tokens=%d)"
-                      % (name, attempt, max_tokens))
+                print(
+                    "✅ %s recovered on attempt %d (max_tokens=%d)"
+                    % (name, attempt, max_tokens)
+                )
             return text, tcs, finish
 
         reason = _prov_reason(r.text)
@@ -2549,12 +3315,19 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         #     cover the prompt. ACEsi's system prompt plus tool schema is ~8.5k
         #     tokens, so no max_tokens change helps; this needs credits or a
         #     different provider. Classify it so the two are never confused.
-        if r.status_code == 402 and re.search(r"prompt tokens limit exceeded", r.text, re.I):
+        if r.status_code == 402 and re.search(
+            r"prompt tokens limit exceeded", r.text, re.I
+        ):
             m = re.search(r"(\d+)\s*>\s*(\d+)", r.text)
             detail = ("need=%s affordable=%s" % (m.group(1), m.group(2))) if m else ""
-            _prov_record(name, model, 402, reason,
-                         "balance cannot cover the PROMPT itself - needs credits, "
-                         "not a smaller max_tokens" + (" [%s]" % detail if detail else ""))
+            _prov_record(
+                name,
+                model,
+                402,
+                reason,
+                "balance cannot cover the PROMPT itself - needs credits, "
+                "not a smaller max_tokens" + (" [%s]" % detail if detail else ""),
+            )
             return None
 
         # 402 "requires more credits, or fewer max_tokens ... can only afford N":
@@ -2565,28 +3338,41 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                 shrunk = True
                 max_tokens = afford
                 body["max_tokens"] = afford
-                print("💳 %s 402: balance affords only %d max_tokens, retrying smaller"
-                      % (name, afford))
+                print(
+                    "💳 %s 402: balance affords only %d max_tokens, retrying smaller"
+                    % (name, afford)
+                )
                 continue
 
         # 429: worth waiting out, unless the quota is gone for the day.
         if r.status_code == 429 and attempt <= _PROV_429_RETRIES:
             if _prov_hard_quota(r.text):
-                _prov_record(name, model, 429, reason,
-                             "daily/period quota exhausted - not retrying")
+                _prov_record(
+                    name,
+                    model,
+                    429,
+                    reason,
+                    "daily/period quota exhausted - not retrying",
+                )
                 return None
             if spent + 1 > _PROV_RETRY_BUDGET_S:
                 _prov_record(name, model, 429, reason, "retry budget exhausted")
                 return None
             wait = _prov_retry_wait(getattr(r, "headers", None), r.text, attempt)
             try:
-                audit_write("provider", name,
-                            {"model": model, "status": 429, "note": "retry in %.1fs" % wait},
-                            False, "rate limited, backing off: %s" % reason[:120])
+                audit_write(
+                    "provider",
+                    name,
+                    {"model": model, "status": 429, "note": "retry in %.1fs" % wait},
+                    False,
+                    "rate limited, backing off: %s" % reason[:120],
+                )
             except Exception:
                 pass
-            print("⏳ %s 429: waiting %.1fs before attempt %d (%s)"
-                  % (name, wait, attempt + 1, reason[:90]))
+            print(
+                "⏳ %s 429: waiting %.1fs before attempt %d (%s)"
+                % (name, wait, attempt + 1, reason[:90])
+            )
             time.sleep(wait)
             spent += wait
             _PROV_TLS.spent = spent
@@ -2600,8 +3386,11 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         if r.status_code == 413 and cut < 3 and (tools_schema or msgs):
             m = re.search(r"requested (\d+)", r.text, re.I)
             lim = re.search(r"limit (\d+)", r.text, re.I)
-            prov = ("requested %s of %s" % (m.group(1), lim.group(1) if lim else "?")
-                    if m else "input limit exceeded")
+            prov = (
+                "requested %s of %s" % (m.group(1), lim.group(1) if lim else "?")
+                if m
+                else "input limit exceeded"
+            )
             # A 413 retry MUST be strictly smaller than the request that failed.
             # Dropping tools alone is not enough and can even look like growth if
             # the retry re-sent a full (unreduced) history: a 3014-token reduced
@@ -2619,10 +3408,18 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
             msgs = _shrink_messages_for_retry(msgs, cut)
             body["messages"] = msgs
             cut += 1
-            _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
-                              note="413 cut=%d (%s)" % (cut, prov))
-            print("✂️ %s 413 (%s): retrying with %d tools, %d messages"
-                  % (name, prov, len(tools_schema or []), len(msgs)))
+            _prov_token_audit(
+                name,
+                model,
+                msgs,
+                tools_schema,
+                max_tokens,
+                note="413 cut=%d (%s)" % (cut, prov),
+            )
+            print(
+                "✂️ %s 413 (%s): retrying with %d tools, %d messages"
+                % (name, prov, len(tools_schema or []), len(msgs))
+            )
             continue
 
         note = ""
@@ -2631,10 +3428,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         elif r.status_code == 404:
             note = "model slug not found or retired at this provider"
         elif r.status_code == 413:
-            note = ("request still too large after dropping every tool - the system "
-                    "prompt itself exceeds this provider's input limit")
-        elif r.status_code == 400 and ("did not match schema" in r.text
-                                       or "expected" in r.text):
+            note = (
+                "request still too large after dropping every tool - the system "
+                "prompt itself exceeds this provider's input limit"
+            )
+        elif r.status_code == 400 and (
+            "did not match schema" in r.text or "expected" in r.text
+        ):
             # Log what the model actually sent. The provider's message names
             # the field but never its value, so without this the log cannot
             # distinguish a null from an empty string or a wrong type.
@@ -2643,6 +3443,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         _prov_record(name, model, r.status_code, reason, note)
         return None
 
+
+OLLAMA_SYS_PROMPT = (
+    "You are ACESi, a Windows PC assistant. "
+    "You are on Windows. Never use Linux commands. "
+    "Keep answers short and direct. "
+    "If the user asks a math question, just calculate it using your own knowledge. Do not use any tools."
+)
 
 
 def _ollama_local_messages(llm_messages):
@@ -2660,28 +3467,47 @@ def _ollama_local_messages(llm_messages):
             # Local prompt = driving persona + a memory-awareness section with the
             # light facts block, so the 3b model knows it HAS persistent memory and
             # can actually quote stored facts when asked (/chat never strips this).
-            sys_ = {"role": "system", "content":
-                    OLLAMA_SYS_PROMPT +
-                    "\nMEMORY: You DO have persistent memory. The bracketed blocks below "
-                    "([Facts I know about Chris], [Shared history], [Tasks & calendar], and "
-                    "the recent conversation turns) are loaded from your database every message. "
-                    "When Chris asks 'can you access/remember your memory', answer YES and quote "
-                    "the exact facts below — never say you have no memory. Always give the final "
-                    "text reply in the last turn.\n\n"
-                    + build_context_block(light=True)}
-        elif role == "user" and first_user is None and "SCREEN STATE" not in str(m.get("content", "")):
-            if "You only described" not in str(m.get("content", "")) and \
-               "I detected Chrome" not in str(m.get("content", "")) and \
-               "SCREEN STATE" not in str(m.get("content", "")):
+            sys_ = {
+                "role": "system",
+                "content": OLLAMA_SYS_PROMPT
+                + "\nMEMORY: You DO have persistent memory. The bracketed blocks below "
+                "([Facts I know about Chris], [Shared history], [Tasks & calendar], and "
+                "the recent conversation turns) are loaded from your database every message. "
+                "When Chris asks 'can you access/remember your memory', answer YES and quote "
+                "the exact facts below — never say you have no memory. Always give the final "
+                "text reply in the last turn.\n\n" + build_context_block(light=True),
+            }
+        elif (
+            role == "user"
+            and first_user is None
+            and "SCREEN STATE" not in str(m.get("content", ""))
+        ):
+            if (
+                "You only described" not in str(m.get("content", ""))
+                and "I detected Chrome" not in str(m.get("content", ""))
+                and "SCREEN STATE" not in str(m.get("content", ""))
+            ):
                 first_user = m
         elif role in ("user", "assistant", "tool"):
             tail.append(m)
-    return ([m for m in (sys_, first_user) if m] + tail[-3:]) if sys_ else (
-        [m for m in (first_user,) if m] + tail[-3:])
+    return (
+        ([m for m in (sys_, first_user) if m] + tail[-3:])
+        if sys_
+        else ([m for m in (first_user,) if m] + tail[-3:])
+    )
 
 
-_DEV_TOOLS = ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
-              "ui_dump", "ui_screenshot", "ui_device", "ui_connect")
+_DEV_TOOLS = (
+    "ui_app_open",
+    "ui_tap",
+    "ui_swipe",
+    "ui_type",
+    "ui_key",
+    "ui_dump",
+    "ui_screenshot",
+    "ui_device",
+    "ui_connect",
+)
 
 
 def _collect_tool_evidence(llm_messages, max_chars=12000):
@@ -2696,7 +3522,8 @@ def _collect_tool_evidence(llm_messages, max_chars=12000):
             break
         if len(content) > remaining:
             content = content[:remaining] + "\n...[TRUNCATED %d further chars]" % (
-                len(content) - remaining)
+                len(content) - remaining
+            )
         used += len(content)
         out.append({"tool": str(m.get("name") or "unknown_tool"), "content": content})
     return out
@@ -2704,9 +3531,15 @@ def _collect_tool_evidence(llm_messages, max_chars=12000):
 
 def _last_user_question(llm_messages):
     """The most recent real user turn - not one of the loop's injected nudges."""
-    _NUDGE_MARKERS = ("tool call", "SCREEN STATE", "You only described",
-                      "You stopped narrating", "You replied with text",
-                      "Your previous reply was cut off", "Now provide your final")
+    _NUDGE_MARKERS = (
+        "tool call",
+        "SCREEN STATE",
+        "You only described",
+        "You stopped narrating",
+        "You replied with text",
+        "Your previous reply was cut off",
+        "Now provide your final",
+    )
     for m in reversed(llm_messages):
         if m.get("role") != "user":
             continue
@@ -2727,16 +3560,18 @@ def _last_user_question(llm_messages):
 # Anything matching this is never a real answer, so it is detected and dropped
 # in favour of a grounded reply built from the tool evidence.
 _TOOL_MARKUP_RE = re.compile(
-    r'<(?:dots_function_call|function_call|invoke|parameter|tool_call|'
-    r'function_results?|tool_use)\b'
-    r'|</(?:invoke|parameter|function_call|dots_function_call|tool_call)>'
-    r'|<\|?\s*(?:tool_call|function_call|python_tag|tool|end_tool)\s*\|?>'
-    r'|\bfunctions\.[a-z_]+\s*\(', re.IGNORECASE)
+    r"<(?:dots_function_call|function_call|invoke|parameter|tool_call|"
+    r"function_results?|tool_use)\b"
+    r"|</(?:invoke|parameter|function_call|dots_function_call|tool_call)>"
+    r"|<\|?\s*(?:tool_call|function_call|python_tag|tool|end_tool)\s*\|?>"
+    r"|\bfunctions\.[a-z_]+\s*\(",
+    re.IGNORECASE,
+)
 
 
 def _looks_like_tool_markup(text):
     """True when model output is leaked tool-call syntax rather than an answer."""
-    t = str(text or '')
+    t = str(text or "")
     if not t.strip():
         return False
     return bool(_TOOL_MARKUP_RE.search(t))
@@ -2746,15 +3581,22 @@ def _sanitize_reply(text):
     """Clean a candidate reply. Returns the text, or None when the model
     emitted tool markup instead of an answer and the caller must fall back to
     a grounded/evidence reply rather than showing this to Chris."""
-    t = str(text or '').strip()
+    t = str(text or "").strip()
     if not t:
         return None
     if not _looks_like_tool_markup(t):
         return t
-    print("[reply-guard] dropped leaked tool-call markup (%d chars)" % len(t), flush=True)
+    print(
+        "[reply-guard] dropped leaked tool-call markup (%d chars)" % len(t), flush=True
+    )
     try:
-        audit_write('reply', 'markup_guard', {'chars': len(t)}, False,
-                    'model emitted tool markup instead of an answer')
+        audit_write(
+            "reply",
+            "markup_guard",
+            {"chars": len(t)},
+            False,
+            "model emitted tool markup instead of an answer",
+        )
     except Exception:
         pass
     return None
@@ -2798,8 +3640,9 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
             if len(content) > remaining:
                 content = content[:remaining] + "..."
             used += len(content)
-            parts.append("--- RESULT %d from `%s` ---\n%s" % (
-                len(parts) + 1, e["tool"], content))
+            parts.append(
+                "--- RESULT %d from `%s` ---\n%s" % (len(parts) + 1, e["tool"], content)
+            )
         body = "\n\n".join(parts)
     return (
         "Question: %s\n\n"
@@ -2808,13 +3651,15 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
         "Answer the question in a SINGLE SHORT SENTENCE using ONLY these results. "
         "No preamble, no listing of results, no bullet points.\n"
         "If these results do not contain the answer, reply with just: \"I couldn't "
-        "find that.\" Do NOT guess and do NOT answer from memory.\n"
-        "Never list tool names as findings - \"web_search\" is not a result."
-        % (question, body))
+        'find that." Do NOT guess and do NOT answer from memory.\n'
+        'Never list tool names as findings - "web_search" is not a result.'
+        % (question, body)
+    )
 
 
-def _final_answer(llm_messages, names, last_screen, active, user_message,
-                  chat_one=None):
+def _final_answer(
+    llm_messages, names, last_screen, active, user_message, chat_one=None
+):
     """The reply to show the user when the loop ends with work done.
 
     Replaces the block that produced
@@ -2827,14 +3672,16 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
 
     if evidence:
         prompt = _build_grounded_prompt(
-            _last_user_question(llm_messages) or user_message, evidence)
+            _last_user_question(llm_messages) or user_message, evidence
+        )
         schema = None
     elif device_acts:
         prompt = (
             "The device actions are complete. Actions executed: %s.\n"
             "Write a short final summary (2-3 sentences) of what you did and where "
             "the process ended up. Cite real text from the screen dump below. "
-            "Do not call any tools." % ", ".join(dict.fromkeys(device_acts)))
+            "Do not call any tools." % ", ".join(dict.fromkeys(device_acts))
+        )
         if last_screen:
             prompt += "\nLast screen seen:\n%s" % last_screen[:3000]
         schema = None
@@ -2844,12 +3691,23 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
     if chat_one is not None and active:
         try:
             msgs = list(llm_messages) + [{"role": "user", "content": prompt}]
-            got = chat_one(active[0], active[1], active[2], active[3], msgs,
-                           tools_schema=[], tool_choice="none")
+            got = chat_one(
+                active[0],
+                active[1],
+                active[2],
+                active[3],
+                msgs,
+                tools_schema=[],
+                tool_choice="none",
+            )
         except Exception:
             got = None
         if got:
-            text = (got[0] or "").strip() if isinstance(got, (tuple, list)) else str(got).strip()
+            text = (
+                (got[0] or "").strip()
+                if isinstance(got, (tuple, list))
+                else str(got).strip()
+            )
             # The grounded call can itself emit leaked tool markup; if so, fall
             # through to the evidence fallback instead of showing it to Chris.
             text = _sanitize_reply(text) if text else None
@@ -2863,9 +3721,21 @@ def _final_summary_call(active, llm_messages, names, last_screen):
     """After the dispatch loop ends (time budget / round cap) with real actions
     executed, give the model ONE short call to write a proper final summary
     instead of the mechanical 'action cap' string. Returns text or None."""
-    done = ", ".join(n for n in names if n in
-                     ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
-                      "ui_dump", "ui_screenshot", "ui_device"))
+    done = ", ".join(
+        n
+        for n in names
+        if n
+        in (
+            "ui_app_open",
+            "ui_tap",
+            "ui_swipe",
+            "ui_type",
+            "ui_key",
+            "ui_dump",
+            "ui_screenshot",
+            "ui_device",
+        )
+    )
     prompt = (
         "The device actions are complete. Actions executed: %s.\n"
         "Write a short, natural final summary (2-3 sentences) of what you did "
@@ -2879,8 +3749,16 @@ def _final_summary_call(active, llm_messages, names, last_screen):
     is_ollama = (active and active[0] == "Ollama") or not active
     try:
         if is_ollama and OLLAMA_ENABLED:
-            got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
-                            msgs, timeout=(15, 120), tools_schema=OLLAMA_TOOLS_SCHEMA)
+            got = _chat_one(
+                "Ollama",
+                OLLAMA_ENDPOINT,
+                "local",
+                OLLAMA_CHAT_MODEL,
+                msgs,
+                timeout=(15, 120),
+                tools_schema=[],  # No tools for summary call
+                tool_choice="none",
+            )
         elif active:
             got = _chat_one(active[0], active[1], active[2], active[3], msgs)
         else:
@@ -2894,6 +3772,47 @@ def _final_summary_call(active, llm_messages, names, last_screen):
     return None
 
 
+def _tool_icon(name):
+    """Return an emoji icon for a tool name, or a default if unknown."""
+    _icons = {
+        "list_files": "📂",
+        "read_file": "📄",
+        "grep": "🔍",
+        "write_file": "✏️",
+        "edit_file": "✏️",
+        "open_in_vscode": "📤",
+        "run_command": "▶",
+        "notify": "🔔",
+        "web_search": "🔎",
+        "webfetch": "🌐",
+        "curl": "🔗",
+        "git_status": "🌿",
+        "git_log": "🌿",
+        "git_commit": "🌿",
+        "git_branch": "🌿",
+        "git_merge": "🌿",
+        "build_apk": "📦",
+        "pub_add": "🧩",
+        "pub_remove": "🧩",
+        "pub_upgrade": "🧩",
+        "flutter_test": "🧪",
+        "flutter_analyze": "🔬",
+        "view_web_image": "🖼️",
+        "restart": "🔄",
+    }
+    return _icons.get(name, "🔧")
+
+
+def _tool_desc(name, args):
+    """Return a human-readable description of a tool call."""
+    if not args:
+        return name
+    parts = []
+    for k, v in args.items():
+        parts.append("%s=%s" % (k, str(v)[:80]))
+    return "%s(%s)" % (name, ", ".join(parts))
+
+
 def _auto_open_user_file_fallback(names, llm_messages, user_message):
     """Deterministic fallback: Chris asked to open/view/show a file in his user
     folders but the model answered from memory without calling the file tool
@@ -2901,8 +3820,12 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
     and attach the opened-file view so the request still completes AND the UI
     popup appears even when the model stalls. Returns True when a file was
     opened (a step with view data was appended to the ledger)."""
-    if ("view_user_file" in names or "open_user_file" in names or
-            "read_user_file" in names or not _match_open_user_file(user_message)):
+    if (
+        "view_user_file" in names
+        or "open_user_file" in names
+        or "read_user_file" in names
+        or not _match_open_user_file(user_message)
+    ):
         return False
     _hint = _extract_user_file_hint(user_message)
     if not _hint:
@@ -2916,7 +3839,9 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
         # Inline view failed (e.g. OneDrive cloud-only placeholder). Still open
         # it externally so the request completes: os.startfile lets the provider
         # hydrate the file and opens the default app for editing.
-        print("⚠️ /chat auto-open fallback: could not view %s — opening externally" % _rp)
+        print(
+            "⚠️ /chat auto-open fallback: could not view %s — opening externally" % _rp
+        )
         try:
             os.startfile(_rp)
         except Exception as _e:
@@ -2924,29 +3849,52 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
         names.append("open_user_file")
         sid = _agent_next_id()
         with _AGENT_LOCK:
-            _AGENT["steps"].append({"id": sid, "kind": "work",
-                                    "text": "open_user_file %s" % os.path.basename(_rp),
-                                    "state": "done", "icon": _tool_icon("open_user_file"),
-                                    "view": {"type": "external", "filename": os.path.basename(_rp),
-                                             "path": _rp}})
-        llm_messages.append({"role": "tool",
-                             "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
-                             "name": "open_user_file",
-                             "content": "Opened externally: %s" % _rp})
+            _AGENT["steps"].append(
+                {
+                    "id": sid,
+                    "kind": "work",
+                    "text": "open_user_file %s" % os.path.basename(_rp),
+                    "state": "done",
+                    "icon": _tool_icon("open_user_file"),
+                    "view": {
+                        "type": "external",
+                        "filename": os.path.basename(_rp),
+                        "path": _rp,
+                    },
+                }
+            )
+        llm_messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
+                "name": "open_user_file",
+                "content": "Opened externally: %s" % _rp,
+            }
+        )
         print("🖼 /chat auto-open fallback: externally opened %s" % _rp)
         return True
     names.append("view_user_file")
     sid = _agent_next_id()
     _view = result.view if isinstance(result, _ViewResult) else result
     with _AGENT_LOCK:
-        _AGENT["steps"].append({"id": sid, "kind": "work",
-                                "text": "view_user_file %s" % os.path.basename(_rp),
-                                "state": "done", "icon": _tool_icon("view_user_file"),
-                                "view": _view})
-    llm_messages.append({"role": "tool",
-                         "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
-                         "name": "view_user_file",
-                         "content": str(result)})
+        _AGENT["steps"].append(
+            {
+                "id": sid,
+                "kind": "work",
+                "text": "view_user_file %s" % os.path.basename(_rp),
+                "state": "done",
+                "icon": _tool_icon("view_user_file"),
+                "view": _view,
+            }
+        )
+    llm_messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": "chat_autoopen_%d" % int(time.time() * 1000),
+            "name": "view_user_file",
+            "content": str(result),
+        }
+    )
     print("🖼 /chat auto-open fallback: viewed %s" % _rp)
     return True
 
@@ -2954,21 +3902,57 @@ def _auto_open_user_file_fallback(names, llm_messages, user_message):
 def _wants_web_image(user_message):
     """True when Chris asked to see a picture/photo/image from the internet."""
     m = (user_message or "").lower()
-    return bool(re.search(r'\b(picture|photo|image|pic|pics|gif|photo of|picture of|image of)\b', m))
+    return bool(
+        re.search(
+            r"\b(picture|photo|image|pic|pics|gif|photo of|picture of|image of)\b", m
+        )
+    )
 
 
 def _find_image_url_in_text(text):
     """Return the first http(s) URL in `text` that looks like a direct image
     file (ends in an image extension, NET tools + curl)."""
     for url in re.findall(r'https?://[^\s)\]>"\'<]+', text or ""):
-        u = url.rstrip('.,;:') 
-        if re.search(r'\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)', u, re.IGNORECASE):
+        u = url.rstrip(".,;:")
+        if re.search(r"\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)", u, re.IGNORECASE):
             return u
     return None
 
 
-def _auto_open_web_image_fallback(reply_text, llm_messages, user_message,
-                                  triggered_by_tool=False):
+def _wants_vision_model(user_message):
+    """True when the user explicitly asked to see an image/photo/picture."""
+    return bool(
+        re.search(
+            r"\b(picture|photo|image|images|pic|pics|show\s*me|look\s*at|"
+            r"what\s*does\s*it\s*look\s*like|screenshot|snapshot)\b",
+            user_message or "",
+            re.IGNORECASE,
+        )
+    )
+
+
+def _vision_fallback_models():
+    """Models known to support image input on the current provider chain."""
+    return [
+        (
+            "Groq",
+            GROQ_ENDPOINT,
+            GROQ_API_KEY,
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+        ),
+        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, "llava-70b"),
+        (
+            "OpenRouter",
+            OPENROUTER_ENDPOINT,
+            OPENROUTER_API_KEY,
+            "google/gemini-2.5-flash",
+        ),
+    ]
+
+
+def _auto_open_web_image_fallback(
+    reply_text, llm_messages, user_message, triggered_by_tool=False
+):
     """Deterministic fallback: Chris asked for a picture from the internet and
     the model found an image URL but never called view_web_image (it either
     pasted the link in prose, or looped on web_search and stopped without a
@@ -2983,11 +3967,16 @@ def _auto_open_web_image_fallback(reply_text, llm_messages, user_message,
     # invents a plausible-looking path that 404s while a real one sits further
     # down the search output. Try them in order until one actually downloads.
     candidates = []
-    for text in [reply_text] + [m.get("content", "") for m in
-                                reversed(llm_messages or []) if m.get("role") == "tool"]:
-        for u in re.findall(r'https?://[^\s)\]>"\'<]+', text or ""):
-            u = u.rstrip('.,;:')
-            if re.search(r'\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)', u, re.IGNORECASE):
+    for text in [reply_text] + [
+        m.get("content", "")
+        for m in reversed(llm_messages or [])
+        if m.get("role") == "tool"
+    ]:
+        for u in re.findall(r'https?://[^\s)\]>"\'<]+', textF or ""):
+            u = u.rstrip(".,;:")
+            if re.search(
+                r"\.(?:png|jpe?g|gif|webp|bmp|tiff?)(?:\?|$)", u, re.IGNORECASE
+            ):
                 if u not in candidates:
                     candidates.append(u)
     if not candidates:
@@ -3005,22 +3994,38 @@ def _auto_open_web_image_fallback(reply_text, llm_messages, user_message,
         return False
     sid = _agent_next_id()
     with _AGENT_LOCK:
-        _AGENT["steps"].append({"id": sid, "kind": "work",
-                                "text": "view_web_image %s" % str(result.view.get("filename", url)),
-                                "state": "done", "icon": _tool_icon("view_web_image") or "🌐",
-                                "view": result.view})
-    llm_messages.append({"role": "tool",
-                         "tool_call_id": "webimg_%d" % int(time.time() * 1000),
-                         "name": "view_web_image",
-                         "content": str(result)[:4000]})
+        _AGENT["steps"].append(
+            {
+                "id": sid,
+                "kind": "work",
+                "text": "view_web_image %s" % str(result.view.get("filename", url)),
+                "state": "done",
+                "icon": _tool_icon("view_web_image") or "🌐",
+                "view": result.view,
+            }
+        )
+    llm_messages.append(
+        {
+            "role": "tool",
+            "tool_call_id": "webimg_%d" % int(time.time() * 1000),
+            "name": "view_web_image",
+            "content": str(result)[:4000],
+        }
+    )
     print("🌐 web-image fallback: displayed %s" % url)
     return True
 
 
 def _seen_tool_names():
     with _AGENT_LOCK:
-        return {s.get("text", "").split()[0] for s in _AGENT.get("steps", [])
-                if s.get("kind") == "work" and s.get("text")}
+        return {
+            s.get("text", "").split()[0]
+            for s in _AGENT.get("steps", [])
+            if s.get("kind") == "work" and s.get("text")
+        }
+
+
+_outstanding_subtasks = 0
 
 
 def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model=None):
@@ -3031,9 +4036,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     Rounds cap so a stuck model still terminates.
     Publishes live work-steps to _AGENT so the frontend (which polls
     /opencode/status) renders progress inline, exactly like run_agent does."""
+    # Track which provider/model actually answered, so the UI badge can show it.
+    global _LAST_MODEL_USED
+    _LAST_MODEL_USED = ""
     # Fresh provider-failure diagnostics for THIS dispatch only.
     _prov_reset()
     _prov_spend()
+
     # --- Domain separation (checked BEFORE marking the agent running): keep UI /
     # code / network work in distinct contexts so ACEsi stops mixing them. One
     # concrete domain wins; more than one is ambiguous -> ASK FOR CLARIFICATION.
@@ -3044,12 +4053,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     if len(concrete) >= 2:
         with _AGENT_LOCK:
             _AGENT["activity"] = "needs clarification"
-            _AGENT["last_reply"] = ("I can help with: (UI) navigating the Android app on the "
-                                    "device, (NETWORK) checking whether a URL/port is up, or "
-                                    "(CODE) reading/editing files. Which would you like?\n"
-                                    "E.g. \"navigate StudentSyncSA to the Venda ITS portal\", "
-                                    "\"curl https://univenierp01.univen.ac.za\", or "
-                                    "\"read lib/screens/...\".")
+            _AGENT["last_reply"] = (
+                "I can help with: (UI) navigating the Android app on the "
+                "device, (NETWORK) checking whether a URL/port is up, or "
+                "(CODE) reading/editing files. Which would you like?\n"
+                'E.g. "navigate StudentSyncSA to the Venda ITS portal", '
+                '"curl https://univenierp01.univen.ac.za", or '
+                '"read lib/screens/...".'
+            )
         return _AGENT["last_reply"]
     if _kill_armed():
         with _AGENT_LOCK:
@@ -3086,7 +4097,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # to a single domain strips the tools the other subtasks need, and the model then
     # correctly reports it cannot do them.
     _registered = {t["function"]["name"] for t in TOOLS_SCHEMA}
-    allowed_names = ace_dispatcher.widen_to_cover(user_message, allowed_names, _registered)
+    allowed_names = ace_dispatcher.widen_to_cover(
+        user_message, allowed_names, _registered
+    )
+    # ---- Job-Specific System Prompts ----
+    # Inject only the rules the AI actually needs for the tools it can call,
+    # instead of one giant prompt that confuses it and wastes tokens.
+    _job_text = _job_prompts_for_tools(sorted(allowed_names))
+    if _job_text and llm_messages and llm_messages[0].get("role") == "system":
+        llm_messages[0] = {
+            "role": "system",
+            "content": llm_messages[0].get("content", "") + _job_text,
+        }
     # A device task must never see a browser tool. Stripped here, at the one
     # point allowed_names is final, so the Ollama, full and net schemas are all
     # covered by one edit rather than three that can drift apart.
@@ -3101,10 +4123,51 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _AGENT["activity"] = "blocked (missing tools)"
             _AGENT["last_reply"] = "I can't complete this: %s" % _gaps
         return _AGENT["last_reply"]
-    # Ollama uses the COMPACT schema (prompt-size critical on this CPU); cloud
-    # providers get the FULL schema restricted to the active domain only.
-    ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
+    # Ollama uses a MINIMAL schema (web_search + webfetch only) to avoid wsarecv
+    # crash on this CPU-only hardware. Cloud providers get the FULL schema
+    # restricted to the active domain only.
+    ollama_domain_schema = OLLAMA_TOOLS_SCHEMA
     full_domain_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names)
+    # Ensure run_command is in the schema if allowed (workaround for parsing issue)
+    if "run_command" in allowed_names and not any(
+        t["function"]["name"] == "run_command" for t in full_domain_schema
+    ):
+        run_cmd_tool = {
+            "type": "function",
+            "function": {
+                "name": "run_command",
+                "description": "Run a shell command and return stdout/stderr. Args: command.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"command": {"type": "string"}},
+                    "required": ["command"],
+                },
+            },
+        }
+        full_domain_schema.append(run_cmd_tool)
+    # DEBUG
+    try:
+        with open(
+            "C:/Users/chris/StudentSyncSA/debug_schema.txt", "a", encoding="utf-8"
+        ) as f:
+            newline = "\n"
+            f.write(
+                f"full_domain_schema: {len(full_domain_schema)} tools: {[t['function']['name'] for t in full_domain_schema]}"
+                + newline
+            )
+            f.write(
+                f"  run_command in full_domain_schema: {'run_command' in [t['function']['name'] for t in full_domain_schema]}"
+                + newline
+            )
+            f.write(
+                f"  allowed_names at filter time: {sorted(allowed_names)}" + newline
+            )
+            f.write(
+                f"  run_command in allowed_names: {'run_command' in allowed_names}"
+                + newline
+            )
+    except:
+        pass
     # Compact schema for net-domain tools (OpenRouter free tier token limit).
     # Also used for hybrid web-research tasks (search + save to a file) which
     # classify as 'general' but still need web_search/webfetch to gather data.
@@ -3178,8 +4241,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # for the app, open it now and feed the resulting screen state back so the
     # model's first ui_dump reads the real app screen.
     opened_app = False
-    if _ui_task(user_message) and not _ui_situational_ask(user_message) and (
-            re.search(r'\bui_app_open\b', user_message, re.IGNORECASE)):
+    if (
+        _ui_task(user_message)
+        and not _ui_situational_ask(user_message)
+        and (re.search(r"\bui_app_open\b", user_message, re.IGNORECASE))
+    ):
         try:
             _aok, _atxt = _call_tool("ui_app_open", {})
             if _aok:
@@ -3190,11 +4256,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 _dok, _dtxt = _ui_auto_dump()
                 if _dok:
                     last_screen = _dtxt
-                    seen_screen_hint = ("APP LAUNCHED. Here is what is now on screen:\n%s%s"
-                                        % (str(_dtxt)[:2000], _cert_warning_directive(_dtxt)))
+                    seen_screen_hint = (
+                        "APP LAUNCHED. Here is what is now on screen:\n%s%s"
+                        % (str(_dtxt)[:2000], _cert_warning_directive(_dtxt))
+                    )
                 else:
                     seen_screen_hint = "APP LAUNCHED."
-                llm_messages = [{"role": "user", "content": seen_screen_hint}] + llm_messages
+                llm_messages = [
+                    {"role": "user", "content": seen_screen_hint}
+                ] + llm_messages
         except Exception as e:
             print("⚠️ /chat auto ui_app_open failed: %s" % e)
     # Tracks whether the model has read the screen (ui_dump or an auto-dump fed
@@ -3251,11 +4321,20 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if prov and prov[0] == "Groq":
                         for m in GROQ_FALLBACKS:
                             if m != preferred_model:
-                                providers.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, m))
+                                providers.append(
+                                    ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, m)
+                                )
                     elif prov and prov[0] == "OpenRouter":
                         for m in OPENROUTER_FALLBACKS:
                             if m != preferred_model:
-                                providers.append(("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, m))
+                                providers.append(
+                                    (
+                                        "OpenRouter",
+                                        OPENROUTER_ENDPOINT,
+                                        OPENROUTER_API_KEY,
+                                        m,
+                                    )
+                                )
                 # Then try the standard providers.
                 for p in _chat_providers(active_domain):
                     if p not in providers:
@@ -3264,9 +4343,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
                     # files; otherwise it is dead weight in the schema.
-                    _want_files = bool(re.search(
-                        r"\b(file|files|folder|read|open|edit|save|document|"
-                        r"download|desktop|documents)\b", (user_message or ""), re.I))
+                    _want_files = bool(
+                        re.search(
+                            r"\b(file|files|folder|read|open|edit|save|document|"
+                            r"download|desktop|documents)\b",
+                            (user_message or ""),
+                            re.I,
+                        )
+                    )
                     # Same idea for the phone: the connect tools are only worth
                     # their schema tokens when the task is about reaching a device.
                     _want_device = _needs_phone_link(user_message)
@@ -3278,19 +4362,31 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         schema = ollama_domain_schema
                         msgs = _ollama_local_messages(llm_messages)
                         tc2 = tc
-                    elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
+                    elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith(
+                        "OpenRouter"
+                    ):
                         # Reduced payload: the full one is rejected outright by
                         # these free tiers (measured 8866-9541 input tokens vs a
                         # 7000 ITPM cap and a ~151-token balance).
-                        _budget = (GROQ_REDUCED_BUDGET if _pname == "Groq"
-                                   else OPENROUTER_REDUCED_BUDGET)
-                        _base = _reduced_tool_pool(active_domain,
-                                                   net_domain_schema or full_domain_schema)
-                        msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
+                        _budget = (
+                            GROQ_REDUCED_BUDGET
+                            if _pname == "Groq"
+                            else OPENCODE_REDUCED_BUDGET if _pname == "OpenCode"
+                            else OPENROUTER_REDUCED_BUDGET
+                        )
+                        _base = _reduced_tool_pool(
+                            active_domain, net_domain_schema or full_domain_schema
+                        )
+                        msgs = reduced_messages(
+                            llm_messages, active_domain, ctx_overlay
+                        )
                         schema = build_reduced_schema(
-                            _base, want_files=_want_files, want_device=_want_device,
+                            _base,
+                            want_files=_want_files,
+                            want_device=_want_device,
                             drop_cdp=_no_cdp,
-                            budget=_reduced_schema_budget(_budget, msgs, _base))
+                            budget=_reduced_schema_budget(_budget, msgs, _base),
+                        )
                         tc2 = tc
                     else:
                         schema = full_domain_schema
@@ -3298,16 +4394,26 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         tc2 = tc
                         if p[0] in ("OpenRouter", "Groq") and net_domain_schema:
                             schema = net_domain_schema
-                    got = _chat_one(p[0], p[1], p[2], p[3], msgs,
-                                     tools_schema=schema, tool_choice=tc2)
+                    got = _chat_one(
+                        p[0],
+                        p[1],
+                        p[2],
+                        p[3],
+                        msgs,
+                        tools_schema=schema,
+                        tool_choice=tc2,
+                        timeout=(30, 240) if p[0] == "Ollama" else (10, 90),
+                    )
                     if _no_cdp:
                         # Log what the model can actually see, not what the
                         # domain filter intended. A device task reported "I
                         # don't have the CDP tools" while the ui_* tools were
                         # present, and nothing in the log settled it either
                         # way; the two lists have to be printed side by side.
-                        print("[cdp-strip] final schema (%d): %s"
-                              % (len(schema), [t["function"]["name"] for t in schema]))
+                        print(
+                            "[cdp-strip] final schema (%d): %s"
+                            % (len(schema), [t["function"]["name"] for t in schema])
+                        )
                     # No outer retry loop here any more: _chat_one owns 429
                     # backoff and the 402 max_tokens shrink, and it refuses to
                     # retry a daily-quota 429. The old wrapper blindly re-called
@@ -3315,58 +4421,108 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # 'daily_quota_exhausted' and just burned the round budget.
                     if got is not None:
                         active = p
+                        # Record which provider/model actually answered so the
+                        # frontend badge can display it.
+                        _pname = p[0]
+                        _pmodel = p[3] if len(p) > 3 else ""
+                        _LAST_MODEL_USED = ("%s - %s" % (_pname, _pmodel)).strip(" -")
                         break
                 if got is None:
-                    for model in OPENROUTER_FALLBACKS:
-                        # Same reduced payload as the primary OpenRouter attempt:
+                    for model in OPENCODE_FALLBACKS:
+                        # Same reduced payload as the primary OpenCode attempt:
                         # the free balance rejects the full prompt, so retrying
                         # other slugs with it would just fail identically.
-                        or_schema = build_reduced_schema(
-                            _reduced_tool_pool(active_domain,
-                                               net_domain_schema or full_domain_schema),
-                            want_files=_want_files, want_device=_want_device,
-                            drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET)
-                        or_msgs = reduced_messages(llm_messages, active_domain,
-                                                   ctx_overlay)
-                        got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                        OPENROUTER_API_KEY, model, or_msgs,
-                                        tools_schema=or_schema, tool_choice=tc)
+                        oc_schema = build_reduced_schema(
+                            _reduced_tool_pool(
+                                active_domain, net_domain_schema or full_domain_schema
+                            ),
+                            want_files=_want_files,
+                            want_device=_want_device,
+                            drop_cdp=_no_cdp,
+                            budget=OPENCODE_REDUCED_BUDGET,
+                        )
+                        oc_msgs = reduced_messages(
+                            llm_messages, active_domain, ctx_overlay
+                        )
+                        got = _chat_one(
+                            "OpenCode-fallback",
+                            OPENCODE_ENDPOINT,
+                            OPENCODE_API_KEY,
+                            model,
+                            oc_msgs,
+                            tools_schema=oc_schema,
+                            tool_choice=tc,
+                        )
                         if got is not None:
-                            active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                      OPENROUTER_API_KEY, model)
+                            active = (
+                                "OpenCode-fallback",
+                                OPENCODE_ENDPOINT,
+                                OPENCODE_API_KEY,
+                                model,
+                            )
+                            _LAST_MODEL_USED = "OpenCode - %s" % model
                             break
                 if got is None and OLLAMA_ENABLED:
+                    # Rate-limit / quota fallback: cloud APIs (Groq/OpenRouter) failed
+                    print(
+                        "[Fallback] Cloud API rate limited. Switching to local Ollama."
+                    )
                     # Ollama warm-up probe first: cheap tiny call that forces the
                     # model to LOAD (with keep_alive persisted in Ollama) so the
                     # heavy first round reuses the loaded model instead of eating
                     # the whole timeout on a cold swap. MUST use the same /v1
                     # endpoint with the same options as the real call.
                     try:
-                        _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                  OLLAMA_CHAT_MODEL,
-                                  [{"role": "user", "content": "ok"}],
-                                  timeout=(15, 300),
-                                  tools_schema=OLLAMA_TOOLS_SCHEMA)
+                        _chat_one(
+                            "Ollama",
+                            OLLAMA_ENDPOINT,
+                            "local",
+                            OLLAMA_CHAT_MODEL,
+                            [{"role": "user", "content": "ok"}],
+                            timeout=(15, 300),
+                            tools_schema=OLLAMA_TOOLS_SCHEMA,
+                        )
                     except Exception:
                         pass
-                    got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                    OLLAMA_CHAT_MODEL, _ollama_local_messages(llm_messages),
-                                    timeout=(15, 300),
-                                    tools_schema=ollama_domain_schema, tool_choice=tc)
+                    got = _chat_one(
+                        "Ollama",
+                        OLLAMA_ENDPOINT,
+                        "local",
+                        OLLAMA_CHAT_MODEL,
+                        _ollama_local_messages(llm_messages),
+                        timeout=(15, 300),
+                        tools_schema=ollama_domain_schema,
+                        tool_choice=tc,
+                    )
                     if got is not None:
-                        active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
-                                  "compact")
+                        active = (
+                            "Ollama",
+                            OLLAMA_ENDPOINT,
+                            "local",
+                            OLLAMA_CHAT_MODEL,
+                            "compact",
+                        )
+                        _LAST_MODEL_USED = "Local Ollama - %s" % OLLAMA_CHAT_MODEL
                 if got is None:
-                    print("[ACE-DISPATCH] All providers exhausted. tried=%s ollama=%s"
-                          % ([p[0] for p in providers], OLLAMA_ENABLED))
+                    print(
+                        "[ACE-DISPATCH] All providers exhausted. tried=%s ollama=%s"
+                        % ([p[0] for p in providers], OLLAMA_ENABLED)
+                    )
                     _prov_log_summary(providers)
                     break
             else:
                 tc = "required" if (_ui_task(user_message) and not names) else "auto"
                 if len(active) > 4 and active[4] == "compact":
-                    got = _chat_one(active[0], active[1], active[2], active[3],
-                                    _ollama_local_messages(llm_messages), timeout=(15, 300),
-                                    tools_schema=ollama_domain_schema, tool_choice=tc)
+                    got = _chat_one(
+                        active[0],
+                        active[1],
+                        active[2],
+                        active[3],
+                        _ollama_local_messages(llm_messages),
+                        timeout=(15, 300),
+                        tools_schema=ollama_domain_schema,
+                        tool_choice=tc,
+                    )
                 else:
                     fwd_schema = full_domain_schema
                     # OpenRouter keeps the compact net/research schema on follow-up
@@ -3377,22 +4533,38 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # opening round. Sending the full prompt here is what kept
                     # hitting 413 after a successful first call: round 1 went
                     # out at ~2.6k tokens and round 2 went back out at 9.5k.
-                    if (active[0] in REDUCED_MODE_PROVIDERS
-                            or active[0].startswith("OpenRouter")):
-                        _budget = (GROQ_REDUCED_BUDGET if active[0] == "Groq"
-                                   else OPENROUTER_REDUCED_BUDGET)
-                        fwd_msgs = reduced_messages(llm_messages, active_domain,
-                                                    ctx_overlay)
+                    if active[0] in REDUCED_MODE_PROVIDERS or active[0].startswith(
+                        "OpenRouter"
+                    ):
+                        _budget = (
+                            GROQ_REDUCED_BUDGET
+                            if active[0] == "Groq"
+                            else OPENCODE_REDUCED_BUDGET if active[0] == "OpenCode"
+                            else OPENROUTER_REDUCED_BUDGET
+                        )
+                        fwd_msgs = reduced_messages(
+                            llm_messages, active_domain, ctx_overlay
+                        )
                         fwd_schema = build_reduced_schema(
                             _reduced_tool_pool(active_domain, fwd_schema),
-                            want_files=_want_files, want_device=_want_device,
+                            want_files=_want_files,
+                            want_device=_want_device,
                             drop_cdp=_no_cdp,
-                            budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
+                            budget=_reduced_schema_budget(
+                                _budget, fwd_msgs, fwd_schema
+                            ),
+                        )
                     else:
                         fwd_msgs = llm_messages
-                    got = _chat_one(active[0], active[1], active[2], active[3],
-                                    fwd_msgs, tools_schema=fwd_schema,
-                                    tool_choice=tc)
+                    got = _chat_one(
+                        active[0],
+                        active[1],
+                        active[2],
+                        active[3],
+                        fwd_msgs,
+                        tools_schema=fwd_schema,
+                        tool_choice=tc,
+                    )
                 if got is None:
                     active = None
                     continue
@@ -3406,10 +4578,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             # a nudge, instead of returning the half-sentence as the reply.
             if finish == "length" and not tcs:
                 llm_messages.append({"role": "assistant", "content": text or ""})
-                llm_messages.append({"role": "user", "content":
-                    "Your previous reply was cut off by the length limit before you "
-                    "could call a tool. Continue now: emit the tool call directly, "
-                    "with no preamble and no restating of your plan."})
+                llm_messages.append(
+                    {
+                        "role": "user",
+                        "content": "Your previous reply was cut off by the length limit before you "
+                        "could call a tool. Continue now: emit the tool call directly, "
+                        "with no preamble and no restating of your plan.",
+                    }
+                )
                 active = None
                 dead_rounds += 1
                 if dead_rounds >= 4:
@@ -3457,11 +4633,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # field guard below cannot catch it, because a repeat IS
                         # a field fill and so passes as "progress".
                         _repeat_field_nudges += 1
-                        print("REPEAT-FIELD-GUARD: %s already filled but model "
-                              "re-filled it; nudging (n=%d)"
-                              % (_fk, _repeat_field_nudges), flush=True)
-                        llm_messages.append({"role": "user",
-                                             "content": _REPEAT_FIELD_NUDGE})
+                        print(
+                            "REPEAT-FIELD-GUARD: %s already filled but model "
+                            "re-filled it; nudging (n=%d)"
+                            % (_fk, _repeat_field_nudges),
+                            flush=True,
+                        )
+                        llm_messages.append(
+                            {"role": "user", "content": _REPEAT_FIELD_NUDGE}
+                        )
                         continue
             if _awaiting_field and tcs and _field_nudges < 3:
                 # A fill happened and the next call is a read. There is no POST
@@ -3478,13 +4658,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _cargs = _cf.get("args") or _cf.get("arguments") or {}
                 else:
                     _cname, _cargs = "", {}
-                if not (_is_field_fill(_cname, _cargs)
-                        or _is_form_submit_call(_cname, _cargs)
-                        or _is_network_read_call(_cname, _cargs)):
+                if not (
+                    _is_field_fill(_cname, _cargs)
+                    or _is_form_submit_call(_cname, _cargs)
+                    or _is_network_read_call(_cname, _cargs)
+                ):
                     _field_nudges += 1
-                    print("FIELD-GUARD: after a fill, next call was %s; "
-                          "nudging to finish the form (n=%d)" % (_cname, _field_nudges),
-                          flush=True)
+                    print(
+                        "FIELD-GUARD: after a fill, next call was %s; "
+                        "nudging to finish the form (n=%d)" % (_cname, _field_nudges),
+                        flush=True,
+                    )
                     llm_messages.append({"role": "user", "content": _FIELD_NUDGE})
                     continue
             if _awaiting_submit and tcs and _submit_nudges < 2:
@@ -3499,9 +4683,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _cname, _cargs = "", {}
                 if not _is_form_submit_call(_cname, _cargs):
                     _submit_nudges += 1
-                    print("SUBMIT-GUARD: all fields filled but next call was %s; "
-                          "nudging for submit (n=%d)" % (_cname, _submit_nudges),
-                          flush=True)
+                    print(
+                        "SUBMIT-GUARD: all fields filled but next call was %s; "
+                        "nudging for submit (n=%d)" % (_cname, _submit_nudges),
+                        flush=True,
+                    )
                     llm_messages.append({"role": "user", "content": _SUBMIT_NUDGE})
                     continue
             if _awaiting_read and not _read_captured:
@@ -3510,17 +4696,29 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # which then fails because the page already navigated away. The
                 # submit already happened and the request log already has it, so
                 # read it here and hand over the answer.
-                _recs = d.find_new_requests(before=_req_ids_before_submit,
-                                            methods=("POST",), timeout=8.0,
-                                            require_done=True)
+                _recs = d.find_new_requests(
+                    before=_req_ids_before_submit,
+                    methods=("POST",),
+                    timeout=8.0,
+                    require_done=True,
+                )
                 # Log both outcomes. A capture that silently finds nothing looks
                 # identical to a submit that never happened, which is how a
                 # broken snapshot went unnoticed for a run.
-                print("READ-GUARD: capture looked for a POST after a submit "
-                      "(snapshot=%s ids, log now has %d ids) -> %d record(s)"
-                      % ("none" if _req_ids_before_submit is None
-                         else len(_req_ids_before_submit),
-                         len(d.request_ids()), len(_recs)), flush=True)
+                print(
+                    "READ-GUARD: capture looked for a POST after a submit "
+                    "(snapshot=%s ids, log now has %d ids) -> %d record(s)"
+                    % (
+                        (
+                            "none"
+                            if _req_ids_before_submit is None
+                            else len(_req_ids_before_submit)
+                        ),
+                        len(d.request_ids()),
+                        len(_recs),
+                    ),
+                    flush=True,
+                )
                 if _recs:
                     _read_captured = True
                     _awaiting_read = False
@@ -3528,8 +4726,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     for _r in _recs[-3:]:
                         _st = _r.get("status")
                         if _st is None:
-                            _st = ("failed:%s" % _r.get("errorText")
-                                   if _r.get("state") == "failed" else "no response")
+                            _st = (
+                                "failed:%s" % _r.get("errorText")
+                                if _r.get("state") == "failed"
+                                else "no response"
+                            )
                         # Location lives in response_headers; there is no
                         # top-level "location" key on the record.
                         _hdrs = _r.get("response_headers") or {}
@@ -3546,24 +4747,35 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             _body = "no (redirect response carries no body)"
                         else:
                             _ok, _txt = d.get_response_body(
-                                url_contains=str(_r.get("url") or "").split("?")[0])
+                                url_contains=str(_r.get("url") or "").split("?")[0]
+                            )
                             if _ok:
-                                _body = ("yes" if _txt and not str(_txt).startswith("(")
-                                         else "no (empty)")
+                                _body = (
+                                    "yes"
+                                    if _txt and not str(_txt).startswith("(")
+                                    else "no (empty)"
+                                )
                             else:
                                 _body = "not retrievable (%s)" % str(_txt)[:90]
                         _lines.append(
                             "  %s %s -> status %s, Location: %s, has a response "
-                            "body: %s" % (_r.get("method"), _r.get("url"), _st,
-                                          _loc, _body))
-                    _msg = ("SERVER-CAPTURED RESULT for the form submission you "
-                            "just made:\n" + "\n".join(_lines)
-                            + "\nReport the method, URL, status code, Location and "
-                              "body presence from this. You do not need to call "
-                              "cdp_network_requests, and you must not re-fill or "
-                              "re-submit the form.")
-                    print("READ-GUARD: captured %d POST(s) server-side; "
-                          "handing the result to the model" % len(_recs), flush=True)
+                            "body: %s"
+                            % (_r.get("method"), _r.get("url"), _st, _loc, _body)
+                        )
+                    _msg = (
+                        "SERVER-CAPTURED RESULT for the form submission you "
+                        "just made:\n"
+                        + "\n".join(_lines)
+                        + "\nReport the method, URL, status code, Location and "
+                        "body presence from this. You do not need to call "
+                        "cdp_network_requests, and you must not re-fill or "
+                        "re-submit the form."
+                    )
+                    print(
+                        "READ-GUARD: captured %d POST(s) server-side; "
+                        "handing the result to the model" % len(_recs),
+                        flush=True,
+                    )
                     llm_messages.append({"role": "user", "content": _msg})
                     continue
             if _awaiting_read and tcs and _read_nudges < 2:
@@ -3577,9 +4789,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _cname, _cargs = "", {}
                 if not _is_network_read_call(_cname, _cargs):
                     _read_nudges += 1
-                    print("READ-GUARD: submit seen but next call was %s; "
-                          "nudging for the POST read (n=%d)" % (_cname, _read_nudges),
-                          flush=True)
+                    print(
+                        "READ-GUARD: submit seen but next call was %s; "
+                        "nudging for the POST read (n=%d)" % (_cname, _read_nudges),
+                        flush=True,
+                    )
                     llm_messages.append({"role": "user", "content": _READ_NUDGE})
                     continue
             if tcs:
@@ -3600,29 +4814,40 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _req_ids_before_submit = d.request_ids()
                     _read_captured = False
             if not tcs:
-                if _ui_task(user_message) and (not names or _looks_like_plan_narration(text)):
+                if _ui_task(user_message) and (
+                    not names or _looks_like_plan_narration(text)
+                ):
                     # Pick the RIGHT first tool: a screen-read ask ("You are on
                     # the ITS portal", "what does the screen show") means the app
                     # is ALREADY open — the model must ui_dump, not re-launch.
                     if _ui_situational_ask(user_message):
-                        first = ("ui_dump {} to READ the screen and report what is on "
-                                 "it right now")
+                        first = (
+                            "ui_dump {} to READ the screen and report what is on "
+                            "it right now"
+                        )
                     else:
-                        first = ("ui_app_open {} if the app is not running, then "
-                                 "ui_dump {} to READ the screen")
+                        first = (
+                            "ui_app_open {} if the app is not running, then "
+                            "ui_dump {} to READ the screen"
+                        )
                     if not names:
-                        msg = ("You only described a plan but did NOT call any tool. This task "
-                               "requires real actions on the device. Emit a structured tool "
-                               "call NOW, e.g. %s, then ui_tap/ui_swipe/ui_type to navigate "
-                               "toward the target, and ui_screenshot only after ui_dump "
-                               "confirms it. Never just narrate the plan." % first)
+                        msg = (
+                            "You only described a plan but did NOT call any tool. This task "
+                            "requires real actions on the device. Emit a structured tool "
+                            "call NOW, e.g. %s, then ui_tap/ui_swipe/ui_type to navigate "
+                            "toward the target, and ui_screenshot only after ui_dump "
+                            "confirms it. Never just narrate the plan." % first
+                        )
                     else:
-                        msg = ("You stopped narrating without calling a tool, but the task is "
-                               "NOT finished — you have already performed: %s. Continue the "
-                               "task step by step: read the screen with ui_dump, then "
-                               "ui_tap/ui_swipe/ui_type toward the target, ui_dump after "
-                               "each action, and only report done when the target screen is "
-                               "confirmed. Emit a tool call NOW, do not narrate." % ", ".join(names))
+                        msg = (
+                            "You stopped narrating without calling a tool, but the task is "
+                            "NOT finished — you have already performed: %s. Continue the "
+                            "task step by step: read the screen with ui_dump, then "
+                            "ui_tap/ui_swipe/ui_type toward the target, ui_dump after "
+                            "each action, and only report done when the target screen is "
+                            "confirmed. Emit a tool call NOW, do not narrate."
+                            % ", ".join(names)
+                        )
                     llm_messages.append({"role": "user", "content": msg})
                     active = None
                     dead_rounds += 1
@@ -3636,11 +4861,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # tasks previously fell straight through to `return _terse_reply(...)`.
                 _outstanding = _outstanding_subtasks(user_message, names)
                 if _outstanding:
-                    msg = ("You replied with text but called NO tool, and the task is "
-                           "NOT finished. Still outstanding: %s. Do not describe your "
-                           "capabilities or list your tools - call one now. If you "
-                           "genuinely cannot proceed, state exactly what is blocking "
-                           "you." % ", ".join(_outstanding))
+                    msg = (
+                        "You replied with text but called NO tool, and the task is "
+                        "NOT finished. Still outstanding: %s. Do not describe your "
+                        "capabilities or list your tools - call one now. If you "
+                        "genuinely cannot proceed, state exactly what is blocking "
+                        "you." % ", ".join(_outstanding)
+                    )
                     llm_messages.append({"role": "user", "content": msg})
                     active = None
                     dead_rounds += 1
@@ -3653,14 +4880,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # If Chris asked for a screenshot but the model finished with
                     # a text-only reply (never called ui_screenshot), capture it
                     # server-side so the popup still shows the target screen.
-                    if not tcs and "ui_screenshot" not in names and \
-                       re.search(r'\b(screenshot|show me|show what|snapshot|capture|look at)\b',
-                                 user_message, re.IGNORECASE):
+                    if (
+                        not tcs
+                        and "ui_screenshot" not in names
+                        and re.search(
+                            r"\b(screenshot|show me|show what|snapshot|capture|look at)\b",
+                            user_message,
+                            re.IGNORECASE,
+                        )
+                    ):
                         try:
                             _sok, _stxt = _call_tool("ui_screenshot", {})
                             if _sok:
                                 names.append("ui_screenshot")
-                                print("📷 /chat auto-captured screenshot on text-only final reply")
+                                print(
+                                    "📷 /chat auto-captured screenshot on text-only final reply"
+                                )
                         except Exception:
                             pass
                     # RESEARCH-AND-SAVE: the model gathered web results but is
@@ -3669,18 +4904,28 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # Chris still gets to review — but ONLY when Chris explicitly
                     # asked for a file; simple questions get a direct answer.
                     if _research_task and _explicit_save:
-                        _drafted, _draft_reply = _draft_research_fallback(llm_messages, names, user_message)
+                        _drafted, _draft_reply = _draft_research_fallback(
+                            llm_messages, names, user_message
+                        )
                         if _drafted:
                             with _AGENT_LOCK:
                                 _AGENT["last_reply"] = _draft_reply
                             return _draft_reply
                     with _AGENT_LOCK:
                         _AGENT["last_reply"] = _terse_reply(text or "")
-                    if names and not _already_reasked and _is_ungrounded(_terse_reply(text or "") or ""):
-                        llm_messages.append({"role": "user", "content":
-                            "That answer is from memory, not from the tool results. Re-answer "
-                            "using ONLY the tool results above, cite the source for each claim, "
-                            "or state that the results do not establish it."})
+                    if (
+                        names
+                        and not _already_reasked
+                        and _is_ungrounded(_terse_reply(text or "") or "")
+                    ):
+                        llm_messages.append(
+                            {
+                                "role": "user",
+                                "content": "That answer is from memory, not from the tool results. Re-answer "
+                                "using ONLY the tool results above, cite the source for each claim, "
+                                "or state that the results do not establish it.",
+                            }
+                        )
                         _already_reasked = True
                         active = None
                         continue
@@ -3688,13 +4933,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # requested file actually gets opened (view step + UI popup),
                     # even when the model answered from memory without a tool call.
                     _auto_open_user_file_fallback(names, llm_messages, user_message)
-                    _auto_open_web_image_fallback(text or "", llm_messages, user_message)
+                    _auto_open_web_image_fallback(
+                        text or "", llm_messages, user_message
+                    )
                     return _terse_reply(text or "")
-# Model returned empty text after using tools — nudge it to answer
+                # Model returned empty text after using tools — nudge it to answer
                 if names:
-                    nudge = ("You have completed the tool calls: %s. "
-                             "Now provide your final answer based on the results. "
-                             "Do not call more tools." % ", ".join(names))
+                    nudge = (
+                        "You have completed the tool calls: %s. "
+                        "Now provide your final answer based on the results. "
+                        "Do not call more tools." % ", ".join(names)
+                    )
                     llm_messages.append({"role": "user", "content": nudge})
                     active = None
                     dead_rounds += 1
@@ -3705,9 +4954,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             dead_rounds = 0
             last_had_tools = True
             batch = tcs[:_BATCH_MAX]
-            tids = [{"id": "chat_t%d_%d" % (rnd, j), "type": "function",
-                     "function": {"name": nm, "arguments": json.dumps(a)}}
-                    for j, (nm, a) in enumerate(batch)]
+            tids = [
+                {
+                    "id": "chat_t%d_%d" % (rnd, j),
+                    "type": "function",
+                    "function": {"name": nm, "arguments": json.dumps(a)},
+                }
+                for j, (nm, a) in enumerate(batch)
+            ]
             # Guard against degenerate loops (e.g. ui_type repeating the same
             # call dozens of times): bail when the same (tool,args) repeats 3+.
             sig = _batch_sig(batch)
@@ -3721,8 +4975,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _AGENT["activity"] = "stopped (repeated loop)"
                 print("🛑 /chat stop: repeated identical batch %s" % sig[:1])
                 break
-            llm_messages.append({"role": "assistant", "content": "" if tcs else (text or ""),
-                                 "tool_calls": tids})
+            llm_messages.append(
+                {
+                    "role": "assistant",
+                    "content": "" if tcs else (text or ""),
+                    "tool_calls": tids,
+                }
+            )
             for j, (name, args) in enumerate(batch):
                 # Abort must be honoured PER TOOL, not once per round. The model
                 # emits up to _BATCH_MAX calls at a time and this loop ran all of
@@ -3731,8 +4990,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # the worst possible answer to "stop".
                 if _AGENT.get("abort"):
                     print("⛔ %s skipped, user aborted" % name, flush=True)
-                    audit_write("tool", name, args or {}, False,
-                                "skipped: aborted by user")
+                    audit_write(
+                        "tool", name, args or {}, False, "skipped: aborted by user"
+                    )
                     break
                 # RESEARCH+SAVE FLOW: research tasks write their findings via
                 # write_file. Redirect that to open_in_vscode so the findings are
@@ -3752,29 +5012,48 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 icon = _tool_icon(run_name)
                 desc = _tool_desc(run_name, run_args)
                 with _AGENT_LOCK:
-                    _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
-                                            "state": "running", "icon": icon})
+                    _AGENT["steps"].append(
+                        {
+                            "id": sid,
+                            "kind": "work",
+                            "text": desc,
+                            "state": "running",
+                            "icon": icon,
+                        }
+                    )
                 # HARD GUARD: block ui_tap/ui_swipe unless the model has read
                 # the screen (ui_dump in this batch, or a successful ui_dump /
                 # auto-dump in a previous round) since the last screen change —
                 # forces the model to read before tapping, not tap blind.
                 if run_name in ("ui_tap", "ui_swipe") and not seen_screen:
-                    result = ("BLOCKED: You must run ui_dump in the same round "
-                              "before ui_tap/ui_swipe. Run ui_dump first to read "
-                              "the screen, then decide your tap coordinates from "
-                              "the screen state.")
+                    result = (
+                        "BLOCKED: You must run ui_dump in the same round "
+                        "before ui_tap/ui_swipe. Run ui_dump first to read "
+                        "the screen, then decide your tap coordinates from "
+                        "the screen state."
+                    )
                     ok = False
-                elif run_name == "ui_swipe" and _swipe_n >= 2 and \
-                        _swipe_sig == (run_args.get("x1"), run_args.get("y1"),
-                                       run_args.get("x2"), run_args.get("y2")) and \
-                        _swipe_screen == _last_dump_text:
+                elif (
+                    run_name == "ui_swipe"
+                    and _swipe_n >= 2
+                    and _swipe_sig
+                    == (
+                        run_args.get("x1"),
+                        run_args.get("y1"),
+                        run_args.get("x2"),
+                        run_args.get("y2"),
+                    )
+                    and _swipe_screen == _last_dump_text
+                ):
                     # Same swipe, same direction, same screen: it is not working.
-                    result = ("BLOCKED: you have swiped %d times with identical "
-                              "coordinates and the screen has not changed. This is "
-                              "a no-op. Stop swiping. Read the latest ui_dump and act "
-                              "on what is actually visible - the control you want is "
-                              "already on the screen, you are looking for it in the "
-                              "wrong place." % (_swipe_n + 1))
+                    result = (
+                        "BLOCKED: you have swiped %d times with identical "
+                        "coordinates and the screen has not changed. This is "
+                        "a no-op. Stop swiping. Read the latest ui_dump and act "
+                        "on what is actually visible - the control you want is "
+                        "already on the screen, you are looking for it in the "
+                        "wrong place." % (_swipe_n + 1)
+                    )
                     ok = False
                     _swipe_n = 0
                     _swipe_sig = None
@@ -3783,14 +5062,28 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # every result gathered so far is real work worth returning.
                     try:
                         ok, result = _call_tool(run_name, run_args)
+                        _live_log(
+                            f"Tool: {run_name}({json.dumps(run_args)[:120]}) ok={ok}"
+                        )
                     except Exception as e:
                         ok = False
-                        result = ("tool %r failed: %s: %s"
-                                  % (run_name, type(e).__name__, e))
-                        audit_write("tool", run_name, run_args or {}, False,
-                                    "raised %s: %s" % (type(e).__name__, e))
-                        print("💥 tool %s raised %s: %s"
-                              % (run_name, type(e).__name__, e), flush=True)
+                        result = "tool %r failed: %s: %s" % (
+                            run_name,
+                            type(e).__name__,
+                            e,
+                        )
+                        audit_write(
+                            "tool",
+                            run_name,
+                            run_args or {},
+                            False,
+                            "raised %s: %s" % (type(e).__name__, e),
+                        )
+                        print(
+                            "💥 tool %s raised %s: %s"
+                            % (run_name, type(e).__name__, e),
+                            flush=True,
+                        )
                 if ok and run_name == "ui_dump":
                     # An explicit ui_dump's result is fed straight back to the
                     # model, so it now has real screen state to tap from.
@@ -3800,8 +5093,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # nothing and repeating it will not help.
                     _last_dump_text = result
                 if run_name == "ui_swipe":
-                    _sig = (run_args.get("x1"), run_args.get("y1"),
-                            run_args.get("x2"), run_args.get("y2"))
+                    _sig = (
+                        run_args.get("x1"),
+                        run_args.get("y1"),
+                        run_args.get("x2"),
+                        run_args.get("y2"),
+                    )
                     if _sig == _swipe_sig and _last_dump_text == _swipe_screen:
                         _swipe_n += 1
                     else:
@@ -3827,8 +5124,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # the password at all, so the form submitted empty.
                     if _is_password_fill(run_name, run_args):
                         _awaiting_submit = True
-                    print("SUBMIT-GUARD: field filled via %s (field=%s, submit required next: %s)"
-                          % (run_name, _fk or "?", _awaiting_submit), flush=True)
+                    print(
+                        "SUBMIT-GUARD: field filled via %s (field=%s, submit required next: %s)"
+                        % (run_name, _fk or "?", _awaiting_submit),
+                        flush=True,
+                    )
                 elif _is_network_read_call(run_name, run_args):
                     _awaiting_read = False
                 tcid = "chat_t%d_%d" % (rnd, j)
@@ -3842,52 +5142,66 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             s["state"] = "done" if ok else "error"
                             s["error"] = "" if ok else result
                             # Store viewable result (image/pdf/text) for frontend rendering
-                            if ok and run_name in ("view_user_file", "open_user_file", "view_web_image"):
+                            if ok and run_name in (
+                                "view_user_file",
+                                "open_user_file",
+                                "view_web_image",
+                            ):
                                 if isinstance(result, _ViewResult):
                                     s["view"] = result.view
                                 elif isinstance(result, dict):
                                     s["view"] = result
-                    llm_messages.append({"role": "tool", "tool_call_id": tcid,
-                                         "name": name, "content": str(result)[:4000]})
-                # Detect unproductive re-querying: a research tool (web_search /
-                # webfetch / curl) called 3+ times with different arguments looks
-                # like a stall. BUT in a multi-part request ("search X, fetch Y,
-                # save it, then check weather, the time, and book Z") the model
-                # legitimately runs several DIFFERENT queries for the separate
-                # subtasks — killing the whole run on the 3rd distinct query would
-                # silently drop the not-yet-done subtasks. Only end the tool loop
-                # when the remaining work is itself just research/save; if real
-                # subtasks (weather, time, etc.) are still pending, nudge the model
-                # to move on to them instead of grinding the same topic.
-                _call_counts[name] = _call_counts.get(name, 0) + 1
-                _call_arg_sigs[name] = _call_arg_sigs.get(name, set())
-                _call_arg_sigs[name].add(json.dumps(run_args or {}, sort_keys=True))
-                _research_nudge = False
-                if name in ("web_search", "webfetch", "curl") and \
-                   _call_counts[name] >= 3 and len(_call_arg_sigs[name]) >= 3:
-                    _outstanding = _outstanding_subtasks(user_message, names)
-                    _outstanding_research_only = bool(_outstanding) and all(
-                        o in ("web search", "fetch pages", "save file")
-                        for o in _outstanding)
-                    if _outstanding and not _outstanding_research_only:
-                        _research_nudge = True
-                    else:
-                        # The searches already returned content (it's in the tool
-                        # results). Instead of the old abort message that just listed
-                        # the tool names ("searches returned: web_search, ...") —
-                        # which the model learned to echo as if it were an answer —
-                        # stop the tool loop and let the post-loop synthesizer answer
-                        # from the collected evidence.
-                        print("[ACE-DISPATCH] 3+ distinct searches; synthesizing from evidence")
-                        _stall_break = True
-                        break
-                if _research_nudge:
-                    _outstanding = _outstanding_subtasks(user_message, names)
-                    llm_messages.append({"role": "user", "content":
-                        "You've re-searched this topic several times without a clear result. "
-                        "Stop fighting this one query: move on and do the still-outstanding "
-                        "subtasks now (%s), then give your final report." %
-                        ", ".join(_outstanding)})
+                    llm_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tcid,
+                            "name": name,
+                            "content": str(result)[:4000],
+                        }
+                    )
+                    # Detect unproductive re-querying: a research tool (web_search /
+                    # webfetch / curl) called 3+ times with different arguments looks
+                    # like a stall. BUT in a multi-part request ("search X, fetch Y,
+                    # save it, then check weather, the time, and book Z") the model
+                    # legitimately runs several DIFFERENT queries for the separate
+                    # subtasks — killing the whole run on the 3rd distinct query would
+                    # silently drop the not-yet-done subtasks. Only end the tool loop
+                    # when the remaining work is itself just research/save; if real
+                    # subtasks (weather, time, etc.) are still pending, nudge the model
+                    # to move on to them instead of grinding the same topic.
+                    _call_counts[name] = _call_counts.get(name, 0) + 1
+                    _call_arg_sigs[name] = _call_arg_sigs.get(name, set())
+                    _call_arg_sigs[name].add(json.dumps(run_args or {}, sort_keys=True))
+                    _research_nudge = False
+                    if (
+                        name in ("web_search", "webfetch", "curl")
+                        and _call_counts[name] >= 3
+                        and len(_call_arg_sigs[name]) >= 3
+                    ):
+                        _outstanding = _outstanding_subtasks(user_message, names)
+                        _outstanding_research_only = bool(_outstanding) and all(
+                            o in ("web search", "fetch pages", "save file")
+                            for o in _outstanding
+                        )
+                        if _outstanding and not _outstanding_research_only:
+                            _research_nudge = True
+                        else:
+                            print(
+                                "[ACE-DISPATCH] 3+ distinct searches; synthesizing from evidence"
+                            )
+                            _stall_break = True
+                            break
+                    if _research_nudge:
+                        _outstanding = _outstanding_subtasks(user_message, names)
+                        llm_messages.append(
+                            {
+                                "role": "user",
+                                "content": "You've re-searched this topic several times without a clear result. "
+                                "Stop fighting this one query: move on and do the still-outstanding "
+                                "subtasks now (%s), then give your final report."
+                                % ", ".join(_outstanding),
+                            }
+                        )
                     active = None
                     dead_rounds += 1
                     break
@@ -3896,19 +5210,27 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     seen_screen = _dok
                     if _dok:
                         last_screen = str(_dtxt)[:1500]
-                        llm_messages.append({"role": "user", "content":
-                            "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
-                                name, last_screen, _cert_warning_directive(_dtxt))})
+                        llm_messages.append(
+                            {
+                                "role": "user",
+                                "content": "SCREEN STATE after your %s action (auto ui_dump):\n%s%s"
+                                % (name, last_screen, _cert_warning_directive(_dtxt)),
+                            }
+                        )
                         llm_messages.extend(_auto_bypass_cert_warning(_dtxt))
                         # Force the model to READ the screen state before its next
                         # move — without this directive the 3B model ignores the
                         # dumped screen and keeps guessing coordinates.
                         if name in ("ui_tap", "ui_swipe", "ui_type", "ui_key"):
-                            llm_messages.append({"role": "user", "content":
-                                "STOP. Read the SCREEN STATE above carefully. "
-                                 "Based on what you see, decide your NEXT action. "
-                                 "Do NOT guess coordinates — use the text/bounds "
-                                 "from the screen state above."})
+                            llm_messages.append(
+                                {
+                                    "role": "user",
+                                    "content": "STOP. Read the SCREEN STATE above carefully. "
+                                    "Based on what you see, decide your NEXT action. "
+                                    "Do NOT guess coordinates — use the text/bounds "
+                                    "from the screen state above.",
+                                }
+                            )
             if _stall_break:
                 break
     finally:
@@ -3918,7 +5240,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _advance_indicator()
     # Rounds exhausted (or all providers returned None). If we actually did real
     # work, report it honestly instead of the misleading "no models available".
-    if not names and _ui_task(user_message) and not (last_text and "FINAL" in last_text.upper()):
+    if (
+        not names
+        and _ui_task(user_message)
+        and not (last_text and "FINAL" in last_text.upper())
+    ):
         # The model stalled without a single tool call (narrated a plan). For a
         # screen-read/nav ask, fall back to an automatic ui_dump so Chris still
         # gets REAL on-device state instead of the monologue.
@@ -3937,11 +5263,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # it in the editor. The parked pending_save means "save it"/"discard" work
     # the same as the model-driven flow.
     if _research_task and _explicit_save:
-        _drafted, _draft_reply = _draft_research_fallback(llm_messages, names, user_message)
+        _drafted, _draft_reply = _draft_research_fallback(
+            llm_messages, names, user_message
+        )
         if _drafted:
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = _draft_reply
             return _draft_reply
+
     # AUTO-OPEN FALLBACK (helper): Chris asked to open/view/show a file in his
     # user folders but the model answered from memory without calling the file
     # tool (or it narrated a plan and stopped). Resolve the hinted filename
@@ -3960,15 +5289,27 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         _auto_opened = _auto_open_user_file()
         _auto_open_web_image_fallback(last_text, llm_messages, user_message)
         if _auto_opened or (names and _is_ungrounded(last_text)):
-            summary = _final_answer(llm_messages, names, last_screen, active,
-                                    user_message, chat_one=_chat_one)
+            summary = _final_answer(
+                llm_messages,
+                names,
+                last_screen,
+                active,
+                user_message,
+                chat_one=_chat_one,
+            )
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = summary
             return summary
         clean = _sanitize_reply(last_text)
         if clean is None:
-            clean = _final_answer(llm_messages, names, last_screen, active,
-                                  user_message, chat_one=_chat_one)
+            clean = _final_answer(
+                llm_messages,
+                names,
+                last_screen,
+                active,
+                user_message,
+                chat_one=_chat_one,
+            )
         with _AGENT_LOCK:
             _AGENT["last_reply"] = clean
         return clean
@@ -3981,15 +5322,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         msg = _AGENT["last_reply"]
         if not (msg and msg.strip()):
             with _AGENT_LOCK:
-                _AGENT["last_reply"] = (("Opened the file you asked for.")
-                                        if _auto_picked else (last_text or ""))
+                _AGENT["last_reply"] = (
+                    ("Opened the file you asked for.")
+                    if _auto_picked
+                    else (last_text or "")
+                )
         return _AGENT["last_reply"]
 
     # Auto-capture a screenshot if the user asked for one but the model didn't.
     if names:
-        _wants_shot = bool(re.search(
-            r'\b(screenshot|show me|show what|snapshot|capture)\b',
-            user_message, re.IGNORECASE))
+        _wants_shot = bool(
+            re.search(
+                r"\b(screenshot|show me|show what|snapshot|capture)\b",
+                user_message,
+                re.IGNORECASE,
+            )
+        )
         if _wants_shot and "ui_screenshot" not in names:
             try:
                 _sok, _stxt = _call_tool("ui_screenshot", {})
@@ -4004,8 +5352,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # display it inline so the request still completes even if the model stalls.
     _auto_open_user_file()
 
-    summary = _final_answer(llm_messages, names, last_screen, active,
-                            user_message, chat_one=_chat_one)
+    summary = _final_answer(
+        llm_messages, names, last_screen, active, user_message, chat_one=_chat_one
+    )
     summary = _normalize_reply(summary)
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
@@ -4015,13 +5364,31 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     return summary
 
 
-@app.route('/chat', methods=['POST'])
+@app.route("/api/live_logs", methods=["GET"])
+def api_live_logs():
+    """Return the last N entries from the live action log buffer."""
+    limit = int(request.args.get("limit", 200))
+    return jsonify({"logs": _LIVE_LOGS[-limit:]})
+
+@app.route("/api/live_logs/clear", methods=["POST"])
+def api_live_logs_clear():
+    """Clear the live action log buffer."""
+    global _LIVE_LOGS
+    _LIVE_LOGS = []
+    return jsonify({"ok": True, "cleared": True})
+
+
+@app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
-    user_message = data.get('message', '')
+    data = request.json or {}
+    user_message = data.get("message", "")
     # E-STOP: kill mode = total silence. No conversation saved, no model touched.
     if _kill_armed():
-        return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
+        return jsonify(
+            {
+                "reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."
+            }
+        )
     save_conversation("user", user_message)
 
     # Emotional memory: notice tiredness/frustration/sadness in what Chris says
@@ -4033,15 +5400,18 @@ def chat():
 
     # Deterministic "how did I feel" - answer from the mood ledger, not the LLM.
     _mood_q = re.match(
-        r'(?i)\b(?:how\s+(?:did|do|am|are)\s+i\s+feel(?:ing)?|what\s+was\s+my\s+mood|how\s+was\s+my\s+(?:mood|day)|how\s+am\s+i\s+(?:feeling|doing)|'
-        r'how\s+have\s+i\s+been|what\s+mood\s+was\s+i)\b'
-        r'(?:\s+(?:yesterday|today|last\s+night|earlier|tonight|this\s+week|last\s+week))?[?.!]*$',
-        user_message)
+        r"(?i)\b(?:how\s+(?:did|do|am|are)\s+i\s+feel(?:ing)?|what\s+was\s+my\s+mood|how\s+was\s+my\s+(?:mood|day)|how\s+am\s+i\s+(?:feeling|doing)|"
+        r"how\s+have\s+i\s+been|what\s+mood\s+was\s+i)\b"
+        r"(?:\s+(?:yesterday|today|last\s+night|earlier|tonight|this\s+week|last\s+week))?[?.!]*$",
+        user_message,
+    )
     if _mood_q:
-        _day_sm = re.search(r'(?i)\b(yesterday|last\s+night|last\s+week)\b', user_message)
+        _day_sm = re.search(
+            r"(?i)\b(yesterday|last\s+night|last\s+week)\b", user_message
+        )
         _target = None
         if _day_sm:
-            if 'week' in _day_sm.group(1):
+            if "week" in _day_sm.group(1):
                 _target = "week"
             else:
                 _target = (datetime.now() - timedelta(days=1)).date().isoformat()
@@ -4051,24 +5421,32 @@ def chat():
             _mv = get_moods(7)
             if _mv:
                 entry = _mv[-1]
-                reply = f"This week I noticed: {entry['mood']} (last on {entry['when'][:10]} at {entry['when'][11:16]})" + (f" — {entry['note'][:120]}" if entry.get('note') else "")
+                reply = (
+                    f"This week I noticed: {entry['mood']} (last on {entry['when'][:10]} at {entry['when'][11:16]})"
+                    + (f" — {entry['note'][:120]}" if entry.get("note") else "")
+                )
             else:
                 reply = "I don't have a clear read on your moods this week yet — mostly neutral from what I saw."
         else:
             _me = mood_for_date(_target)
             if _me:
-                reply = f"On {_target} I read you as {_me['mood']}" + (f" — {_me['note'][:150]}" if _me.get('note') else "")
+                reply = f"On {_target} I read you as {_me['mood']}" + (
+                    f" — {_me['note'][:150]}" if _me.get("note") else ""
+                )
             else:
                 reply = f"I don't have a mood note for {_target} yet. Tell me how you're feeling and I'll remember it."
         save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
+        return jsonify({"reply": reply, "model": _LAST_MODEL_USED})
 
     # Deterministic "forget <key>" — Chris controls what stays.
-    _forget_m = re.match(r'(?i)^(?:please\s+)?forget\s+(?:the\s+)?(?:fact|memory|key)?\s*[:=]?\s*(.+)$', user_message)
+    _forget_m = re.match(
+        r"(?i)^(?:please\s+)?forget\s+(?:the\s+)?(?:fact|memory|key)?\s*[:=]?\s*(.+)$",
+        user_message,
+    )
     if _forget_m:
-        _k = _forget_m.group(1).strip().strip('"\'')
-        if _k.lower() in ('everything', 'all', 'my memory'):
-            conn = sqlite3.connect('ace_memory.db')
+        _k = _forget_m.group(1).strip().strip("\"'")
+        if _k.lower() in ("everything", "all", "my memory"):
+            conn = sqlite3.connect("ace_memory.db")
             c = conn.cursor()
             c.execute("DELETE FROM memories")
             conn.commit()
@@ -4087,15 +5465,17 @@ def chat():
             else:
                 reply = f"I don't have anything stored under '{_k}'."
         save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
+        return jsonify({"reply": reply, "model": _LAST_MODEL_USED})
 
     # Deterministic "do I remember X?" - leaf recall from the memories table so
     # the test questions (Ember, oldest book in Harvard, mood) never depend on
     # model availability. Questions like "what is Ember?" and "what/which is the
     # oldest book in the Harvard library?" resolve straight from stored facts.
     _recall_m = re.match(
-        r'(?i)^(?:what|which|who|whats|whos|tell\s+me\s+about)\s+(?:is|was|are|were|the)\s*(.+)'
-        r'(\?|\?*\.*)$', user_message.strip())
+        r"(?i)^(?:what|which|who|whats|whos|tell\s+me\s+about)\s+(?:is|was|are|were|the)\s*(.+)"
+        r"(\?|\?*\.*)$",
+        user_message.strip(),
+    )
     if _recall_m:
         _q = _recall_m.group(1).strip("?.,! ").lower()
         _mem = get_memories()
@@ -4115,11 +5495,15 @@ def chat():
             _hit_key = _norm[_q]
         else:
             for k, v in _mem.items():
-                if _q in k.lower() or k.lower() in _q or (_q in str(v['value']).lower()):
+                if (
+                    _q in k.lower()
+                    or k.lower() in _q
+                    or (_q in str(v["value"]).lower())
+                ):
                     _hit_key = k
                     break
         if _hit_key and _hit_key in _mem:
-            reply = _mem[_hit_key]['value']
+            reply = _mem[_hit_key]["value"]
         else:
             reply = None
         if reply:
@@ -4134,12 +5518,16 @@ def chat():
     # outcome is exact. The model still sees the rest of the conversation.
     _pm = user_message.strip().lower()
     _save_follow = re.match(
-        r'^(?:(?:yes|yeah|yep|ok|okay|sure|please)\s+)?(?:save|keep|commit|publish|write)\b'
-        r'(?:\s+(?:it|the\s+(?:findings?|notes?|results|file|research|draft)))?'
-        r'(?:\s+(?:as|to)\s+.+)?[!.?]*$', _pm)
+        r"^(?:(?:yes|yeah|yep|ok|okay|sure|please)\s+)?(?:save|keep|commit|publish|write)\b"
+        r"(?:\s+(?:it|the\s+(?:findings?|notes?|results|file|research|draft)))?"
+        r"(?:\s+(?:as|to)\s+.+)?[!.?]*$",
+        _pm,
+    )
     _discard_follow = re.match(
-        r'^(?:(?:no|nah|nope)\s+)?(?:discard|ditch|trash|throw|delete|abandon|cancel|forget|dont\s+save|do\s+not\s+save|leave\s+it)\b'
-        r'(?:\s+(?:it|the\s+(?:findings?|notes?|results|file|research|draft)))?[!.?]*$', _pm)
+        r"^(?:(?:no|nah|nope)\s+)?(?:discard|ditch|trash|throw|delete|abandon|cancel|forget|dont\s+save|do\s+not\s+save|leave\s+it)\b"
+        r"(?:\s+(?:it|the\s+(?:findings?|notes?|results|file|research|draft)))?[!.?]*$",
+        _pm,
+    )
     with _AGENT_LOCK:
         _has_pending = bool(_AGENT.get("pending_save"))
     _follow_reply = None
@@ -4171,13 +5559,13 @@ def chat():
             return None
         if os.path.isabs(token):
             return token
-        doc_base = os.path.join(os.path.expanduser('~'), 'Documents')
+        doc_base = os.path.join(os.path.expanduser("~"), "Documents")
         proj_base = DATA_DIR
         for base in (doc_base, proj_base):
             cand = os.path.join(base, token)
             if os.path.exists(cand):
                 return cand
-        for ext in ('.dart',):
+        for ext in (".dart",):
             for base in (doc_base, proj_base):
                 cand = os.path.join(base, token) + ext
                 if os.path.exists(cand):
@@ -4186,11 +5574,11 @@ def chat():
         return token
 
     if file_path:
-        COMMON_EXTS = ('.pdf', '.txt', '.png', '.jpg', '.jpeg', '.docx', '.md')
+        COMMON_EXTS = (".pdf", ".txt", ".png", ".jpg", ".jpeg", ".docx", ".md")
         if not os.path.isabs(file_path):
             # Try Documents folder first, then project directory
-            doc_base = os.path.join(os.path.expanduser('~'), 'Documents')
-            proj_base = 'C:\\Users\\chris\\StudentSyncSA'
+            doc_base = os.path.join(os.path.expanduser("~"), "Documents")
+            proj_base = "C:\\Users\\chris\\StudentSyncSA"
             doc_path = os.path.join(doc_base, file_path)
             proj_path = os.path.join(proj_base, file_path)
             if os.path.exists(doc_path):
@@ -4215,8 +5603,9 @@ def chat():
                         break
         try:
             ext = os.path.splitext(file_path)[1].lower()
-            if ext == '.pdf':
+            if ext == ".pdf":
                 import fitz
+
                 doc = fitz.open(file_path)
                 pages = len(doc)
                 content = "\n".join(page.get_text() for page in doc)
@@ -4224,10 +5613,10 @@ def chat():
                 if len(content.strip()) < 10:
                     # Scanned PDF — render pages and OCR them
                     content = ocr_pdf(file_path)
-            elif ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'):
+            elif ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"):
                 content = ocr_image(file_path)
             else:
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
             LAST_FILE_PATH = file_path
             # If the user said "open", physically launch the file (default viewer)
@@ -4254,7 +5643,7 @@ def chat():
         save_conversation("assistant", reply)
         return jsonify({"reply": reply})
 
-    preferred = data.get('model', '')
+    preferred = data.get("model", "")
     provider = _find_provider_for_model(preferred)
     if provider:
         _, _, _, model, *_ = provider
@@ -4262,7 +5651,11 @@ def chat():
         model = OPENROUTER_MODEL
 
     # "note this / write down: X / log X" → journal entry
-    note_match = re.match(r'^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$', user_message, re.IGNORECASE)
+    note_match = re.match(
+        r"^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$",
+        user_message,
+        re.IGNORECASE,
+    )
     if note_match and note_match.group(1).strip():
         add_journal(note_match.group(1).strip())
         reply = "Logged it."
@@ -4270,8 +5663,11 @@ def chat():
         return jsonify({"reply": reply})
 
     # "remember <key> = <value>" or "remember <key>: <value>" → stored fact
-    rem_match = re.match(r'^remember\s+(?:that\s+)?(.+?)\s*=\s*(.+)$', user_message, re.IGNORECASE) or \
-                re.match(r'^remember\s+(?:that\s+)?([^:]+):\s*(.+)$', user_message, re.IGNORECASE)
+    rem_match = re.match(
+        r"^remember\s+(?:that\s+)?(.+?)\s*=\s*(.+)$", user_message, re.IGNORECASE
+    ) or re.match(
+        r"^remember\s+(?:that\s+)?([^:]+):\s*(.+)$", user_message, re.IGNORECASE
+    )
     if rem_match:
         key = rem_match.group(1).strip()
         value = rem_match.group(2).strip()
@@ -4288,19 +5684,22 @@ def chat():
     # is flaky here. Also catches "was that all / only the first N lines" type
     # follow-ups so they get a clean count list instead of a raw context dump.
     mem_q = re.match(
-        r'(?i)\b(?:access|check|open|see|read|use|consult)\s+(?:your\s+)?(?:database|memory)\b'
-        r'|\bdo you (?:have|remember)\b|\bcan you remember\b|\bcheck your memory\b'
-        r'|\bwhat do you (?:know|remember)\b|\bwhat do you (?:know|remember) about me\b'
-        r'|\b(?:was|is) that (?:only|all)\b|\bonly the first \d+ (?:lines?|facts?|memories?)\b',
-        user_message)
+        r"(?i)\b(?:access|check|open|see|read|use|consult)\s+(?:your\s+)?(?:database|memory)\b"
+        r"|\bdo you (?:have|remember)\b|\bcan you remember\b|\bcheck your memory\b"
+        r"|\bwhat do you (?:know|remember)\b|\bwhat do you (?:know|remember) about me\b"
+        r"|\b(?:was|is) that (?:only|all)\b|\bonly the first \d+ (?:lines?|facts?|memories?)\b",
+        user_message,
+    )
     if mem_q:
         mem = get_memories()
         if mem:
             facts = _curated_memory_lines(mem)
             total = len(mem)
             shown = len(facts)
-            reply = ("Yes — I have persistent memory. Here's what I have stored:\n"
-                     + "\n".join(facts))
+            reply = (
+                "Yes — I have persistent memory. Here's what I have stored:\n"
+                + "\n".join(facts)
+            )
             if total > shown:
                 reply += f"\n\n…plus {total - shown} more stored facts (I can list them if you want)."
         else:
@@ -4313,41 +5712,69 @@ def chat():
     # phone", "can you send a 'test' ping?", or "ping me" hits here before the
     # LLM loop. Quotes/quotes-types around 'test' are tolerated.
     _pm = user_message.strip()
-    ping_match = re.match(
-        r'(?i)^(?:can (?:you|u)\s+|please\s+|hey\s+acesi[\s,]+)?'
-        r'(?:send\s+)?(?:a\s+)?(?:test\s+)?[\"\']?test[\"\']?\s+'
-        r'ping(?:\s+(?:to|on)\s+my\s+phone)?[!.?]*$', _pm) or \
+    ping_match = (
         re.match(
-        r'(?i)^(?:can (?:you|u)\s+|please\s+|hey\s+acesi[\s,]+)?'
-        r'(?:send\s+)?(?:a\s+)?(?:test\s+)?ping'
-        r'(?:\s+(?:to|on)\s+my\s+phone)?[!.?]*$', _pm) or \
-        re.match(r'(?i)^(?:send|fire)\s+(?:a\s+)?(?:test\s+)?(?:push|notification|alert)'
-                 r'(?:\s+to\s+(?:my\s+)?(?:phone|device|ntfy))?[!.?]*$', _pm) or \
-        re.match(r'(?i)^(?:send\s+)?(?:me\s+)?(?:a\s+)?(?:push\s+)?notification'
-                 r'(?:\s+to\s+my\s+phone)?$', _pm)
+            r"(?i)^(?:can (?:you|u)\s+|please\s+|hey\s+acesi[\s,]+)?"
+            r"(?:send\s+)?(?:a\s+)?(?:test\s+)?[\"\']?test[\"\']?\s+"
+            r"ping(?:\s+(?:to|on)\s+my\s+phone)?[!.?]*$",
+            _pm,
+        )
+        or re.match(
+            r"(?i)^(?:can (?:you|u)\s+|please\s+|hey\s+acesi[\s,]+)?"
+            r"(?:send\s+)?(?:a\s+)?(?:test\s+)?ping"
+            r"(?:\s+(?:to|on)\s+my\s+phone)?[!.?]*$",
+            _pm,
+        )
+        or re.match(
+            r"(?i)^(?:send|fire)\s+(?:a\s+)?(?:test\s+)?(?:push|notification|alert)"
+            r"(?:\s+to\s+(?:my\s+)?(?:phone|device|ntfy))?[!.?]*$",
+            _pm,
+        )
+        or re.match(
+            r"(?i)^(?:send\s+)?(?:me\s+)?(?:a\s+)?(?:push\s+)?notification"
+            r"(?:\s+to\s+my\s+phone)?$",
+            _pm,
+        )
+    )
     if ping_match:
         ok, out = tool_notify("ACEsi Test", "This is a test ping from ACEsi")
-        reply = ("Pinged your phone — check the ntfy notification." if ok
-                 else f"Couldn't reach your phone: {out}")
+        reply = (
+            "Pinged your phone — check the ntfy notification."
+            if ok
+            else f"Couldn't reach your phone: {out}"
+        )
         save_conversation("assistant", reply)
-        return jsonify({"reply": reply})
+        return jsonify({"reply": reply, "model": _LAST_MODEL_USED})
 
     if "auto-fix" in user_message.lower():
         # Capture a bare filename, a lib/... path, or a Windows/absolute path ending in .dart
-        file_match = re.search(r'((?:[\w.-]+/)*[\w.-]+\.dart|(?:[A-Za-z]:[\\/][^\s,]+\.dart))', user_message)
-        error_match = re.search(r'(?:the\s+)?error(?:\s+is)?\s*:\s*(.+)$', user_message, re.IGNORECASE)
+        file_match = re.search(
+            r"((?:[\w.-]+/)*[\w.-]+\.dart|(?:[A-Za-z]:[\\/][^\s,]+\.dart))",
+            user_message,
+        )
+        error_match = re.search(
+            r"(?:the\s+)?error(?:\s+is)?\s*:\s*(.+)$", user_message, re.IGNORECASE
+        )
         file_path = file_match.group(1) if file_match else None
         if file_path:
             file_path = resolve_file_path(file_path)
         if file_path and error_match:
-            error_text = error_match.group(1).strip().rstrip('.').strip()
-            return jsonify({
-                "type": "stream",
-                "url": f"/auto_fix_stream?file_path={quote_plus(file_path)}&error_text={quote_plus(error_text)}"
-            })
+            error_text = error_match.group(1).strip().rstrip(".").strip()
+            return jsonify(
+                {
+                    "type": "stream",
+                    "url": f"/auto_fix_stream?file_path={quote_plus(file_path)}&error_text={quote_plus(error_text)}",
+                }
+            )
         else:
             hint = "a file path like lib/path/file.dart, C:\\path\\file.dart, or just file.dart"
-            return jsonify({"reply": "I need a file path and error description. Say: 'auto-fix " + hint + ". The error is: ...'"})
+            return jsonify(
+                {
+                    "reply": "I need a file path and error description. Say: 'auto-fix "
+                    + hint
+                    + ". The error is: ...'"
+                }
+            )
 
     try:
         print(f"📨 Incoming message length: {len(user_message)} chars")
@@ -4361,269 +5788,266 @@ def chat():
         _prefs_block = build_preferences_block()
         _prefs_text = ("\n\n" + _prefs_block) if _prefs_block else ""
         system_prompt = (
-            "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
-            "You are calm, present, and can be quiet — you don't gush, over-cheer, or over-promise. "
-            "You can be brief; silence is fine. If you don't know something, say you don't know. "
-            "Never invent personal history, memories, or references to past events that are not in the context below. "
-            "Use the facts and journal entries below naturally when they are relevant — not every message. "
-            "Keep replies short unless Chris asks for more.\n\n"
-            "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
-            "[Facts I know about Chris], [Shared history — recent journal entries], and the recent "
-            "conversation turns at the end of this prompt. They are loaded from your database on every "
-            "message, so you remember across conversations. When Chris asks 'can you remember / do you "
-            "have memory / check your memory', answer YES and quote the exact facts from those blocks — "
-            "do not say you have no memory. If Chris tells you something to remember, reply "
-            "with: remember <key> = <value> (this stores a new fact).\n\n"
-            "DEVICE + DEV TOOLS: You can ACTUALLY perform actions yourself — you are not limited to "
-            "talking. When Chris asks you to do something on the device or app (open the app, tap, swipe, "
-            "type, press a key, navigate, take a screenshot, check what is on screen), CALL the ui_* tools "
-            "(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot). For code work you "
-            "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
-            "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
-            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
-            "FILE TOOLS: You have FULL access to Chris's PC (Documents, Pictures, Desktop, Downloads, any folder). When he asks you to look at, find, open, or show a file, use list_user_files to locate the folder, then view_user_file (accepts a full path OR a bare filename like 'GEPFGEPF' — it searches automatically) to display it inline in the chat. "
-            "If view_user_file's search fails, run list_user_files on the specific folder to confirm the exact filename first. "
-            "The tool open_user_file is ONLY for 'launch externally in "
-            "default app' — do NOT use it for normal 'show me the file' requests.\n"
-            "WEB IMAGES: when Chris asks to 'get a picture of X', 'show me an image of Y', or 'open the picture "
-            "from the internet', you MUST actually display it: after web_search/webfetch returns a link, call "
-            "view_web_image with the image URL (the .jpg/.png/.gif link itself) so the picture pops up in the chat. "
-            "Do NOT just paste the URL into your reply.\n"
-            "EMAIL + PHONE ALERTS: a background watcher already polls Chris's Gmail and "
-            "Yahoo every ~2 minutes and pushes a PHONE notification (ntfy) when an email "
-            "matches a watch rule (NSFAS is already watched). So when he says 'keep an eye "
-            "on my email, tell me when an NSFAS mail arrives' or 'check my NSFAS email': "
-            "call check_email to look NOW, and tell him plainly that alerts are set to his "
-            "PHONE and are already active. Never suggest he set up a filter in his email "
-            "client, check his spam folder, or contact NSFAS directly — that is a "
-            "deflection. Only add a NEW sender with the email_rules tool if he names one. "
-            "If he says he does NOT want a local/desktop notification, do not use any "
-            "Windows toast — ntfy to his phone is the channel.\n"
-            "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
-            "STANDING PREFERENCES: the moment Chris states how he wants things done "
-            "('call me Braam', 'answer in Afrikaans', 'use metric units', 'keep it to two "
-            "lines', 'no bullet points', 'be more formal'), call set_preference with that "
-            "key and value, then confirm it in one short sentence. Do this WITHOUT being "
-            "asked to remember it. Always pick the key from the tool's list — never invent "
-            "a key name like 'name_preference'. If he tells you to STOP following one, call "
-            "forget_preference. If he asks what you always do for him, call "
-            "list_preferences. Any preference stored this way overrides your default "
-            "style in every later reply until it is changed or removed.\n"
-            "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
-            "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
-            "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
-            "confirm each screen change, and only ui_screenshot AFTER the last ui_dump proves the target is "
-            "visible. A screenshot of the launch screen is NOT reaching the target — never finish a "
-            "navigation after just opening the app. Use ui_dump (text hierarchy) to know where you are; you "
-            "cannot see images. Screenshots are shown to Chris in a popup and are NOT saved to disk unless "
-            "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
-            "page content from the last ui_dump and what you actually did — never invent a screenshot "
-            "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
-            "STYLE: never narrate your reasoning in prose — no 'I will', no 'The dump shows', no "
-            "commentary between actions. Output ONLY the tool call, then when the task is done give a "
-            "SHORT, plain report (a few lines, like a text message): what you did and the key on-screen "
-            "values. Do not lecture or recap the whole process.\n"
-"AUTO-TRACK: When Chris gives you 2 or more separate instructions\n"
-"in one message (e.g. \"do X, do Y, and do Z\"), break them into\n"
-"tracked tasks automatically. After finishing each one, mark it\n"
-"done. In your FINAL reply, always end with a progress line:\n"
-"\"Progress: X/Y tasks done\" (e.g. \"Progress: 3/3 tasks done\" or\n"
-"\"Progress: 2/3 tasks done — 1 pending\").\n"
-"HTTPS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT / "
-            "HSTS warning for the ITS portal, type thisisunsafe (ui_type {\"text\": \"thisisunsafe\"}) "
-            "to bypass it and continue — the expired certificate is expected and safe. If ACEsi's "
-            "server already auto-typed it, keep navigating from the fresh ui_dump.\n"
-            "RESEARCH + SAVE: when Chris EXPLICITLY asks you to research something AND save the "
-            "results to a file (e.g. 'research X and save it to notes.txt'), CALL web_search "
-            "(or curl/webfetch) to gather the data, then call open_in_vscode with the full "
-            "formatted findings (path = the filename Chris asked for, content = the markdown). "
-            "That opens the findings in VS Code as a DRAFT for Chris to review — it does NOT "
-            "write the final file. Then stop and tell Chris the draft is open for review in VS "
-            "Code and that you will save it to <path> when he says 'save it'.\n"
-            "IMPORTANT: For simple factual questions (e.g. 'what is X?', 'who is Y?'), just "
-            "answer directly from the tool results. Do NOT save to a file unless explicitly asked.\n\n"
-            "ANSWER QUALITY RULES — NEVER VIOLATE:\n"
-            "1. When web_search returns results, SYNTHESIZE them into a DEFINITIVE answer. Never say 'it depends', 'it's unclear', or 'would you like more detail?'. Give the exact answer the user asked for.\n"
-            "2. For 'who is X?' or 'what is X?' — give a complete, direct answer from the search results. Do NOT end with 'would you like more detail?', 'is there anything specific?', 'would you like me to dig deeper?', 'want me to go deeper?', or ANY question back to the user.\n"
-            "3. If search results contain the answer, STATE IT CLEARLY. Do not hedge, deflect, or ask follow-up questions.\n"
-            "4. For historical/factual questions (oldest book, who was Mandela, market prices) — give the concrete fact from the sources. If sources disagree, cite the consensus or most authoritative source.\n"
-            "5. NEVER end a factual answer with a question back to the user.\n"
-            "6. FORBIDDEN PHRASES — NEVER USE: 'Would you like me to...', 'Want me to...', 'Would you like...', 'Would you like more...', 'Is there anything...', 'Let me know if...', 'Shall I...', 'Do you want...'. These are DEFLECTIONS. Answer directly instead.\n"
+            CORE_RULES_TEXT
+            + "\n\n"
+            + WEB_SEARCH_RULES_TEXT
             + _mood_softener_line()
             + build_context_block()
             + _prefs_text
-            + "\n\n" + _GROUNDING_DIRECTIVE + "\n\n" + _GROUNDING_FALLBACK
+            + "\n\n"
+            + _GROUNDING_DIRECTIVE
+            + "\n\n"
+            + _GROUNDING_FALLBACK
+            + "\n\n"
+            + _WEB_SEARCH_FORMAT_RULE
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
         history = get_recent_conversation(9)[:-1]
         llm_messages = [{"role": "system", "content": system_prompt}]
         for h in history:
-            if h.get('role') in ('user', 'assistant'):
-                llm_messages.append({"role": h['role'], "content": h['content']})
+            if h.get("role") in ("user", "assistant"):
+                llm_messages.append({"role": h["role"], "content": h["content"]})
         llm_messages.append({"role": "user", "content": user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
-        reply = _chat_dispatch(llm_messages, user_message=user_message, preferred_model=model)
+        reply = _chat_dispatch(
+            llm_messages, user_message=user_message, preferred_model=model
+        )
+        _live_log(f"Dispatch complete: {len(llm_messages)} messages, model={model}")
         if reply:
             # Playbook memory: record which tools proved useful on this task.
             with _AGENT_LOCK:
-                chat_tools = [s.get("text", "") for s in _AGENT.get("steps", [])
-                              if s.get("state") == "done" and s.get("kind") == "work"]
+                chat_tools = [
+                    s.get("text", "")
+                    for s in _AGENT.get("steps", [])
+                    if s.get("state") == "done" and s.get("kind") == "work"
+                ]
             done_tool_names = [t.split(" ")[0].strip("()") for t in chat_tools if t]
             if done_tool_names and not _kill_armed():
                 playbook_note(user_message, done_tool_names, reply)
             save_conversation("assistant", reply)
             # Journal the session close when Chris signs off for the day
-            if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
-                add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
+            if re.search(
+                r"\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b",
+                user_message,
+                re.IGNORECASE,
+            ):
+                add_journal(
+                    f'Session closed. Chris said: "{user_message[:200]}". I replied: "{reply[:200]}"'
+                )
                 print("📓 Journaled session close")
-            return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
+            return jsonify(
+                {"reply": reply, "shot_ts": _LAST_SHOT["ts"], "model": _LAST_MODEL_USED}
+            )
         # Every provider failed. Say WHICH and WHY instead of the old opaque
         # "no models available", which made a rate limit indistinguishable from
         # an expired key. Details are already in audit.log; this is the short
         # version so the failure is self-describing in the UI too.
         _why = _prov_summary_lines()
         if _why:
-            print("[ACE-DISPATCH] no models available. per-provider reasons:\n%s"
-                  % "\n".join(_why))
-            reply = ("Error: no models available. Every provider failed:\n"
-                     + "\n".join(_why)
-                     + "\n(Full detail in audit.log, kind=provider)")
+            print(
+                "[ACE-DISPATCH] no models available. per-provider reasons:\n%s"
+                % "\n".join(_why)
+            )
+            reply = (
+                "Error: no models available. Every provider failed:\n"
+                + "\n".join(_why)
+                + "\n(Full detail in audit.log, kind=provider)"
+            )
             save_conversation("assistant", reply)
         else:
-            reply = ("Error: no models available, and no provider reported a reason "
-                     "(check server_stdout.txt and audit.log).")
-        return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
+            reply = (
+                "Error: no models available, and no provider reported a reason "
+                "(check server_stdout.txt and audit.log)."
+            )
+        return jsonify(
+            {"reply": reply, "shot_ts": _LAST_SHOT["ts"], "model": _LAST_MODEL_USED}
+        )
     except Exception as e:
         print(f"💥 Exception in /chat: {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
         with _AGENT_LOCK:
             _AGENT["running"] = False
             _AGENT["activity"] = "error"
             _AGENT["last_reply"] = f"Error: {type(e).__name__}: {e}"
-        return jsonify({"reply": f"Error: {str(e)}"})
+        return jsonify({"error": f"Server error: {type(e).__name__}: {e}"}), 500
 
-@app.route('/history', methods=['GET'])
+
+@app.errorhandler(500)
+def handle_500(e):
+    print(f"🔥 Flask 500 error: {e}")
+    import traceback
+
+    traceback.print_exc()
+    return jsonify({"error": f"Server error: {e}"}), 500
+
+
+@app.errorhandler(Exception)
+def handle_uncaught(e):
+    print(f"🔥 Uncaught exception: {type(e).__name__}: {e}")
+    import traceback
+
+    traceback.print_exc()
+    return jsonify({"error": f"Server error: {type(e).__name__}: {e}"}), 500
+
+
+@app.route("/history", methods=["GET"])
 def history():
-    limit = min(int(request.args.get('limit', 100)), 500)
-    conn = sqlite3.connect('ace_memory.db')
+    limit = min(int(request.args.get("limit", 100)), 500)
+    conn = sqlite3.connect("ace_memory.db")
     c = conn.cursor()
-    c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,))
+    c.execute(
+        "SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?", (limit,)
+    )
     rows = c.fetchall()
     conn.close()
     messages = [{"role": r[0], "content": r[1]} for r in reversed(rows)]
     return jsonify({"messages": messages})
 
-@app.route('/run', methods=['POST'])
+
+@app.route("/model", methods=["GET"])
+def current_model():
+    """Return the provider/model that answered the last /chat request, so the
+    frontend badge can display it without waiting for a chat round."""
+    return jsonify({"model": _LAST_MODEL_USED or "(idle)"})
+
+
+@app.route("/run", methods=["POST"])
 def run_command():
-    command = (request.json or {}).get('command', '')
+    command = (request.json or {}).get("command", "")
     try:
         if "scrcpy" in command.lower():
             _popen('start cmd /k "scrcpy"', shell=True)
-            return jsonify({'output': '✅ Scrcpy launched'})
+            return jsonify({"output": "✅ Scrcpy launched"})
         # `flutter run` / `dart run` are long-lived, attached dev sessions that
         # never exit on their own. subprocess.run would block this request
         # thread forever, so stream to a log and return immediately.
-        if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+        if re.match(r"^\s*(flutter\s+run|dart\s+run)\b", command, re.I):
             command = _resolve_run_device(command)
             if command is None:
-                return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
-            log_path = f'run_{uuid.uuid4().hex}.log'
-            log = open(log_path, 'w', encoding='utf-8')
-            proc = _popen(command, shell=True, stdout=log,
-                                    stderr=subprocess.STDOUT)
-            return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
-                f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
-                f'for ~50-60s while the APK builds/installs; after install the app launches '
-                f'on the device. Logs: {log_path}')})
+                return jsonify(
+                    {
+                        "output": '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'
+                    }
+                )
+            log_path = f"run_{uuid.uuid4().hex}.log"
+            log = open(log_path, "w", encoding="utf-8")
+            proc = _popen(command, shell=True, stdout=log, stderr=subprocess.STDOUT)
+            return jsonify(
+                {
+                    "output": (
+                        f"✅ {command} started (pid {proc.pid}). "
+                        f"Watch output live: `Get-Content {log_path} -Wait`. The log stays empty "
+                        f"for ~50-60s while the APK builds/installs; after install the app launches "
+                        f"on the device. Logs: {log_path}"
+                    )
+                }
+            )
         result = _run(command, shell=True, capture_output=True, text=True)
         output = result.stdout if result.stdout else result.stderr
-        return jsonify({'output': output})
+        return jsonify({"output": output})
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({"error": str(e)})
+
 
 def _android_device_id():
     """First connected Android serial in 'device' state, or None."""
     try:
-        out = _check_output(['adb', 'devices'], stderr=subprocess.STDOUT,
-                                      text=True, timeout=15)
+        out = _check_output(
+            ["adb", "devices"], stderr=subprocess.STDOUT, text=True, timeout=15
+        )
         for line in out.splitlines():
             parts = line.split()
-            if len(parts) >= 2 and not parts[0].startswith('List') and parts[1] == 'device':
+            if (
+                len(parts) >= 2
+                and not parts[0].startswith("List")
+                and parts[1] == "device"
+            ):
                 return parts[0]
     except Exception:
         pass
     return None
 
+
 def _resolve_run_device(command):
     """flutter's -d does not accept 'android' as a device id for a physical
     phone; resolve it (or a bare `flutter run`) to the real adb serial so a
     device is always selected instead of hanging/ erroring on 'android'."""
-    m = re.search(r'-d\s+(\S+)', command)
+    m = re.search(r"-d\s+(\S+)", command)
     token = m.group(1) if m else None
-    if token is not None and not token.lower().startswith('android'):
+    if token is not None and not token.lower().startswith("android"):
         return command  # user chose a real target (e.g. -d chrome / windows)
     device_id = _android_device_id()
     if not device_id:
         return None
     if m:
-        command = re.sub(r'-d\s+\S+', '-d ' + device_id, command, count=1)
+        command = re.sub(r"-d\s+\S+", "-d " + device_id, command, count=1)
     else:
-        command = command.rstrip() + ' -d ' + device_id
+        command = command.rstrip() + " -d " + device_id
     return command
 
-@app.route('/files', methods=['GET'])
+
+@app.route("/files", methods=["GET"])
 def list_files():
     try:
-        files = os.listdir('C:\\Users\\chris\\StudentSyncSA')
-        return jsonify({'files': files})
+        files = os.listdir("C:\\Users\\chris\\StudentSyncSA")
+        return jsonify({"files": files})
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({"error": str(e)})
+
 
 def strip_code_fences(code):
     """Remove a leading ```<lang> ... trailing ``` wrapper if the model added one."""
     if not code:
         return code
     s = code.strip()
-    if s.startswith('```'):
+    if s.startswith("```"):
         lines = s.splitlines()
-        if lines and lines[-1].startswith('```'):
+        if lines and lines[-1].startswith("```"):
             lines = lines[1:-1]
-        elif len(lines) > 1 and lines[0].startswith('```') and lines[-1].startswith('```'):
+        elif (
+            len(lines) > 1
+            and lines[0].startswith("```")
+            and lines[-1].startswith("```")
+        ):
             lines = lines[1:-1]
         else:
-            lines = lines[1:] if lines and lines[0].startswith('```') else lines
-            if lines and lines[-1].startswith('```'):
+            lines = lines[1:] if lines and lines[0].startswith("```") else lines
+            if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
         return "\n".join(lines).strip() + "\n"
     return code
 
-@app.route('/read', methods=['POST'])
+
+@app.route("/read", methods=["POST"])
 def read_file():
     data = request.json
-    path = data.get('path', '')
+    path = data.get("path", "")
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             content = f.read()
-        return jsonify({'content': content})
+        return jsonify({"content": content})
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({"error": str(e)})
 
-@app.route('/write', methods=['POST'])
+
+@app.route("/write", methods=["POST"])
 def write_file():
     data = request.json
-    path = data.get('path', '')
-    content = data.get('content', '')
+    path = data.get("path", "")
+    content = data.get("content", "")
     try:
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(content)
-        return jsonify({'status': 'saved'})
+        return jsonify({"status": "saved"})
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({"error": str(e)})
+
 
 def _open_external(rp):
     """Open a real file in its default app. For OneDrive cloud-only placeholders
@@ -4635,23 +6059,29 @@ def _open_external(rp):
         return False, "file not found: %s" % rp
     cloud_only = False
     try:
-        if os.name == 'nt':
+        if os.name == "nt":
             import ctypes
+
             attrs = ctypes.windll.kernel32.GetFileAttributesW(rp)
             if attrs != 0xFFFFFFFF:
-                cloud_only = bool(attrs & (0x1000 | 0x400000))  # OFFLINE | RECALL_ON_DATA_ACCESS
+                cloud_only = bool(
+                    attrs & (0x1000 | 0x400000)
+                )  # OFFLINE | RECALL_ON_DATA_ACCESS
     except Exception:
         pass
+
     def _try_read():
         try:
-            with open(rp, 'rb') as _f:
+            with open(rp, "rb") as _f:
                 return len(_f.read(1)) == 1
         except Exception:
             return False
+
     if cloud_only and not _try_read():
         # Force pin to this device (asks OneDrive to download the real content).
         try:
             import subprocess
+
             subprocess.run(["attrib", "-U", "+P", rp], capture_output=True, timeout=30)
         except Exception as e:
             print("⚠️ cloud-file pin attempt failed: %s" % e)
@@ -4665,12 +6095,17 @@ def _open_external(rp):
             # Explorer so Chris can see/trigger the sync manually.
             try:
                 import subprocess
+
                 subprocess.run(["explorer.exe", "/select,", rp], check=False)
             except Exception as e:
                 print("⚠️ explorer fallback failed: %s" % e)
-            return True, "cloud file not downloaded yet — opened its folder in Explorer (start OneDrive to sync it)"
+            return (
+                True,
+                "cloud file not downloaded yet — opened its folder in Explorer (start OneDrive to sync it)",
+            )
     try:
         import subprocess, platform
+
         system = platform.system()
         if system == "Windows":
             os.startfile(rp)
@@ -4683,35 +6118,39 @@ def _open_external(rp):
     return True, "opened %s for you" % os.path.basename(rp)
 
 
-@app.route('/file/open', methods=['POST'])
+@app.route("/file/open", methods=["POST"])
 def file_open():
     """Open a saved file in the OS default viewer so the user can verify it."""
     data = request.json or {}
-    path = data.get('path', '')
+    path = data.get("path", "")
     rp = _safe_path(path)
     if not rp:
-        return jsonify({'error': 'path outside project: %s' % path})
+        return jsonify({"error": "path outside project: %s" % path})
     if not os.path.isfile(rp):
-        return jsonify({'error': 'file not found: %s' % os.path.relpath(rp, PROJECT_ROOT)})
+        return jsonify(
+            {"error": "file not found: %s" % os.path.relpath(rp, PROJECT_ROOT)}
+        )
     try:
         os.startfile(rp)
     except Exception as e:
-        return jsonify({'error': str(e)})
-    return jsonify({'ok': True, 'path': os.path.relpath(rp, PROJECT_ROOT)})
+        return jsonify({"error": str(e)})
+    return jsonify({"ok": True, "path": os.path.relpath(rp, PROJECT_ROOT)})
 
-@app.route('/userfile/open', methods=['POST'])
+
+@app.route("/userfile/open", methods=["POST"])
 def userfile_open():
     """Open a file from anywhere on Chris's PC in its default application (for
     editing, viewing externally, etc.). Called when he clicks a file in a popup."""
     data = request.json or {}
-    path = data.get('path', '')
+    path = data.get("path", "")
     rp = _safe_user_path(path)
     if not rp or not os.path.isfile(rp):
-        return jsonify({'error': 'file not found: %s' % path})
+        return jsonify({"error": "file not found: %s" % path})
     ok, msg = _open_external(rp)
     if not ok:
-        return jsonify({'error': msg})
-    return jsonify({'ok': True, 'path': rp, 'msg': msg})
+        return jsonify({"error": msg})
+    return jsonify({"ok": True, "path": rp, "msg": msg})
+
 
 # ===== Autonomous code agent (ACEsi writing/editing code on its own) =====
 # The model plans with THOUGHT/CALL/FINAL lines; the server executes tools,
@@ -4731,27 +6170,47 @@ INDICATOR_STATES = [
 ]
 _agent_indicator_idx = [0]
 
+
 def _reset_indicator():
     with _AGENT_LOCK:
         _agent_indicator_idx[0] = 0
+
 
 def _advance_indicator():
     with _AGENT_LOCK:
         _agent_indicator_idx[0] = (_agent_indicator_idx[0] + 1) % len(INDICATOR_STATES)
         return INDICATOR_STATES[_agent_indicator_idx[0]]
 
+
 def _current_indicator():
     with _AGENT_LOCK:
-        return INDICATOR_STATES[_agent_indicator_idx[0]] if _AGENT.get("running") else ""
+        return (
+            INDICATOR_STATES[_agent_indicator_idx[0]] if _AGENT.get("running") else ""
+        )
+
 
 _AGENT_LOCK = threading.RLock()
-_AGENT = {"running": False, "abort": False, "activity": "", "steps": [], "last_reply": "", "last_raw": "", "tools_used": 0, "corrective": 0, "last_call_sig": None, "last_call_ok": False, "last_error": "",
-          # Review-before-save: when a research/write task opens findings in the
-          # editor (VS Code / VSCodium) instead of silently writing to disk, the
-          # draft path + intended target are parked here so a follow-up message
-          # ("keep it" / "save it") can commit it, or "discard" can delete it.
-          "pending_save": None}
+_AGENT = {
+    "running": False,
+    "abort": False,
+    "activity": "",
+    "steps": [],
+    "last_reply": "",
+    "last_raw": "",
+    "tools_used": 0,
+    "corrective": 0,
+    "last_call_sig": None,
+    "last_call_ok": False,
+    "last_error": "",
+    # Review-before-save: when a research/write task opens findings in the
+    # editor (VS Code / VSCodium) instead of silently writing to disk, the
+    # draft path + intended target are parked here so a follow-up message
+    # ("keep it" / "save it") can commit it, or "discard" can delete it.
+    "pending_save": None,
+}
 _agent_seq = [0]
+
+
 def _agent_reset():
     with _AGENT_LOCK:
         _AGENT["running"] = False
@@ -4767,22 +6226,30 @@ def _agent_reset():
         _AGENT["last_call_ok"] = False
         _AGENT["last_error"] = ""
 
+
 def _agent_next_id():
     with _AGENT_LOCK:
         _agent_seq[0] += 1
         return "a%d" % _agent_seq[0]
 
+
 # ===== Task Queue System =====
 # Persistent queue of tasks that ACEsi executes sequentially.
 # Survives restarts, reports progress, handles failures.
-_TASK_QUEUE_FILE = 'task_queue.json'
+_TASK_QUEUE_FILE = "task_queue.json"
 _TASK_QUEUE_LOCK = threading.RLock()
 
+
 def _load_task_queue():
-    return load_json(_TASK_QUEUE_FILE, {"queue": [], "current_index": 0, "status": "idle", "results": []})
+    return load_json(
+        _TASK_QUEUE_FILE,
+        {"queue": [], "current_index": 0, "status": "idle", "results": []},
+    )
+
 
 def _save_task_queue(queue_data):
     save_json(_TASK_QUEUE_FILE, queue_data)
+
 
 def _queue_add(tasks, on_failure="stop"):
     """Add tasks to queue. tasks = list of {"task": "...", "on_failure": "skip|retry|stop"}.
@@ -4792,18 +6259,21 @@ def _queue_add(tasks, on_failure="stop"):
         for t in tasks:
             if isinstance(t, str):
                 t = {"task": t}
-            q["queue"].append({
-                "task": t.get("task", ""),
-                "on_failure": t.get("on_failure", on_failure),
-                "status": "pending",
-                "result": None,
-                "error": None,
-                "started_at": None,
-                "finished_at": None,
-            })
+            q["queue"].append(
+                {
+                    "task": t.get("task", ""),
+                    "on_failure": t.get("on_failure", on_failure),
+                    "status": "pending",
+                    "result": None,
+                    "error": None,
+                    "started_at": None,
+                    "finished_at": None,
+                }
+            )
         q["status"] = "pending" if q["status"] == "idle" else q["status"]
         _save_task_queue(q)
         return q
+
 
 def _queue_clear():
     with _TASK_QUEUE_LOCK:
@@ -4815,9 +6285,11 @@ def _queue_clear():
         _save_task_queue(q)
         return q
 
+
 def _queue_status():
     with _TASK_QUEUE_LOCK:
         return _load_task_queue()
+
 
 def _queue_stop():
     with _TASK_QUEUE_LOCK:
@@ -4827,6 +6299,7 @@ def _queue_stop():
             _save_task_queue(q)
         return q
 
+
 def _queue_resume():
     with _TASK_QUEUE_LOCK:
         q = _load_task_queue()
@@ -4834,6 +6307,7 @@ def _queue_resume():
             q["status"] = "pending"
             _save_task_queue(q)
         return q
+
 
 def _queue_skip_current():
     with _TASK_QUEUE_LOCK:
@@ -4850,10 +6324,13 @@ def _queue_skip_current():
             _save_task_queue(q)
         return q
 
+
 def _queue_retry_current():
     with _TASK_QUEUE_LOCK:
         q = _load_task_queue()
-        if q["status"] in ("running", "failed") and 0 <= q["current_index"] < len(q["queue"]):
+        if q["status"] in ("running", "failed") and 0 <= q["current_index"] < len(
+            q["queue"]
+        ):
             q["queue"][q["current_index"]]["status"] = "pending"
             q["queue"][q["current_index"]]["error"] = None
             q["queue"][q["current_index"]]["started_at"] = None
@@ -4863,13 +6340,17 @@ def _queue_retry_current():
             _save_task_queue(q)
         return q
 
+
 def _queue_run_next():
     """Run the next pending task. Returns (task_dict, result_text, success_bool) or None if none."""
     with _TASK_QUEUE_LOCK:
         q = _load_task_queue()
         # Find next pending task at or after current_index
         idx = q["current_index"]
-        while idx < len(q["queue"]) and q["queue"][idx]["status"] in ("done", "skipped"):
+        while idx < len(q["queue"]) and q["queue"][idx]["status"] in (
+            "done",
+            "skipped",
+        ):
             idx += 1
         if idx >= len(q["queue"]):
             if q["status"] == "running":
@@ -4882,20 +6363,25 @@ def _queue_run_next():
         task["status"] = "running"
         task["started_at"] = time.time()
         _save_task_queue(q)
-    
+
     # Execute outside the lock to avoid blocking status checks
     task_text = task["task"]
     try:
         # Use the existing chat dispatch for task execution
-        msgs = [{"role": "system", "content": "You are ACEsi, an autonomous agent. Execute the task and report results."},
-                {"role": "user", "content": task_text}]
+        msgs = [
+            {
+                "role": "system",
+                "content": "You are ACEsi, an autonomous agent. Execute the task and report results.",
+            },
+            {"role": "user", "content": task_text},
+        ]
         reply = _chat_dispatch(msgs, user_message=task_text, preferred_model=None)
         success = reply is not None and not reply.startswith("Error:")
         result_text = reply if reply else "No response"
     except Exception as e:
         success = False
         result_text = "%s: %s" % (type(e).__name__, e)
-    
+
     # Update queue with result
     with _TASK_QUEUE_LOCK:
         q = _load_task_queue()
@@ -4907,13 +6393,15 @@ def _queue_run_next():
             if not success:
                 task["error"] = result_text
             # Record result summary
-            q["results"].append({
-                "index": idx,
-                "task": task_text,
-                "status": task["status"],
-                "result": result_text[:500],
-                "error": task["error"],
-            })
+            q["results"].append(
+                {
+                    "index": idx,
+                    "task": task_text,
+                    "status": task["status"],
+                    "result": result_text[:500],
+                    "error": task["error"],
+                }
+            )
             # Determine next status based on on_failure policy
             if not success:
                 policy = task.get("on_failure", "stop")
@@ -4946,6 +6434,7 @@ def _queue_run_next():
             _save_task_queue(q)
     return task, result_text, success
 
+
 # Background runner - drains the queue on its own
 _TASK_QUEUE_POLL = 5
 
@@ -4974,6 +6463,7 @@ def _task_queue_worker():
         # Fast while there is work, slow when idle so we don't burn CPU.
         time.sleep(0.5 if active else _TASK_QUEUE_POLL)
 
+
 # ===== ACEsi dispatcher integration (ace_dispatcher module) ────────────────
 # Provides robust multi-subtask execution as a fallback when the
 # model-driven _chat_dispatch loop exhausts all providers.
@@ -4997,8 +6487,10 @@ def _dispatcher_tool_wrapper(name, args):
 
 def _make_tool_fn(name):
     """Return a function that calls _call_tool for the given tool name."""
+
     def _fn(**kwargs):
         return _dispatcher_tool_wrapper(name, kwargs)
+
     return _fn
 
 
@@ -5016,18 +6508,26 @@ def _build_dispatcher_registry():
             fn, arg_keys = TOOLS[name]
             schema = schema_map.get(name, {})
             description = (schema.get("function") or {}).get("description") or ""
-            reg.register(name, fn=_make_tool_fn(name),
-                         timeout=30.0, retries=1,
-                         description=description,
-                         original_fn=fn,
-                         arg_keys=arg_keys,
-                         schema=schema)
+            reg.register(
+                name,
+                fn=_make_tool_fn(name),
+                timeout=30.0,
+                retries=1,
+                description=description,
+                original_fn=fn,
+                arg_keys=arg_keys,
+                schema=schema,
+            )
         _DISPATCHER_REGISTRY = reg
         REGISTRY = reg
         return reg
 
 
-LEDGER_PATH = os.path.join(DATA_DIR, '.dispatch_ledger.json') if 'DATA_DIR' in dir() else '.dispatch_ledger.json'
+LEDGER_PATH = (
+    os.path.join(DATA_DIR, ".dispatch_ledger.json")
+    if "DATA_DIR" in dir()
+    else ".dispatch_ledger.json"
+)
 
 
 def _run_dispatcher(user_message, subtasks=None, max_steps=50):
@@ -5036,8 +6536,12 @@ def _run_dispatcher(user_message, subtasks=None, max_steps=50):
     Returns dict with summary, ok, counts, steps, stopped_early.
     """
     if ace_dispatcher is None:
-        return {"summary": "ace_dispatcher module not available.",
-                "ok": False, "counts": {}, "steps": []}
+        return {
+            "summary": "ace_dispatcher module not available.",
+            "ok": False,
+            "counts": {},
+            "steps": [],
+        }
     registry = _build_dispatcher_registry()
     config = ace_dispatcher.RunConfig(max_steps=max_steps, fail_fast=False)
 
@@ -5060,12 +6564,18 @@ def _run_dispatcher(user_message, subtasks=None, max_steps=50):
         print("[ACE] ledger construction FAILED: %s: %s" % (type(e).__name__, e))
         raise
 
-    result = ace_dispatcher.TaskRunner(registry, config, ledger_path=LEDGER_PATH).run(ledger)
-    print("[ACE] steps=%d counts=%s ok=%s stopped=%r" % (
-        result.steps, result.counts(), result.ok, result.stopped_early))
+    result = ace_dispatcher.TaskRunner(registry, config, ledger_path=LEDGER_PATH).run(
+        ledger
+    )
+    print(
+        "[ACE] steps=%d counts=%s ok=%s stopped=%r"
+        % (result.steps, result.counts(), result.ok, result.stopped_early)
+    )
     if result.steps == 0:
-        print("[ACE] NOTHING RAN. plan problems: %s" % (
-            ledger.counts() if hasattr(ledger, 'counts') else 'no counts method'))
+        print(
+            "[ACE] NOTHING RAN. plan problems: %s"
+            % (ledger.counts() if hasattr(ledger, "counts") else "no counts method")
+        )
 
     summary = ace_dispatcher.summarize(result)
     return {
@@ -5087,9 +6597,22 @@ def _safe_path(path):
         return None
     return rp
 
+
 def _walk_files(root):
-    skip = {'.git', '.dart_tool', '.gradle', 'build', '.vscode', '.idea',
-            'node_modules', '__pycache__', '.gradle', 'venv', '.dart_tool', 'web'}
+    skip = {
+        ".git",
+        ".dart_tool",
+        ".gradle",
+        "build",
+        ".vscode",
+        ".idea",
+        "node_modules",
+        "__pycache__",
+        ".gradle",
+        "venv",
+        ".dart_tool",
+        "web",
+    }
     out = []
     for base, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in skip]
@@ -5099,6 +6622,7 @@ def _walk_files(root):
             out.append("📄 " + os.path.relpath(os.path.join(base, f), root))
     return sorted(out)
 
+
 def tool_list_files(path="."):
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
@@ -5107,8 +6631,15 @@ def tool_list_files(path="."):
         return False, "dir not found: %s" % path
     # Hide kill-state files from the agent's view of the project.
     out = _walk_files(rp)
-    out = [l for l in out if not _kill_protected_path(os.path.join(rp, l.replace("📄 ", "").replace("📁 ", "")))]
+    out = [
+        l
+        for l in out
+        if not _kill_protected_path(
+            os.path.join(rp, l.replace("📄 ", "").replace("📁 ", ""))
+        )
+    ]
     return True, "\n".join(out)[:4000]
+
 
 def tool_read_file(path):
     if _kill_armed():
@@ -5119,7 +6650,7 @@ def tool_read_file(path):
     if _kill_protected_path(rp):
         return False, "blocked: that file is protected."
     try:
-        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+        with open(rp, "r", encoding="utf-8", errors="replace") as f:
             c = f.read()
         cut = c[:8000]
         if len(c) > 8000:
@@ -5127,6 +6658,7 @@ def tool_read_file(path):
         return True, cut
     except Exception as e:
         return False, str(e)
+
 
 _USER_ALLOWED_ROOTS = [
     os.path.join(os.path.expanduser("~"), "Pictures"),
@@ -5146,6 +6678,7 @@ _USER_ALIASES = {
     "my desktop": os.path.join(os.path.expanduser("~"), "Desktop"),
     "my downloads": os.path.join(os.path.expanduser("~"), "Downloads"),
 }
+
 
 def _safe_user_path(path):
     """Resolve a user path to a real, existing location. Gives ACEsi access to
@@ -5179,23 +6712,28 @@ def _safe_user_path(path):
         return rp
     return None
 
+
 def _extract_user_file_hint(message):
     """Pull a filename out of a natural-language 'open/view <file>' request.
     E.g. 'the file Median XL and open it' -> 'Median XL'. Matches the biggest
     token run after 'file', or a dotted filename directly."""
-    m = (message or "")
+    m = message or ""
     pat = re.search(
-        r'\bfile\s+(?:called\s+|named\s+|sf?\s+)?'
+        r"\bfile\s+(?:called\s+|named\s+|sf?\s+)?"
         r"([A-Za-z0-9][A-Za-z0-9 _.\-]*?)"
-        r'(?=\s+(?:and\b|then\b|,|\.|$|\bin\b|\bon\b|\bopen\b|\bview\b|\bplease\b))',
-        m, re.IGNORECASE)
+        r"(?=\s+(?:and\b|then\b|,|\.|$|\bin\b|\bon\b|\bopen\b|\bview\b|\bplease\b))",
+        m,
+        re.IGNORECASE,
+    )
     if pat:
         hint = pat.group(1).strip()
         if len(hint) >= 2:
             return hint
     pat2 = re.search(
-        r'\b([A-Za-z0-9][A-Za-z0-9 _.\-]{2,}\.(?:png|jpe?g|gif|webp|bmp|pdf|txt|md|docx|csv|json))\b',
-        m, re.IGNORECASE)
+        r"\b([A-Za-z0-9][A-Za-z0-9 _.\-]{2,}\.(?:png|jpe?g|gif|webp|bmp|pdf|txt|md|docx|csv|json))\b",
+        m,
+        re.IGNORECASE,
+    )
     if pat2:
         return pat2.group(1).strip()
     return None
@@ -5204,10 +6742,14 @@ def _extract_user_file_hint(message):
 def _match_open_user_file(message):
     """True when Chris asked to open/view/show a file in his user folders."""
     ml = (message or "").lower()
-    has_open = bool(re.search(r'\b(?:open|view|show|display|read)\b', ml))
-    filey = bool(re.search(
-        r'\b(?:file|picture|photo|image|capture|median|gdpfgdpf)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b', ml))
-    find_open = bool(re.search(r'\bfind\b[^.!?\n]{0,80}\b(?:open|view|show)\b', ml))
+    has_open = bool(re.search(r"\b(?:open|view|show|display|read)\b", ml))
+    filey = bool(
+        re.search(
+            r"\b(?:file|picture|photo|image|capture|median|gdpfgdpf)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b",
+            ml,
+        )
+    )
+    find_open = bool(re.search(r"\bfind\b[^.!?\n]{0,80}\b(?:open|view|show)\b", ml))
     return bool((has_open and filey) or find_open)
 
 
@@ -5216,19 +6758,43 @@ def _find_user_file_fuzzy(name):
     bare name and with common extensions appended. Returns the realpath or None."""
     if not name:
         return None
-    base = os.path.basename(name.strip().strip('"\'')).lower()
-    base = re.sub(r'^the\s+file\s*[: ]?\s*', '', base).strip()
-    base = re.sub(r'\s+(?:now|please)$', '', base).strip()
+    base = os.path.basename(name.strip().strip("\"'")).lower()
+    base = re.sub(r"^the\s+file\s*[: ]?\s*", "", base).strip()
+    base = re.sub(r"\s+(?:now|please)$", "", base).strip()
     if not base:
         return None
-    exts = ['', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.pdf',
-            '.txt', '.md', '.markdown', '.docx', '.doc', '.xlsx', '.csv',
-            '.json', '.log']
+    exts = [
+        "",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".pdf",
+        ".txt",
+        ".md",
+        ".markdown",
+        ".docx",
+        ".doc",
+        ".xlsx",
+        ".csv",
+        ".json",
+        ".log",
+    ]
     # Root = the whole home profile (full PC access); the four named root
     # aliases are all under it anyway. Skip heavy/unrestricted system dirs.
-    SKIP = {'appdata', 'application data', 'ntuser.dat', 'ntuser.ini',
-            '$recycle.bin', 'program files', 'program files (x86)',
-            'windows', 'system volume information'}
+    SKIP = {
+        "appdata",
+        "application data",
+        "ntuser.dat",
+        "ntuser.ini",
+        "$recycle.bin",
+        "program files",
+        "program files (x86)",
+        "windows",
+        "system volume information",
+    }
     roots = _USER_ALLOWED_ROOTS + [os.path.expanduser("~")]
     seen = set()
     for root in roots:
@@ -5282,6 +6848,7 @@ def tool_list_user_files(path="."):
         return True, "(empty folder)"
     return True, "\n".join(out)[:4000]
 
+
 def tool_read_user_file(path):
     """Read a file's content from anywhere on Chris's PC."""
     if _kill_armed():
@@ -5290,7 +6857,7 @@ def tool_read_user_file(path):
     if not rp or not os.path.isfile(rp):
         return False, "file not found or not allowed: %s" % path
     try:
-        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+        with open(rp, "r", encoding="utf-8", errors="replace") as f:
             c = f.read()
         cut = c[:8000]
         if len(c) > 8000:
@@ -5298,6 +6865,7 @@ def tool_read_user_file(path):
         return True, cut
     except Exception as e:
         return False, str(e)
+
 
 def tool_open_user_file(path):
     """Open a file from anywhere on Chris's PC with the system default application.
@@ -5316,21 +6884,29 @@ def tool_open_user_file(path):
     if ok and isinstance(result, _ViewResult):
         return True, _ViewResult(
             "opened %s in the default app; displayed inline too" % os.path.basename(rp),
-            result.view)
+            result.view,
+        )
     return True, _ViewResult(
         "opened %s in the default app" % os.path.basename(rp),
-        {"type": "external", "filename": os.path.basename(rp), "path": rp})
+        {"type": "external", "filename": os.path.basename(rp), "path": rp},
+    )
+
 
 class _ViewResult:
     """Tool result that shows nicely to the model but carries view data for frontend."""
+
     __slots__ = ("model_msg", "view")
+
     def __init__(self, model_msg, view):
         self.model_msg = model_msg
         self.view = view
+
     def __str__(self):
         return self.model_msg
+
     def __repr__(self):
         return self.model_msg
+
 
 def tool_view_user_file(path):
     """View a file from anywhere on Chris's PC inline in chat.
@@ -5342,110 +6918,154 @@ def tool_view_user_file(path):
     if not rp or not os.path.isfile(rp):
         return False, "file not found or not allowed: %s" % path
     import base64, mimetypes
+
     ext = os.path.splitext(rp)[1].lower()
-    image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif'}
+    image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif"}
     # Sniff magic bytes so extension-less files (e.g. 'GEPFGEPF' that IS a PNG)
     # still display as images/PDFs instead of garbage text.
     sniff_type = None
     try:
-        with open(rp, 'rb') as _f:
+        with open(rp, "rb") as _f:
             _head = _f.read(16)
-        if _head[:8] == b'\x89PNG\r\n\x1a\n':
-            sniff_type = 'image'
+        if _head[:8] == b"\x89PNG\r\n\x1a\n":
+            sniff_type = "image"
             if ext not in image_exts:
-                ext = '.png'
-        elif _head[:2] == b'\xff\xd8':
-            sniff_type = 'image'
+                ext = ".png"
+        elif _head[:2] == b"\xff\xd8":
+            sniff_type = "image"
             if ext not in image_exts:
-                ext = '.jpg'
-        elif _head[:6] in (b'GIF87a', b'GIF89a'):
-            sniff_type = 'image'
+                ext = ".jpg"
+        elif _head[:6] in (b"GIF87a", b"GIF89a"):
+            sniff_type = "image"
             if ext not in image_exts:
-                ext = '.gif'
-        elif _head[:4] == b'%PDF':
-            sniff_type = 'pdf'
-        elif _head[:4] in (b'RIFF',):
-            if _head[8:12] == b'WEBP':
-                sniff_type = 'image'
+                ext = ".gif"
+        elif _head[:4] == b"%PDF":
+            sniff_type = "pdf"
+        elif _head[:4] in (b"RIFF",):
+            if _head[8:12] == b"WEBP":
+                sniff_type = "image"
                 if ext not in image_exts:
-                    ext = '.webp'
+                    ext = ".webp"
     except Exception:
         pass
     if ext in image_exts:
         try:
-            with open(rp, 'rb') as f:
+            with open(rp, "rb") as f:
                 data = f.read()
             if len(data) == 0:
                 raise OSError("file is empty (cloud placeholder not downloaded?)")
-            b64 = base64.b64encode(data).decode('ascii')
-            mime = mimetypes.guess_type(rp)[0] or 'image/' + ext[1:]
-            view = {"type": "image", "mime": mime, "data": b64, "filename": os.path.basename(rp),
-                    "path": rp}
-            return True, _ViewResult("[Image displayed inline: %s]" % os.path.basename(rp), view)
+            b64 = base64.b64encode(data).decode("ascii")
+            mime = mimetypes.guess_type(rp)[0] or "image/" + ext[1:]
+            view = {
+                "type": "image",
+                "mime": mime,
+                "data": b64,
+                "filename": os.path.basename(rp),
+                "path": rp,
+            }
+            return True, _ViewResult(
+                "[Image displayed inline: %s]" % os.path.basename(rp), view
+            )
         except Exception as e:
             # Unreadable cloud-only file: open it externally so OneDrive can
             # hydrate/download the real content, and still surface a popup.
             _open_external(rp)
             return True, _ViewResult(
-                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
-                {"type": "external", "filename": os.path.basename(rp), "path": rp})
+                "[%s is cloud-only/unreadable — opening it in its app]"
+                % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp},
+            )
     # PDFs - return base64 for iframe embed
-    if ext == '.pdf':
+    if ext == ".pdf":
         try:
-            with open(rp, 'rb') as f:
+            with open(rp, "rb") as f:
                 data = f.read()
             if len(data) == 0:
                 raise OSError("file is empty (cloud placeholder not downloaded?)")
-            b64 = base64.b64encode(data).decode('ascii')
-            view = {"type": "pdf", "mime": "application/pdf", "data": b64, "filename": os.path.basename(rp),
-                    "path": rp}
-            return True, _ViewResult("[PDF displayed inline: %s]" % os.path.basename(rp), view)
+            b64 = base64.b64encode(data).decode("ascii")
+            view = {
+                "type": "pdf",
+                "mime": "application/pdf",
+                "data": b64,
+                "filename": os.path.basename(rp),
+                "path": rp,
+            }
+            return True, _ViewResult(
+                "[PDF displayed inline: %s]" % os.path.basename(rp), view
+            )
         except Exception as e:
             _open_external(rp)
             return True, _ViewResult(
-                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
-                {"type": "external", "filename": os.path.basename(rp), "path": rp})
+                "[%s is cloud-only/unreadable — opening it in its app]"
+                % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp},
+            )
     # Word docs - extract paragraphs from the docx zip so the text displays.
-    if ext == '.docx':
+    if ext == ".docx":
         try:
             import zipfile, re as _re
+
             text_parts = []
             with zipfile.ZipFile(rp) as z:
                 for name in z.namelist():
-                    if name in ('word/document.xml',) or (name.startswith('word/') and name.endswith('.xml')):
-                        xml = z.read(name).decode('utf-8', errors='replace')
-                        paras = _re.findall(r'<w:p[ >].*?</w:p>|<w:p[ ]?/>', xml, _re.S)
+                    if name in ("word/document.xml",) or (
+                        name.startswith("word/") and name.endswith(".xml")
+                    ):
+                        xml = z.read(name).decode("utf-8", errors="replace")
+                        paras = _re.findall(r"<w:p[ >].*?</w:p>|<w:p[ ]?/>", xml, _re.S)
                         for p in paras:
-                            txt = _re.sub(r'<[^>]+>', '', p)
-                            txt = txt.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"').replace('&apos;', "'")
+                            txt = _re.sub(r"<[^>]+>", "", p)
+                            txt = (
+                                txt.replace("&amp;", "&")
+                                .replace("&lt;", "<")
+                                .replace("&gt;", ">")
+                                .replace("&quot;", '"')
+                                .replace("&apos;", "'")
+                            )
                             if txt.strip():
                                 text_parts.append(txt.strip())
-            cut = '\n'.join(text_parts)[:8000]
-            view = {"type": "text", "content": cut or "(no extractable text)", "filename": os.path.basename(rp),
-                    "path": rp}
-            return True, _ViewResult("[Word document displayed inline: %s]" % os.path.basename(rp), view)
+            cut = "\n".join(text_parts)[:8000]
+            view = {
+                "type": "text",
+                "content": cut or "(no extractable text)",
+                "filename": os.path.basename(rp),
+                "path": rp,
+            }
+            return True, _ViewResult(
+                "[Word document displayed inline: %s]" % os.path.basename(rp), view
+            )
         except Exception as e:
             # Not a real zip = cloud-only placeholder (OneDrive hasn't downloaded
             # the content). Open it externally so the app hydrates it.
             _open_external(rp)
             return True, _ViewResult(
-                "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
-                {"type": "external", "filename": os.path.basename(rp), "path": rp})
+                "[%s is cloud-only/unreadable — opening it in its app]"
+                % os.path.basename(rp),
+                {"type": "external", "filename": os.path.basename(rp), "path": rp},
+            )
     # Text files - return text
     try:
-        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+        with open(rp, "r", encoding="utf-8", errors="replace") as f:
             c = f.read()
         cut = c[:8000]
         if len(c) > 8000:
             cut += "\n...[truncated, %d chars total]" % len(c)
-        view = {"type": "text", "content": cut, "filename": os.path.basename(rp),
-                "path": rp}
-        return True, _ViewResult("[Text file displayed inline: %s]" % os.path.basename(rp), view)
+        view = {
+            "type": "text",
+            "content": cut,
+            "filename": os.path.basename(rp),
+            "path": rp,
+        }
+        return True, _ViewResult(
+            "[Text file displayed inline: %s]" % os.path.basename(rp), view
+        )
     except Exception as e:
         _open_external(rp)
         return True, _ViewResult(
-            "[%s is cloud-only/unreadable — opening it in its app]" % os.path.basename(rp),
-            {"type": "external", "filename": os.path.basename(rp), "path": rp})
+            "[%s is cloud-only/unreadable — opening it in its app]"
+            % os.path.basename(rp),
+            {"type": "external", "filename": os.path.basename(rp), "path": rp},
+        )
 
 
 def tool_view_web_image(url):
@@ -5454,11 +7074,13 @@ def tool_view_web_image(url):
     directly at an image file (png/jpg/jpeg/gif/webp/bmp). Returns a base64
     image view so the frontend renders it. For non-image URLs use curl/webfetch."""
     import base64, mimetypes, ssl
+
     if not url or not str(url).startswith(("http://", "https://")):
         return False, "view_web_image usage: url=http[s]://.../image.png"
     try:
-        req = _urlreq.Request(str(url), headers={"User-Agent":
-            "Mozilla/5.0 (ACEsi image viewer)"})
+        req = _urlreq.Request(
+            str(url), headers={"User-Agent": "Mozilla/5.0 (ACEsi image viewer)"}
+        )
         ctx = ssl.create_default_context()
         handler = _urlreq.HTTPSHandler(context=ctx)
         opener = _urlreq.build_opener(handler, _urlreq.HTTPRedirectHandler())
@@ -5469,37 +7091,53 @@ def tool_view_web_image(url):
             return False, "view_web_image: empty response from %s" % url
         # Sniff magic bytes to pick the right mime/ext (servers mislabel often).
         ext = ".jpg"
-        if data[:8] == b'\x89PNG\r\n\x1a\n':
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
             ext, ctype = ".png", "image/png"
-        elif data[:2] == b'\xff\xd8':
+        elif data[:2] == b"\xff\xd8":
             ext, ctype = ".jpg", "image/jpeg"
-        elif data[:6] in (b'GIF87a', b'GIF89a'):
+        elif data[:6] in (b"GIF87a", b"GIF89a"):
             ext, ctype = ".gif", "image/gif"
-        elif data[:12] == b'RIFF' and data[8:12] == b'WEBP':
+        elif data[:12] == b"RIFF" and data[8:12] == b"WEBP":
             ext, ctype = ".webp", "image/webp"
-        elif data[:4] in (b'%PDF',):
+        elif data[:4] in (b"%PDF",):
             return True, _ViewResult(
                 "[URL points at a PDF, not an image: %s]" % url,
-                {"type": "pdf", "mime": "application/pdf",
-                 "data": base64.b64encode(data).decode('ascii'),
-                 "filename": "web_document.pdf", "path": url})
-        b64 = base64.b64encode(data).decode('ascii')
+                {
+                    "type": "pdf",
+                    "mime": "application/pdf",
+                    "data": base64.b64encode(data).decode("ascii"),
+                    "filename": "web_document.pdf",
+                    "path": url,
+                },
+            )
+        b64 = base64.b64encode(data).decode("ascii")
         if not ctype.startswith("image/"):
             ctype = "image/" + ext[1:]
         fname = os.path.basename(_urlreq.urlsplit(str(url)).path) or ("image" + ext)
         if "." not in fname:
             fname += ext
-        view = {"type": "image", "mime": ctype, "data": b64,
-                "filename": fname, "path": str(url)}
-        return True, _ViewResult("[Image displayed inline (from web): %s]" % fname, view)
+        view = {
+            "type": "image",
+            "mime": ctype,
+            "data": b64,
+            "filename": fname,
+            "path": str(url),
+        }
+        return True, _ViewResult(
+            "[Image displayed inline (from web): %s]" % fname, view
+        )
     except _urlerr.HTTPError as e:
         return False, "view_web_image: HTTP %d fetching %s" % (e.code, url)
     except _urlerr.URLError as e:
-        return False, "view_web_image: network error fetching %s — %s" % (url, str(getattr(e, "reason", e)))
+        return False, "view_web_image: network error fetching %s — %s" % (
+            url,
+            str(getattr(e, "reason", e)),
+        )
     except _socket.timeout:
         return False, "view_web_image: timeout fetching %s" % url
     except Exception as e:
         return False, "view_web_image: %s" % str(e)[:200]
+
 
 def tool_grep(pattern, path="."):
     if _kill_armed():
@@ -5517,18 +7155,45 @@ def tool_grep(pattern, path="."):
         targets.append(rp)
     else:
         for root, dirs, files in os.walk(rp):
-            dirs[:] = [d for d in dirs if d not in ('build', '.dart_tool', '.git', '__pycache__', '.gradle', 'node_modules')]
+            dirs[:] = [
+                d
+                for d in dirs
+                if d
+                not in (
+                    "build",
+                    ".dart_tool",
+                    ".git",
+                    "__pycache__",
+                    ".gradle",
+                    "node_modules",
+                )
+            ]
             for fn in files:
-                if fn.endswith(('.dart', '.py', '.js', '.ts', '.html', '.json', '.yaml', '.yml', '.md', '.txt')):
+                if fn.endswith(
+                    (
+                        ".dart",
+                        ".py",
+                        ".js",
+                        ".ts",
+                        ".html",
+                        ".json",
+                        ".yaml",
+                        ".yml",
+                        ".md",
+                        ".txt",
+                    )
+                ):
                     targets.append(os.path.join(root, fn))
     for fp in targets:
         if _kill_protected_path(fp):
             continue
         try:
-            with open(fp, 'r', encoding='utf-8', errors='replace') as fh:
+            with open(fp, "r", encoding="utf-8", errors="replace") as fh:
                 for i, line in enumerate(fh, 1):
                     if cre.search(line):
-                        rel = os.path.relpath(fp, rp if os.path.isdir(rp) else PROJECT_ROOT)
+                        rel = os.path.relpath(
+                            fp, rp if os.path.isdir(rp) else PROJECT_ROOT
+                        )
                         hits.append("%s:%d: %s" % (rel, i, line.rstrip()[:200]))
                         if len(hits) >= 50:
                             hits.append("...[more truncated]")
@@ -5536,6 +7201,7 @@ def tool_grep(pattern, path="."):
         except Exception:
             pass
     return True, "\n".join(hits) if hits else "(no matches)"
+
 
 def tool_write_file(path, content):
     if _kill_armed():
@@ -5549,11 +7215,15 @@ def tool_write_file(path, content):
         d = os.path.dirname(rp)
         if d:
             os.makedirs(d, exist_ok=True)
-        with open(rp, 'w', encoding='utf-8') as f:
+        with open(rp, "w", encoding="utf-8") as f:
             f.write(content)
-        return True, "wrote %s (%d chars)" % (os.path.relpath(rp, PROJECT_ROOT), len(content))
+        return True, "wrote %s (%d chars)" % (
+            os.path.relpath(rp, PROJECT_ROOT),
+            len(content),
+        )
     except Exception as e:
         return False, str(e)
+
 
 # The user's code editor (VS Code or the VSCodium fork Chris has installed).
 _EDITOR_CANDIDATES = [
@@ -5564,18 +7234,23 @@ _EDITOR_CANDIDATES = [
     r"C:\Program Files (x86)\Microsoft VS Code\Code.exe",
 ]
 
+
 def _find_editor():
     for c in _EDITOR_CANDIDATES:
         if os.path.isfile(c):
             return c
     from shutil import which
+
     for name in ("code", "codium", "code-insiders"):
         p = which(name)
         if p:
             return p
     return None
 
+
 _editor_path = [None]
+
+
 def _vscode_open(draft_path):
     """Launch the editor on a file (best-effort, non-blocking). Returns (ok, msg)."""
     if _kill_armed():
@@ -5585,14 +7260,18 @@ def _vscode_open(draft_path):
     if _editor_path[0] is None:
         _editor_path[0] = _find_editor()
     if not _editor_path[0]:
-        return False, ("No code editor found (VS Code / VSCodium not installed). "
-                       "Draft was saved but could not be opened.")
+        return False, (
+            "No code editor found (VS Code / VSCodium not installed). "
+            "Draft was saved but could not be opened."
+        )
     try:
-        subprocess.Popen([_editor_path[0], draft_path],
-                         creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(
+            [_editor_path[0], draft_path], creationflags=0x00000008 | 0x00000200
+        )  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
         return True, "opened %s in the editor" % os.path.basename(draft_path)
     except Exception as e:
         return False, str(e)
+
 
 def tool_open_in_vscode(path, content):
     """Write content to a REVIEW DRAFT (not the final file) and open it in the
@@ -5612,7 +7291,7 @@ def tool_open_in_vscode(path, content):
     try:
         os.makedirs(draft_dir, exist_ok=True)
         draft = os.path.join(draft_dir, os.path.basename(rp))
-        with open(draft, 'w', encoding='utf-8') as f:
+        with open(draft, "w", encoding="utf-8") as f:
             f.write(content or "")
     except Exception as e:
         return False, str(e)
@@ -5622,13 +7301,18 @@ def tool_open_in_vscode(path, content):
     with _AGENT_LOCK:
         _AGENT["pending_save"] = {"draft": draft, "target": rp}
     if not ok:
-        return True, ("Draft saved but could NOT open the editor: %s. "
-                      "Draft is at %s — tell Chris the draft is ready for review "
-                      "and answer only: saved_draft %s" % (msg, rel_draft, rel_target))
-    return True, ("Draft opened in the editor for Chris to review: %s. "
-                  "The final file %s has NOT been written yet. Tell Chris to review "
-                  "it in VS Code, then reply with EXACTLY: saved_draft %s"
-                  % (rel_draft, rel_target, rel_target))
+        return True, (
+            "Draft saved but could NOT open the editor: %s. "
+            "Draft is at %s — tell Chris the draft is ready for review "
+            "and answer only: saved_draft %s" % (msg, rel_draft, rel_target)
+        )
+    return True, (
+        "Draft opened in the editor for Chris to review: %s. "
+        "The final file %s has NOT been written yet. Tell Chris to review "
+        "it in VS Code, then reply with EXACTLY: saved_draft %s"
+        % (rel_draft, rel_target, rel_target)
+    )
+
 
 def _commit_pending_save():
     """Move the parked review draft to its final target. Returns a user-facing message."""
@@ -5644,14 +7328,15 @@ def _commit_pending_save():
         d = os.path.dirname(target)
         if d:
             os.makedirs(d, exist_ok=True)
-        with open(draft, 'r', encoding='utf-8', errors='replace') as f:
+        with open(draft, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-        with open(target, 'w', encoding='utf-8') as f:
+        with open(target, "w", encoding="utf-8") as f:
             f.write(content)
         os.remove(draft)
         return "Saved the reviewed draft to %s." % os.path.relpath(target, PROJECT_ROOT)
     except Exception as e:
         return "Could not save the draft: %s" % e
+
 
 def _discard_pending_save():
     """Delete the parked review draft. Returns a user-facing message."""
@@ -5669,6 +7354,7 @@ def _discard_pending_save():
             return "Could not delete the draft: %s" % e
     return "There is no draft waiting to be discarded."
 
+
 def tool_edit_file(path, old, new):
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
@@ -5678,7 +7364,7 @@ def tool_edit_file(path, old, new):
     if _kill_protected_path(rp):
         return False, "blocked: that file is protected."
     try:
-        with open(rp, 'r', encoding='utf-8', errors='replace') as f:
+        with open(rp, "r", encoding="utf-8", errors="replace") as f:
             c = f.read()
     except Exception as e:
         return False, str(e)
@@ -5688,46 +7374,68 @@ def tool_edit_file(path, old, new):
     if count > 1:
         return False, "old_string is ambiguous (%d matches) — add more context" % count
     try:
-        with open(rp, 'w', encoding='utf-8') as f:
+        with open(rp, "w", encoding="utf-8") as f:
             f.write(c.replace(old, new, 1))
         return True, "edited %s (1 replacement)" % os.path.relpath(rp, PROJECT_ROOT)
     except Exception as e:
         return False, str(e)
 
+
 # Blocked shell commands keep the agent from nuking the project/env.
 _DESTRUCTIVE = re.compile(
-    r'^\s*(rm(?:\s+-rf)?|rd|rmdir|del|erase|format|shutdown|reboot|'
-    r'git\s+(push|pushall|reset|checkout|rebase|merge|stash|reflog|branch\s+-D|switch|clean|filter-branch)|'
-    r'flutter\s+(clean|pub\s+get|pub\s+upgrade|build|bootstrap)|'
-    r'dart\s+(compile|pub\s+get|pub\s+upgrade)|'
-    r'adb\s+(uninstall|shell\s+pm\s+clear|shell\s+rm)|scrcpy|'
-    r'(taskkill\s+/f)|'
-    r'(kill_switch\.json|\.ace_kill\.local))\b', re.I)
+    r"^\s*(rm(?:\s+-rf)?|rd|rmdir|del|erase|format|shutdown|reboot|"
+    r"git\s+(push|pushall|reset|checkout|rebase|merge|stash|reflog|branch\s+-D|switch|clean|filter-branch)|"
+    r"flutter\s+(clean|pub\s+get|pub\s+upgrade|build|bootstrap)|"
+    r"dart\s+(compile|pub\s+get|pub\s+upgrade)|"
+    r"adb\s+(uninstall|shell\s+pm\s+clear|shell\s+rm)|scrcpy|"
+    r"(taskkill\s+/f)|"
+    r"(kill_switch\.json|\.ace_kill\.local))\b",
+    re.I,
+)
+
 
 def tool_run_command(command, timeout=120):
     if _kill_armed():
         return False, "E-STOP is armed — no commands run."
     if _DESTRUCTIVE.search(command):
         return False, "blocked (safety): %s" % command
-    lb = (command or '').lower()
-    if 'kill_switch.json' in lb or '.ace_kill.local' in lb:
+    lb = (command or "").lower()
+    if "kill_switch.json" in lb or ".ace_kill.local" in lb:
         return False, "blocked (protected file): %s" % command
     try:
         # `flutter run` / `dart run` are long-lived dev sessions — stream to a
         # log file and return immediately instead of blocking forever.
-        if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+        if re.match(r"^\s*(flutter\s+run|dart\s+run)\b", command, re.I):
             command = _resolve_run_device(command)
             if command is None:
-                return False, 'flutter run needs a connected Android device (none found or locked/offline).'
-            log_path = os.path.join(PROJECT_ROOT, 'run_%s.log' % uuid.uuid4().hex[:8])
-            log = open(log_path, 'w', encoding='utf-8')
-            proc = _track_proc(_popen(command, shell=True, stdout=log,
-                                      stderr=subprocess.STDOUT, cwd=PROJECT_ROOT))
-            return True, ('%s started (pid %d). Watch: Get-Content %s -Wait. '
-                          'Logs: %s') % (command, proc.pid, log_path, log_path)
-        r = _run(command, shell=True, capture_output=True, text=True,
-                           timeout=timeout, cwd=PROJECT_ROOT, env=os.environ.copy())
-        out = (r.stdout or '') + (r.stderr or '')
+                return (
+                    False,
+                    "flutter run needs a connected Android device (none found or locked/offline).",
+                )
+            log_path = os.path.join(PROJECT_ROOT, "run_%s.log" % uuid.uuid4().hex[:8])
+            log = open(log_path, "w", encoding="utf-8")
+            proc = _track_proc(
+                _popen(
+                    command,
+                    shell=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    cwd=PROJECT_ROOT,
+                )
+            )
+            return True, (
+                "%s started (pid %d). Watch: Get-Content %s -Wait. " "Logs: %s"
+            ) % (command, proc.pid, log_path, log_path)
+        r = _run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+        )
+        out = (r.stdout or "") + (r.stderr or "")
         out = out.strip()
         if len(out) > 3000:
             out = out[-3000:] + "\n...[truncated]"
@@ -5741,12 +7449,19 @@ def tool_run_command(command, timeout=120):
 # ---- Git / build / dependency tools (dedicated, bypass the shell blocklist
 # ---- but with their own guardrails) ----
 
+
 def _run_shell(cmd, timeout=300, cwd=None):
     try:
-        r = _run(cmd, shell=True, capture_output=True, text=True,
-                           timeout=timeout, cwd=cwd or PROJECT_ROOT,
-                           env=os.environ.copy())
-        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        r = _run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd or PROJECT_ROOT,
+            env=os.environ.copy(),
+        )
+        out = ((r.stdout or "") + (r.stderr or "")).strip()
         if len(out) > 4000:
             out = out[-4000:] + "\n...[truncated]"
         return r.returncode == 0, "exit=%d\n%s" % (r.returncode, out)
@@ -5760,10 +7475,16 @@ def _run_args(args, timeout=300):
     # Windows-safe: list2cmdline does proper quoting, shell=True resolves .bat
     cmdline = subprocess.list2cmdline(args)
     try:
-        r = _run(cmdline, shell=True, capture_output=True, text=True,
-                           timeout=timeout, cwd=PROJECT_ROOT,
-                           env=os.environ.copy())
-        out = ((r.stdout or '') + (r.stderr or '')).strip()
+        r = _run(
+            cmdline,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=PROJECT_ROOT,
+            env=os.environ.copy(),
+        )
+        out = ((r.stdout or "") + (r.stderr or "")).strip()
         if len(out) > 4000:
             out = out[-4000:] + "\n...[truncated]"
         return r.returncode == 0, "exit=%d\n%s" % (r.returncode, out)
@@ -5797,9 +7518,19 @@ def tool_git_commit(message, files=None):
     ok1, out1 = _run_args(stage, timeout=60)
     if not ok1:
         return False, out1
-    ok2, out2 = _run_args(["git", "-c", "user.name=ACEsi",
-                           "-c", "user.email=acesi@local",
-                           "commit", "-m", str(message)], timeout=60)
+    ok2, out2 = _run_args(
+        [
+            "git",
+            "-c",
+            "user.name=ACEsi",
+            "-c",
+            "user.email=acesi@local",
+            "commit",
+            "-m",
+            str(message),
+        ],
+        timeout=60,
+    )
     if "nothing to commit" in out2 or "no changes added" in out2:
         return True, "nothing to commit (working tree clean)"
     return ok2, out2
@@ -5820,7 +7551,11 @@ def tool_git_merge(branch):
         return False, "branch '%s' does not exist locally: %s" % (b, out)
     ok2, out2 = _run_args(["git", "merge", "--no-commit", "--no-ff", b], timeout=180)
     if "CONFLICT" in out2:
-        return False, "merge conflicts in %s:\n%s\nResolve conflicts with edit_file, then git_commit." % (b, out2)
+        return (
+            False,
+            "merge conflicts in %s:\n%s\nResolve conflicts with edit_file, then git_commit."
+            % (b, out2),
+        )
     _run_args(["git", "merge", "--abort"], timeout=60)  # roll back --no-commit staging
     if not ok2:
         return False, out2
@@ -5832,8 +7567,9 @@ def tool_build_apk(mode="release"):
     if mode not in ("release", "debug"):
         return False, "usage: build_apk mode=release|debug"
     ok, out = _run_args(["flutter", "build", "apk", "--" + mode], timeout=600)
-    apk = os.path.join(PROJECT_ROOT, "build", "app", "outputs",
-                       "flutter-apk", "app-%s.apk" % mode)
+    apk = os.path.join(
+        PROJECT_ROOT, "build", "app", "outputs", "flutter-apk", "app-%s.apk" % mode
+    )
     exists = os.path.exists(apk)
     if ok and exists:
         size = os.path.getsize(apk) // 1024
@@ -5874,15 +7610,33 @@ ACE_UI_SHOTS = os.path.join(PROJECT_ROOT, "ui_screenshots")
 # University of Venda ITS / iEnabler portal (prodi41 startup URL). Used by the
 # /check-portal health route and by ACEsi's network diagnostics. The public
 # university site (www.univen.ac.za) links to this exact host.
-UNIVEN_ITS_STARTUP_URL = ("https://univenierp01.univen.ac.za/pls/prodi41/"
-                           "gen.gw1pkg.gw1startup?x_processcode=ITS_OAP")
+UNIVEN_ITS_STARTUP_URL = (
+    "https://univenierp01.univen.ac.za/pls/prodi41/"
+    "gen.gw1pkg.gw1startup?x_processcode=ITS_OAP"
+)
 # Last captured screenshot lives in memory (NOT on disk by default) so it can be
 # served to the frontend popup without cluttering ui_screenshots/. ts increments
 # every capture so clients can detect a NEW screenshot after a run.
 _LAST_SHOT = {"png": b"", "ts": 0}
-_UI_KEYS = {"back": "4", "home": "3", "enter": "66", "tab": "61", "menu": "82",
-            "up": "19", "down": "20", "left": "21", "right": "22",
-            "esc": "111", "power": "26", "recents": "187"}
+# The provider/model that actually answered the last /chat request. Read by the
+# frontend badge so Chris can see at a glance whether Cloud or local Ollama ran.
+_LAST_MODEL_USED = ""
+
+
+_UI_KEYS = {
+    "back": "4",
+    "home": "3",
+    "enter": "66",
+    "tab": "61",
+    "menu": "82",
+    "up": "19",
+    "down": "20",
+    "left": "21",
+    "right": "22",
+    "esc": "111",
+    "power": "26",
+    "recents": "187",
+}
 
 
 # A phone with wireless debugging on is TWO entries in "adb devices" - the USB
@@ -5894,8 +7648,9 @@ _ADB_WIRELESS_ALIAS_RE = re.compile(
     # The random suffix is not hex - real aliases look like
     # adb-R52N518ESBE-aQ93NA._adb-tls-connect._tcp - so match any non-dot
     # token rather than a hex run, or the collapse silently never fires.
-    r'^adb-(?P<serial>.+?)-[^.\s]{4,}\._adb-tls-(?:connect|pairing)\._tcp$',
-    re.IGNORECASE)
+    r"^adb-(?P<serial>.+?)-[^.\s]{4,}\._adb-tls-(?:connect|pairing)\._tcp$",
+    re.IGNORECASE,
+)
 
 # Resolved target, cached briefly: the ui_* tools make a couple of dozen adb
 # calls per action and re-listing devices each time would dominate the runtime.
@@ -5911,6 +7666,7 @@ _ADB_SIZE_TTL = 300.0
 
 def _adb_screen_size():
     import time as _time
+
     now = _time.time()
     if _ADB_TARGET["size"] and now - _ADB_TARGET["size_at"] < _ADB_SIZE_TTL:
         return _ADB_TARGET["size"]
@@ -5948,8 +7704,9 @@ def _pick_adb_device(online):
         return None
     want = (os.environ.get("ACE_ADB_TARGETS") or "").strip()
     if want:
-        named = [d for d in online
-                 if d[0] in want or _adb_physical_serial(d[0]) in want]
+        named = [
+            d for d in online if d[0] in want or _adb_physical_serial(d[0]) in want
+        ]
         if named:
             online = named
     if len(online) > 1:
@@ -5971,9 +7728,9 @@ def _resolve_adb_entry(devs=None, force=False):
     cache-hit and cache-miss paths.
     """
     import time as _time
+
     now = _time.time()
-    if (not force and _ADB_TARGET["entry"]
-            and now - _ADB_TARGET["at"] < _ADB_TARGET_TTL):
+    if not force and _ADB_TARGET["entry"] and now - _ADB_TARGET["at"] < _ADB_TARGET_TTL:
         return _ADB_TARGET["entry"]
     if devs is None:
         devs, _raw = _adb_connected_devices()
@@ -6005,11 +7762,18 @@ def _ui_adb(args, timeout=120, cap=3000):
             args = ["-s", _serial] + args
     cmd = subprocess.list2cmdline(["adb"] + args)
     try:
-        proc = _popen(cmd, shell=True, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, env=os.environ.copy())
+        proc = _popen(
+            cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=os.environ.copy(),
+        )
         try:
             r_out, r_err = proc.communicate(timeout=timeout)
-            out = (r_out.decode('utf-8', 'replace') + r_err.decode('utf-8', 'replace')).strip()
+            out = (
+                r_out.decode("utf-8", "replace") + r_err.decode("utf-8", "replace")
+            ).strip()
             if cap and len(out) > cap:
                 out = out[-cap:] + "\n...[truncated]"
             return proc.returncode == 0, out
@@ -6018,8 +7782,11 @@ def _ui_adb(args, timeout=120, cap=3000):
             # orphaned adb.exe would otherwise hold the device and stall every
             # later adb call in the run.
             try:
-                _run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                               capture_output=True, timeout=10)
+                _run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    capture_output=True,
+                    timeout=10,
+                )
             except Exception:
                 pass
             return False, "timed out after %ds" % timeout
@@ -6068,23 +7835,30 @@ def _adb_diagnose(devices, raw):
     low = blob.lower()
     for serial, state, _t in devices:
         if state == "unauthorized":
-            return ("Authorization problem: %s is 'unauthorized'. Unlock the phone "
-                    "and accept the 'Allow USB debugging' prompt, then retry."
-                    % serial)
+            return (
+                "Authorization problem: %s is 'unauthorized'. Unlock the phone "
+                "and accept the 'Allow USB debugging' prompt, then retry." % serial
+            )
         if state == "offline":
-            return ("%s is 'offline' - the adb link is up but not talking. Usually "
-                    "a stale TCP/IP session or a revoked RSA key; try 'adb kill-server' "
-                    "and reconnect." % serial)
+            return (
+                "%s is 'offline' - the adb link is up but not talking. Usually "
+                "a stale TCP/IP session or a revoked RSA key; try 'adb kill-server' "
+                "and reconnect." % serial
+            )
     if "unauthorized" in low:
-        return ("Authorization problem: a device is 'unauthorized'. Unlock the phone "
-                "and accept the 'Allow USB debugging' prompt, then retry.")
+        return (
+            "Authorization problem: a device is 'unauthorized'. Unlock the phone "
+            "and accept the 'Allow USB debugging' prompt, then retry."
+        )
     if "no devices/emulators" in low or not devices:
-        return ("No device visible to adb. In order of likelihood: (1) USB debugging "
-                "is off in Developer options, (2) the cable is charge-only or the port "
-                "is not a data port, (3) the Windows driver is missing or not signed - "
-                "check Device Manager for an unrecognised device with a warning icon. "
-                "For wireless: turn on Wireless debugging and pair, or run "
-                "'adb connect <host>:<port>'.")
+        return (
+            "No device visible to adb. In order of likelihood: (1) USB debugging "
+            "is off in Developer options, (2) the cable is charge-only or the port "
+            "is not a data port, (3) the Windows driver is missing or not signed - "
+            "check Device Manager for an unrecognised device with a warning icon. "
+            "For wireless: turn on Wireless debugging and pair, or run "
+            "'adb connect <host>:<port>'."
+        )
     if "offline" in low:
         return "A device is offline - see the adb output above."
     return "See the raw adb output above."
@@ -6098,13 +7872,22 @@ def tool_ui_connect(target=None, wait=10):
     if online:
         _adb_invalidate_target()
         entry = _pick_adb_device(online)
-        transports = ", ".join(sorted({d[2] for d in online
-                                       if _adb_same_physical_device(d[0], entry[0])}))
-        return True, ("already connected: %s over %s\n%s\n(adb lists %d entr%s "
-                      "for this one device; targeting %s)\n%s"
-                      % (entry[0], transports, _devices_summary(online),
-                         len(online), "y" if len(online) == 1 else "ies",
-                         entry[0], _device_facts(entry)))
+        transports = ", ".join(
+            sorted({d[2] for d in online if _adb_same_physical_device(d[0], entry[0])})
+        )
+        return True, (
+            "already connected: %s over %s\n%s\n(adb lists %d entr%s "
+            "for this one device; targeting %s)\n%s"
+            % (
+                entry[0],
+                transports,
+                _devices_summary(online),
+                len(online),
+                "y" if len(online) == 1 else "ies",
+                entry[0],
+                _device_facts(entry),
+            )
+        )
     tried = []
     candidates = []
     if target:
@@ -6134,7 +7917,9 @@ def tool_ui_connect(target=None, wait=10):
             continue
         seen.add(cand)
         ok, out = _ui_adb(["connect", cand], timeout=int(wait or 10) + 5, cap=1200)
-        tried.append("  adb connect %s -> %s" % (cand, (out or "").strip() or "no output"))
+        tried.append(
+            "  adb connect %s -> %s" % (cand, (out or "").strip() or "no output")
+        )
         if ok and "connected to" in str(out).lower():
             _adb_invalidate_target()
             devs2, _r2 = _adb_connected_devices()
@@ -6142,17 +7927,26 @@ def tool_ui_connect(target=None, wait=10):
             if live:
                 _adb_invalidate_target()
                 entry = _pick_adb_device(live)
-                return True, ("connected: %s over %s\n%s\n%s"
-                              % (entry[0], entry[2], _devices_summary(live),
-                                 _device_facts(entry)))
-    detail = ("\n".join(tried) if tried else
-              "no connection target to try: no wireless-debugging mDNS service was "
-              "advertised and ACE_ADB_TARGETS is unset")
+                return True, (
+                    "connected: %s over %s\n%s\n%s"
+                    % (entry[0], entry[2], _devices_summary(live), _device_facts(entry))
+                )
+    detail = (
+        "\n".join(tried)
+        if tried
+        else "no connection target to try: no wireless-debugging mDNS service was "
+        "advertised and ACE_ADB_TARGETS is unset"
+    )
     devs3, raw3 = _adb_connected_devices()
-    return False, ("NOT CONNECTED - no Android device is reachable.\n"
-                   "adb said: %s\n%s\ndiagnosis: %s"
-                   % (str(raw3 or raw or "").strip()[:400], detail,
-                      _adb_diagnose(devs3, raw3 or raw)))
+    return False, (
+        "NOT CONNECTED - no Android device is reachable.\n"
+        "adb said: %s\n%s\ndiagnosis: %s"
+        % (
+            str(raw3 or raw or "").strip()[:400],
+            detail,
+            _adb_diagnose(devs3, raw3 or raw),
+        )
+    )
 
 
 def _devices_summary(devs):
@@ -6167,7 +7961,9 @@ def _devices_summary(devs):
                 if row.startswith(phys + " "):
                     extra = d[2]
                     lines[_i] = row.rstrip() + " (also reachable over %s as %s)" % (
-                        extra, d[0])
+                        extra,
+                        d[0],
+                    )
                     break
             continue
         seen.append(phys)
@@ -6188,8 +7984,12 @@ def _device_facts(entry):
     fg = "foreground=%s" % pkg if pkg else "(unknown)"
     if act:
         fg += " activity=%s" % act
-    return ("device id: %s\nscreen: %s\ndensity: %s\n%s"
-            % (serial, str(size).strip(), str(dens).strip(), fg))
+    return "device id: %s\nscreen: %s\ndensity: %s\n%s" % (
+        serial,
+        str(size).strip(),
+        str(dens).strip(),
+        fg,
+    )
 
 
 def tool_ui_device():
@@ -6197,13 +7997,17 @@ def tool_ui_device():
     online = [d for d in devs if d[1] == "device"]
     if online:
         _adb_invalidate_target()
-        return True, "%s\n\n%s" % (_devices_summary(online),
-                                   _device_facts(_resolve_adb_entry(devs)))
+        return True, "%s\n\n%s" % (
+            _devices_summary(online),
+            _device_facts(_resolve_adb_entry(devs)),
+        )
     # Nothing online: say so plainly, with the raw adb output and a diagnosis,
     # instead of returning an empty device list that reads like an answer.
-    return False, ("NOT CONNECTED - no Android device is reachable.\n"
-                   "adb said: %s\ndiagnosis: %s"
-                   % (str(raw or "").strip()[:400], _adb_diagnose(devs, raw)))
+    return False, (
+        "NOT CONNECTED - no Android device is reachable.\n"
+        "adb said: %s\ndiagnosis: %s"
+        % (str(raw or "").strip()[:400], _adb_diagnose(devs, raw))
+    )
 
 
 def tool_ui_app_open():
@@ -6212,29 +8016,49 @@ def tool_ui_app_open():
     # fullscreen app (e.g. the Honor search screen) and every later tap fails.
     # `am start` with FLAG_ACTIVITY_NEW_TASK|CLEAR_TOP brings the existing task
     # forward, then we verify the resumed activity is ours and retry once.
-    launch = ["shell", "am", "start",
-              "-n", "%s/.MainActivity" % ACE_PACKAGE,
-              "-a", "android.intent.action.MAIN",
-              "-c", "android.intent.category.LAUNCHER"]
+    launch = [
+        "shell",
+        "am",
+        "start",
+        "-n",
+        "%s/.MainActivity" % ACE_PACKAGE,
+        "-a",
+        "android.intent.action.MAIN",
+        "-c",
+        "android.intent.category.LAUNCHER",
+    ]
     ok, out = _ui_adb(launch, timeout=60)
     if not ok:
         return ok, out
     for attempt in (1, 2):
         # Parse locally: dumpsys output is large and the ResumedActivity lines
         # sit near the TOP, so cap must keep them (full output ~40KB).
-        fg = _ui_adb(["shell", "dumpsys", "activity", "activities"],
-                     timeout=60, cap=120000)
+        fg = _ui_adb(
+            ["shell", "dumpsys", "activity", "activities"], timeout=60, cap=120000
+        )
         if not fg[0]:
             continue
-        lines = [l for l in fg[1].splitlines()
-                 if "topResumedActivity" in l or "ResumedActivity:" in l]
+        lines = [
+            l
+            for l in fg[1].splitlines()
+            if "topResumedActivity" in l or "ResumedActivity:" in l
+        ]
         if lines and ACE_PACKAGE in lines[-1]:
             return True, "foreground: %s" % lines[-1].strip()
         if attempt == 1:
             # Second launch pass: NEW_TASK|CLEAR_TOP more aggressively resumes
             # the running task instead of just scheduling a new activity.
-            _ui_adb(["shell", "am", "start", "--activity-brought-to-front",
-                     "-n", "%s/.MainActivity" % ACE_PACKAGE], timeout=60)
+            _ui_adb(
+                [
+                    "shell",
+                    "am",
+                    "start",
+                    "--activity-brought-to-front",
+                    "-n",
+                    "%s/.MainActivity" % ACE_PACKAGE,
+                ],
+                timeout=60,
+            )
             _ui_adb(["shell", "input", "keyevent", "3"], timeout=60)  # home
             ok, out = _ui_adb(launch, timeout=60)
     return True, "launched %s (foreground unverified)" % ACE_PACKAGE
@@ -6258,8 +8082,9 @@ def tool_ui_swipe(x1, y1, x2, y2, duration=200):
         duration = int(float(str(duration).replace(",", "")))
     except Exception:
         return False, "usage: ui_swipe x1 y1 x2 y2 [duration=200]"
-    return _ui_adb(["shell", "input", "swipe", str(x1), str(y1),
-                    str(x2), str(y2), str(duration)])
+    return _ui_adb(
+        ["shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration)]
+    )
 
 
 def tool_ui_type(text):
@@ -6283,6 +8108,7 @@ def _ui_dump_compact(xml, cap=3000):
     the model sees a compact actionable list (label + tap center) instead of raw
     XML full of empty text=\"\" attributes. Returns the compact string."""
     import xml.etree.ElementTree as ET
+
     lines = []
     for n in ET.fromstring(xml).iter("node"):
         t = (n.get("text") or "").strip()
@@ -6292,6 +8118,7 @@ def _ui_dump_compact(xml, cap=3000):
             continue
         b = n.get("bounds", "")
         import re as _re
+
         m = _re.findall(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b)
         cx = cy = ""
         if m:
@@ -6302,13 +8129,26 @@ def _ui_dump_compact(xml, cap=3000):
         # treat a page heading as a button, which is how it ended up tapping
         # "Academic Application Process" instead of the dropdown below it.
         flags = []
-        for attr, tag in (("clickable", "CLICKABLE"), ("checkable", "CHECKABLE"),
-                          ("focusable", "FOCUSABLE"), ("long_clickable", "LONG_CLICKABLE")):
+        for attr, tag in (
+            ("clickable", "CLICKABLE"),
+            ("checkable", "CHECKABLE"),
+            ("focusable", "FOCUSABLE"),
+            ("long_clickable", "LONG_CLICKABLE"),
+        ):
             if n.get(attr) == "true":
                 flags.append(tag)
         cls = n.get("class") or ""
-        for kind in ("Button", "CheckBox", "RadioButton", "Spinner", "ToggleButton",
-                     "Switch", "ImageButton", "AutoCompleteTextView", "Tab"):
+        for kind in (
+            "Button",
+            "CheckBox",
+            "RadioButton",
+            "Spinner",
+            "ToggleButton",
+            "Switch",
+            "ImageButton",
+            "AutoCompleteTextView",
+            "Tab",
+        ):
             if kind in cls and kind.upper() not in flags:
                 flags.append(kind.upper())
         if n.get("clickable") == "true" and n.get("focusable") == "true":
@@ -6316,10 +8156,10 @@ def _ui_dump_compact(xml, cap=3000):
                 flags.append("FOCUSABLE")
         tappable = bool(flags)
         if tappable:
-            lines.append('%s @ tap(%s,%s) %s' % (label, cx, cy, " ".join(flags)))
+            lines.append("%s @ tap(%s,%s) %s" % (label, cx, cy, " ".join(flags)))
         else:
             # Plain text: report it so the model can READ it, with no tap point.
-            lines.append('%s  [not tappable]' % label)
+            lines.append("%s  [not tappable]" % label)
     total = len(lines)
     joined = "\n".join(lines)
     if len(joined) > cap:
@@ -6328,16 +8168,19 @@ def _ui_dump_compact(xml, cap=3000):
 
 
 _FOCUS_WINDOW_RE = re.compile(
-    r'mCurrentFocus=Window\{(?P<id>[0-9a-fA-F]+)\s+u0\s+(?P<pkg>[^/}\s]+)/(?P<act>[^}\s]+)\}')
+    r"mCurrentFocus=Window\{(?P<id>[0-9a-fA-F]+)\s+u0\s+(?P<pkg>[^/}\s]+)/(?P<act>[^}\s]+)\}"
+)
 _FOCUSED_APP_RE = re.compile(
-    r'mFocusedApp=ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)')
+    r"mFocusedApp=ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)"
+)
 # Activity-manager fallbacks, most authoritative first. On modern Android
 # topResumedActivity is the live one; mResumedActivity is the older spelling;
 # a bare ResumedActivity: line can be historical.
 _RESUMED_PATTERNS = ("topResumedActivity", "mResumedActivity:", "ResumedActivity:")
 _RESUMED_RE = re.compile(
-    r'(?:topResumedActivity|mResumedActivity|ResumedActivity)[:=]\s*'
-    r'ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)')
+    r"(?:topResumedActivity|mResumedActivity|ResumedActivity)[:=]\s*"
+    r"ActivityRecord\{[^}]*?\s(?P<pkg>[a-zA-Z0-9_.]+)/(?P<act>[^}\s]+)"
+)
 
 
 def _foreground_app():
@@ -6355,14 +8198,15 @@ def _foreground_app():
             if m:
                 act = m.group("act")
                 if act.startswith(m.group("pkg") + "."):
-                    act = act[len(m.group("pkg")) + 1:]
+                    act = act[len(m.group("pkg")) + 1 :]
                 return m.group("pkg"), act, m.group("id")
         for line in str(out).splitlines():
             m = _FOCUSED_APP_RE.search(line)
             if m:
                 return m.group("pkg"), m.group("act"), ""
-    ok2, acts = _ui_adb(["shell", "dumpsys", "activity", "activities"],
-                        timeout=45, cap=200000)
+    ok2, acts = _ui_adb(
+        ["shell", "dumpsys", "activity", "activities"], timeout=45, cap=200000
+    )
     if ok2:
         for pat in _RESUMED_PATTERNS:
             for line in str(acts).splitlines():
@@ -6404,8 +8248,12 @@ def _has_webview():
     low = str(out).lower()
     # A bare "webview" substring matches any prose or node label that happens
     # to contain the word, so require a real WebView class or plugin marker.
-    for marker in ("android.webkit", "android.widget.webview",
-                   "webviewflutter", "flutter_webview"):
+    for marker in (
+        "android.webkit",
+        "android.widget.webview",
+        "webviewflutter",
+        "flutter_webview",
+    ):
         if marker in low:
             return True
     return False
@@ -6451,15 +8299,21 @@ def tool_ui_dump():
     except Exception as e:
         nodes = out.count("<node")
         trimmed = out[:3000] + ("\n..." if len(out) > 3000 else "")
-        return True, ("%s\n%d visible nodes (compact parse failed: %s)\n%s"
-                      % (header, nodes, e, trimmed))
+        return True, (
+            "%s\n%d visible nodes (compact parse failed: %s)\n%s"
+            % (header, nodes, e, trimmed)
+        )
 
 
 def tool_ui_screenshot(name=None, save=False):
     try:
         r = _run(
             subprocess.list2cmdline(["adb", "exec-out", "screencap", "-p"]),
-            shell=True, capture_output=True, timeout=60, env=os.environ.copy())
+            shell=True,
+            capture_output=True,
+            timeout=60,
+            env=os.environ.copy(),
+        )
         data = r.stdout if isinstance(r.stdout, bytes) else r.stdout.encode()
         if not data.startswith(b"\x89PNG"):
             return False, "screencap failed: %s" % r.stderr[:300]
@@ -6473,13 +8327,17 @@ def tool_ui_screenshot(name=None, save=False):
             path = os.path.join(ACE_UI_SHOTS, fname)
             with open(path, "wb") as f:
                 f.write(data)
-            return True, ("%s (%d KB) -- SAVED to disk at Chris's request. Shown in a popup too. "
-                          "NOTE: you cannot view images; the user can in the screenshot popup." %
-                          (path, len(data) // 1024))
-        return True, ("Screenshot captured (%d KB) and shown to Chris in a popup -- NOT saved to disk. "
-                      "If you or Chris later want it as a file, call ui_screenshot with {\"save\": true}. "
-                      "You cannot view images; describe the screen from ui_dump labels, never the image." %
-                      (len(data) // 1024))
+            return True, (
+                "%s (%d KB) -- SAVED to disk at Chris's request. Shown in a popup too. "
+                "NOTE: you cannot view images; the user can in the screenshot popup."
+                % (path, len(data) // 1024)
+            )
+        return True, (
+            "Screenshot captured (%d KB) and shown to Chris in a popup -- NOT saved to disk. "
+            'If you or Chris later want it as a file, call ui_screenshot with {"save": true}. '
+            "You cannot view images; describe the screen from ui_dump labels, never the image."
+            % (len(data) // 1024)
+        )
     except subprocess.TimeoutExpired:
         return False, "screencap timed out"
     except Exception as e:
@@ -6500,6 +8358,7 @@ def _ui_parse_nodes(xml):
     """Parse a uiautomator XML dump into node dicts (text/content-desc/
     resource-id/class/visibility/bounds + tap center). Uses only stdlib (ET)."""
     import xml.etree.ElementTree as ET
+
     nodes = []
     for n in ET.fromstring(xml).iter("node"):
         b = n.get("bounds", "")
@@ -6507,19 +8366,25 @@ def _ui_parse_nodes(xml):
         m = re.findall(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b)
         if m:
             x1, y1, x2, y2 = (int(v) for v in m[0])
-        nodes.append({
-            "text": (n.get("text") or "").strip(),
-            "desc": (n.get("content-desc") or "").strip(),
-            "rid": (n.get("resource-id") or "").strip(),
-            "cls": (n.get("class") or "").strip(),
-            "clickable": n.get("clickable") == "true",
-            "focusable": n.get("focusable") == "true",
-            "visible": (n.get("visible-to-user") or "true") != "false",
-            "enabled": n.get("enabled") != "false",
-            "bounds": b, "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-            "cx": (x1 + x2) // 2 if x1 is not None else None,
-            "cy": (y1 + y2) // 2 if y1 is not None else None,
-        })
+        nodes.append(
+            {
+                "text": (n.get("text") or "").strip(),
+                "desc": (n.get("content-desc") or "").strip(),
+                "rid": (n.get("resource-id") or "").strip(),
+                "cls": (n.get("class") or "").strip(),
+                "clickable": n.get("clickable") == "true",
+                "focusable": n.get("focusable") == "true",
+                "visible": (n.get("visible-to-user") or "true") != "false",
+                "enabled": n.get("enabled") != "false",
+                "bounds": b,
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "cx": (x1 + x2) // 2 if x1 is not None else None,
+                "cy": (y1 + y2) // 2 if y1 is not None else None,
+            }
+        )
     return nodes
 
 
@@ -6569,7 +8434,10 @@ def _ui_assert_find(rid=None, text=None, desc=None, cls=None):
             continue
         if text:
             tl = str(text).lower()
-            if tl not in (n["text"] or "").lower() and tl not in (n["desc"] or "").lower():
+            if (
+                tl not in (n["text"] or "").lower()
+                and tl not in (n["desc"] or "").lower()
+            ):
                 continue
         matched.append(n)
     if not (rid or text or desc or cls):
@@ -6579,30 +8447,48 @@ def _ui_assert_find(rid=None, text=None, desc=None, cls=None):
 
 def tool_ui_assert_text(text, present=True):
     if not text or not str(text).strip():
-        return False, "ui_assert_text usage: text=<string to look for> [present=true|false]"
+        return (
+            False,
+            "ui_assert_text usage: text=<string to look for> [present=true|false]",
+        )
     dko, dkres = _ui_dump_nodes()
     if not dko:
         return False, "ui_assert_text FAIL: %s" % dkres
     tl = str(text).strip().lower()
-    found = [n for n in dkres if tl in (n["text"] or "").lower() or tl in (n["desc"] or "").lower()]
+    found = [
+        n
+        for n in dkres
+        if tl in (n["text"] or "").lower() or tl in (n["desc"] or "").lower()
+    ]
     want_present = str(present).lower() not in ("0", "false", "no")
     if want_present and found:
         return True, "PASS: ui_assert_text found %r on screen (%d match%s)" % (
-            text, len(found), "es" if len(found) > 1 else "")
+            text,
+            len(found),
+            "es" if len(found) > 1 else "",
+        )
     if (not want_present) and not found:
         return True, "PASS: ui_assert_text confirmed %r is NOT on screen" % text
     if want_present:
         labels = [l for n in dkres for l in _ui_node_labels(n) if l][:30]
         return False, "FAIL: ui_assert_text: %r NOT on screen. Labels: %s" % (
-            text, " | ".join(labels))
-    return False, "FAIL: ui_assert_text: %r IS on screen (asserted absent): %d match%s" % (
-        text, len(found), "es" if len(found) > 1 else "")
+            text,
+            " | ".join(labels),
+        )
+    return (
+        False,
+        "FAIL: ui_assert_text: %r IS on screen (asserted absent): %d match%s"
+        % (text, len(found), "es" if len(found) > 1 else ""),
+    )
 
 
 def tool_ui_assert_element(resource_id="", text="", desc="", cls="", present=True):
     selectors = dict(rid=resource_id, text=text, desc=desc, cls=cls)
     if not any(v for v in selectors.values()):
-        return False, "ui_assert_element usage: give at least one of resource_id, text, desc, cls"
+        return (
+            False,
+            "ui_assert_element usage: give at least one of resource_id, text, desc, cls",
+        )
     dko, matched = _ui_assert_find(**selectors)
     if not dko:
         return False, "ui_assert_element FAIL: %s" % matched
@@ -6611,18 +8497,26 @@ def tool_ui_assert_element(resource_id="", text="", desc="", cls="", present=Tru
     if want_present and matched:
         m = matched[0]
         return True, "PASS: ui_assert_element (%s) found at %s [%s]" % (
-            sel, m["bounds"], m["cls"] or "?")
+            sel,
+            m["bounds"],
+            m["cls"] or "?",
+        )
     if (not want_present) and not matched:
         return True, "PASS: ui_assert_element confirmed no element matches (%s)" % sel
     rids = sorted({n["rid"] for n in matched or [] if n["rid"]})[:10]
     return False, "FAIL: ui_assert_element (%s) not found%s" % (
-        sel, "; existing resource-ids: %s" % (", ".join(rids) if rids else " none visible"))
+        sel,
+        "; existing resource-ids: %s" % (", ".join(rids) if rids else " none visible"),
+    )
 
 
 def tool_ui_assert_visible(resource_id="", text="", desc="", cls=""):
     selectors = dict(rid=resource_id, text=text, desc=desc, cls=cls)
     if not any(v for v in selectors.values()):
-        return False, "ui_assert_visible usage: give at least one of resource_id, text, desc, cls"
+        return (
+            False,
+            "ui_assert_visible usage: give at least one of resource_id, text, desc, cls",
+        )
     dko, matched = _ui_assert_find(**selectors)
     if not dko:
         return False, "ui_assert_visible FAIL: %s" % matched
@@ -6638,8 +8532,15 @@ def tool_ui_assert_visible(resource_id="", text="", desc="", cls=""):
             if n["x1"] < 0 or n["y1"] < 0 or n["x2"] > W or n["y2"] > H:
                 on_screen = False
         if on_screen:
-            return True, "PASS: ui_assert_visible (%s) is VISIBLE on screen at %s" % (sel, n["bounds"])
-    return False, "FAIL: ui_assert_visible (%s) found but NOT visible/interactable on screen" % sel
+            return True, "PASS: ui_assert_visible (%s) is VISIBLE on screen at %s" % (
+                sel,
+                n["bounds"],
+            )
+    return (
+        False,
+        "FAIL: ui_assert_visible (%s) found but NOT visible/interactable on screen"
+        % sel,
+    )
 
 
 def _ui_split_fragments(s):
@@ -6658,19 +8559,36 @@ def _ui_expect_parse(expected):
     (None, error)."""
     s = str(expected or "").strip()
     if not s:
-        return None, "ui_expect usage: expected=<JSON {present:[],absent:[]} or text fragments>"
+        return (
+            None,
+            "ui_expect usage: expected=<JSON {present:[],absent:[]} or text fragments>",
+        )
     present, absent = [], []
     try:
         d = json.loads(s)
         if isinstance(d, dict):
             for k in ("present", "include", "must"):
                 if isinstance(d.get(k), list) or isinstance(d.get(k), str):
-                    present = _ui_split_fragments("\n".join(
-                        d[k] if isinstance(d[k], list) else [d[k]])) if d.get(k) else []
+                    present = (
+                        _ui_split_fragments(
+                            "\n".join(d[k] if isinstance(d[k], list) else [d[k]])
+                        )
+                        if d.get(k)
+                        else []
+                    )
                     break
             if isinstance(d.get("absent"), list) or isinstance(d.get("absent"), str):
-                absent = _ui_split_fragments("\n".join(
-                    d["absent"] if isinstance(d["absent"], list) else [d["absent"]])) if d.get("absent") else []
+                absent = (
+                    _ui_split_fragments(
+                        "\n".join(
+                            d["absent"]
+                            if isinstance(d["absent"], list)
+                            else [d["absent"]]
+                        )
+                    )
+                    if d.get("absent")
+                    else []
+                )
         else:
             present = _ui_split_fragments(d)
     except Exception:
@@ -6696,13 +8614,18 @@ def tool_ui_expect(expected):
     missing = [f for f in present if f.lower() not in corpus]
     unexpected = [f for f in absent if f.lower() in corpus]
     if not missing and not unexpected:
-        return True, "PASS: ui_expect — screen matches expected state (present=%d, absent=%d)" % (
-            len(present), len(absent))
+        return (
+            True,
+            "PASS: ui_expect — screen matches expected state (present=%d, absent=%d)"
+            % (len(present), len(absent)),
+        )
     bits = []
     if missing:
         bits.append("missing on screen: %s" % ", ".join(repr(m) for m in missing))
     if unexpected:
-        bits.append("should be absent but present: %s" % ", ".join(repr(u) for u in unexpected))
+        bits.append(
+            "should be absent but present: %s" % ", ".join(repr(u) for u in unexpected)
+        )
     return False, "FAIL: ui_expect — %s" % "; ".join(bits)
 
 
@@ -6735,16 +8658,27 @@ def tool_ui_test_run(steps, name=""):
         if len(sres) > 300:
             sres = sres[:300] + "…"
         detail = (" — %s" % sres) if ok else (" — %s" % sres)
-        lines.append("%2d. [%s] %s %s%s" % (
-            i, "PASS" if ok else "FAIL", tool,
-            _tool_desc_short(tool, args), detail))
+        lines.append(
+            "%2d. [%s] %s %s%s"
+            % (i, "PASS" if ok else "FAIL", tool, _tool_desc_short(tool, args), detail)
+        )
     total = len(steps)
-    verdict = "TEST PASSED (%d/%d)" % (passed, total) if passed == total \
+    verdict = (
+        "TEST PASSED (%d/%d)" % (passed, total)
+        if passed == total
         else "TEST FAILED (%d/%d)" % (passed, total)
+    )
     report = "ui_test_run %s: %s\n%s" % (name or "scenario", verdict, "\n".join(lines))
     with _AGENT_LOCK:
-        _UI_LAST_TEST.update({"ts": time.time(), "name": name or "",
-                              "passed": passed, "total": total, "report": report})
+        _UI_LAST_TEST.update(
+            {
+                "ts": time.time(),
+                "name": name or "",
+                "passed": passed,
+                "total": total,
+                "report": report,
+            }
+        )
     print("🧪 ui_test_run %s: %s" % (name or "", verdict))
     return passed == total, report
 
@@ -6767,8 +8701,13 @@ def _watchdog_alive():
         if not os.path.exists(ACE_HOST_PID):
             return False
         pid = int(open(ACE_HOST_PID).read().strip())
-        r = _run("tasklist /FI \"PID eq %d\"" % pid, shell=True,
-                           capture_output=True, text=True, timeout=30)
+        r = _run(
+            'tasklist /FI "PID eq %d"' % pid,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         return str(pid) in r.stdout
     except Exception:
         return False
@@ -6780,14 +8719,21 @@ def tool_restart(what="cdp"):
         if _watchdog_alive():
             with open(ACE_HOST_FLAG, "w") as f:
                 f.write("restart")
-            return True, ("ace_host.py watchdog (pid %s) will restart the server within ~3s; "
-                          "the API may drop briefly." % open(ACE_HOST_PID).read().strip())
-        return True, ("no watchdog running (ace_host.pid not found). Restart manually: "
-                      "`python ace_host.py` (auto-restarts on crash) or `python -u server.py`.")
+            return True, (
+                "ace_host.py watchdog (pid %s) will restart the server within ~3s; "
+                "the API may drop briefly." % open(ACE_HOST_PID).read().strip()
+            )
+        return True, (
+            "no watchdog running (ace_host.pid not found). Restart manually: "
+            "`python ace_host.py` (auto-restarts on crash) or `python -u server.py`."
+        )
     if w == "chrome":
         ok = d.restart_local_chrome()
-        return ok, ("local CDP chrome relaunched at http://127.0.0.1:9230"
-                    if ok else "failed to relaunch chrome")
+        return ok, (
+            "local CDP chrome relaunched at http://127.0.0.1:9230"
+            if ok
+            else "failed to relaunch chrome"
+        )
     if w == "cdp":
         old = d.status()[:160]
         sess = d._get_session(force=True)
@@ -6795,14 +8741,25 @@ def tool_restart(what="cdp"):
         return True, "cdp session reset. previous: %s\nnew target: %s" % (old, new)
     if w == "ollama":
         try:
-            rr = requests.get("http://localhost:11434/api/tags", timeout=3)
-            return True, "ollama is already running (%d models)" % len(rr.json().get("models", []))
+            s = requests.Session()
+            s.trust_env = False
+            r = s.get("http://127.0.0.1:11434/api/tags", timeout=5)
+            if r.status_code == 200:
+                models = r.json().get("models", [])
+                return True, "ollama is already running (%d models)" % len(models)
+            return False, "ollama responded with HTTP %s" % r.status_code
         except Exception:
             try:
-                _popen(["ollama", "serve"],
-                                 creationflags=subprocess.DETACHED_PROCESS | _NO_WINDOW,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return True, "ollama was down — started `ollama serve` detached. Wait ~5s then retry."
+                _popen(
+                    ["ollama", "serve"],
+                    creationflags=subprocess.DETACHED_PROCESS | _NO_WINDOW,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return (
+                    True,
+                    "ollama was down — started `ollama serve` detached. Wait ~5s then retry.",
+                )
             except Exception as e:
                 return False, "failed to start ollama: %s" % e
     return False, "usage: restart what=server|chrome|cdp|ollama"
@@ -6810,15 +8767,19 @@ def tool_restart(what="cdp"):
 
 # ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
 
+
 def tool_cdp_connect():
     ok, msg = d.connect_cmd()
     return ok, msg
 
+
 def tool_cdp_navigate(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
     if not url:
         return False, "usage: cdp_navigate <url>"
-    return d.navigate_url(url, wait=wait, wait_for=wait_for,
-                          timeout=timeout, idle_ms=idle_ms)
+    return d.navigate_url(
+        url, wait=wait, wait_for=wait_for, timeout=timeout, idle_ms=idle_ms
+    )
+
 
 # jQuery pseudo-selectors and helpers that look like CSS/JS but are not valid in
 # querySelector. The model reaches for these when it wants "the element whose
@@ -6827,23 +8788,21 @@ def tool_cdp_navigate(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
 # :has() IS valid CSS but is frequently written the jQuery way, and :eq()/:first
 # are jQuery extensions, so all of them are worth naming back to the model.
 _JQUERY_ONLY_RE = re.compile(
-    r':contains\s*\('
-    r'|:eq\s*\('
-    r'|:gt\s*\('
-    r'|:lt\s*\('
+    r":contains\s*\(" r"|:eq\s*\(" r"|:gt\s*\(" r"|:lt\s*\("
     # :even/:odd/:first/:last take no parentheses in jQuery, unlike the
     # positional ones above, so anchoring them on "(" would miss "tr:even".
-    r'|:even\b'
-    r'|:odd\b'
-    r'|:first\b(?!-child)'
-    r'|:last\b(?!-child)'
-    r'|\$\s*\('
-    r'|\bjquery\b',
-    re.IGNORECASE)
+    r"|:even\b"
+    r"|:odd\b"
+    r"|:first\b(?!-child)"
+    r"|:last\b(?!-child)"
+    r"|\$\s*\("
+    r"|\bjquery\b",
+    re.IGNORECASE,
+)
 
 # A case-insensitive attribute match is `[attr*="value" i]` - the flag goes last.
 # The model also writes it as `[attr i*="value"]`, which is a syntax error.
-_BAD_ATTR_FLAG_RE = re.compile(r'\[\s*[^\]\s]*\s+[a-zA-Z]\s*\*?=')
+_BAD_ATTR_FLAG_RE = re.compile(r"\[\s*[^\]\s]*\s+[a-zA-Z]\s*\*?=")
 
 
 def _js_selector_problem(expr):
@@ -6854,15 +8813,19 @@ def _js_selector_problem(expr):
     selector ten times, and any of these hits is a certain SyntaxError.
     """
     if _JQUERY_ONLY_RE.search(expr or ""):
-        return ("That expression uses a jQuery-only selector, which is not valid "
-                "CSS. querySelector supports standard CSS only. To match by text, "
-                "either iterate (Array.from(document.querySelectorAll('button'))"
-                ".find(b => b.textContent.trim() === 'Label')) or use "
-                "[value*='Login'] for a literal substring in an attribute.")
+        return (
+            "That expression uses a jQuery-only selector, which is not valid "
+            "CSS. querySelector supports standard CSS only. To match by text, "
+            "either iterate (Array.from(document.querySelectorAll('button'))"
+            ".find(b => b.textContent.trim() === 'Label')) or use "
+            "[value*='Login'] for a literal substring in an attribute."
+        )
     if _BAD_ATTR_FLAG_RE.search(expr or ""):
-        return ("That expression puts the case-insensitive flag in the wrong "
-                "place inside an attribute selector. The correct form is "
-                "[attr*='value' i] - the 'i' flag comes last, after the value.")
+        return (
+            "That expression puts the case-insensitive flag in the wrong "
+            "place inside an attribute selector. The correct form is "
+            "[attr*='value' i] - the 'i' flag comes last, after the value."
+        )
     return None
 
 
@@ -6874,19 +8837,26 @@ def tool_cdp_evaluate(expr):
         return False, problem
     return d.evaluate_js(expr)
 
+
 def tool_cdp_console_logs():
     return d.get_console_logs()
+
 
 def tool_cdp_dom_state():
     return d.get_dom_state()
 
+
 def tool_cdp_get_response_body(url_contains=None, filter_status=None, max_chars=4000):
-    return d.get_response_body(url_contains=url_contains,
-                               filter_status=filter_status, max_chars=max_chars)
+    return d.get_response_body(
+        url_contains=url_contains, filter_status=filter_status, max_chars=max_chars
+    )
+
 
 def tool_cdp_network_requests(filter_status=None, filter_url=None, limit=100):
-    return d.get_network_requests(filter_status=filter_status,
-                                  filter_url=filter_url, limit=limit)
+    return d.get_network_requests(
+        filter_status=filter_status, filter_url=filter_url, limit=limit
+    )
+
 
 def tool_cdp_status():
     return True, d.status()
@@ -6899,6 +8869,7 @@ import socket as _socket
 
 class _NoRedirectHandler(_urlreq.HTTPRedirectHandler):
     """Used when allow_redirects=False: stop following 3xx redirects."""
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
@@ -6925,22 +8896,37 @@ def tool_curl(url, method="GET", timeout=20, verify=True, allow_redirects=True):
     refused / timeout — which is the 'server reachable but no web service / port
     closed' signal ACEsi couldn't get from uiautomator alone."""
     if not url or not str(url).startswith(("http://", "https://")):
-        return False, "curl usage: url=<http://host or https://host/path> [method] [timeout]"
+        return (
+            False,
+            "curl usage: url=<http://host or https://host/path> [method] [timeout]",
+        )
     try:
-        req = _urlreq.Request(str(url), method=str(method).upper(),
-                              headers={"User-Agent": "Mozilla/5.0 (ACEsi curl)"})
+        req = _urlreq.Request(
+            str(url),
+            method=str(method).upper(),
+            headers={"User-Agent": "Mozilla/5.0 (ACEsi curl)"},
+        )
         try:
-            ctx = ssl.create_default_context() if verify else ssl._create_unverified_context()
+            ctx = (
+                ssl.create_default_context()
+                if verify
+                else ssl._create_unverified_context()
+            )
             handler = _urlreq.HTTPSHandler(context=ctx)
         except Exception:
             handler = _urlreq.HTTPSHandler()
         opener = _urlreq.build_opener(
-            handler, _urlreq.HTTPRedirectHandler() if allow_redirects else _NoRedirectHandler())
+            handler,
+            _urlreq.HTTPRedirectHandler() if allow_redirects else _NoRedirectHandler(),
+        )
         with opener.open(req, timeout=float(timeout)) as resp:
             data = resp.read(6000)
             ctype = resp.headers.get("Content-Type", "")
             return True, "HTTP %d | %s | %s" % (
-                resp.status, ctype.split(";")[0], _body_snippet(data, ctype))
+                resp.status,
+                ctype.split(";")[0],
+                _body_snippet(data, ctype),
+            )
     except _urlerr.HTTPError as e:
         return True, "HTTP %d (server responded) | %s" % (e.code, str(e)[:200])
     except _urlerr.URLError as e:
@@ -6957,7 +8943,10 @@ def tool_get_time():
     now = datetime.now()
     wk = (now + timedelta(days=7)).date().isoformat()
     return True, "Now: %s. Tomorrow: %s. One week out: %s." % (
-        now.strftime('%A, %d %B %Y, %I:%M %p'), (now + timedelta(days=1)).date().isoformat(), wk)
+        now.strftime("%A, %d %B %Y, %I:%M %p"),
+        (now + timedelta(days=1)).date().isoformat(),
+        wk,
+    )
 
 
 def _clean_result_url(href, title):
@@ -6967,6 +8956,7 @@ def _clean_result_url(href, title):
     URL so the links in drafts/summaries work."""
     import html as _html
     import urllib.parse as _uparse
+
     try:
         if "duckduckgo.com/l/?uddg=" in href:
             q = _uparse.urlsplit(href).query
@@ -6978,24 +8968,105 @@ def _clean_result_url(href, title):
     href = _html.unescape(href).strip()
     return "- %s\n  %s" % (title, href)
 
+
 def _decode_bing_redirect(href):
     """Decode Bing's redirect URL (ck/a links) to get the actual URL."""
     import urllib.parse as _up
+
     try:
         # Parse the redirect URL to extract the 'u' parameter
         parsed = _up.urlparse(href)
         params = _up.parse_qs(parsed.query)
-        if 'u' in params:
-            encoded = params['u'][0]
+        if "u" in params:
+            encoded = params["u"][0]
             # Strip the 2-char prefix (e.g., 'a1') then base64 decode
             if len(encoded) > 2:
                 encoded = encoded[2:]
                 import base64
-                encoded += '=' * (-len(encoded) % 4)
-                return base64.b64decode(encoded).decode('utf-8', 'replace')
+
+                encoded += "=" * (-len(encoded) % 4)
+                return base64.b64decode(encoded).decode("utf-8", "replace")
     except Exception:
         pass
     return href
+
+
+def _format_search_result(title, url, snippet):
+    """Force a clean, consistent format that the AI cannot mess up.
+
+    The AI was ignoring every prompt-level formatting rule and pasting raw
+    Tavily text verbatim ("-- Rates - Mabula..."). So the formatting now
+    happens in Python BEFORE the result reaches the model. The AI only ever
+    sees: Name: X | Location: Y | Snippet: Z
+
+    Location is ALWAYS extracted from the URL domain (e.g. trivago.com,
+    sa-venues.com, tripadvisor.com) — never left blank.
+
+    Garbage results (CLOSED, By Category, By Province, svg, footer menus) are
+    rejected and returned as None so the caller can skip them.
+    """
+    title = (title or "").strip()
+    url = (url or "").strip()
+    snippet = (snippet or "").strip()
+
+    # REJECT GARBAGE: competition pages, directory footers, closed listings,
+    # SVG icons, and other non-content results.
+    _garbage = re.compile(
+        r"\b(CLOSED|By Category|By Province|By Region|By Type|By Price|"
+        r"By Rating|By Star|footer|menu|cookie|privacy|terms of service|"
+        r"copyright|all rights reserved)\b|\.svg\b|\.css\b|\.js\b",
+        re.IGNORECASE,
+    )
+    combined = "%s %s %s" % (title, snippet, url)
+    if _garbage.search(combined):
+        print(f"[web_search] REJECTED garbage result: '{title[:80]}'")
+        return None
+
+    # --- Clean the snippet: strip HTML, decode URL encodings, collapse whitespace ---
+    snippet = re.sub(r"<[^>]+>", "", snippet)  # strip HTML tags
+    snippet = re.sub(r"%[0-9A-Fa-f]{2}", " ", snippet)  # decode %20 etc
+    snippet = re.sub(r"&[a-z]+;", " ", snippet)  # decode &amp; &nbsp;
+    snippet = re.sub(r"https?://\S+", "", snippet)  # strip URLs from snippet
+    snippet = re.sub(r"\s+", " ", snippet).strip()
+
+    # --- Extract Location from the URL domain (always present in Tavily) ---
+    # If the URL is missing, fall back to a generic location so the field is
+    # NEVER blank — the AI needs something to work with.
+    location = "Bela-Bela area"
+    if url:
+        try:
+            from urllib.parse import urlparse
+
+            host = urlparse(url).netloc.lower()
+            host = re.sub(r"^(www\.)?", "", host)  # strip www.
+            if host:
+                location = host
+        except Exception:
+            pass
+
+    title = title or "N/A"
+    snippet = snippet or "N/A"
+    if len(snippet) > 200:
+        snippet = snippet[:200].rsplit(" ", 1)[0] + "..."
+    # Clean paragraph format — no pipes, no raw HTML. The AI will webfetch
+    # each URL to extract the real Location, Price, and Amenities.
+    return "%s - Location: %s - Snippet: %s" % (title, location, snippet)
+
+
+def _clean_raw_search_text(text):
+    """Post-processing safety net: if the AI STILL outputs a messy list, this
+    regex-scrapes the 3 best names/prices out and rebuilds a clean list."""
+    if not text:
+        return text
+    # Already clean? Let it through.
+    if re.search(r"^Name:\s", text, re.MULTILINE):
+        return text
+    # Strip the leading "- -" Tavily artifacts and URLs
+    text = re.sub(r"https?://\S+", "", text)
+    text = re.sub(r"^\s*-+\s*-+\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\.\.\.", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 def _search_tavily(query, max_results, include_images=False):
@@ -7057,13 +9128,12 @@ def _search_tavily(query, max_results, include_images=False):
         title = r.get("title", "").strip()
         url = r.get("url", "").strip()
         snippet = (r.get("content") or "").strip()
-        if len(snippet) > 260:
-            snippet = snippet[:260] + "…"
-        if title and url:
-            line = "- %s\n  %s" % (title, url)
-            if snippet:
-                line += "\n  " + snippet.replace("\n", " ")
-            items.append(line)
+        # FORCE the clean format — the AI was pasting raw Tavily text verbatim.
+        # _format_search_result returns None for garbage (CLOSED, By Category,
+        # By Province, footer menus) so those results are skipped entirely.
+        formatted = _format_search_result(title, url, snippet)
+        if formatted:
+            items.append(formatted)
     return items
 
 
@@ -7076,10 +9146,12 @@ def _search_serper(query, max_results):
 
     api_key = "81456d3c3d5a16cabb4d76f78141fc94ea62634f"
     url = "https://google.serper.dev/search"
-    payload = json.dumps({
-        "q": query,
-        "num": int(max_results),
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "q": query,
+            "num": int(max_results),
+        }
+    ).encode("utf-8")
 
     req = _urlreq.Request(
         url,
@@ -7097,18 +9169,18 @@ def _search_serper(query, max_results):
     # Google's Knowledge Graph answer box gives a one-line answer when one exists.
     kg = data.get("knowledgeGraph") or {}
     if kg.get("title") and kg.get("description"):
-        items.append("KNOWLEDGE: %s — %s" % (kg.get("title"), str(kg.get("description"))[:300]))
+        items.append(
+            "KNOWLEDGE: %s — %s" % (kg.get("title"), str(kg.get("description"))[:300])
+        )
     for r in data.get("organic", [])[:max_results]:
         title = r.get("title", "").strip()
         url = r.get("link", "").strip()
         snippet = (r.get("snippet") or "").strip()
-        if len(snippet) > 260:
-            snippet = snippet[:260] + "…"
-        if title and url:
-            line = "- %s\n  %s" % (title, url)
-            if snippet:
-                line += "\n  " + snippet.replace("\n", " ")
-            items.append(line)
+        # FORCE the clean format — the AI was pasting raw Serper text verbatim.
+        # _format_search_result returns None for garbage results.
+        formatted = _format_search_result(title, url, snippet)
+        if formatted:
+            items.append(formatted)
     return items
 
 
@@ -7126,14 +9198,18 @@ def _search_duckduckgo(query, max_results):
 
     items = []
     for m in _re.finditer(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, _re.S):
-        href, title = m.group(1), _re.sub(r'<[^>]+>', '', m.group(2)).strip()
+        href, title = m.group(1), _re.sub(r"<[^>]+>", "", m.group(2)).strip()
         if not title or not href:
             continue
         if href.startswith("//"):
             href = "https:" + href
         elif href.startswith("/"):
             href = "https://lite.duckduckgo.com" + href
-        items.append("- %s\n  %s" % (title, href))
+        # FORCE the clean format — the AI was pasting raw DDG text verbatim.
+        # _format_search_result returns None for garbage results.
+        formatted = _format_search_result(title, href, "")
+        if formatted:
+            items.append(formatted)
         if len(items) >= int(max_results):
             break
     return items
@@ -7148,25 +9224,95 @@ def _search_bing(query, max_results):
 
     q = _up.quote_plus(str(query).strip())
     url = "https://www.bing.com/search?q=" + q + "&setlang=en-US"
-    req = _urlreq.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    })
+    req = _urlreq.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        },
+    )
     with _urlreq.urlopen(req, timeout=20) as resp:
         html = resp.read(200000).decode("utf-8", "replace")
 
     items = []
-    for m in _re.finditer(r'<li class="b_algo"[^>]*>.*?<h2[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, _re.S | _re.I):
-        href, title = m.group(1), _re.sub(r'<[^>]+>', '', m.group(2)).strip()
+    for m in _re.finditer(
+        r'<li class="b_algo"[^>]*>.*?<h2[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+        html,
+        _re.S | _re.I,
+    ):
+        href, title = m.group(1), _re.sub(r"<[^>]+>", "", m.group(2)).strip()
         if not title or not href or href.startswith("javascript:"):
             continue
         if "/ck/a?" in href or href.startswith("/ck/a?"):
             href = _decode_bing_redirect(href)
-        items.append("- %s\n  %s" % (title, href))
+        # FORCE the clean format — the AI was pasting raw Bing text verbatim.
+        # _format_search_result returns None for garbage results.
+        formatted = _format_search_result(title, href, "")
+        if formatted:
+            items.append(formatted)
         if len(items) >= int(max_results):
             break
     return items
+
+
+def _clean_search_result(text, max_chars=2000):
+    """Strip HTML tags, URLs, and whitespace from a search result, then
+    truncate to a safe length so the model cannot echo raw URLs or HTML."""
+    if not text:
+        return ""
+    # Strip HTML tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # Strip URLs (http/https and bare domains) so the model has nothing to echo
+    text = re.sub(r"https?://\S+", "", text)
+    text = re.sub(
+        r"\b(?:www\.)?\S+\.(?:com|net|org|co|za|io|uk|us|info|biz)\b\S*", "", text
+    )
+    # Collapse whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+    # Truncate
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0] + "..."
+    return text
+
+
+def _fetch_raw_tavily(query, max_results):
+    """Fetch the raw Tavily response as a debug string when fewer than 3 clean
+    results were returned, so Chris can see what the search engine actually
+    found instead of getting an empty or short list."""
+    try:
+        import urllib.request as _urlreq
+        import json
+
+        api_key = os.environ.get("TAVILY_API_KEY") or _LK.get("tavily", "")
+        if not api_key:
+            return ""
+        body = {
+            "api_key": api_key,
+            "query": query,
+            "max_results": int(max_results),
+            "search_depth": "basic",
+            "include_answer": False,
+            "include_raw_content": False,
+        }
+        payload = json.dumps(body).encode("utf-8")
+        req = _urlreq.Request(
+            "https://api.tavily.com/search",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with _urlreq.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        lines = []
+        for r in data.get("results", []):
+            lines.append("URL: %s" % r.get("url", ""))
+            lines.append("TITLE: %s" % r.get("title", ""))
+            lines.append("CONTENT: %s" % (r.get("content") or "")[:500])
+            lines.append("")
+        return "\n".join(lines)
+    except Exception as e:
+        return "raw fetch failed: %s" % e
 
 
 def tool_web_search(query, max_results=6):
@@ -7181,11 +9327,34 @@ def tool_web_search(query, max_results=6):
         return False, "web_search usage: query=<search text>"
 
     q = str(query).strip()
+    # Force the query to target South African B&Bs so it doesn't return
+    # global junk. Appending "South Africa bed and breakfast" surfaces actual
+    # local accommodation listings with real domains (sa-venues.com,
+    # tripadvisor.com, trivago.com, etc.).
+    _enhanced = q.rstrip(".").strip()
+    if not re.search(
+        r"\b(south\s*africa|south\s*african|johannesburg|pretoria|"
+        r"cape\s*town|durban|bloemfontein|mabula|waterberg|"
+        r"mpumalanga|gauteng|kwazulu-natal|western\s*cape|"
+        r"limpopo|north\s*west|eastern\s*cape|nelspruit|"
+        r"belabela|warmbaths)\b",
+        _enhanced,
+        re.IGNORECASE,
+    ):
+        _enhanced = _enhanced + " South Africa bed and breakfast"
+        print(f"[web_search] Enhanced query: '{q}' → '{_enhanced}'")
+    q = _enhanced
+
     # Ask for real image URLs when the query is about seeing something. Without
     # this the model has to guess an image path from page URLs, and guesses 404.
-    want_images = bool(re.search(
-        r'\b(picture|photo|image|images|pic|pics|portrait|logo|poster|'
-        r'illustration|drawing|artwork|wallpaper|headshot)\b', q, re.IGNORECASE))
+    want_images = bool(
+        re.search(
+            r"\b(picture|photo|image|images|pic|pics|portrait|logo|poster|"
+            r"illustration|drawing|artwork|wallpaper|headshot)\b",
+            q,
+            re.IGNORECASE,
+        )
+    )
     providers = [
         ("Tavily", lambda: _search_tavily(q, max_results, include_images=want_images)),
         ("Serper", lambda: _search_serper(q, max_results)),
@@ -7198,9 +9367,17 @@ def tool_web_search(query, max_results=6):
             print(f"[web_search] Trying {name}...")
             items = search_fn()
             if items:
+                # If we got fewer than 3 clean results, append the raw Tavily
+                # URL + content so Chris can see what the search engine found.
+                if len(items) < 3 and name == "Tavily":
+                    raw = _fetch_raw_tavily(q, max_results)
+                    if raw:
+                        items.append("\n--- RAW TAVILY (debug) ---\n" + raw)
+                # Clean and truncate every result before returning
+                items = [_clean_search_result(item) for item in items]
                 result = "\n".join(items)
                 print(f"[web_search] SUCCESS via {name} ({len(items)} results)")
-                return True, "[provider: %s]\n%s" % (name, result)
+                return True, result
             else:
                 print(f"[web_search] {name} returned no results")
         except Exception as e:
@@ -7217,10 +9394,13 @@ def tool_webfetch(url, format="markdown"):
         return False, "webfetch usage: url=<http(s)://...>"
     try:
         from webfetch_impl import fetch_url
+
         return True, fetch_url(str(url), fmt=format)
     except ImportError:
         pass
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     for attempt in range(3):
         try:
             req = _urlreq.Request(str(url), method="GET", headers=headers)
@@ -7232,16 +9412,17 @@ def tool_webfetch(url, format="markdown"):
                 return True, data.decode("utf-8", "replace")
             else:
                 import html as _html
+
                 raw = data.decode("utf-8", "replace")
                 text = _html.unescape(raw)
-                text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.S)
-                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.S)
-                text = re.sub(r'<[^>]+>', ' ', text)
-                text = re.sub(r'\s+', ' ', text).strip()
+                text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.S)
+                text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.S)
+                text = re.sub(r"<[^>]+>", " ", text)
+                text = re.sub(r"\s+", " ", text).strip()
                 return True, text[:8000]
         except Exception as e:
             if attempt < 2:
-                time.sleep(2 * (2 ** attempt))
+                time.sleep(2 * (2**attempt))
             else:
                 return False, "webfetch failed after 3 retries: %s" % str(e)[:160]
 
@@ -7251,19 +9432,32 @@ def tool_weather(city="Thohoyandou"):
     (optional, default Thohoyandou)."""
     try:
         import urllib.parse as _up
-        _geo = ("https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1" % _up.quote_plus(str(city)))
-        gp = json.loads(_urlreq.urlopen(_geo, timeout=15).read().decode("utf-8", "replace"))
+
+        _geo = (
+            "https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1"
+            % _up.quote_plus(str(city))
+        )
+        gp = json.loads(
+            _urlreq.urlopen(_geo, timeout=15).read().decode("utf-8", "replace")
+        )
         results = gp.get("results") or []
         if not results:
             return False, "weather: no city matched '%s'" % city
         r0 = results[0]
-        wurl = ("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current_weather=true" %
-                (r0["latitude"], r0["longitude"]))
-        wj = json.loads(_urlreq.urlopen(wurl, timeout=15).read().decode("utf-8", "replace"))
+        wurl = (
+            "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current_weather=true"
+            % (r0["latitude"], r0["longitude"])
+        )
+        wj = json.loads(
+            _urlreq.urlopen(wurl, timeout=15).read().decode("utf-8", "replace")
+        )
         cw = wj.get("current_weather") or {}
         return True, "Weather in %s: %.0f°C, wind %.0f km/h, %s" % (
-            r0.get("name", city), cw.get("temperature", 0), cw.get("windspeed", 0),
-            cw.get("weathercode", "?"))
+            r0.get("name", city),
+            cw.get("temperature", 0),
+            cw.get("windspeed", 0),
+            cw.get("weathercode", "?"),
+        )
     except Exception as e:
         return False, "weather failed: %s" % str(e)[:160]
 
@@ -7274,19 +9468,22 @@ def tool_note(text):
     if not text or not str(text).strip():
         return False, "note usage: text=<what to remember>"
     with _data_lock:
-        notes = load_json('notes.json', []).get('notes', [])
+        notes = load_json("notes.json", []).get("notes", [])
         notes.append({"ts": datetime.now().isoformat(), "text": str(text)[:500]})
-        save_json('notes.json', {'notes': notes[-200:]})
+        save_json("notes.json", {"notes": notes[-200:]})
     return True, "note saved (%d notes)" % len(notes)
 
 
-TODO_FILE = 'todo.json'
+TODO_FILE = "todo.json"
 
 
 def tool_todo_add(text, priority="medium", category="general"):
     """Add a task to the shared to-do list. Args: text (REQUIRED, task description), priority (optional: high/medium/low, default medium), category (optional: default general)."""
     if not text or not str(text).strip():
-        return False, "todo_add usage: text=<task description> [priority=high|medium|low] [category=name]"
+        return (
+            False,
+            "todo_add usage: text=<task description> [priority=high|medium|low] [category=name]",
+        )
     with _data_lock:
         todos = load_json(TODO_FILE, {}).get("items", [])
         # max(existing)+1, not len()+1: after removing id 2 from [1,2,3] the
@@ -7298,13 +9495,25 @@ def tool_todo_add(text, priority="medium", category="general"):
                 next_id = max(next_id, int(t.get("id", 0)) + 1)
             except (TypeError, ValueError):
                 continue
-        item = {"id": next_id, "text": str(text).strip()[:300],
-                "priority": str(priority).lower() if str(priority).lower() in ("high", "medium", "low") else "medium",
-                "category": str(category).strip()[:100] or "general",
-                "done": False, "created": datetime.now().isoformat()}
+        item = {
+            "id": next_id,
+            "text": str(text).strip()[:300],
+            "priority": (
+                str(priority).lower()
+                if str(priority).lower() in ("high", "medium", "low")
+                else "medium"
+            ),
+            "category": str(category).strip()[:100] or "general",
+            "done": False,
+            "created": datetime.now().isoformat(),
+        }
         todos.append(item)
         save_json(TODO_FILE, {"items": todos})
-    return True, "todo_add: '%s' (id=%d, priority=%s)" % (str(text).strip()[:80], item["id"], item["priority"])
+    return True, "todo_add: '%s' (id=%d, priority=%s)" % (
+        str(text).strip()[:80],
+        item["id"],
+        item["priority"],
+    )
 
 
 def tool_todo_list(category=None, done=False):
@@ -7321,7 +9530,10 @@ def tool_todo_list(category=None, done=False):
     for t in todos:
         mark = "✅" if t.get("done") else "⬜"
         pri = t.get("priority", "medium")
-        lines.append("%s [#%d] (%s/%s) %s" % (mark, t["id"], pri, t.get("category", "general"), t["text"]))
+        lines.append(
+            "%s [#%d] (%s/%s) %s"
+            % (mark, t["id"], pri, t.get("category", "general"), t["text"])
+        )
     return True, "To-do list:\n" + "\n".join(lines)
 
 
@@ -7337,7 +9549,10 @@ def tool_todo_done(task_id):
             if t["id"] == task_id:
                 t["done"] = True
                 save_json(TODO_FILE, {"items": todos})
-                return True, "todo_done: [#%d] marked done — %s" % (task_id, t["text"][:80])
+                return True, "todo_done: [#%d] marked done — %s" % (
+                    task_id,
+                    t["text"][:80],
+                )
         save_json(TODO_FILE, {"items": todos})
     return False, "todo_done: no task with id %d" % task_id
 
@@ -7365,8 +9580,14 @@ def tool_notify(title="ACEsi", message="Ping from ACEsi"):
     if not message or not str(message).strip():
         return False, "notify usage: message=<text> [title=<title>]"
     ok = send_ntfy(str(title), str(message))
-    return (True, f"Notified '{title}': {str(message)[:80]}" if ok
-            else (False, "ntfy push failed (check internet / ntfy app subscription)"))
+    return (
+        True,
+        (
+            f"Notified '{title}': {str(message)[:80]}"
+            if ok
+            else (False, "ntfy push failed (check internet / ntfy app subscription)")
+        ),
+    )
 
 
 def tool_check_email(force_all=True):
@@ -7413,10 +9634,1462 @@ def tool_list_email_rules():
         return True, "No email rules enabled."
     lines = []
     for r in rules:
-        lines.append("- %s [%s] from=%r subject=%r body=%r" % (
-            r.get("name") or "(unnamed)", r.get("account") or "both",
-            r.get("from") or "", r.get("subject") or "", r.get("body") or ""))
+        lines.append(
+            "- %s [%s] from=%r subject=%r body=%r"
+            % (
+                r.get("name") or "(unnamed)",
+                r.get("account") or "both",
+                r.get("from") or "",
+                r.get("subject") or "",
+                r.get("body") or "",
+            )
+        )
     return True, "\n".join(lines)
+
+
+def tool_get_distance(origin, destination):
+    """Calculate driving distance and time between two locations using the
+    free OSRM routing API (no key required). Args: origin, destination.
+    Returns distance in km and estimated driving time."""
+    import urllib.request as _urlreq
+    import urllib.parse as _up
+    import json
+
+    if not origin or not destination:
+        return False, "get_distance usage: origin=<place>, destination=<place>"
+
+    # OSRM demo server (free, no API key). Uses lat,lng coordinates; geocoding
+    # is done via Nominatim (also free) so the user can pass place names.
+    def _geocode(place):
+        q = _up.quote(str(place))
+        url = "https://nominatim.openstreetmap.org/search?q=%s&format=json&limit=1" % q
+        req = _urlreq.Request(url, headers={"User-Agent": "ACEsi/1.0"})
+        with _urlreq.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if not data:
+            return None
+        return float(data[0]["lat"]), float(data[0]["lon"])
+
+    try:
+        a = _geocode(origin)
+        b = _geocode(destination)
+        if not a or not b:
+            return False, "get_distance: could not geocode one of the locations"
+        coords = "%f,%f;%f,%f" % (a[1], a[0], b[1], b[0])
+        url = (
+            "https://router.project-osrm.org/route/v1/driving/%s?overview=false"
+            % coords
+        )
+        req = _urlreq.Request(url, headers={"User-Agent": "ACEsi/1.0"})
+        with _urlreq.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("code") != "Ok" or not data.get("routes"):
+            return False, "get_distance: no route found"
+        route = data["routes"][0]
+        distance_km = round(route["distance"] / 1000, 1)
+        duration_min = round(route["duration"] / 60, 0)
+        return True, (
+            "Distance: %s km | Duration: %s minutes (driving) | "
+            "From: %s | To: %s" % (distance_km, duration_min, origin, destination)
+        )
+    except Exception as e:
+        return False, "get_distance failed: %s" % str(e)[:200]
+
+
+# Native OpenAI-compatible tool schema. Sent to the provider so the model can
+# emit structured tool_calls (the reason ACEsi stalled is that this was never
+# passed before — the model had no tool-calling signal and emitted prose only).
+TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List files/dirs in a directory. Args: path (dir to list).",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read a file's contents. Args: path.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_user_files",
+            "description": "List files/dirs on Chris's PC. Paths can be 'Documents', 'My Pictures', 'Desktop', 'Downloads' or any folder on the machine. Args: path (dir to list).",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_user_file",
+            "description": "Read a file's content from anywhere on Chris's PC (any folder: Documents, Pictures, Desktop, Downloads, etc). Accepts a full path or a bare filename. Args: path.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "view_user_file",
+            "description": "VIEW a file from Chris's PC inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Accepts a full path or a bare filename. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_user_file",
+            "description": "LAUNCH a file EXTERNALLY with the system default application (Windows Photos, browser, etc.). Use ONLY when the user explicitly says 'open externally', 'launch in default app', or 'open outside ACEsi'. For normal 'show me the file' or 'open the file' in a browsing context, use view_user_file instead. Args: path.",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "view_web_image",
+            "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet (e.g. 'get me a picture of X', 'show me an image of Y'). The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Always call this after web_search/webfetch finds an image URL. Args: url.",
+            "parameters": {
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "grep",
+            "description": "Regex search file contents. Args: pattern, path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string"},
+                    "path": {"type": "string"},
+                },
+                "required": ["pattern", "path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Create/overwrite a file. Args: path, content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_in_vscode",
+            "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_file",
+            "description": "Surgical exact-match edit; old must match exactly once. Args: path, old, new.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "old": {"type": "string"},
+                    "new": {"type": "string"},
+                },
+                "required": ["path", "old", "new"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": "Run a shell command and return stdout/stderr. Args: command.",
+            "parameters": {
+                "type": "object",
+                "properties": {"command": {"type": "string"}},
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_status",
+            "description": "Short git status incl. current branch. Args: none.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_log",
+            "description": "Recent commit log. Args: n (optional, default 10, max 50).",
+            "parameters": {
+                "type": "object",
+                "properties": {"n": {"type": "integer"}},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_commit",
+            "description": "Stage changes and commit as ACEsi. Args: message (commit message), files (optional, list of paths to stage instead of git add -A).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "files": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["message"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_branch",
+            "description": "List branches, or create+switch to a new branch when create=true. Args: name, create (bool, optional).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "create": {"type": "boolean"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_merge",
+            "description": "Merge an existing local branch into the current branch. Reports conflicts if any (resolve with edit_file then git_commit). Args: branch.",
+            "parameters": {
+                "type": "object",
+                "properties": {"branch": {"type": "string"}},
+                "required": ["branch"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "build_apk",
+            "description": "Build an Android APK with flutter build apk --release (default) or --debug. Returns the artifact path. Args: mode (optional).",
+            "parameters": {
+                "type": "object",
+                "properties": {"mode": {"type": "string"}},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pub_add",
+            "description": "Add a dependency via `flutter pub add <package>` (updates pubspec.yaml + pub get). Args: package (e.g. 'http:^1.2.0').",
+            "parameters": {
+                "type": "object",
+                "properties": {"package": {"type": "string"}},
+                "required": ["package"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pub_remove",
+            "description": "Remove a dependency via `flutter pub remove <package>`. Args: package.",
+            "parameters": {
+                "type": "object",
+                "properties": {"package": {"type": "string"}},
+                "required": ["package"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pub_upgrade",
+            "description": "Upgrade all dependencies via `flutter pub upgrade`. Args: none.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flutter_test",
+            "description": "Run the Flutter test suite. Args: path (optional, test file/dir to run).",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flutter_analyze",
+            "description": "Static analysis via `flutter analyze`. Args: none.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    #     {"type": "function", "function": {"name": "ui_device",
+    #         "description": "Report the connected Android device: device id, screen size, density, foreground app, and whether it is USB or TCP/IP. If no device is connected this FAILS and explains whether it is a cable, driver, or authorization problem. Args: none.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_connect",
+    #         "description": "Connect to an Android device. Call this FIRST for any 'connect to my phone' task. If a device is already online it reports device id, screen size, foreground app and transport. Otherwise it looks for a wireless-debugging (mDNS) target and runs 'adb connect', then reports the exact adb error and a diagnosis. Args: target (optional host:port to connect to), wait (optional seconds per attempt).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "target": {"type": "string", "title": "target",
+    #                        "description": "OPTIONAL. host:port to connect to, e.g. 192.168.0.100:5555. Omit to auto-discover via mDNS."},
+    #             "wait": {"type": "integer", "title": "wait",
+    #                      "description": "OPTIONAL. Seconds to allow each adb connect attempt. Default 10."}},
+    #             "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_app_open",
+    #         "description": "Launch the StudentSyncSA app on the connected device. Args: none.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_tap",
+    #         "description": "Tap the screen at a pixel coordinate. Call ui_device FIRST to learn the screen size (e.g. 1080x2412). REQUIRED arguments: x (horizontal pixel from left edge), y (vertical pixel from top edge). Both must be integer pixel values, never null, never strings.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "x": {"type": "integer", "title": "x", "description": "REQUIRED. Horizontal pixel coordinate from the LEFT edge of the screen. Integer, e.g. 540 on a 1080-wide screen."},
+    #             "y": {"type": "integer", "title": "y", "description": "REQUIRED. Vertical pixel coordinate from the TOP edge of the screen. Integer, e.g. 1200 on a 2412-tall screen."}},
+    #             "required": ["x", "y"]}}},
+    #     {"type": "function", "function": {"name": "ui_swipe",
+    #         "description": "Swipe (scroll/gesture) from a start pixel (x1,y1) to an end pixel (x2,y2). REQUIRED: x1, y1, x2, y2 (integer pixels). OPTIONAL: duration (integer ms, default 200). For a downward scroll use a larger y2 than y1.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "x1": {"type": "integer", "title": "x1", "description": "REQUIRED. Start horizontal pixel coordinate from the LEFT edge."},
+    #             "y1": {"type": "integer", "title": "y1", "description": "REQUIRED. Start vertical pixel coordinate from the TOP edge."},
+    #             "x2": {"type": "integer", "title": "x2", "description": "REQUIRED. End horizontal pixel coordinate from the LEFT edge."},
+    #             "y2": {"type": "integer", "title": "y2", "description": "REQUIRED. End vertical pixel coordinate from the TOP edge."},
+    #             "duration": {"type": "integer", "title": "duration", "description": "OPTIONAL. Gesture duration in milliseconds. Default 200."}},
+    #             "required": ["x1", "y1", "x2", "y2"]}}},
+    #     {"type": "function", "function": {"name": "ui_type",
+    #         "description": "Type a text string into the currently focused input field on the device. REQUIRED argument: text (the exact characters to type; spaces are sent as %s). Never null.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "text": {"type": "string", "title": "text", "description": "REQUIRED. The exact text to type, e.g. \"john@school.edu\". Never null or empty."}},
+    #             "required": ["text"]}}},
+    #     {"type": "function", "function": {"name": "ui_key",
+    #         "description": "Send a single key event to the device. REQUIRED argument: key. Allowed values: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric Android keyevent code (e.g. 4 = BACK).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "key": {"type": "string", "title": "key", "description": "REQUIRED. One of: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric keyevent code. Never null."}},
+    #             "required": ["key"]}}},
+    #     {"type": "function", "function": {"name": "ui_dump",
+    #         "description": "Dump the on-screen UI accessibility hierarchy (all visible text, buttons, bounds). Use this to VERIFY what is actually on screen after taps/navigation. No arguments required.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_screenshot",
+    #         "description": "Capture the current screen. By DEFAULT the image is NOT written to disk — it is buffered in memory and shown to Chris in a popup. Only set save=true when Chris explicitly asks to save/keep the screenshot as a file. If you later want it saved, call again with save=true. NOTE: you cannot view images — use ui_dump to read the screen. OPTIONAL arguments: name (string used in the filename when saved), save (boolean).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot when save=true, e.g. \"login\". Omit or null to auto-name."},
+    #             "save": {"type": "boolean", "title": "save", "description": "OPTIONAL. Defaults to false. Set true ONLY when Chris asked to keep the screenshot as a file. Must be boolean true, not a string."}},
+    #             "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_assert_text",
+    #         "description": "UI VALIDATION: assert whether text exists on screen (case-insensitive substring of any visible text/content-desc). REQUIRED: text (the string to look for). OPTIONAL: present (boolean, default true; set false to assert the text is ABSENT). Returns PASS when the assertion holds, FAIL with a label list otherwise.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "text": {"type": "string", "title": "text", "description": "REQUIRED. Text to search the live screen for, e.g. \"Welcome\"."},
+    #             "present": {"type": "boolean", "title": "present", "description": "OPTIONAL. true = assert text exists (default), false = assert text does NOT exist."}},
+    #             "required": ["text"]}}},
+    #     {"type": "function", "function": {"name": "ui_assert_element",
+    #         "description": "UI VALIDATION: assert whether an element with the given properties exists in the accessibility tree (NOT that it is visible/on-screen — use ui_assert_visible for that). OPTIONAL AND COMBINABLE filters: resource_id (exact resource-id), text (case-insensitive substring of text OR content-desc), desc (exact content-desc), cls (substring of class, e.g. Button). OPTIONAL: present (default true; false asserts the element is ABSENT). Provide at least one filter.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id, e.g. \"com.studentsyncsa:id/btn_login\"."},
+    #             "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
+    #             "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
+    #             "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."},
+    #             "present": {"type": "boolean", "description": "OPTIONAL. true = assert present (default), false = assert absent."}},
+    #             "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_assert_visible",
+    #         "description": "UI VALIDATION: assert whether a matching element is actually VISIBLE and interactable on screen (on-screen bounds, visible-to-user, enabled). OPTIONAL AND COMBINABLE filters: resource_id, text, desc, cls (same semantics as ui_assert_element). Provide at least one filter.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id."},
+    #             "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
+    #             "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
+    #             "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."}},
+    #             "required": []}}},
+    #     {"type": "function", "function": {"name": "ui_expect",
+    #         "description": "UI VALIDATION: compare the current ui_dump against an expected screen state. REQUIRED: expected — either a JSON object {\"present\": [labels that must be on screen], \"absent\": [labels that must be absent]} or a plain string whose lines/commas are fragments that must all be present. Returns PASS/FAIL with the specific missing/unexpected fragments.",
+    #         "parameters": {"type": "object", "properties": {
+    #             "expected": {"type": "string", "title": "expected", "description": "REQUIRED. Expected state — JSON {present:[...],absent:[...]} or plain text fragments."}},
+    #             "required": ["expected"]}}},
+    #     {"type": "function", "function": {"name": "ui_test_run",
+    #         "description": "UI VALIDATION HARNESS: run a scripted sequence of UI actions + assertions and report PASS/FAIL. REQUIRED: steps — a JSON list of {\"tool\": \"ui_tap\", \"args\": {...}} entries (any ui_* action or ui_assert_* tool). Each step is judged by the tool's ok flag; concludes 'TEST PASSED (n/total)' or 'TEST FAILED'. OPTIONAL: name (string label for the report).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "steps": {"type": "string", "title": "steps", "description": "REQUIRED. JSON list of {tool, args} step objects, e.g. [{\"tool\":\"ui_app_open\",\"args\":{}},{\"tool\":\"ui_assert_text\",\"args\":{\"text\":\"Login\"}}]."},
+    #             "name": {"type": "string", "title": "name", "description": "OPTIONAL. Test/scenario name shown in the report."}},
+    #             "required": ["steps"]}}},
+    {
+        "type": "function",
+        "function": {
+            "name": "restart",
+            "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
+            "parameters": {
+                "type": "object",
+                "properties": {"what": {"type": "string"}},
+                "required": [],
+            },
+        },
+    },
+    # DISABLED CDP TOOLS (commented out to prevent browser loops)
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_connect",
+    #         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []},
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_navigate",
+    #         "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait for the page. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://), wait (default true; false returns immediately without waiting), wait_for ('load' = readyState complete, default; 'network_idle' = also wait until no request is in flight and nothing has hit the wire for idle_ms - USE THIS when the page has background polling and the request you care about may be a late XHR), timeout (default 30s, caps the wait), idle_ms (default 500). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "url": {
+    #                     "type": "string",
+    #                     "title": "url",
+    #                     "description": "REQUIRED. Full URL, or a bare host such as example.com",
+    #                 },
+    #                 "wait": {
+    #                     "type": "boolean",
+    #                     "description": "Wait for the page before returning. Default true.",
+    #                     "default": True,
+    #                 },
+    #                 "wait_for": {
+    #                     "type": "string",
+    #                     "enum": ["load", "network_idle"],
+    #                     "description": "'load' waits for readyState=complete. 'network_idle' additionally waits for the network to fall quiet, which catches late background XHRs. Default 'load'.",
+    #                     "default": "load",
+    #                 },
+    #                 "timeout": {
+    #                     "type": "number",
+    #                     "description": "Maximum seconds to wait, so a page that polls forever cannot hang. Default 30.",
+    #                     "default": 30,
+    #                 },
+    #                 "idle_ms": {
+    #                     "type": "number",
+    #                     "description": "Milliseconds of network silence required by wait_for='network_idle'. Default 500.",
+    #                     "default": 500,
+    #                 },
+    #             },
+    #             "required": ["url"],
+    #         },
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_evaluate",
+    #         "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its value. Use it to click links or read page data, e.g. cdp_evaluate(\"document.querySelector('a').click()\"). Objects/arrays come back as readable JSON, plain strings unquoted. Args: expr.",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {"expr": {"type": "string"}},
+    #             "required": ["expr"],
+    #         },
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_console_logs",
+    #         "description": "Return buffered console.log/console.error events captured by CDP since the connect. Args: none.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []},
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_dom_state",
+    #         "description": "Snapshot the current DOM via CDP: page title, URL, and a slice of documentElement.outerHTML.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []},
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_get_response_body",
+    #         "description": "Fetch the body of a request already seen by cdp_network_requests, via CDP. Use it right after the request happens - Chrome evicts a response body once the page navigates, and this then says so rather than returning empty. Args: url_contains (substring of the URL, identifies which request), filter_status (e.g. 404), max_chars (default 4000).",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "url_contains": {
+    #                     "type": "string",
+    #                     "description": "Substring identifying which request's body to read, e.g. /authenticate",
+    #                 },
+    #                 "filter_status": {
+    #                     "type": "string",
+    #                     "description": "Only consider requests with this status.",
+    #                 },
+    #                 "max_chars": {
+    #                     "type": "number",
+    #                     "description": "Truncate the body to this many characters. Default 4000.",
+    #                     "default": 4000,
+    #                 },
+    #             },
+    #             "required": [],
+    #         },
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_network_requests",
+    #         "description": "Return network request events captured by CDP (requestWillBeSent / responseReceived / loadingFinished / loadingFailed), with response headers and POST data. FILTER SERVER-SIDE on a busy page instead of pulling every request: filter_status (exact 404, a class like '4xx'/'5xx', or a list '404,500'), filter_url (case-insensitive substring), limit (default 100, returns the most recent matches). Redirect hops are kept separately, so a POST that answers 303 still shows up. A request still in flight shows as 'pending' and one that never got a response as 'failed:<reason>', so an absent status is never ambiguous.",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "filter_status": {
+    #                     "type": "string",
+    #                     "description": "Only return requests with this status. Accepts 404, a class like '4xx', or a comma list '404,500'.",
+    #                 },
+    #                 "filter_url": {
+    #                     "type": "string",
+    #                     "description": "Only return requests whose URL contains this text (case-insensitive).",
+    #                 },
+    #                 "limit": {
+    #                     "type": "number",
+    #                     "description": "Maximum entries to return, most recent first. Default 100.",
+    #                     "default": 100,
+    #                 },
+    #             },
+    #             "required": [],
+    #         },
+    #     },
+    # },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "cdp_status",
+    #         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
+    #         "parameters": {"type": "object", "properties": {}, "required": []},
+    #     },
+    # },
+    {
+        "type": "function",
+        "function": {
+            "name": "curl",
+            "description": "Hit a URL like a browser and return the HTTP status + a body snippet. Use this to confirm whether a network service (e.g. an ITS portal) is UP before blaming on-device code. Args: url (REQUIRED, http(s)://...), method (optional, default GET), timeout (optional int seconds, default 20), verify (optional bool, default true), allow_redirects (optional bool, default true). Returns ok=True even on 4xx/5xx (a server responded); ok=False only on DNS failure / connection refused / timeout = the 'no web service / port closed' signal.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "title": "url",
+                        "description": "REQUIRED. Full URL starting with http:// or https://.",
+                    },
+                    "method": {
+                        "type": "string",
+                        "title": "method",
+                        "description": "Optional. HTTP method, default GET.",
+                        "default": "GET",
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "title": "timeout",
+                        "description": "Optional. Seconds to wait, default 20.",
+                        "default": 20,
+                    },
+                    "verify": {
+                        "type": "boolean",
+                        "title": "verify",
+                        "description": "Optional. Verify TLS cert, default true.",
+                        "default": True,
+                    },
+                    "allow_redirects": {
+                        "type": "boolean",
+                        "title": "allow_redirects",
+                        "description": "Optional. Follow 3xx redirects, default true.",
+                        "default": True,
+                    },
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "notify",
+            "description": "Send a push notification to Chris's phone via ntfy. Use for pings, alerts, reminders, or any 'notify me / ping my phone / tell me when' request. Args: title (optional, default 'ACEsi'), message (optional text to send). NOTE: Chris's phone must have the ntfy app installed and subscribed to this server's private topic.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "title",
+                        "description": "Optional. Notification title, default 'ACEsi'.",
+                    },
+                    "message": {
+                        "type": "string",
+                        "title": "message",
+                        "description": "Optional. The message text to push. Default 'Ping from ACEsi'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_email",
+            "description": "Check Chris's Gmail and Yahoo inboxes NOW and push a PHONE notification (ntfy) for any email matching his watch rules (e.g. NSFAS). Use this when he asks about email out of the blue ('check my email', 'any NSFAS email?', 'did I get an NSFAS mail?'). A background watcher already does this every ~2 minutes; this tool forces it immediately. Args: force_all (optional boolean, default true — true re-checks the whole recent inbox, false only looks for mail newer than the last poll).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "force_all": {
+                        "type": "boolean",
+                        "title": "force_all",
+                        "description": "Optional. Re-scan the recent inbox instead of only new mail. Default true.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_email_rules",
+            "description": "List the active email-watch rules — which senders/subjects/keywords trigger a phone push for Chris. No args.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_time",
+            "description": "Current local date/time, weekday, and dates 1 and 7 days out. No args.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web (Tavily/Serper then DuckDuckGo, no key) and return the top results WITH their answer snippets: title + URL + content text, plus Tavily/Google's direct ANSWER line when one exists. The returned snippet text usually contains the answer to the question — read it and answer directly; use webfetch only when more detail is needed. Args: query (REQUIRED), max_results (optional, default 6).",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "title": "query",
+                        "description": "REQUIRED. Search query.",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "title": "max_results",
+                        "description": "Optional. Max results, default 6.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "webfetch",
+            "description": "Fetch full page content from a URL. Args: url (REQUIRED, http(s)://...), format (optional: markdown/text/html, default markdown). USE THIS AFTER web_search — search results only give titles and snippets; webfetch reads the actual page for details like addresses and phone numbers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "title": "url",
+                        "description": "REQUIRED. Full URL starting with http:// or https://.",
+                    },
+                    "format": {
+                        "type": "string",
+                        "title": "format",
+                        "description": "Optional. Output format: markdown, text, or html. Default markdown.",
+                    },
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "weather",
+            "description": "Current weather (temp, wind, conditions) for a city via Open-Meteo. Args: city (optional, default Thohoyandou).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "title": "city",
+                        "description": "Optional. City name.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "note",
+            "description": "Save a quick scratchpad note to notes.json (extra memory). Args: text (REQUIRED, what to remember).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "title": "text",
+                        "description": "REQUIRED. The note text.",
+                    }
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "todo_add",
+            "description": "Add a task to the shared to-do list. Args: text (REQUIRED), priority (optional: high/medium/low), category (optional).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "title": "text",
+                        "description": "REQUIRED. Task description.",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "title": "priority",
+                        "description": "Optional. high/medium/low.",
+                    },
+                    "category": {
+                        "type": "string",
+                        "title": "category",
+                        "description": "Optional. Category name.",
+                    },
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "todo_list",
+            "description": "List to-do items. Args: category (optional filter), done (optional bool).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string"},
+                    "done": {"type": "boolean"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "todo_done",
+            "description": "Mark a to-do item as done. Args: task_id (REQUIRED, integer).",
+            "parameters": {
+                "type": "object",
+                "properties": {"task_id": {"type": "integer"}},
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "todo_remove",
+            "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
+            "parameters": {
+                "type": "object",
+                "properties": {"task_id": {"type": "integer"}},
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_preference",
+            "description": "Store a standing preference Chris wants obeyed on every future reply. Call it as soon as he states one, without being asked. Pick the key from the enum — do NOT invent key names. Args: key (REQUIRED, one of the enum values), value (REQUIRED).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "enum": [
+                            "name",
+                            "pronouns",
+                            "tone",
+                            "brevity",
+                            "format",
+                            "language",
+                            "units",
+                            "currency",
+                            "dates",
+                            "email",
+                            "phone",
+                            "location",
+                            "study",
+                            "notifications",
+                            "schedule",
+                            "greeting",
+                            "diet",
+                        ],
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "what to prefer from now on",
+                    },
+                },
+                "required": ["key", "value"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_preferences",
+            "description": "List the standing preferences already stored.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "forget_preference",
+            "description": "Stop following a stored preference when Chris asks you to. Args: key (REQUIRED).",
+            "parameters": {
+                "type": "object",
+                "properties": {"key": {"type": "string"}},
+                "required": ["key"],
+            },
+        },
+    },
+]
+
+# Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
+# /chat dispatch. This PC (i7-3770, no GPU) prefills at ~10 tok/s, so the full
+# 30-tool schema (~2.7k tok) + persona (~3.5k tok) = ~6k tokens = 10+ MINUTES of
+# prefill on a cold model — that's the 8-minute timeout Chris keeps hitting.
+# Sending only the device/navigation tools with terse descriptions keeps each
+# round's prefill under ~150s; Ollama's KV cache then makes rounds 2+ cheap.
+# Tool names MUST match TOOLS keys (the executor only accepts those).
+# Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
+# /chat dispatch. This PC (i7-3770, no GPU) prefills at ~10 tok/s, so the full
+# 30-tool schema (~2.7k tok) + persona (~3.5k tok) = ~6k tokens = 10+ MINUTES of
+# prefill on a cold model — that's the 8-minute timeout Chris keeps hitting.
+# Sending only the device/navigation tools with terse descriptions keeps each
+# round's prefill under ~150s; Ollama's KV cache then makes rounds 2+ cheap.
+# OLLAMA_TOOLS_SCHEMA = [
+#     {"type": "function", "function": {"name": "ui_device",
+#         "description": "Device id, screen size, density, foreground app, USB or TCP/IP. Fails with a diagnosis if none connected.",
+#         "parameters": {"type": "object", "properties": {}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_connect",
+#         "description": "Connect to an Android device. Call FIRST for 'connect to my phone'. Auto-discovers over mDNS and runs adb connect; reports the exact adb error and diagnosis on failure. Args: target (optional host:port), wait (optional seconds).",
+#         "parameters": {"type": "object", "properties": {
+#             "target": {"type": "string", "title": "target", "description": "OPTIONAL host:port, e.g. 192.168.0.100:5555."},
+#             "wait": {"type": "integer", "title": "wait", "description": "OPTIONAL seconds per attempt. Default 10."}},
+#             "required": []}}},
+#     {"type": "function", "function": {"name": "ui_app_open",
+#         "description": "Launch StudentSyncSA on the device. No args.",
+#         "parameters": {"type": "object", "properties": {}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_tap",
+#         "description": "Tap at pixel (x,y). Get screen size first via ui_device. x,y integer pixels.",
+#         "parameters": {"type": "object", "properties": {
+#             "x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}}},
+#     {"type": "function", "function": {"name": "ui_swipe",
+#         "description": "Swipe/scroll from (x1,y1) to (x2,y2). duration ms optional.",
+#         "parameters": {"type": "object", "properties": {
+#             "x1": {"type": "integer"}, "y1": {"type": "integer"},
+#             "x2": {"type": "integer"}, "y2": {"type": "integer"},
+#             "duration": {"type": "integer"}}, "required": ["x1", "y1", "x2", "y2"]}}},
+#     {"type": "function", "function": {"name": "ui_type",
+#         "description": "Type text into the focused field. Args: text (string).",
+#         "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+#     {"type": "function", "function": {"name": "ui_key",
+#         "description": "Press a key: back, home, enter, tab, up, down, left, right, esc.",
+#         "parameters": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}}},
+#     {"type": "function", "function": {"name": "ui_dump",
+#         "description": "Read on-screen UI hierarchy text (verify where you are). No args.",
+#         "parameters": {"type": "object", "properties": {}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_screenshot",
+#         "description": "Capture screen (shown to Chris in a popup; not saved unless save=true).",
+#         "parameters": {"type": "object", "properties": {
+#             "name": {"type": "string"}, "save": {"type": "boolean"}}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_assert_text",
+#         "description": "Assert text is (or isn't, present=false) on screen. Args: text (string), present optional bool.",
+#         "parameters": {"type": "object", "properties": {
+#             "text": {"type": "string"}, "present": {"type": "boolean"}}, "required": ["text"]}}},
+#     {"type": "function", "function": {"name": "ui_assert_element",
+#         "description": "Assert an element exists by resource_id / text / desc / cls. Args: resource_id, text, desc, cls optional, present optional bool.",
+#         "parameters": {"type": "object", "properties": {
+#             "resource_id": {"type": "string"}, "text": {"type": "string"},
+#             "desc": {"type": "string"}, "cls": {"type": "string"},
+#             "present": {"type": "boolean"}}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_assert_visible",
+#         "description": "Assert an element is visible+enabled on screen. Args: resource_id / text / desc / cls optional.",
+#         "parameters": {"type": "object", "properties": {
+#             "resource_id": {"type": "string"}, "text": {"type": "string"},
+#             "desc": {"type": "string"}, "cls": {"type": "string"}}, "required": []}}},
+#     {"type": "function", "function": {"name": "ui_expect",
+#         "description": "Compare screen to expected state. Args: expected = JSON {present:[],absent:[]} or text fragments.",
+#         "parameters": {"type": "object", "properties": {
+#             "expected": {"type": "string"}}, "required": ["expected"]}}},
+#     {"type": "function", "function": {"name": "ui_test_run",
+#         "description": "Run scripted UI actions+assertions. Args: steps = JSON list of {tool,args}, name optional.",
+#         "parameters": {"type": "object", "properties": {
+#             "steps": {"type": "string"},             "name": {"type": "string"}}, "required": ["steps"]}}},
+#     {"type": "function", "function": {"name": "curl",
+#         "description": "Hit a URL and return HTTP status + body snippet. ok=False = no service/port closed. Args: url (https), timeout optional.",
+#         "parameters": {"type": "object", "properties": {
+#             "url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
+#     {"type": "function", "function": {"name": "run_command",
+#         "description": "Run a shell command and return stdout/stderr. Args: command.",
+#         "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
+#     {"type": "function", "function": {"name": "notify",
+#         "description": "Send a push notification to Chris's phone via ntfy. Use when Chris asks to 'ping my phone', 'notify me'. Args: message (text), title optional.",
+#         "parameters": {"type": "object", "properties": {
+#             "title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+#     {"type": "function", "function": {"name": "check_email",
+#         "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+#         "parameters": {"type": "object", "properties": {
+#             "force_all": {"type": "boolean"}}, "required": []}}},
+#     {"type": "function", "function": {"name": "get_time",
+#         "description": "Current local date/time and weekday. No args.",
+#         "parameters": {"type": "object", "properties": {}, "required": []}}},
+#     {"type": "function", "function": {"name": "web_search",
+#         "description": "Search the web and return top results WITH content snippets; answer directly from those. Args: query, max_results optional.",
+#         "parameters": {"type": "object", "additionalProperties": False, "properties": {
+#             "query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
+#     {"type": "function", "function": {"name": "webfetch",
+#         "description": "Fetch full page content from a URL. Args: url (REQUIRED), format (optional). USE after web_search to read actual page content.",
+#         "parameters": {"type": "object", "properties": {
+#             "url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+# ]
+
+# OLLAMA_SYS_PROMPT = (
+#     "You are ACESi, a Windows PC assistant. "
+#     "You are on Windows. Never use Linux commands. "
+#     "Keep answers short and direct. "
+#     "If the user asks a math question, just calculate it using your own knowledge. Do not use any tools. "
+#     "If the user asks for a search, use web_search and summarize the results."
+# )
+
+# _ICONS = {
+#     "list_files": "📂", "read_file": "📄", "grep": "🔍",
+#     "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
+#     "run_command": "▶", "notify": "🔔", "web_search": "🔎", "webfetch": "🌐",
+#     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
+#     "todo_remove": "🗑️", "note": "📝",
+#     "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
+#     "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_get_response_body": "📄", "cdp_status": "📊",
+#     "curl": "🔗",
+#     "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
+#     "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
+#     "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
+#     "flutter_test": "🧪", "flutter_analyze": "🔬",
+#     "ui_device": "📱", "ui_app_open": "📱", "ui_tap": "🖱️", "ui_swipe": "🖱️",
+#     "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷",
+#     "ui_assert_text": "✅", "ui_assert_element": "✅", "ui_assert_visible": "👁️",
+#     "ui_expect": "🎯", "ui_test_run": "🧪",
+#     "restart": "🔄",
+# }
+
+# def _tool_icon(name):
+#     return _ICONS.get(name, "🔧")
+
+
+_SUBTASK_PROBES = [
+    ("web search",   ("web_search",),            r"\bsearch\b|\bfind out\b|\bagenc"),
+    ("fetch pages",  ("webfetch", "curl"),       r"\bfetch\b|\btop \d+\b"),
+    ("save file",    ("write_file", "open_in_vscode"), r"\bsave\b|\bwrite .*file\b"),
+    ("weather",      ("weather",),               r"\bweather\b"),
+    ("current time", ("get_time",),              r"\bcurrent time\b|\bwhat time\b"),
+    ("open/view user file", ("view_user_file", "open_user_file", "read_user_file"),
+    r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b"),
+    # Broad question-type probes. These match almost any question, so they are
+    # only enforced on genuinely multi-step requests (see _BROAD_PROBES).
+    ("answer question", ("web_search", "webfetch", "curl"),
+    r"\b(?:what|who|when|where|which|whom|whose)\b\s+[\w'\- ]{2,40}\b(?:is|was|were|are|does|did|do)\b"
+    r"|\boldest\b|\blargest\b|\bsmallest\b|\bhighest\b|\binvented\b|\bfounded\b"),
+    ("price lookup", ("web_search",),
+    r"\b(?:price|closing price|close[ds]? at|index|stock|share price|exchange rate|rate of)\b"),
+    ("compare values", ("web_search",),
+    r"\bcompare[ds]?\b|\bversus\b|\bvs\.?\b|\bcompared to\b|\byear ago\b|\bthan last\b|\bchange in\b"),
+]
+
+# Probes too generic to enforce on their own: "who was Nelson Mandela?" must not
+# leave the model being nagged forever about unanswered subtasks. They only
+# count when the request also contains at least one narrow, explicit step.
+_BROAD_PROBES = frozenset(("answer question", "price lookup", "compare values"))
+
+
+def _outstanding_subtasks(user_message: str, names: list[str]) -> list[str]:
+    """Which requested subtasks have had no matching tool call yet."""
+    text = (user_message or "").lower()
+    done = set(names)
+    matched = [
+        label
+        for label, tools, pattern in _SUBTASK_PROBES
+        if re.search(pattern, text) and not (done & set(tools))
+    ]
+    if not matched:
+        return []
+    # Enforce broad question probes only for multi-step requests.
+    detected = sum(1 for _l, _t, pat in _SUBTASK_PROBES if re.search(pat, text))
+    if detected < 2:
+        return [l for l in matched if l not in _BROAD_PROBES]
+    return matched
+
+
+# KNOWN LIMITATION: completion is keyed on tool name, so a single web_search
+# satisfies every question-type probe at once. That is deliberate and safe
+# (it can only under-nudge, never over-nudge) but it means the nudge cannot
+# distinguish "searched for housing" from "answered the Mandela question".
+# Broad probes therefore only bite when the model stalls BEFORE searching, e.g.
+# after a file step. The reply-leak guard in _sanitize_reply covers the case
+# where the research completed but the final answer was destroyed.
+
+
+# def _draft_research_fallback(llm_messages, names, user_message):
+#     """If a research+save task gathered web results but the model never emitted
+#     open_in_vscode/write_file, compile the collected tool results into a REVIEW
+#     DRAFT and open it in the editor. Returns (True, reply) when a draft was made,
+#     else (False, None)."""
+#     try:
+#         if not user_message or "open_in_vscode" in names or "write_file" in names:
+#             return False, None
+# Prefer clean web_search results ("- title\n  url" pairs) over raw HTML
+# dumps from webfetch/curl — those are not for Chris to read directly.
+#         _search = [str(msg.get("content", "")) for msg in llm_messages
+#                    if msg.get("role") == "tool" and msg.get("name") == "web_search"]
+#         _search = [s for s in _search if s and s != "(no web results)"]
+#         _fetches = [str(msg.get("content", "")) for msg in llm_messages
+#                     if msg.get("role") == "tool" and msg.get("name") in ("webfetch", "curl")]
+#         _fetches = [f for f in _fetches if f and not f.startswith("web_search failed")
+#                     and not f.startswith("webfetch failed") and not f.startswith("curl failed")]
+#         if not _search and not _fetches:
+#             return False, None
+#         _target = _save_target_path(user_message) or "notes/research_findings.md"
+#         lines = []
+#         if _search:
+# Search results already arrive as "- Title\n  URL" line pairs; pick
+# the top results the user asked for. URLs were decoded by
+# _clean_result_url so they open directly (no DDG 400 redirects).
+#             for sr in _search:
+#                 prev = None
+#                 for ln in sr.splitlines():
+#                     ln = ln.rstrip()
+#                     stripped = ln.strip()
+#                     if stripped.startswith("- "):
+#                         if prev is not None:
+#                             lines.append(prev)
+#                         prev = ln
+#                     elif prev is not None and stripped:
+# indent continuation (the URL under a "- Title")
+#                         prev = prev + " " + stripped
+#                 if prev is not None:
+#                     lines.append(prev)
+#             if not lines and _fetches:
+#                 lines = _summarize_fetched(_fetches)
+#         else:
+#             lines = _summarize_fetched(_fetches)
+#         if not lines:
+#             return False, None
+#         body = "".join("%s\n\n" % ln for ln in lines)
+#         _head = ("# %s\n\n"
+#                  "ACEsi gathered these results. Review them in VS Code, then say "
+#                  "'save it' to write this to %s (or 'discard' to throw it away).\n\n"
+#                  % (_target.replace(".md", "").replace("_", " ").title(),
+#                     _target))
+#         _draft_content = _head + body
+#         _dok, _dtxt = tool_open_in_vscode(_target, _draft_content)
+#         if not _dok:
+#             print("📥 /chat research fallback: could not open draft: %s" % _dtxt)
+#             return False, None
+#         names.append("open_in_vscode")
+#         with _AGENT_LOCK:
+#             _AGENT["steps"].append({"id": _agent_next_id(), "kind": "work",
+#                                     "text": "open_in_vscode %s" % _target,
+#                                     "state": "done", "icon": "📤"})
+#         print("📥 /chat research fallback: drafted collected results for review (%d items)" % len(lines))
+#         return True, ("I researched that and put the findings in VS Code as a draft "
+#                       "(%s). Give them a look — say 'save it' and I'll write them to "
+#                       "%s, or 'discard' to throw them away." % (_target.replace("/", "\\"), _target))
+#     except Exception as _e:
+#         print("⚠️ /chat research-fallback draft failed: %s" % _e)
+#         return False, None
+
+# def _summarize_fetched(_fetches):
+#     """Turn raw webfetch/curl bodies into short one-line-per-result summaries."""
+#     import html as _html
+#     import re as _r
+#     out = []
+#     for f in _fetches:
+#         txt = _r.sub(r'<script[^>]*>.*?</script>', '', f, flags=_r.S)
+#         txt = _r.sub(r'<style[^>]*>.*?</style>', '', txt, flags=_r.S)
+#         txt = _r.sub(r'<[^>]+>', ' ', txt)
+#         txt = _html.unescape(_r.sub(r'\s+', ' ', txt)).strip()
+#         out.append("- " + txt[:200])
+#     return out
+
+# def _tool_desc(name, args):
+#     a = {k: v for k, v in (args or {}).items() if k in (TOOLS.get(name, (None, ()))[1] or ())}
+#     if name not in TOOLS:
+#         return name
+#     if name in ("list_files", "read_file", "grep"):
+#         p = a.get("path", ".")
+#         s = a.get("pattern")
+#         return "%s %s%s" % (name, p, (" — "+s) if s else "")
+#     if name in ("edit_file",):
+#         return "%s %s" % (name, a.get("path", "?"))
+#     if name == "write_file":
+#         return "%s %s" % (name, a.get("path", "?"))
+#     if name == "open_in_vscode":
+#         return "%s %s" % (name, a.get("path", "?"))
+#     if name == "run_command":
+#         return "%s `%s`" % (name, str(a.get("command", ""))[:80])
+#     if name == "cdp_navigate":
+#         return "%s %s" % (name, str(a.get("url", ""))[:80])
+#     if name == "cdp_evaluate":
+#         return "%s `%s`" % (name, str(a.get("expr", ""))[:80])
+#     if name == "git_commit":
+#         return "%s `%s`" % (name, str(a.get("message", ""))[:80])
+#     if name == "git_merge":
+#         return "%s `%s`" % (name, str(a.get("branch", ""))[:40])
+#     if name == "pub_add":
+#         return "%s `%s`" % (name, str(a.get("package", ""))[:80])
+#     if name == "ui_tap":
+#         return "%s (%s,%s)" % (name, a.get("x"), a.get("y"))
+#     if name == "ui_swipe":
+#         return "%s (%s,%s)->(%s,%s)" % (name, a.get("x1"), a.get("y1"),
+#                                         a.get("x2"), a.get("y2"))
+#     if name == "ui_type":
+#         return "%s `%s`" % (name, str(a.get("text", ""))[:60])
+#     if name == "ui_screenshot":
+#         return "%s %s" % (name, a.get("name") or "")
+#     if name in ("ui_assert_text", "ui_assert_element", "ui_assert_visible"):
+#         return "%s %s" % (name, ", ".join(
+#             "%s=%r" % (k, v) for k, v in (a or {}).items() if v not in (None, "")))
+#     if name == "ui_expect":
+#         return "%s `%s`" % (name, str(a.get("expected", ""))[:80])
+#     if name == "ui_test_run":
+#         return "%s `%s`" % (name, str(a.get("name") or "scenario")[:40])
+#     if name == "restart":
+#         return "%s `%s`" % (name, a.get("what") or "cdp")
+#     if name == "curl":
+#         return "%s `%s`" % (name, str(a.get("url", ""))[:60])
+#     return name
+
+_REQUIRED_ARGS = {}
+for _t in TOOLS_SCHEMA:
+    _req = (_t.get("function") or {}).get("parameters") or {}
+    _name = (_t.get("function") or {}).get("name")
+    if _name:
+        _REQUIRED_ARGS[_name] = [r for r in (_req.get("required") or []) if r]
+
+    # Compact schema for net-domain tools (used by OpenRouter to stay under 2652 token limit)
+    # read_file/write_file are included so web-research tasks that ALSO save findings to a
+    # notes/*.md file can persist results; they're filtered out for pure net domain calls.
+    NET_TOOLS_SCHEMA = [
+        {"type": "function", "function": {"name": "curl",
+            "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
+            "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
+        {"type": "function", "function": {"name": "web_search",
+            "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
+            "parameters": {"type": "object", "additionalProperties": False, "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
+        {"type": "function", "function": {"name": "webfetch",
+            "description": "Fetch full page content. Args: url, format.",
+            "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+        {"type": "function", "function": {"name": "check_email",
+            "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+            "parameters": {"type": "object", "properties": {"force_all": {"type": "boolean"}}, "required": []}}},
+        {"type": "function", "function": {"name": "view_web_image",
+            "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
+            "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
+        {"type": "function", "function": {"name": "weather",
+            "description": "Current weather for a city. Args: city.",
+            "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
+        {"type": "function", "function": {"name": "read_file",
+            "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+        {"type": "function", "function": {"name": "write_file",
+            "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+        {"type": "function", "function": {"name": "open_in_vscode",
+            "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+        {"type": "function", "function": {"name": "note",
+            "description": "Save a note to notes.json. Args: text.",
+            "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+        {"type": "function", "function": {"name": "todo_add",
+            "description": "Add a to-do task. Args: text (REQUIRED), priority (optional), category (optional).",
+            "parameters": {"type": "object", "properties": {
+                "text": {"type": "string", "title": "text", "description": "REQUIRED. Task description."},
+                "priority": {"type": "string"}, "category": {"type": "string"}},
+            "required": ["text"]}}},
+        {"type": "function", "function": {"name": "todo_list",
+            "description": "List to-do items. Args: category (optional), done (optional bool).",
+            "parameters": {"type": "object", "properties": {
+                "category": {"type": "string"}, "done": {"type": "boolean"}},
+            "required": []}}},
+        {"type": "function", "function": {"name": "todo_done",
+            "description": "Mark a to-do item done. Args: task_id (REQUIRED, integer).",
+            "parameters": {"type": "object", "properties": {
+                "task_id": {"type": "integer"}},
+            "required": ["task_id"]}}},
+        {"type": "function", "function": {"name": "todo_remove",
+            "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
+            "parameters": {"type": "object", "properties": {
+                "task_id": {"type": "integer"}},
+            "required": ["task_id"]}}},
+        {"type": "function", "function": {"name": "get_time",
+            "description": "Current local date/time and weekday.",
+            "parameters": {"type": "object", "properties": {}, "required": []}}},
+        {"type": "function", "function": {"name": "notify",
+            "description": "Send push notification via ntfy. Args: message, title.",
+            "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+    ]
+    # Old commented version with CDP tools:
+    # NET_TOOLS_SCHEMA = [
+    #     {"type": "function", "function": {"name": "cdp_network_requests",
+    #         "description": "Network requests captured by CDP, with response headers. Filter server-side on a busy page: filter_status (404, '4xx', or '404,500'), filter_url (substring), limit. In-flight shows as 'pending', no-response as 'failed:<reason>'. Args: filter_status, filter_url, limit.",
+    #         "parameters": {"type": "object", "properties": {"filter_status": {"type": "string"}, "filter_url": {"type": "string"}, "limit": {"type": "number"}}, "required": []}}},
+    #     {"type": "function", "function": {"name": "cdp_navigate",
+    #         "description": "Open a URL in the attached Chrome/WebView via CDP and wait. wait_for='network_idle' also waits for background XHRs to settle. Args: url (REQUIRED), wait, wait_for ('load'|'network_idle'), timeout, idle_ms.",
+    #         "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "wait": {"type": "boolean"}, "wait_for": {"type": "string", "enum": ["load", "network_idle"]}, "timeout": {"type": "number"}, "idle_ms": {"type": "number"}}, "required": ["url"]}}},
+    #     {"type": "function", "function": {"name": "curl",
+    #         "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
+    #         "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
+    #     {"type": "function", "function": {"name": "web_search",
+    #         "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
+    #         "parameters": {"type": "object", "additionalProperties": False, "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
+    #     {"type": "function", "function": {"name": "webfetch",
+    #         "description": "Fetch full page content. Args: url, format.",
+    #         "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+    #     {"type": "function", "function": {"name": "check_email",
+    #         "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+    #         "parameters": {"type": "object", "properties": {"force_all": {"type": "boolean"}}, "required": []}}},
+    #     {"type": "function", "function": {"name": "view_web_image",
+    #         "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
+    #         "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
+    #     {"type": "function", "function": {"name": "weather",
+    #         "description": "Current weather for a city. Args: city.",
+    #         "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
+    #     {"type": "function", "function": {"name": "read_file",
+    #         "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
+    #         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    #     {"type": "function", "function": {"name": "write_file",
+    #         "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
+    #         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+    #     {"type": "function", "function": {"name": "open_in_vscode",
+    #         "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
+    #         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+    #     {"type": "function", "function": {"name": "note",
+    #         "description": "Save a note to notes.json. Args: text.",
+    #         "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+    #     {"type": "function", "function": {"name": "todo_add",
+    #         "description": "Add a to-do task. Args: text (REQUIRED), priority (optional), category (optional).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "text": {"type": "string", "title": "text", "description": "REQUIRED. Task description."},
+    #             "priority": {"type": "string"}, "category": {"type": "string"}},
+    #             "required": ["text"]}}},
+    #     {"type": "function", "function": {"name": "todo_list",
+    #         "description": "List to-do items. Args: category (optional), done (optional bool).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "category": {"type": "string"}, "done": {"type": "boolean"}},
+    #             "required": []}}},
+    #     {"type": "function", "function": {"name": "todo_done",
+    #         "description": "Mark a to-do item done. Args: task_id (REQUIRED, integer).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "task_id": {"type": "integer"}},
+    #             "required": ["task_id"]}}},
+    #     {"type": "function", "function": {"name": "todo_remove",
+    #         "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
+    #         "parameters": {"type": "object", "properties": {
+    #             "task_id": {"type": "integer"}},
+    #             "required": ["task_id"]}}},
+    #     {"type": "function", "function": {"name": "get_time",
+    #         "description": "Current local date/time and weekday.",
+    #         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    #     {"type": "function", "function": {"name": "notify",
+    #         "description": "Send push notification via ntfy. Args: message, title.",
+    #         "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+    {
+        "type": "function",
+        "function": {
+            "name": "restart",
+            "description": "Restart server/cdp/ollama. Args: what.",
+            "parameters": {
+                "type": "object",
+                "properties": {"what": {"type": "string"}},
+                "required": ["what"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_distance",
+            "description": "Calculate driving distance and time between two locations using the free OSRM routing API (no key required). Args: origin, destination. Returns distance in km and estimated driving time.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "origin": {
+                        "type": "string",
+                        "description": "Starting point (e.g. 'Pretoria')",
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination (e.g. 'Mabula Lodge')",
+                    },
+                },
+                "required": ["origin", "destination"],
+            },
+        },
+    },
+# ]
+
+_index_tool_param_types()
+
+# Tool domain / context separation (ACEsi mixes UI, code, and network work, so
+# we keep them in distinct buckets and can restrict which domain a request is
+# allowed to touch). A tool normally lives in exactly one domain, but a value
+# MAY be a tuple when a tool is legitimately reachable from two of them - the
+# dispatch loop consults ALLOWED_DOMAINS per request.
+_TOOL_DOMAINS = {
+    # device UI work
+    "ui_device": "ui",
+    "ui_connect": "ui",
+    "ui_app_open": "ui",
+    "ui_tap": "ui",
+    "ui_swipe": "ui",
+    "ui_type": "ui",
+    "ui_key": "ui",
+    "ui_dump": "ui",
+    "ui_screenshot": "ui",
+    "ui_assert_text": "ui",
+    "ui_assert_element": "ui",
+    "ui_assert_visible": "ui",
+    "ui_expect": "ui",
+    "ui_test_run": "ui",
+    # on-device Chrome/WebView (still UI-side, but via CDP)
+    # cdp_navigate and cdp_network_requests are also reachable from the net
+    # domain: both are self-sufficient (they connect on demand via
+    # _get_session), so a network-inspection task can use them without also
+    # needing cdp_connect in its schema.
+    "cdp_connect": "ui",
+    "cdp_navigate": ("ui", "net"),
+    "cdp_evaluate": "ui",
+    "cdp_console_logs": "ui",
+    "cdp_dom_state": "ui",
+    "cdp_network_requests": ("ui", "net"),
+    "cdp_get_response_body": ("ui", "net"),
+    "cdp_status": "ui",
+    # network / URL probes — the new curl tool isolates "is this URL up?" from
+    # both code edits and on-device taps
+    "curl": "net",
+    "get_distance": "net",
+    # file-system / code tools
+    "list_files": "code",
+    "read_file": "code",
+    "list_user_files": "code",
+    "read_user_file": "code",
+    "open_user_file": "code",
+    "view_user_file": "code",
+    "grep": "code",
+    "write_file": "code",
+    "edit_file": "code",
+    "open_in_vscode": "code",
+    "run_command": "code",
+    "git_status": "code",
+    "git_log": "code",
+    "git_commit": "code",
+    "git_branch": "code",
+    "git_merge": "code",
+    "build_apk": "code",
+    "pub_add": "code",
+    "pub_remove": "code",
+    "pub_upgrade": "code",
+    "flutter_test": "code",
+    "flutter_analyze": "code",
+    # runtime controls
+    "restart": "ctrl",
+    # push notification to Chris's phone (available in every domain, like ctrl)
+    "notify": "ctrl",
+    # email watch: polls Gmail/Yahoo and phone-pushes matches (NSFAS etc.)
+    "check_email": "ctrl",
+    "list_email_rules": "ctrl",
+    # general helpers available in every domain (get_time, note) — network info
+    # helpers (web_search, weather) live in net so code-only contexts exclude them
+    "get_time": "ctrl",
+    "note": "ctrl",
+    "todo_add": "ctrl",
+    "todo_list": "ctrl",
+    "todo_done": "ctrl",
+    "todo_remove": "ctrl",
+    "web_search": "net",
+    "webfetch": "net",
+    "view_web_image": "net",
+    "weather": "net",
+}
 
 
 TOOLS = {
@@ -7452,8 +11125,14 @@ TOOLS = {
     "ui_dump": (tool_ui_dump, ()),
     "ui_screenshot": (tool_ui_screenshot, ("name", "save")),
     "ui_assert_text": (tool_ui_assert_text, ("text", "present")),
-    "ui_assert_element": (tool_ui_assert_element, ("resource_id", "text", "desc", "cls", "present")),
-    "ui_assert_visible": (tool_ui_assert_visible, ("resource_id", "text", "desc", "cls")),
+    "ui_assert_element": (
+        tool_ui_assert_element,
+        ("resource_id", "text", "desc", "cls", "present"),
+    ),
+    "ui_assert_visible": (
+        tool_ui_assert_visible,
+        ("resource_id", "text", "desc", "cls"),
+    ),
     "ui_expect": (tool_ui_expect, ("expected",)),
     "ui_test_run": (tool_ui_test_run, ("steps", "name")),
     "restart": (tool_restart, ("what",)),
@@ -7482,756 +11161,7 @@ TOOLS = {
     "set_preference": (tool_set_preference, ("key", "value")),
     "list_preferences": (tool_list_preferences, ()),
     "forget_preference": (tool_forget_preference, ("key",)),
-}
-
-# Native OpenAI-compatible tool schema. Sent to the provider so the model can
-# emit structured tool_calls (the reason ACEsi stalled is that this was never
-# passed before — the model had no tool-calling signal and emitted prose only).
-TOOLS_SCHEMA = [
-    {"type": "function", "function": {"name": "list_files",
-        "description": "List files/dirs in a directory. Args: path (dir to list).",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "read_file",
-        "description": "Read a file's contents. Args: path.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "list_user_files",
-        "description": "List files/dirs on Chris's PC. Paths can be 'Documents', 'My Pictures', 'Desktop', 'Downloads' or any folder on the machine. Args: path (dir to list).",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "read_user_file",
-        "description": "Read a file's content from anywhere on Chris's PC (any folder: Documents, Pictures, Desktop, Downloads, etc). Accepts a full path or a bare filename. Args: path.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "view_user_file",
-        "description": "VIEW a file from Chris's PC inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Accepts a full path or a bare filename. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "open_user_file",
-        "description": "LAUNCH a file EXTERNALLY with the system default application (Windows Photos, browser, etc.). Use ONLY when the user explicitly says 'open externally', 'launch in default app', or 'open outside ACEsi'. For normal 'show me the file' or 'open the file' in a browsing context, use view_user_file instead. Args: path.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "view_web_image",
-        "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet (e.g. 'get me a picture of X', 'show me an image of Y'). The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Always call this after web_search/webfetch finds an image URL. Args: url.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "grep",
-        "description": "Regex search file contents. Args: pattern, path.",
-        "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern", "path"]}}},
-    {"type": "function", "function": {"name": "write_file",
-        "description": "Create/overwrite a file. Args: path, content.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-    {"type": "function", "function": {"name": "open_in_vscode",
-        "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-    {"type": "function", "function": {"name": "edit_file",
-        "description": "Surgical exact-match edit; old must match exactly once. Args: path, old, new.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
-    {"type": "function", "function": {"name": "run_command",
-        "description": "Run a shell command and return stdout/stderr. Args: command.",
-             "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
-    {"type": "function", "function": {"name": "git_status",
-        "description": "Short git status incl. current branch. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "git_log",
-        "description": "Recent commit log. Args: n (optional, default 10, max 50).",
-        "parameters": {"type": "object", "properties": {"n": {"type": "integer"}}, "required": []}}},
-    {"type": "function", "function": {"name": "git_commit",
-        "description": "Stage changes and commit as ACEsi. Args: message (commit message), files (optional, list of paths to stage instead of git add -A).",
-        "parameters": {"type": "object", "properties": {"message": {"type": "string"}, "files": {"type": "array", "items": {"type": "string"}}}, "required": ["message"]}}},
-    {"type": "function", "function": {"name": "git_branch",
-        "description": "List branches, or create+switch to a new branch when create=true. Args: name, create (bool, optional).",
-        "parameters": {"type": "object", "properties": {"name": {"type": "string"}, "create": {"type": "boolean"}}, "required": []}}},
-    {"type": "function", "function": {"name": "git_merge",
-        "description": "Merge an existing local branch into the current branch. Reports conflicts if any (resolve with edit_file then git_commit). Args: branch.",
-        "parameters": {"type": "object", "properties": {"branch": {"type": "string"}}, "required": ["branch"]}}},
-    {"type": "function", "function": {"name": "build_apk",
-        "description": "Build an Android APK with flutter build apk --release (default) or --debug. Returns the artifact path. Args: mode (optional).",
-        "parameters": {"type": "object", "properties": {"mode": {"type": "string"}}, "required": []}}},
-    {"type": "function", "function": {"name": "pub_add",
-        "description": "Add a dependency via `flutter pub add <package>` (updates pubspec.yaml + pub get). Args: package (e.g. 'http:^1.2.0').",
-        "parameters": {"type": "object", "properties": {"package": {"type": "string"}}, "required": ["package"]}}},
-    {"type": "function", "function": {"name": "pub_remove",
-        "description": "Remove a dependency via `flutter pub remove <package>`. Args: package.",
-        "parameters": {"type": "object", "properties": {"package": {"type": "string"}}, "required": ["package"]}}},
-    {"type": "function", "function": {"name": "pub_upgrade",
-        "description": "Upgrade all dependencies via `flutter pub upgrade`. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "flutter_test",
-        "description": "Run the Flutter test suite. Args: path (optional, test file/dir to run).",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}}},
-    {"type": "function", "function": {"name": "flutter_analyze",
-        "description": "Static analysis via `flutter analyze`. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_device",
-        "description": "Report the connected Android device: device id, screen size, density, foreground app, and whether it is USB or TCP/IP. If no device is connected this FAILS and explains whether it is a cable, driver, or authorization problem. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_connect",
-        "description": "Connect to an Android device. Call this FIRST for any 'connect to my phone' task. If a device is already online it reports device id, screen size, foreground app and transport. Otherwise it looks for a wireless-debugging (mDNS) target and runs 'adb connect', then reports the exact adb error and a diagnosis. Args: target (optional host:port to connect to), wait (optional seconds per attempt).",
-        "parameters": {"type": "object", "properties": {
-            "target": {"type": "string", "title": "target",
-                       "description": "OPTIONAL. host:port to connect to, e.g. 192.168.0.100:5555. Omit to auto-discover via mDNS."},
-            "wait": {"type": "integer", "title": "wait",
-                     "description": "OPTIONAL. Seconds to allow each adb connect attempt. Default 10."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "ui_app_open",
-        "description": "Launch the StudentSyncSA app on the connected device. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_tap",
-        "description": "Tap the screen at a pixel coordinate. Call ui_device FIRST to learn the screen size (e.g. 1080x2412). REQUIRED arguments: x (horizontal pixel from left edge), y (vertical pixel from top edge). Both must be integer pixel values, never null, never strings.",
-        "parameters": {"type": "object", "properties": {
-            "x": {"type": "integer", "title": "x", "description": "REQUIRED. Horizontal pixel coordinate from the LEFT edge of the screen. Integer, e.g. 540 on a 1080-wide screen."},
-            "y": {"type": "integer", "title": "y", "description": "REQUIRED. Vertical pixel coordinate from the TOP edge of the screen. Integer, e.g. 1200 on a 2412-tall screen."}},
-            "required": ["x", "y"]}}},
-    {"type": "function", "function": {"name": "ui_swipe",
-        "description": "Swipe (scroll/gesture) from a start pixel (x1,y1) to an end pixel (x2,y2). REQUIRED: x1, y1, x2, y2 (integer pixels). OPTIONAL: duration (integer ms, default 200). For a downward scroll use a larger y2 than y1.",
-        "parameters": {"type": "object", "properties": {
-            "x1": {"type": "integer", "title": "x1", "description": "REQUIRED. Start horizontal pixel coordinate from the LEFT edge."},
-            "y1": {"type": "integer", "title": "y1", "description": "REQUIRED. Start vertical pixel coordinate from the TOP edge."},
-            "x2": {"type": "integer", "title": "x2", "description": "REQUIRED. End horizontal pixel coordinate from the LEFT edge."},
-            "y2": {"type": "integer", "title": "y2", "description": "REQUIRED. End vertical pixel coordinate from the TOP edge."},
-            "duration": {"type": "integer", "title": "duration", "description": "OPTIONAL. Gesture duration in milliseconds. Default 200."}},
-            "required": ["x1", "y1", "x2", "y2"]}}},
-    {"type": "function", "function": {"name": "ui_type",
-        "description": "Type a text string into the currently focused input field on the device. REQUIRED argument: text (the exact characters to type; spaces are sent as %s). Never null.",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string", "title": "text", "description": "REQUIRED. The exact text to type, e.g. \"john@school.edu\". Never null or empty."}},
-            "required": ["text"]}}},
-    {"type": "function", "function": {"name": "ui_key",
-        "description": "Send a single key event to the device. REQUIRED argument: key. Allowed values: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric Android keyevent code (e.g. 4 = BACK).",
-        "parameters": {"type": "object", "properties": {
-            "key": {"type": "string", "title": "key", "description": "REQUIRED. One of: back, home, enter, tab, menu, up, down, left, right, esc, power, recents, or a numeric keyevent code. Never null."}},
-            "required": ["key"]}}},
-    {"type": "function", "function": {"name": "ui_dump",
-        "description": "Dump the on-screen UI accessibility hierarchy (all visible text, buttons, bounds). Use this to VERIFY what is actually on screen after taps/navigation. No arguments required.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_screenshot",
-        "description": "Capture the current screen. By DEFAULT the image is NOT written to disk — it is buffered in memory and shown to Chris in a popup. Only set save=true when Chris explicitly asks to save/keep the screenshot as a file. If you later want it saved, call again with save=true. NOTE: you cannot view images — use ui_dump to read the screen. OPTIONAL arguments: name (string used in the filename when saved), save (boolean).",
-        "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "title": "name", "description": "OPTIONAL. File name prefix for the screenshot when save=true, e.g. \"login\". Omit or null to auto-name."},
-            "save": {"type": "boolean", "title": "save", "description": "OPTIONAL. Defaults to false. Set true ONLY when Chris asked to keep the screenshot as a file. Must be boolean true, not a string."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "ui_assert_text",
-        "description": "UI VALIDATION: assert whether text exists on screen (case-insensitive substring of any visible text/content-desc). REQUIRED: text (the string to look for). OPTIONAL: present (boolean, default true; set false to assert the text is ABSENT). Returns PASS when the assertion holds, FAIL with a label list otherwise.",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string", "title": "text", "description": "REQUIRED. Text to search the live screen for, e.g. \"Welcome\"."},
-            "present": {"type": "boolean", "title": "present", "description": "OPTIONAL. true = assert text exists (default), false = assert text does NOT exist."}},
-            "required": ["text"]}}},
-    {"type": "function", "function": {"name": "ui_assert_element",
-        "description": "UI VALIDATION: assert whether an element with the given properties exists in the accessibility tree (NOT that it is visible/on-screen — use ui_assert_visible for that). OPTIONAL AND COMBINABLE filters: resource_id (exact resource-id), text (case-insensitive substring of text OR content-desc), desc (exact content-desc), cls (substring of class, e.g. Button). OPTIONAL: present (default true; false asserts the element is ABSENT). Provide at least one filter.",
-        "parameters": {"type": "object", "properties": {
-            "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id, e.g. \"com.studentsyncsa:id/btn_login\"."},
-            "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
-            "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
-            "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."},
-            "present": {"type": "boolean", "description": "OPTIONAL. true = assert present (default), false = assert absent."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "ui_assert_visible",
-        "description": "UI VALIDATION: assert whether a matching element is actually VISIBLE and interactable on screen (on-screen bounds, visible-to-user, enabled). OPTIONAL AND COMBINABLE filters: resource_id, text, desc, cls (same semantics as ui_assert_element). Provide at least one filter.",
-        "parameters": {"type": "object", "properties": {
-            "resource_id": {"type": "string", "description": "OPTIONAL. Exact Android resource-id."},
-            "text": {"type": "string", "description": "OPTIONAL. Case-insensitive text substring."},
-            "desc": {"type": "string", "description": "OPTIONAL. Exact content-desc."},
-            "cls": {"type": "string", "description": "OPTIONAL. Class substring, e.g. \"Button\"."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "ui_expect",
-        "description": "UI VALIDATION: compare the current ui_dump against an expected screen state. REQUIRED: expected — either a JSON object {\"present\": [labels that must be on screen], \"absent\": [labels that must be absent]} or a plain string whose lines/commas are fragments that must all be present. Returns PASS/FAIL with the specific missing/unexpected fragments.",
-        "parameters": {"type": "object", "properties": {
-            "expected": {"type": "string", "title": "expected", "description": "REQUIRED. Expected state — JSON {present:[...],absent:[...]} or plain text fragments."}},
-            "required": ["expected"]}}},
-    {"type": "function", "function": {"name": "ui_test_run",
-        "description": "UI VALIDATION HARNESS: run a scripted sequence of UI actions + assertions and report PASS/FAIL. REQUIRED: steps — a JSON list of {\"tool\": \"ui_tap\", \"args\": {...}} entries (any ui_* action or ui_assert_* tool). Each step is judged by the tool's ok flag; concludes 'TEST PASSED (n/total)' or 'TEST FAILED'. OPTIONAL: name (string label for the report).",
-        "parameters": {"type": "object", "properties": {
-            "steps": {"type": "string", "title": "steps", "description": "REQUIRED. JSON list of {tool, args} step objects, e.g. [{\"tool\":\"ui_app_open\",\"args\":{}},{\"tool\":\"ui_assert_text\",\"args\":{\"text\":\"Login\"}}]."},
-            "name": {"type": "string", "title": "name", "description": "OPTIONAL. Test/scenario name shown in the report."}},
-            "required": ["steps"]}}},
-    {"type": "function", "function": {"name": "restart",
-        "description": "Self-host restart: what=server (asks ace_host.py watchdog to restart the server), what=chrome (relaunch local CDP headless Chrome), what=cdp (force new CDP session), what=ollama (start ollama serve if down). Args: what.",
-        "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": []}}},
-    {"type": "function", "function": {"name": "cdp_connect",
-        "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "cdp_navigate",
-        "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait for the page. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://), wait (default true; false returns immediately without waiting), wait_for ('load' = readyState complete, default; 'network_idle' = also wait until no request is in flight and nothing has hit the wire for idle_ms - USE THIS when the page has background polling and the request you care about may be a late XHR), timeout (default 30s, caps the wait), idle_ms (default 500). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL, or a bare host such as example.com"},
-            "wait": {"type": "boolean", "description": "Wait for the page before returning. Default true.", "default": True},
-            "wait_for": {"type": "string", "enum": ["load", "network_idle"], "description": "'load' waits for readyState=complete. 'network_idle' additionally waits for the network to fall quiet, which catches late background XHRs. Default 'load'.", "default": "load"},
-            "timeout": {"type": "number", "description": "Maximum seconds to wait, so a page that polls forever cannot hang. Default 30.", "default": 30},
-            "idle_ms": {"type": "number", "description": "Milliseconds of network silence required by wait_for='network_idle'. Default 500.", "default": 500}},
-            "required": ["url"]}}},
-    {"type": "function", "function": {"name": "cdp_evaluate",
-        "description": "Evaluate a JavaScript expression in the connected WebView/Chrome page via CDP and return its value. Use it to click links or read page data, e.g. cdp_evaluate(\"document.querySelector('a').click()\"). Objects/arrays come back as readable JSON, plain strings unquoted. Args: expr.",
-        "parameters": {"type": "object", "properties": {"expr": {"type": "string"}}, "required": ["expr"]}}},
-    {"type": "function", "function": {"name": "cdp_console_logs",
-        "description": "Return buffered console.log/console.error events captured by CDP since the connect. Args: none.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "cdp_dom_state",
-        "description": "Snapshot the current DOM via CDP: page title, URL, and a slice of documentElement.outerHTML.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "cdp_get_response_body",
-        "description": "Fetch the body of a request already seen by cdp_network_requests, via CDP. Use it right after the request happens - Chrome evicts a response body once the page navigates, and this then says so rather than returning empty. Args: url_contains (substring of the URL, identifies which request), filter_status (e.g. 404), max_chars (default 4000).",
-        "parameters": {"type": "object", "properties": {
-            "url_contains": {"type": "string", "description": "Substring identifying which request's body to read, e.g. /authenticate"},
-            "filter_status": {"type": "string", "description": "Only consider requests with this status."},
-            "max_chars": {"type": "number", "description": "Truncate the body to this many characters. Default 4000.", "default": 4000}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "cdp_network_requests",
-        "description": "Return network request events captured by CDP (requestWillBeSent / responseReceived / loadingFinished / loadingFailed), with response headers and POST data. FILTER SERVER-SIDE on a busy page instead of pulling every request: filter_status (exact 404, a class like '4xx'/'5xx', or a list '404,500'), filter_url (case-insensitive substring), limit (default 100, returns the most recent matches). Redirect hops are kept separately, so a POST that answers 303 still shows up. A request still in flight shows as 'pending' and one that never got a response as 'failed:<reason>', so an absent status is never ambiguous.",
-        "parameters": {"type": "object", "properties": {
-            "filter_status": {"type": "string", "description": "Only return requests with this status. Accepts 404, a class like '4xx', or a comma list '404,500'."},
-            "filter_url": {"type": "string", "description": "Only return requests whose URL contains this text (case-insensitive)."},
-            "limit": {"type": "number", "description": "Maximum entries to return, most recent first. Default 100.", "default": 100}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "cdp_status",
-        "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "curl",
-        "description": "Hit a URL like a browser and return the HTTP status + a body snippet. Use this to confirm whether a network service (e.g. an ITS portal) is UP before blaming on-device code. Args: url (REQUIRED, http(s)://...), method (optional, default GET), timeout (optional int seconds, default 20), verify (optional bool, default true), allow_redirects (optional bool, default true). Returns ok=True even on 4xx/5xx (a server responded); ok=False only on DNS failure / connection refused / timeout = the 'no web service / port closed' signal.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL starting with http:// or https://."},
-            "method": {"type": "string", "title": "method", "description": "Optional. HTTP method, default GET.", "default": "GET"},
-            "timeout": {"type": "number", "title": "timeout", "description": "Optional. Seconds to wait, default 20.", "default": 20},
-            "verify": {"type": "boolean", "title": "verify", "description": "Optional. Verify TLS cert, default true.", "default": True},
-            "allow_redirects": {"type": "boolean", "title": "allow_redirects", "description": "Optional. Follow 3xx redirects, default true.", "default": True}},
-            "required": ["url"]}}},
-    {"type": "function", "function": {"name": "notify",
-        "description": "Send a push notification to Chris's phone via ntfy. Use for pings, alerts, reminders, or any 'notify me / ping my phone / tell me when' request. Args: title (optional, default 'ACEsi'), message (optional text to send). NOTE: Chris's phone must have the ntfy app installed and subscribed to this server's private topic.",
-        "parameters": {"type": "object", "properties": {
-            "title": {"type": "string", "title": "title", "description": "Optional. Notification title, default 'ACEsi'."},
-            "message": {"type": "string", "title": "message", "description": "Optional. The message text to push. Default 'Ping from ACEsi'."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "check_email",
-        "description": "Check Chris's Gmail and Yahoo inboxes NOW and push a PHONE notification (ntfy) for any email matching his watch rules (e.g. NSFAS). Use this when he asks about email out of the blue ('check my email', 'any NSFAS email?', 'did I get an NSFAS mail?'). A background watcher already does this every ~2 minutes; this tool forces it immediately. Args: force_all (optional boolean, default true — true re-checks the whole recent inbox, false only looks for mail newer than the last poll).",
-        "parameters": {"type": "object", "properties": {
-            "force_all": {"type": "boolean", "title": "force_all", "description": "Optional. Re-scan the recent inbox instead of only new mail. Default true."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "list_email_rules",
-        "description": "List the active email-watch rules — which senders/subjects/keywords trigger a phone push for Chris. No args.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "get_time",
-        "description": "Current local date/time, weekday, and dates 1 and 7 days out. No args.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "web_search",
-        "description": "Search the web (Tavily/Serper then DuckDuckGo, no key) and return the top results WITH their answer snippets: title + URL + content text, plus Tavily/Google's direct ANSWER line when one exists. The returned snippet text usually contains the answer to the question — read it and answer directly; use webfetch only when more detail is needed. Args: query (REQUIRED), max_results (optional, default 6).",
-        "parameters": {"type": "object", "properties": {
-            "query": {"type": "string", "title": "query", "description": "REQUIRED. Search query."},
-            "max_results": {"type": "integer", "title": "max_results", "description": "Optional. Max results, default 6."}},
-            "required": ["query"]}}},
-    {"type": "function", "function": {"name": "webfetch",
-        "description": "Fetch full page content from a URL. Args: url (REQUIRED, http(s)://...), format (optional: markdown/text/html, default markdown). USE THIS AFTER web_search — search results only give titles and snippets; webfetch reads the actual page for details like addresses and phone numbers.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string", "title": "url", "description": "REQUIRED. Full URL starting with http:// or https://."},
-            "format": {"type": "string", "title": "format", "description": "Optional. Output format: markdown, text, or html. Default markdown."}},
-            "required": ["url"]}}},
-    {"type": "function", "function": {"name": "weather",
-        "description": "Current weather (temp, wind, conditions) for a city via Open-Meteo. Args: city (optional, default Thohoyandou).",
-        "parameters": {"type": "object", "properties": {
-            "city": {"type": "string", "title": "city", "description": "Optional. City name."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "note",
-        "description": "Save a quick scratchpad note to notes.json (extra memory). Args: text (REQUIRED, what to remember).",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string", "title": "text", "description": "REQUIRED. The note text."}},
-            "required": ["text"]}}},
-    {"type": "function", "function": {"name": "todo_add",
-        "description": "Add a task to the shared to-do list. Args: text (REQUIRED), priority (optional: high/medium/low), category (optional).",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string", "title": "text", "description": "REQUIRED. Task description."},
-            "priority": {"type": "string", "title": "priority", "description": "Optional. high/medium/low."},
-            "category": {"type": "string", "title": "category", "description": "Optional. Category name."}},
-            "required": ["text"]}}},
-    {"type": "function", "function": {"name": "todo_list",
-        "description": "List to-do items. Args: category (optional filter), done (optional bool).",
-        "parameters": {"type": "object", "properties": {
-            "category": {"type": "string"}, "done": {"type": "boolean"}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "todo_done",
-        "description": "Mark a to-do item as done. Args: task_id (REQUIRED, integer).",
-        "parameters": {"type": "object", "properties": {
-            "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-    {"type": "function", "function": {"name": "todo_remove",
-        "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
-        "parameters": {"type": "object", "properties": {
-            "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-    {"type": "function", "function": {"name": "set_preference",
-        "description": "Store a standing preference Chris wants obeyed on every future reply. Call it as soon as he states one, without being asked. Pick the key from the enum — do NOT invent key names. Args: key (REQUIRED, one of the enum values), value (REQUIRED).",
-        "parameters": {"type": "object", "properties": {
-            "key": {"type": "string", "enum": [
-                "name", "pronouns", "tone", "brevity", "format", "language",
-                "units", "currency", "dates", "email", "phone", "location",
-                "study", "notifications", "schedule", "greeting", "diet"]},
-            "value": {"type": "string", "description": "what to prefer from now on"}},
-            "required": ["key", "value"]}}},
-    {"type": "function", "function": {"name": "list_preferences",
-        "description": "List the standing preferences already stored.",
-        "parameters": {"type": "object", "properties": {},
-            "required": []}}},
-    {"type": "function", "function": {"name": "forget_preference",
-        "description": "Stop following a stored preference when Chris asks you to. Args: key (REQUIRED).",
-        "parameters": {"type": "object", "properties": {
-            "key": {"type": "string"}},
-            "required": ["key"]}}},
-]
-
-# Compact tool schema + compact system prompt for the LOCAL Ollama fallback in
-# /chat dispatch. This PC (i7-3770, no GPU) prefills at ~10 tok/s, so the full
-# 30-tool schema (~2.7k tok) + persona (~3.5k tok) = ~6k tokens = 10+ MINUTES of
-# prefill on a cold model — that's the 8-minute timeout Chris keeps hitting.
-# Sending only the device/navigation tools with terse descriptions keeps each
-# round's prefill under ~150s; Ollama's KV cache then makes rounds 2+ cheap.
-# Tool names MUST match TOOLS keys (the executor only accepts those).
-OLLAMA_TOOLS_SCHEMA = [
-    {"type": "function", "function": {"name": "ui_device",
-        "description": "Device id, screen size, density, foreground app, USB or TCP/IP. Fails with a diagnosis if none connected.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_connect",
-        "description": "Connect to an Android device. Call FIRST for 'connect to my phone'. Auto-discovers over mDNS and runs adb connect; reports the exact adb error and diagnosis on failure. Args: target (optional host:port), wait (optional seconds).",
-        "parameters": {"type": "object", "properties": {
-            "target": {"type": "string", "title": "target", "description": "OPTIONAL host:port, e.g. 192.168.0.100:5555."},
-            "wait": {"type": "integer", "title": "wait", "description": "OPTIONAL seconds per attempt. Default 10."}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "ui_app_open",
-        "description": "Launch StudentSyncSA on the device. No args.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_tap",
-        "description": "Tap at pixel (x,y). Get screen size first via ui_device. x,y integer pixels.",
-        "parameters": {"type": "object", "properties": {
-            "x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}}},
-    {"type": "function", "function": {"name": "ui_swipe",
-        "description": "Swipe/scroll from (x1,y1) to (x2,y2). duration ms optional.",
-        "parameters": {"type": "object", "properties": {
-            "x1": {"type": "integer"}, "y1": {"type": "integer"},
-            "x2": {"type": "integer"}, "y2": {"type": "integer"},
-            "duration": {"type": "integer"}}, "required": ["x1", "y1", "x2", "y2"]}}},
-    {"type": "function", "function": {"name": "ui_type",
-        "description": "Type text into the focused field. Args: text (string).",
-        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
-    {"type": "function", "function": {"name": "ui_key",
-        "description": "Press a key: back, home, enter, tab, up, down, left, right, esc.",
-        "parameters": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}}},
-    {"type": "function", "function": {"name": "ui_dump",
-        "description": "Read on-screen UI hierarchy text (verify where you are). No args.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_screenshot",
-        "description": "Capture screen (shown to Chris in a popup; not saved unless save=true).",
-        "parameters": {"type": "object", "properties": {
-            "name": {"type": "string"}, "save": {"type": "boolean"}}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_assert_text",
-        "description": "Assert text is (or isn't, present=false) on screen. Args: text (string), present optional bool.",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string"}, "present": {"type": "boolean"}}, "required": ["text"]}}},
-    {"type": "function", "function": {"name": "ui_assert_element",
-        "description": "Assert an element exists by resource_id / text / desc / cls. Args: resource_id, text, desc, cls optional, present optional bool.",
-        "parameters": {"type": "object", "properties": {
-            "resource_id": {"type": "string"}, "text": {"type": "string"},
-            "desc": {"type": "string"}, "cls": {"type": "string"},
-            "present": {"type": "boolean"}}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_assert_visible",
-        "description": "Assert an element is visible+enabled on screen. Args: resource_id / text / desc / cls optional.",
-        "parameters": {"type": "object", "properties": {
-            "resource_id": {"type": "string"}, "text": {"type": "string"},
-            "desc": {"type": "string"}, "cls": {"type": "string"}}, "required": []}}},
-    {"type": "function", "function": {"name": "ui_expect",
-        "description": "Compare screen to expected state. Args: expected = JSON {present:[],absent:[]} or text fragments.",
-        "parameters": {"type": "object", "properties": {
-            "expected": {"type": "string"}}, "required": ["expected"]}}},
-    {"type": "function", "function": {"name": "ui_test_run",
-        "description": "Run scripted UI actions+assertions. Args: steps = JSON list of {tool,args}, name optional.",
-        "parameters": {"type": "object", "properties": {
-            "steps": {"type": "string"},             "name": {"type": "string"}}, "required": ["steps"]}}},
-    {"type": "function", "function": {"name": "curl",
-        "description": "Hit a URL and return HTTP status + body snippet. ok=False = no service/port closed. Args: url (https), timeout optional.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "run_command",
-        "description": "Run a shell command and return stdout/stderr. Args: command.",
-        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
-    {"type": "function", "function": {"name": "notify",
-        "description": "Send a push notification to Chris's phone via ntfy. Use when Chris asks to 'ping my phone', 'notify me'. Args: message (text), title optional.",
-        "parameters": {"type": "object", "properties": {
-            "title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
-    {"type": "function", "function": {"name": "check_email",
-        "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
-        "parameters": {"type": "object", "properties": {
-            "force_all": {"type": "boolean"}}, "required": []}}},
-    {"type": "function", "function": {"name": "get_time",
-        "description": "Current local date/time and weekday. No args.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "web_search",
-        "description": "Search the web and return top results WITH content snippets; answer directly from those. Args: query, max_results optional.",
-        "parameters": {"type": "object", "properties": {
-            "query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "webfetch",
-        "description": "Fetch full page content from a URL. Args: url (REQUIRED), format (optional). USE after web_search to read actual page content.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
-]
-
-OLLAMA_SYS_PROMPT = (
-    "You are ACEsi driving an Android device. ACT, don't ask.\n"
-    "NEVER reply with just a narrated plan — every turn must contain at least "
-    "one real tool call (ui_dump / ui_tap / ui_swipe / ui_type / ui_key / "
-    "ui_app_open / ui_screenshot) unless the screen is confirmed done.\n"
-    "NAVIGATION RULE — you MUST follow this for every UI interaction:\n"
-    "1. ui_app_open (once)\n"
-    "2. ui_dump — read the screen, identify what you see\n"
-    "3. Decide your next tap/swipe based on what ui_dump showed you\n"
-    "4. ui_tap or ui_swipe\n"
-    "5. ui_dump — verify the tap worked, see the new screen\n"
-    "6. Repeat from step 3\n"
-    "If Chris says you are on a screen (e.g. 'You are on the ITS portal'), the "
-    "app is already open: start with ui_dump to read it.\n"
-    "NEVER guess coordinates. NEVER tap without reading the screen first.\n"
-    "After every ui_tap or ui_swipe, you MUST run ui_dump before your next move.\n"
-    "STYLE: never narrate your reasoning in prose. Between tool calls output "
-    "ONLY the next tool call — no 'I will', no 'The dump shows', no summaries, "
-    "no commentary. All thinking is silent. When the screen is confirmed done, "
-    "finish with a SHORT final report: state plainly what you did and read the "
-    "key labels/values from the last ui_dump in a compact list. Keep it to 3-5 "
-    "lines max. No paragraphs of reasoning in the final either.\n"
-)
-
-_ICONS = {
-    "list_files": "📂", "read_file": "📄", "grep": "🔍",
-    "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
-    "run_command": "▶", "notify": "🔔", "web_search": "🔎", "webfetch": "🌐",
-    "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
-    "todo_remove": "🗑️", "note": "📝",
-    "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
-    "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_get_response_body": "📄", "cdp_status": "📊",
-    "curl": "🔗",
-    "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
-    "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
-    "pub_add": "🧩", "pub_remove": "🧩", "pub_upgrade": "🧩",
-    "flutter_test": "🧪", "flutter_analyze": "🔬",
-    "ui_device": "📱", "ui_app_open": "📱", "ui_tap": "🖱️", "ui_swipe": "🖱️",
-    "ui_type": "⌨️", "ui_key": "⌨️", "ui_dump": "🗺️", "ui_screenshot": "📷",
-    "ui_assert_text": "✅", "ui_assert_element": "✅", "ui_assert_visible": "👁️",
-    "ui_expect": "🎯", "ui_test_run": "🧪",
-    "restart": "🔄",
-}
-
-def _tool_icon(name):
-    return _ICONS.get(name, "🔧")
-
-def _save_target_path(user_message):
-    """Extract the intended save path from a research+save request
-    ("...save the findings to notes/rental_agencies.md")."""
-    m = (user_message or "").lower()
-    _pm = user_message or ""
-    mt = re.search(r'\bsave\b.*?\b(?:to|as|in)\b\s+([\w./\\-]+\.(?:md|txt|json|csv)\b)', _pm, re.IGNORECASE)
-    if not mt:
-        mt = re.search(r'\bnotes?/[\w./\\-]+\.(?:md|txt|json|csv)\b', _pm, re.IGNORECASE)
-    if mt:
-        return mt.group(1).replace("\\", "/")
-    return None
-
-
-_SUBTASK_PROBES = [
-    ("web search",   ("web_search",),            r"\bsearch\b|\bfind out\b|\bagenc"),
-    ("fetch pages",  ("webfetch", "curl"),       r"\bfetch\b|\btop \d+\b"),
-    ("save file",    ("write_file", "open_in_vscode"), r"\bsave\b|\bwrite .*file\b"),
-    ("weather",      ("weather",),               r"\bweather\b"),
-    ("current time", ("get_time",),              r"\bcurrent time\b|\bwhat time\b"),
-    ("open/view user file", ("view_user_file", "open_user_file", "read_user_file"),
-     r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b"),
-    # Broad question-type probes. These match almost any question, so they are
-    # only enforced on genuinely multi-step requests (see _BROAD_PROBES).
-    ("answer question", ("web_search", "webfetch", "curl"),
-     r"\b(?:what|who|when|where|which|whom|whose)\b\s+[\w'\- ]{2,40}\b(?:is|was|were|are|does|did|do)\b"
-     r"|\boldest\b|\blargest\b|\bsmallest\b|\bhighest\b|\binvented\b|\bfounded\b"),
-    ("price lookup", ("web_search",),
-     r"\b(?:price|closing price|close[ds]? at|index|stock|share price|exchange rate|rate of)\b"),
-    ("compare values", ("web_search",),
-     r"\bcompare[ds]?\b|\bversus\b|\bvs\.?\b|\bcompared to\b|\byear ago\b|\bthan last\b|\bchange in\b"),
-]
-
-# Probes too generic to enforce on their own: "who was Nelson Mandela?" must not
-# leave the model being nagged forever about unanswered subtasks. They only
-# count when the request also contains at least one narrow, explicit step.
-_BROAD_PROBES = frozenset(("answer question", "price lookup", "compare values"))
-
-
-def _outstanding_subtasks(user_message: str, names: list[str]) -> list[str]:
-    """Which requested subtasks have had no matching tool call yet."""
-    text = (user_message or "").lower()
-    done = set(names)
-    matched = [label for label, tools, pattern in _SUBTASK_PROBES
-               if re.search(pattern, text) and not (done & set(tools))]
-    if not matched:
-        return []
-    # Enforce broad question probes only for multi-step requests.
-    detected = sum(1 for _l, _t, pat in _SUBTASK_PROBES if re.search(pat, text))
-    if detected < 2:
-        return [l for l in matched if l not in _BROAD_PROBES]
-    return matched
-
-
-# KNOWN LIMITATION: completion is keyed on tool name, so a single web_search
-# satisfies every question-type probe at once. That is deliberate and safe
-# (it can only under-nudge, never over-nudge) but it means the nudge cannot
-# distinguish "searched for housing" from "answered the Mandela question".
-# Broad probes therefore only bite when the model stalls BEFORE searching, e.g.
-# after a file step. The reply-leak guard in _sanitize_reply covers the case
-# where the research completed but the final answer was destroyed.
-
-
-def _draft_research_fallback(llm_messages, names, user_message):
-    """If a research+save task gathered web results but the model never emitted
-    open_in_vscode/write_file, compile the collected tool results into a REVIEW
-    DRAFT and open it in the editor. Returns (True, reply) when a draft was made,
-    else (False, None)."""
-    try:
-        if not user_message or "open_in_vscode" in names or "write_file" in names:
-            return False, None
-        # Prefer clean web_search results ("- title\n  url" pairs) over raw HTML
-        # dumps from webfetch/curl — those are not for Chris to read directly.
-        _search = [str(msg.get("content", "")) for msg in llm_messages
-                   if msg.get("role") == "tool" and msg.get("name") == "web_search"]
-        _search = [s for s in _search if s and s != "(no web results)"]
-        _fetches = [str(msg.get("content", "")) for msg in llm_messages
-                    if msg.get("role") == "tool" and msg.get("name") in ("webfetch", "curl")]
-        _fetches = [f for f in _fetches if f and not f.startswith("web_search failed")
-                    and not f.startswith("webfetch failed") and not f.startswith("curl failed")]
-        if not _search and not _fetches:
-            return False, None
-        _target = _save_target_path(user_message) or "notes/research_findings.md"
-        lines = []
-        if _search:
-            # Search results already arrive as "- Title\n  URL" line pairs; pick
-            # the top results the user asked for. URLs were decoded by
-            # _clean_result_url so they open directly (no DDG 400 redirects).
-            for sr in _search:
-                prev = None
-                for ln in sr.splitlines():
-                    ln = ln.rstrip()
-                    stripped = ln.strip()
-                    if stripped.startswith("- "):
-                        if prev is not None:
-                            lines.append(prev)
-                        prev = ln
-                    elif prev is not None and stripped:
-                        # indent continuation (the URL under a "- Title")
-                        prev = prev + " " + stripped
-                if prev is not None:
-                    lines.append(prev)
-            if not lines and _fetches:
-                lines = _summarize_fetched(_fetches)
-        else:
-            lines = _summarize_fetched(_fetches)
-        if not lines:
-            return False, None
-        body = "".join("%s\n\n" % ln for ln in lines)
-        _head = ("# %s\n\n"
-                 "ACEsi gathered these results. Review them in VS Code, then say "
-                 "'save it' to write this to %s (or 'discard' to throw it away).\n\n"
-                 % (_target.replace(".md", "").replace("_", " ").title(),
-                    _target))
-        _draft_content = _head + body
-        _dok, _dtxt = tool_open_in_vscode(_target, _draft_content)
-        if not _dok:
-            print("📥 /chat research fallback: could not open draft: %s" % _dtxt)
-            return False, None
-        names.append("open_in_vscode")
-        with _AGENT_LOCK:
-            _AGENT["steps"].append({"id": _agent_next_id(), "kind": "work",
-                                    "text": "open_in_vscode %s" % _target,
-                                    "state": "done", "icon": "📤"})
-        print("📥 /chat research fallback: drafted collected results for review (%d items)" % len(lines))
-        return True, ("I researched that and put the findings in VS Code as a draft "
-                      "(%s). Give them a look — say 'save it' and I'll write them to "
-                      "%s, or 'discard' to throw them away." % (_target.replace("/", "\\"), _target))
-    except Exception as _e:
-        print("⚠️ /chat research-fallback draft failed: %s" % _e)
-        return False, None
-
-def _summarize_fetched(_fetches):
-    """Turn raw webfetch/curl bodies into short one-line-per-result summaries."""
-    import html as _html
-    import re as _r
-    out = []
-    for f in _fetches:
-        txt = _r.sub(r'<script[^>]*>.*?</script>', '', f, flags=_r.S)
-        txt = _r.sub(r'<style[^>]*>.*?</style>', '', txt, flags=_r.S)
-        txt = _r.sub(r'<[^>]+>', ' ', txt)
-        txt = _html.unescape(_r.sub(r'\s+', ' ', txt)).strip()
-        out.append("- " + txt[:200])
-    return out
-
-def _tool_desc(name, args):
-    a = {k: v for k, v in (args or {}).items() if k in (TOOLS.get(name, (None, ()))[1] or ())}
-    if name not in TOOLS:
-        return name
-    if name in ("list_files", "read_file", "grep"):
-        p = a.get("path", ".")
-        s = a.get("pattern")
-        return "%s %s%s" % (name, p, (" — "+s) if s else "")
-    if name in ("edit_file",):
-        return "%s %s" % (name, a.get("path", "?"))
-    if name == "write_file":
-        return "%s %s" % (name, a.get("path", "?"))
-    if name == "open_in_vscode":
-        return "%s %s" % (name, a.get("path", "?"))
-    if name == "run_command":
-        return "%s `%s`" % (name, str(a.get("command", ""))[:80])
-    if name == "cdp_navigate":
-        return "%s %s" % (name, str(a.get("url", ""))[:80])
-    if name == "cdp_evaluate":
-        return "%s `%s`" % (name, str(a.get("expr", ""))[:80])
-    if name == "git_commit":
-        return "%s `%s`" % (name, str(a.get("message", ""))[:80])
-    if name == "git_merge":
-        return "%s `%s`" % (name, str(a.get("branch", ""))[:40])
-    if name == "pub_add":
-        return "%s `%s`" % (name, str(a.get("package", ""))[:80])
-    if name == "ui_tap":
-        return "%s (%s,%s)" % (name, a.get("x"), a.get("y"))
-    if name == "ui_swipe":
-        return "%s (%s,%s)->(%s,%s)" % (name, a.get("x1"), a.get("y1"),
-                                        a.get("x2"), a.get("y2"))
-    if name == "ui_type":
-        return "%s `%s`" % (name, str(a.get("text", ""))[:60])
-    if name == "ui_screenshot":
-        return "%s %s" % (name, a.get("name") or "")
-    if name in ("ui_assert_text", "ui_assert_element", "ui_assert_visible"):
-        return "%s %s" % (name, ", ".join(
-            "%s=%r" % (k, v) for k, v in (a or {}).items() if v not in (None, "")))
-    if name == "ui_expect":
-        return "%s `%s`" % (name, str(a.get("expected", ""))[:80])
-    if name == "ui_test_run":
-        return "%s `%s`" % (name, str(a.get("name") or "scenario")[:40])
-    if name == "restart":
-        return "%s `%s`" % (name, a.get("what") or "cdp")
-    if name == "curl":
-        return "%s `%s`" % (name, str(a.get("url", ""))[:60])
-    return name
-
-_REQUIRED_ARGS = {}
-for _t in TOOLS_SCHEMA:
-    _req = (_t.get("function") or {}).get("parameters") or {}
-    _name = (_t.get("function") or {}).get("name")
-    if _name:
-        _REQUIRED_ARGS[_name] = [r for r in (_req.get("required") or []) if r]
-
-# Compact schema for net-domain tools (used by OpenRouter to stay under 2652 token limit)
-# read_file/write_file are included so web-research tasks that ALSO save findings to a
-# notes/*.md file can persist results; they're filtered out for pure net domain calls.
-NET_TOOLS_SCHEMA = [
-    {"type": "function", "function": {"name": "cdp_network_requests",
-        "description": "Network requests captured by CDP, with response headers. Filter server-side on a busy page: filter_status (404, '4xx', or '404,500'), filter_url (substring), limit. In-flight shows as 'pending', no-response as 'failed:<reason>'. Args: filter_status, filter_url, limit.",
-        "parameters": {"type": "object", "properties": {"filter_status": {"type": "string"}, "filter_url": {"type": "string"}, "limit": {"type": "number"}}, "required": []}}},
-    {"type": "function", "function": {"name": "cdp_navigate",
-        "description": "Open a URL in the attached Chrome/WebView via CDP and wait. wait_for='network_idle' also waits for background XHRs to settle. Args: url (REQUIRED), wait, wait_for ('load'|'network_idle'), timeout, idle_ms.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "wait": {"type": "boolean"}, "wait_for": {"type": "string", "enum": ["load", "network_idle"]}, "timeout": {"type": "number"}, "idle_ms": {"type": "number"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "curl",
-        "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "web_search",
-        "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
-        "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "webfetch",
-        "description": "Fetch full page content. Args: url, format.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "check_email",
-        "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
-        "parameters": {"type": "object", "properties": {"force_all": {"type": "boolean"}}, "required": []}}},
-    {"type": "function", "function": {"name": "view_web_image",
-        "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-    {"type": "function", "function": {"name": "weather",
-        "description": "Current weather for a city. Args: city.",
-        "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
-    {"type": "function", "function": {"name": "read_file",
-        "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "write_file",
-        "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-    {"type": "function", "function": {"name": "open_in_vscode",
-        "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
-        "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-    {"type": "function", "function": {"name": "note",
-        "description": "Save a note to notes.json. Args: text.",
-        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
-    {"type": "function", "function": {"name": "todo_add",
-        "description": "Add a to-do task. Args: text (REQUIRED), priority (optional), category (optional).",
-        "parameters": {"type": "object", "properties": {
-            "text": {"type": "string", "title": "text", "description": "REQUIRED. Task description."},
-            "priority": {"type": "string"}, "category": {"type": "string"}},
-            "required": ["text"]}}},
-    {"type": "function", "function": {"name": "todo_list",
-        "description": "List to-do items. Args: category (optional), done (optional bool).",
-        "parameters": {"type": "object", "properties": {
-            "category": {"type": "string"}, "done": {"type": "boolean"}},
-            "required": []}}},
-    {"type": "function", "function": {"name": "todo_done",
-        "description": "Mark a to-do item done. Args: task_id (REQUIRED, integer).",
-        "parameters": {"type": "object", "properties": {
-            "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-    {"type": "function", "function": {"name": "todo_remove",
-        "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
-        "parameters": {"type": "object", "properties": {
-            "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-    {"type": "function", "function": {"name": "get_time",
-        "description": "Current local date/time and weekday.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
-    {"type": "function", "function": {"name": "notify",
-        "description": "Send push notification via ntfy. Args: message, title.",
-        "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
-    {"type": "function", "function": {"name": "restart",
-        "description": "Restart server/cdp/ollama. Args: what.",
-        "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": ["what"]}}},
-]
-
-_index_tool_param_types()
-
-# Tool domain / context separation (ACEsi mixes UI, code, and network work, so
-# we keep them in distinct buckets and can restrict which domain a request is
-# allowed to touch). A tool normally lives in exactly one domain, but a value
-# MAY be a tuple when a tool is legitimately reachable from two of them - the
-# dispatch loop consults ALLOWED_DOMAINS per request.
-_TOOL_DOMAINS = {
-    # device UI work
-    "ui_device": "ui", "ui_connect": "ui",
-    "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
-    "ui_type": "ui", "ui_key": "ui", "ui_dump": "ui", "ui_screenshot": "ui",
-    "ui_assert_text": "ui", "ui_assert_element": "ui", "ui_assert_visible": "ui",
-    "ui_expect": "ui", "ui_test_run": "ui",
-    # on-device Chrome/WebView (still UI-side, but via CDP)
-    # cdp_navigate and cdp_network_requests are also reachable from the net
-    # domain: both are self-sufficient (they connect on demand via
-    # _get_session), so a network-inspection task can use them without also
-    # needing cdp_connect in its schema.
-    "cdp_connect": "ui", "cdp_navigate": ("ui", "net"), "cdp_evaluate": "ui", "cdp_console_logs": "ui",
-    "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_get_response_body": ("ui", "net"), "cdp_status": "ui",
-    # network / URL probes — the new curl tool isolates "is this URL up?" from
-    # both code edits and on-device taps
-    "curl": "net",
-    # file-system / code tools
-    "list_files": "code", "read_file": "code", "list_user_files": "code", "read_user_file": "code", "open_user_file": "code", "view_user_file": "code", "grep": "code",
-    "write_file": "code", "edit_file": "code", "open_in_vscode": "code", "run_command": "code",
-    "git_status": "code", "git_log": "code", "git_commit": "code",
-    "git_branch": "code", "git_merge": "code",
-    "build_apk": "code", "pub_add": "code", "pub_remove": "code",
-    "pub_upgrade": "code", "flutter_test": "code", "flutter_analyze": "code",
-    # runtime controls
-    "restart": "ctrl",
-    # push notification to Chris's phone (available in every domain, like ctrl)
-    "notify": "ctrl",
-    # email watch: polls Gmail/Yahoo and phone-pushes matches (NSFAS etc.)
-    "check_email": "ctrl",
-    "list_email_rules": "ctrl",
-    # general helpers available in every domain (get_time, note) — network info
-    # helpers (web_search, weather) live in net so code-only contexts exclude them
-    "get_time": "ctrl",
-    "note": "ctrl",
-    "todo_add": "ctrl",
-    "todo_list": "ctrl",
-    "todo_done": "ctrl",
-    "todo_remove": "ctrl",
-    "web_search": "net",
-    "webfetch": "net",
-    "view_web_image": "net",
-    "weather": "net",
+    "get_distance": (tool_get_distance, ("origin", "destination")),
 }
 
 
@@ -8246,7 +11176,7 @@ def _explicit_tool_domain(user_message):
         # Word-boundary anchored so a note/filename like "notes/rental_agencies.md"
         # does NOT match the `note` tool (only a real "note" / "web_search" /
         # "curl" token does), and a domain hint can't be hijacked by a file path.
-        if re.search(r'\b' + re.escape(name) + r'\b', m):
+        if re.search(r"\b" + re.escape(name) + r"\b", m):
             doms = _dom_set(dom)
             # Prefer a concrete work domain (ui/net/code) over 'ctrl'. For a tool
             # listed in two domains, pick in ui > net > code order so routing is
@@ -8256,12 +11186,18 @@ def _explicit_tool_domain(user_message):
                     # Diagnostic: which tool the user named, and why this domain.
                     # Fires only when a tool is actually named, so it stays quiet
                     # on ordinary messages.
-                    print("[domain] explicit tool %r -> %s (tool domains: %s)"
-                          % (name, cand, sorted(doms)), flush=True)
+                    print(
+                        "[domain] explicit tool %r -> %s (tool domains: %s)"
+                        % (name, cand, sorted(doms)),
+                        flush=True,
+                    )
                     return cand
             if "ctrl" in doms:
-                print("[domain] explicit tool %r -> ctrl (tool domains: %s)"
-                      % (name, sorted(doms)), flush=True)
+                print(
+                    "[domain] explicit tool %r -> ctrl (tool domains: %s)"
+                    % (name, sorted(doms)),
+                    flush=True,
+                )
                 best = best or "ctrl"
     return best
 
@@ -8272,16 +11208,17 @@ def _web_research_task(m):
     or factual questions that need current/authoritative info)."""
     # Explicit search intent
     if ("web" in m or "online" in m or "internet" in m) and bool(
-        re.search(r'\b(?:search|find|look\s+up)\b', m)):
+        re.search(r"\b(?:search|find|look\s+up)\b", m)
+    ):
         return True
     # Factual questions that likely need current/authoritative web info
     factual_patterns = [
-        r'\b(?:what|who|when|where|which)\s+(?:is|was|are|were)\b',
-        r'\b(?:how\s+(?:old|many|much|long|tall|wide))\b',
-        r'\b(?:oldest|newest|latest|current|recent)\b',
-        r'\b(?:capital|population|president|prime\s+minister)\b',
-        r'\b(?:weather|temperature|forecast)\b',
-        r'\b(?:latest\s+news|breaking|headline)\b',
+        r"\b(?:what|who|when|where|which)\s+(?:is|was|are|were)\b",
+        r"\b(?:how\s+(?:old|many|much|long|tall|wide))\b",
+        r"\b(?:oldest|newest|latest|current|recent)\b",
+        r"\b(?:capital|population|president|prime\s+minister)\b",
+        r"\b(?:weather|temperature|forecast)\b",
+        r"\b(?:latest\s+news|breaking|headline)\b",
     ]
     return any(re.search(p, m) for p in factual_patterns)
 
@@ -8293,8 +11230,12 @@ def _explicit_save_request(m):
     returns False even though it may need the web_search tool — only named
     save targets trigger the draft/open_in_vscode review flow."""
     return bool(
-        re.search(r'\bsave\b.*(?:to\s+)?(?:notes?/|\.(?:md|txt|json|csv)\b|file\b)', m) or
-        re.search(r'\b(?:write|put|store|copy)\b.*(?:to\s+)?(?:notes?/|\.(?:md|txt|json|csv)\b)', m))
+        re.search(r"\bsave\b.*(?:to\s+)?(?:notes?/|\.(?:md|txt|json|csv)\b|file\b)", m)
+        or re.search(
+            r"\b(?:write|put|store|copy)\b.*(?:to\s+)?(?:notes?/|\.(?:md|txt|json|csv)\b)",
+            m,
+        )
+    )
 
 
 # A URL / DevTools / CDP / network-inspection ask is real on-device work where
@@ -8309,16 +11250,17 @@ def _explicit_save_request(m):
 # NOTE: bare \bnetwork\b is deliberately NOT a trigger ("network settings" is a
 # legitimate tap target); the intent has to name requests/panel/inspection.
 _CDP_MODEL_TASK_RE = re.compile(
-    r'https?://'
-    r'|\bdev\s?tools?\b|\bchrome\s+dev\b'
-    r'|\bcdp[_ ]?[a-z_]*\b'
-    r'|\bf12\b'
-    r'|\bnetwork\s+(?:request|panel|tab|inspect|inspection|traffic|log|activity)'
-    r'|\bstatus\s+code\b'
-    r'|\bconsole\s+(?:log|message|error|warning)s?\b'
-    r'|\bdom\s+state\b'
-    r'|\bjavascript\s+console\b',
-    re.IGNORECASE)
+    r"https?://"
+    r"|\bdev\s?tools?\b|\bchrome\s+dev\b"
+    r"|\bcdp[_ ]?[a-z_]*\b"
+    r"|\bf12\b"
+    r"|\bnetwork\s+(?:request|panel|tab|inspect|inspection|traffic|log|activity)"
+    r"|\bstatus\s+code\b"
+    r"|\bconsole\s+(?:log|message|error|warning)s?\b"
+    r"|\bdom\s+state\b"
+    r"|\bjavascript\s+console\b",
+    re.IGNORECASE,
+)
 
 # Device CONNECTION and DIAGNOSIS asks must reach the model, not the
 # deterministic step parser. A phone-connect task parsed as a step list, ran
@@ -8332,20 +11274,21 @@ _CDP_MODEL_TASK_RE = re.compile(
 # next to. "connect to my phone", "adb", "device id", "USB or TCP/IP" are all
 # connection intent; "android" on its own is not.
 _PHONE_LINK_TASK_RE = re.compile(
-    r'\badb\b'
-    r'|\bscrcpy\b'
-    r'|\bauto[\s\-_]?connect\w*'
-    r'|\bwireless\s+debugging\b'
-    r'|\bdevice\s*(?:id|serial|list)\b'
-    r'|\bforeground\s+app\b'
-    r'|\busb\b'
-    r'|\btcp\s*/?\s*ip\b'
-    r'|\badb\s+over\s+(?:wi-?fi|network|usb)\b'
-    r'|\bconnect\s+(?:to\s+)?(?:my\s+|the\s+)?(?:android\s+)?(?:phone|device|tablet)\b'
-    r'|\b(?:phone|device|tablet)\s+(?:connect|attach|pair|enumeral)'
-    r'|\bunauthori[sz]ed\b'
-    r'|\bno\s+devices?/emulators\b',
-    re.IGNORECASE)
+    r"\badb\b"
+    r"|\bscrcpy\b"
+    r"|\bauto[\s\-_]?connect\w*"
+    r"|\bwireless\s+debugging\b"
+    r"|\bdevice\s*(?:id|serial|list)\b"
+    r"|\bforeground\s+app\b"
+    r"|\busb\b"
+    r"|\btcp\s*/?\s*ip\b"
+    r"|\badb\s+over\s+(?:wi-?fi|network|usb)\b"
+    r"|\bconnect\s+(?:to\s+)?(?:my\s+|the\s+)?(?:android\s+)?(?:phone|device|tablet)\b"
+    r"|\b(?:phone|device|tablet)\s+(?:connect|attach|pair|enumeral)"
+    r"|\bunauthori[sz]ed\b"
+    r"|\bno\s+devices?/emulators\b",
+    re.IGNORECASE,
+)
 
 
 def _needs_phone_link(user_message):
@@ -8361,28 +11304,29 @@ def _needs_phone_link(user_message):
 # command or any ui_* tool wants on-device tools, and a browser tool in that
 # schema is at best dead weight and at worst actively harmful.
 _DEVICE_TASK_RE = re.compile(
-    r'\bphone\b'
-    r'|\bandroid\b'
-    r'|\badb\b'
-    r'|\bui_tap\b'
-    r'|\bui_dump\b'
-    r'|\bui_type\b'
-    r'|\bui_app_open\b'
-    r'|\bui_swipe\b'
-    r'|\bui_screenshot\b'
-    r'|\bui_connect\b'
-    r'|\bui_assert\w*\b'
-    r'|\bui_expect\b'
-    r'|\bui_test_run\b'
-    r'|\bui_key\b'
-    r'|\bui_device\b'
-    r'|\bui_test\b'
-    r'|\bdo\s+not\s+use\s+cdp\b'
-    r'|\bno\s+cdp\b'
-    r'|\bnot\s+use\s+cdp\b'
-    r'|\bwithout\s+cdp\b'
-    r'|\bdevice\s+[A-Z0-9]{6,}\b',
-    re.IGNORECASE)
+    r"\bphone\b"
+    r"|\bandroid\b"
+    r"|\badb\b"
+    r"|\bui_tap\b"
+    r"|\bui_dump\b"
+    r"|\bui_type\b"
+    r"|\bui_app_open\b"
+    r"|\bui_swipe\b"
+    r"|\bui_screenshot\b"
+    r"|\bui_connect\b"
+    r"|\bui_assert\w*\b"
+    r"|\bui_expect\b"
+    r"|\bui_test_run\b"
+    r"|\bui_key\b"
+    r"|\bui_device\b"
+    r"|\bui_test\b"
+    r"|\bdo\s+not\s+use\s+cdp\b"
+    r"|\bno\s+cdp\b"
+    r"|\bnot\s+use\s+cdp\b"
+    r"|\bwithout\s+cdp\b"
+    r"|\bdevice\s+[A-Z0-9]{6,}\b",
+    re.IGNORECASE,
+)
 
 
 def _is_device_task(user_message):
@@ -8400,8 +11344,7 @@ def _strip_cdp_tools(schema):
     is not in the schema the model cannot call it, which is the only reliable
     way to keep a phone task on the device tools.
     """
-    return [t for t in (schema or [])
-            if not t["function"]["name"].startswith("cdp_")]
+    return [t for t in (schema or []) if not t["function"]["name"].startswith("cdp_")]
 
 
 def _needs_model_driven_ui(user_message):
@@ -8414,8 +11357,11 @@ def _explicit_cdp_intent(m):
     """True when the message explicitly names DevTools / CDP / F12. These are
     on-device browser inspections, so they belong to the 'ui' domain where the
     cdp_* tools live - not to 'net' just because "status code" appears."""
-    return bool(re.search(
-        r'\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b', m or ""))
+    return bool(
+        re.search(
+            r"\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b", m or ""
+        )
+    )
 
 
 def _classify_message(user_message):
@@ -8432,56 +11378,166 @@ def _classify_message(user_message):
     # <url>", "is <host> up/down", "reachability", "status code of", "port 443",
     # "no web service". NOTE: 'up'/'down' only count as net when paired with a
     # probe verb, so a UI request like 'screenshot' never flips to network.
-    net_strong = ("curl" in m and (has_url or "url" in m or "reachab" in m
-                                     or "status code" in m or "port " in m or "443" in m)) or \
-                 bool(_reach_re.search(m)) or \
-                 (has_url and bool(re.search(r'\b(up|down)\b', m))) or \
-                 any(k in m for k in ("reachab", "is up", "is down", "status code",
-                     "no ports", "no web service", "up?", "down?", "port ", "443", "8080", "dns"))
+    net_strong = (
+        (
+            "curl" in m
+            and (
+                has_url
+                or "url" in m
+                or "reachab" in m
+                or "status code" in m
+                or "port " in m
+                or "443" in m
+            )
+        )
+        or bool(_reach_re.search(m))
+        or (has_url and bool(re.search(r"\b(up|down)\b", m)))
+        or any(
+            k in m
+            for k in (
+                "reachab",
+                "is up",
+                "is down",
+                "status code",
+                "no ports",
+                "no web service",
+                "up?",
+                "down?",
+                "port ",
+                "443",
+                "8080",
+                "dns",
+            )
+        )
+    )
     # Real on-device UI ACTION intent only (NOT incidental host mentions like
     # 'univenierp'/'portal'/'screen'). This is what stops 'curl
     # https://univenierp01.univen.ac.za/.../portal/...' being misread as a UI
     # request, and what keeps nav intent in the ui bucket.
-    ui_action = any(k in m for k in (
-        "ui_tap", "ui_swipe", "ui_type", "ui_key", "ui_dump", "ui_screenshot",
-        "ui_app_open", "ui_assert", "ui_expect", "ui_test_run",
-        "emulator", "open the app", "go to", "navigate", "navigation",
-        "tap ", "swipe ", "cdp_", "webview", "show me", "take a", "screenshot")) \
-        or _test_task(m)
+    ui_action = any(
+        k in m
+        for k in (
+            "ui_tap",
+            "ui_swipe",
+            "ui_type",
+            "ui_key",
+            "ui_dump",
+            "ui_screenshot",
+            "ui_app_open",
+            "ui_assert",
+            "ui_expect",
+            "ui_test_run",
+            "emulator",
+            "open the app",
+            "go to",
+            "navigate",
+            "navigation",
+            "tap ",
+            "swipe ",
+            "cdp_",
+            "webview",
+            "show me",
+            "take a",
+            "screenshot",
+        )
+    ) or _test_task(m)
     # Situational/ambient UI asks that don't name a tool but DO place the
     # assistant on the device screen: "You are on the ITS portal", "what does
     # the screen show", "what do you see", "read the screen". Without these, the
     # classifier returns 'general' and the whole ui_* toolset vanishes from the
     # schema — the 3B model then narrates a plan it cannot execute.
-    ui_situational = any(k in m for k in (
-        "you are on", "you're on", "we are on", "on the portal",
-        "on the its portal", "what does the screen show", "what do you see",
-        "read the screen", "look at the screen", "on the screen",
-        "see the screen", "the screen shows", "show the screen",
-        "what is on the screen", "what's on the screen", "screen state"))
+    ui_situational = any(
+        k in m
+        for k in (
+            "you are on",
+            "you're on",
+            "we are on",
+            "on the portal",
+            "on the its portal",
+            "what does the screen show",
+            "what do you see",
+            "read the screen",
+            "look at the screen",
+            "on the screen",
+            "see the screen",
+            "the screen shows",
+            "show the screen",
+            "what is on the screen",
+            "what's on the screen",
+            "screen state",
+        )
+    )
     # Strong code-edit signal: a filename with a code extension (e.g.
     # "university_webview_screen.dart") should be treated as pure code work,
     # even if the filename happens to contain a UI word like 'webview'.
     # This prevents the domain gate from firing a clarification menu when the
     # user asks ACEsi to edit/replace a specific code file.
-    _code_exts = ('.dart', '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css',
-                  '.json', '.yaml', '.yml', '.md', '.sh', '.bat', '.rs', '.go',
-                  '.java', '.kt', '.swift', '.c', '.cpp', '.h', '.hpp')
+    _code_exts = (
+        ".dart",
+        ".py",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".html",
+        ".css",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".md",
+        ".sh",
+        ".bat",
+        ".rs",
+        ".go",
+        ".java",
+        ".kt",
+        ".swift",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+    )
     # Word-boundary anchored so ".c" in "example.com" is NOT a code file, but
     # "file.c" / "main.dart" / "index.html" are.
-    _code_ext_re = r'\.(?:' + '|'.join(re.escape(ext[1:]) for ext in _code_exts) + r')\b'
+    _code_ext_re = (
+        r"\.(?:" + "|".join(re.escape(ext[1:]) for ext in _code_exts) + r")\b"
+    )
     # File-access phrases that should route to code domain (not UI navigation).
     _file_access_phrases = (
-        "look for", "find the file", "my pictures", "my files", "my desktop",
-        "my downloads", "open an find", "open and find", "in my pictures",
-        "in my files", "in my desktop", "in my downloads", "pictures folder",
-        "desktop folder", "downloads folder")
-    code_strong = any(k in m for k in (
-        "edit ", "replace ", "write file", "open file", "read file",
-        "edit_file", "write_file", "read_file")) or \
-        any(k in m for k in _file_access_phrases) or \
-        bool(re.search(_code_ext_re, m)) or \
-        bool(re.search(r'\b(?:lib|src|test|assets)/[\w/]+\.\w+', m))
+        "look for",
+        "find the file",
+        "my pictures",
+        "my files",
+        "my desktop",
+        "my downloads",
+        "open an find",
+        "open and find",
+        "in my pictures",
+        "in my files",
+        "in my desktop",
+        "in my downloads",
+        "pictures folder",
+        "desktop folder",
+        "downloads folder",
+    )
+    code_strong = (
+        any(
+            k in m
+            for k in (
+                "edit ",
+                "replace ",
+                "write file",
+                "open file",
+                "read file",
+                "edit_file",
+                "write_file",
+                "read_file",
+            )
+        )
+        or any(k in m for k in _file_access_phrases)
+        or bool(re.search(_code_ext_re, m))
+        or bool(re.search(r"\b(?:lib|src|test|assets)/[\w/]+\.\w+", m))
+    )
     domains = set()
     # Explicit DevTools/CDP inspection is on-device browser work, and the cdp_*
     # tools live in the 'ui' domain. This must win BEFORE either net_strong
@@ -8498,8 +11554,9 @@ def _classify_message(user_message):
     # web_search/curl to gather AND write_file to store. Resolve it to 'general'
     # (code+net+ctrl) BEFORE code_strong fires on the .md target filename, which
     # would otherwise strip web_search entirely.
-    _save_target = bool(re.search(r'\bsave\b.*\bnotes?/', m)) or bool(
-        re.search(r'\bsave\b.*\.(?:md|txt|json|csv)\b', m))
+    _save_target = bool(re.search(r"\bsave\b.*\bnotes?/", m)) or bool(
+        re.search(r"\bsave\b.*\.(?:md|txt|json|csv)\b", m)
+    )
     if _web_research_task(m) and _save_target and not ui_action:
         return {"general"}
     # A strong code-edit signal (filename with code extension, explicit edit
@@ -8521,12 +11578,28 @@ def _classify_message(user_message):
     # "check if" about app behavior (e.g. "open the app, navigate to ITS,
     # check if the 404 is gone") is a UI verification task, not a curl.
     _status_re = re.compile(
-        r'(check\s+(?:if|whether)\s+(?:the\s+)?(?:url|host|server|site|portal|domain)\b|'
-        r'is\s+(?:it|the\s+(?:url|host|server|site|portal|domain))\s+(?:up|down|reachable|'
-        r'working|live|online|accessible)|reachab|status\s+(?:of|code))')
-    _has_net_term = any(k in m for k in (
-        "url", "host", "server", "site", "domain", "curl", "http",
-        "https", "port", "dns", "endpoint", "reachable", "response"))
+        r"(check\s+(?:if|whether)\s+(?:the\s+)?(?:url|host|server|site|portal|domain)\b|"
+        r"is\s+(?:it|the\s+(?:url|host|server|site|portal|domain))\s+(?:up|down|reachable|"
+        r"working|live|online|accessible)|reachab|status\s+(?:of|code))"
+    )
+    _has_net_term = any(
+        k in m
+        for k in (
+            "url",
+            "host",
+            "server",
+            "site",
+            "domain",
+            "curl",
+            "http",
+            "https",
+            "port",
+            "dns",
+            "endpoint",
+            "reachable",
+            "response",
+        )
+    )
     if net_strong and ui_action and _status_re.search(m) and _has_net_term:
         return {"net"}
     # A strong on-device action ("open the app", "navigate to", "go to") with
@@ -8534,15 +11607,52 @@ def _classify_message(user_message):
     # just the name of a page the user wants navigated TO, not a network probe.
     if ui_action and not _has_url_or_curl:
         return {"ui"}
-    if ui_action or ui_situational or any(k in m for k in ("emulator", "cdp_", "webview")):
+    if (
+        ui_action
+        or ui_situational
+        or any(k in m for k in ("emulator", "cdp_", "webview"))
+    ):
         domains.add("ui")
-    if net_strong or ("curl" in m) or any(k in m for k in (
-            "url", "domain", "offline", "reachab", "is up", "is down",
-            "status code", "port ", "443", "8080", "dns", "no ports", "no web service",
-            "web_search")):
+    if (
+        net_strong
+        or ("curl" in m)
+        or any(
+            k in m
+            for k in (
+                "url",
+                "domain",
+                "offline",
+                "reachab",
+                "is up",
+                "is down",
+                "status code",
+                "port ",
+                "443",
+                "8080",
+                "dns",
+                "no ports",
+                "no web service",
+                "web_search",
+            )
+        )
+    ):
         domains.add("net")
-    if any(k in m for k in ("edit", "read", "file", "write", "code", "build",
-                            "apk", "flutter", "git ", "commit", "analyze")):
+    if any(
+        k in m
+        for k in (
+            "edit",
+            "read",
+            "file",
+            "write",
+            "code",
+            "build",
+            "apk",
+            "flutter",
+            "git ",
+            "commit",
+            "analyze",
+        )
+    ):
         domains.add("code")
     if any(k in m for k in ("restart", "relaunch", "heal", "self-host", "ollama")):
         domains.add("ctrl")
@@ -8568,7 +11678,9 @@ def _domain_tool_names(domain):
     """Tool names allowed for a given domain (general = code + net + ctrl, i.e. the
     file/shell/web toolset but NOT on-device UI work)."""
     if domain == "general":
-        return {n for n, d in _TOOL_DOMAINS.items() if _dom_set(d) & {"code", "net", "ctrl"}}
+        return {
+            n for n, d in _TOOL_DOMAINS.items() if _dom_set(d) & {"code", "net", "ctrl"}
+        }
     return {n for n, d in _TOOL_DOMAINS.items() if domain in _dom_set(d)}
 
 
@@ -8583,14 +11695,32 @@ _LLM_INPUT_TOKEN_BUDGET = 6200
 # find things on the web/file system. Everything else is droppable when the
 # payload is too big for the provider.
 _LLM_CORE_TOOLS = {
-    "web_search", "view_web_image", "webfetch", "curl",
-    "view_user_file", "list_user_files", "read_file", "grep", "list_files",
-    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
-    "ui_dump", "ui_screenshot", "ui_app_open", "ui_tap", "ui_type", "ui_swipe",
+    "web_search",
+    "view_web_image",
+    "webfetch",
+    "curl",
+    "view_user_file",
+    "list_user_files",
+    "read_file",
+    "grep",
+    "list_files",
+    "open_in_vscode",
+    "edit_file",
+    "get_notifications",
+    "check_email",
+    "notify",
+    "ui_dump",
+    "ui_screenshot",
+    "ui_app_open",
+    "ui_tap",
+    "ui_type",
+    "ui_swipe",
 }
 
 
-def _fit_schema_to_budget(messages, tools_schema, max_tokens, budget=_LLM_INPUT_TOKEN_BUDGET):
+def _fit_schema_to_budget(
+    messages, tools_schema, max_tokens, budget=_LLM_INPUT_TOKEN_BUDGET
+):
     """Drop the least important tools until prompt+schema fits the provider cap.
 
     Providers reject an oversized request with 413 and llm_reply then falls
@@ -8598,24 +11728,27 @@ def _fit_schema_to_budget(messages, tools_schema, max_tokens, budget=_LLM_INPUT_
     really a payload-size problem. Core tools are never dropped; the rest are
     removed largest-first until the estimated token count fits.
     """
+
     def est(tools):
-        payload = json.dumps({"messages": messages, "tools": tools,
-                              "max_tokens": max_tokens})
+        payload = json.dumps(
+            {"messages": messages, "tools": tools, "max_tokens": max_tokens}
+        )
         return len(payload) // 4
 
     tools = list(tools_schema)
     if est(tools) <= budget:
         return tools
-    droppable = [t for t in tools
-                 if t["function"]["name"] not in _LLM_CORE_TOOLS]
+    droppable = [t for t in tools if t["function"]["name"] not in _LLM_CORE_TOOLS]
     # Biggest schemas cost the most tokens, so shed those first.
     droppable.sort(key=lambda t: len(json.dumps(t)), reverse=True)
     for t in droppable:
         if est(tools) <= budget:
             break
         tools.remove(t)
-    print("✂️ schema trimmed %d -> %d tools to fit %d-token budget (est %d)"
-          % (len(tools_schema), len(tools), budget, est(tools)))
+    print(
+        "✂️ schema trimmed %d -> %d tools to fit %d-token budget (est %d)"
+        % (len(tools_schema), len(tools), budget, est(tools))
+    )
     return tools
 
 
@@ -8654,8 +11787,9 @@ def _estimate_tokens(obj):
 
 
 def _payload_tokens(messages, tools_schema, max_tokens):
-    return _estimate_tokens({"messages": messages, "tools": tools_schema or [],
-                             "max_tokens": max_tokens})
+    return _estimate_tokens(
+        {"messages": messages, "tools": tools_schema or [], "max_tokens": max_tokens}
+    )
 
 
 def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
@@ -8666,7 +11800,7 @@ def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
     """
     try:
         sysmsg = ""
-        for m in (messages or []):
+        for m in messages or []:
             if m.get("role") == "system":
                 sysmsg = m.get("content") or ""
                 break
@@ -8680,7 +11814,9 @@ def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
         # keep the real figure in context_block_tokens for diagnosis.
         mem_in_prompt = _estimate_tokens(sysmsg) >= int(_LAST_CONTEXT_TOKENS or 0) > 0
         breakdown = {
-            "requested_input_tokens": _payload_tokens(messages, tools_schema, max_tokens),
+            "requested_input_tokens": _payload_tokens(
+                messages, tools_schema, max_tokens
+            ),
             "tools_schema_tokens": _estimate_tokens(tools_schema or []),
             "system_prompt_tokens": _estimate_tokens(sysmsg),
             "memory_tokens": int(_LAST_CONTEXT_TOKENS or 0) if mem_in_prompt else 0,
@@ -8694,10 +11830,13 @@ def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
         detail = " ".join("%s=%s" % (k, v) for k, v in breakdown.items())
         # note goes in args, not detail: detail is length-capped, and a cap that
         # silently amputates the reason field defeats the point of the record.
-        audit_write("provider-tokens", name,
-                    {"model": model, "n_tools": breakdown["n_tools"],
-                     "note": note},
-                    True, detail[:420])
+        audit_write(
+            "provider-tokens",
+            name,
+            {"model": model, "n_tools": breakdown["n_tools"], "note": note},
+            True,
+            detail[:420],
+        )
         return breakdown
     except Exception:
         return {}
@@ -8741,28 +11880,55 @@ _SHORT_DESCRIPTIONS = {
 
 # Shedding order under budget pressure: first listed is the last to go. The
 # network-inspection tools lead because reading a POST is the task that was
-# blocked; screen tools follow; shell and file access trail.
+# blocked; screen tools follow; web search and shell/file access trail.
 _REDUCED_TOOL_ORDER = [
-    "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
-    "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
+    "cdp_network_requests",
+    "cdp_get_response_body",
+    "cdp_navigate",
+    "cdp_evaluate",
+    "cdp_dom_state",
+    "cdp_connect",
+    "cdp_console_logs",
     "cdp_status",
-    "ui_connect", "ui_device",
-    "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_swipe", "ui_key",
+    "ui_connect",
+    "ui_device",
+    "ui_dump",
+    "ui_app_open",
+    "ui_tap",
+    "ui_type",
+    "ui_swipe",
+    "ui_key",
     "ui_screenshot",
-    "run_command", "read_file",
+    "web_search",
+    "webfetch",
+    "curl",
+    "run_command",
+    "read_file",
 ]
 # Never shed these: without them a network or navigation task cannot be done at
 # all, so losing them would turn a working reduced schema into a useless one.
-_REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
-                      "cdp_network_requests", "cdp_get_response_body"}
+_REDUCED_MUST_KEEP = {
+    "cdp_connect",
+    "cdp_navigate",
+    "cdp_evaluate",
+    "cdp_network_requests",
+    "cdp_get_response_body",
+}
 
 # The toolset a reduced browser task is actually required to carry. These are
 # protected from budget shedding for the same reason: a schema that silently
 # drops ui_screenshot or run_command still "fits the budget" but can no longer
 # finish the job, and the failure only shows up later as a confused agent.
 _REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
-    "ui_app_open", "ui_tap", "ui_dump", "ui_type", "ui_screenshot",
+    "ui_app_open",
+    "ui_tap",
+    "ui_dump",
+    "ui_type",
+    "ui_screenshot",
     "run_command",
+    "web_search",
+    "webfetch",
+    "curl",
 }
 
 # Tools a device-connect task cannot be done without, protected from shedding
@@ -8771,25 +11937,33 @@ _REDUCED_REQUIRED = _REDUCED_MUST_KEEP | {
 # ui_connect was missing from the reduced pool altogether: the model was never
 # offered it, so it reached for `adb devices -l` through run_command and then
 # filled the rest of the run with browser tools it did have.
-_REDUCED_DEVICE_REQUIRED = {"ui_connect", "ui_device", "ui_tap", "ui_dump",
-                            "ui_type", "ui_swipe", "ui_key"}
+_REDUCED_DEVICE_REQUIRED = {
+    "ui_connect",
+    "ui_device",
+    "ui_tap",
+    "ui_dump",
+    "ui_type",
+    "ui_swipe",
+    "ui_key",
+}
 
 # Budgets are TOTAL input tokens (system prompt + schema + history), matching
 # how Groq's ITPM and OpenRouter's balance are actually metered.
 GROQ_REDUCED_BUDGET = 1500
 OPENROUTER_REDUCED_BUDGET = 3000
+OPENCODE_REDUCED_BUDGET = 3000
 
 # Floor for the schema budget. The required toolset below is ~1400 tokens on
 # its own, so a total-input budget cannot be honoured by stripping tools without
 # producing a schema that can no longer finish the task. Below this floor the
 # budget stops being a target, and the total lands where the required set puts
 # it (~1900-2200). That is still ~3x under Groq's measured 7000 ITPM cap.
-_REDUCED_SCHEMA_FLOOR = 1200
+_REDUCED_SCHEMA_FLOOR = 2500
 
-# Providers that get the reduced payload. Groq and OpenRouter are on free tiers
+# Providers that get the reduced payload. Groq, OpenRouter, and OpenCode are on free tiers
 # that reject the full prompt outright; Cerebras and FreeLLM are reached with the
 # full one and fall back reactively via the 413 handler in _chat_one.
-REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter"}
+REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter", "OpenCode"}
 _REDUCED_ENV = os.environ.get("ACE_REDUCED_MODE", "")
 if _REDUCED_ENV:
     REDUCED_MODE_PROVIDERS = {p.strip() for p in _REDUCED_ENV.split(",") if p.strip()}
@@ -8801,11 +11975,16 @@ def _short_tool(t):
     short = _SHORT_DESCRIPTIONS.get(name)
     if not short:
         return None
-    out = {"type": "function", "function": {
-        "name": name,
-        "description": short,
-        "parameters": t["function"].get("parameters", {"type": "object", "properties": {}}),
-    }}
+    out = {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": short,
+            "parameters": t["function"].get(
+                "parameters", {"type": "object", "properties": {}}
+            ),
+        },
+    }
     # An empty properties object still costs tokens and confuses some providers.
     params = out["function"]["parameters"]
     if isinstance(params, dict) and not params.get("properties"):
@@ -8819,8 +11998,16 @@ _PASSWORD_BLOBS = ("password", "passwd")
 # moment the next call has to be the submit. Watching only for a password fill
 # missed the observed failure, where the model filled the USERNAME and then
 # read the network panel, skipping the password field altogether.
-_FIELD_BLOBS = ("password", "passwd", "username", "user_name", "email",
-                "login", "#user", "name=\"user")
+_FIELD_BLOBS = (
+    "password",
+    "passwd",
+    "username",
+    "user_name",
+    "email",
+    "login",
+    "#user",
+    'name="user',
+)
 
 
 def _args_blob(args):
@@ -8838,10 +12025,12 @@ def _is_form_submit_call(name, args):
     network panel that has nothing in it, which is the exact stall this guards.
     """
     if name in ("ui_key",):
-        return True                      # Enter is a submit on a login form
+        return True  # Enter is a submit on a login form
     if name == "ui_tap":
-        return any(h in _args_blob(args)
-                   for h in ("submit", "login", "sign in", "signin", "log in"))
+        return any(
+            h in _args_blob(args)
+            for h in ("submit", "login", "sign in", "signin", "log in")
+        )
     if name in ("cdp_evaluate", "run_command", "ui_type"):
         blob = _args_blob(args)
         return any(h in blob for h in _SUBMIT_BLOBS)
@@ -8873,16 +12062,28 @@ def _is_field_fill(name, args):
     if not any(h in blob for h in _FIELD_BLOBS):
         return False
     # A fill assigns; a read merely inspects.
-    return any(h in blob for h in (".value =", ".value=", "= '", "=\"",
-                                   "setvalue", "setattribute", "input.value"))
+    return any(
+        h in blob
+        for h in (
+            ".value =",
+            ".value=",
+            "= '",
+            '="',
+            "setvalue",
+            "setattribute",
+            "input.value",
+        )
+    )
 
 
-_SUBMIT_NUDGE = ("SUBMIT NOW. You just filled the password field, so the form is "
-                 "filled but not sent and there is no POST to read yet. Call "
-                 "cdp_evaluate right now to click the submit button (or call "
-                 "form.requestSubmit() / button.click()). Do not screenshot, do "
-                 "not dump the DOM, do not call cdp_network_requests. The submit "
-                 "must be this next tool call.")
+_SUBMIT_NUDGE = (
+    "SUBMIT NOW. You just filled the password field, so the form is "
+    "filled but not sent and there is no POST to read yet. Call "
+    "cdp_evaluate right now to click the submit button (or call "
+    "form.requestSubmit() / button.click()). Do not screenshot, do "
+    "not dump the DOM, do not call cdp_network_requests. The submit "
+    "must be this next tool call."
+)
 
 _NETWORK_READ_TOOLS = ("cdp_network_requests", "cdp_get_response_body")
 
@@ -8894,30 +12095,42 @@ def _is_network_read_call(name, args):
     if name in ("cdp_evaluate", "run_command"):
         blob = _args_blob(args)
         # A JS read of performance entries counts: it is the same data.
-        return any(h in blob for h in ("performance.getentries", "getentriesbytype",
-                                       "performance.getentriesbyname"))
+        return any(
+            h in blob
+            for h in (
+                "performance.getentries",
+                "getentriesbytype",
+                "performance.getentriesbyname",
+            )
+        )
     return False
 
 
-_READ_NUDGE = ("READ THE POST NOW. The form has been submitted, so the request "
-               "exists. Call cdp_network_requests now (filter on "
-               "url_contains 'authenticate', or filter_status '302'/'303') and "
-               "report its status code, URL and whether it has a body. Do not "
-               "re-fill the form, do not re-submit, do not screenshot.")
+_READ_NUDGE = (
+    "READ THE POST NOW. The form has been submitted, so the request "
+    "exists. Call cdp_network_requests now (filter on "
+    "url_contains 'authenticate', or filter_status '302'/'303') and "
+    "report its status code, URL and whether it has a body. Do not "
+    "re-fill the form, do not re-submit, do not screenshot."
+)
 
-_FIELD_NUDGE = ("FINISH THE FORM FIRST. You have filled one field, so the form "
-                "is not ready to send and there is no POST to read yet. Your "
-                "next call must be another cdp_evaluate that fills the "
-                "remaining field (the password, if you have not filled it), or "
-                "the cdp_evaluate that clicks submit. Do not call "
-                "cdp_network_requests, do not screenshot, do not dump the DOM.")
+_FIELD_NUDGE = (
+    "FINISH THE FORM FIRST. You have filled one field, so the form "
+    "is not ready to send and there is no POST to read yet. Your "
+    "next call must be another cdp_evaluate that fills the "
+    "remaining field (the password, if you have not filled it), or "
+    "the cdp_evaluate that clicks submit. Do not call "
+    "cdp_network_requests, do not screenshot, do not dump the DOM."
+)
 
-_REPEAT_FIELD_NUDGE = ("STOP REPEATING THAT FILL. You have already filled this "
-                       "field; setting it again changes nothing and the run "
-                       "cannot finish. Do exactly one of these two things now: "
-                       "fill the NEXT unfilled field (the password, if the "
-                       "username is already in), or click submit. Do not call "
-                       "the same cdp_evaluate again.")
+_REPEAT_FIELD_NUDGE = (
+    "STOP REPEATING THAT FILL. You have already filled this "
+    "field; setting it again changes nothing and the run "
+    "cannot finish. Do exactly one of these two things now: "
+    "fill the NEXT unfilled field (the password, if the "
+    "username is already in), or click submit. Do not call "
+    "the same cdp_evaluate again."
+)
 
 
 def _field_key(args):
@@ -8966,16 +12179,20 @@ def _norm_js(s):
 def _batch_sig(batch):
     parts = []
     for nm, a in batch:
-        if (nm == "cdp_evaluate" and isinstance(a, dict)
-                and isinstance(a.get("expr"), str)):
+        if (
+            nm == "cdp_evaluate"
+            and isinstance(a, dict)
+            and isinstance(a.get("expr"), str)
+        ):
             parts.append((nm, _norm_js(a["expr"])))
         else:
             parts.append((nm, json.dumps(a or {}, sort_keys=True)))
     return tuple(parts)
 
 
-def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
-                           reserve=0):
+def _reduced_schema_budget(
+    total_budget, msgs, tools_schema, max_tokens=4096, reserve=0
+):
     """Turn a TOTAL input budget into the schema budget actually available.
 
     Passing the total straight through to the schema makes the number a lie: the
@@ -8985,7 +12202,18 @@ def _reduced_schema_budget(total_budget, msgs, tools_schema, max_tokens=4096,
     task needs to finish.
     """
     used = _estimate_tokens(msgs) + int(reserve or 0)
-    return max(_REDUCED_SCHEMA_FLOOR, int(total_budget) - used)
+    result = max(_REDUCED_SCHEMA_FLOOR, int(total_budget) - used)
+    # DEBUG
+    try:
+        with open(
+            "C:/Users/chris/StudentSyncSA/debug_budget.txt", "a", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"_reduced_schema_budget: total_budget={total_budget}, used={used}, floor={_REDUCED_SCHEMA_FLOOR}, result={result}\n"
+            )
+    except:
+        pass
+    return result
 
 
 def _reduced_tool_pool(active_domain, fallback_schema):
@@ -9001,13 +12229,27 @@ def _reduced_tool_pool(active_domain, fallback_schema):
     own _REDUCED_TOOL_ORDER decides the shape. Every other domain keeps the
     existing filtered behaviour, because there the cap is doing real work.
     """
-    if active_domain in ("ui", "net"):
+    # "general" domain tasks may need web_search, run_command, or any tool.
+    # Using the full TOOLS_SCHEMA as pool ensures the reduced builder can
+    # select the right tools via _REDUCED_TOOL_ORDER.
+    # DEBUG
+    try:
+        with open(
+            "C:/Users/chris/StudentSyncSA/debug_pool.txt", "a", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"_reduced_tool_pool: active_domain={active_domain}, fallback_size={len(fallback_schema) if fallback_schema else 0}, returning={'TOOLS_SCHEMA' if active_domain in ('ui', 'net', 'general') else 'fallback'}\n"
+            )
+    except:
+        pass
+    if active_domain in ("ui", "net", "general"):
         return TOOLS_SCHEMA
     return fallback_schema
 
 
-def build_reduced_schema(base_schema, want_files=False, budget=None,
-                         want_device=False, drop_cdp=False):
+def build_reduced_schema(
+    base_schema, want_files=False, budget=None, want_device=False, drop_cdp=False
+):
     """Task-shaped tool subset with one-sentence descriptions, ordered so the
     tools a network/UI task needs survive any budget-driven shedding.
 
@@ -9015,6 +12257,21 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
     still decides which family of tools is eligible; this only cuts it down to
     the ones that matter and strips the prose.
     """
+    # DEBUG
+    try:
+        with open(
+            "C:/Users/chris/StudentSyncSA/debug_pool.txt", "a", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"build_reduced_schema: base_schema size={len(base_schema) if base_schema else 0}, want_files={want_files}, want_device={want_device}, budget={budget}\n"
+            )
+            if base_schema:
+                names = [t["function"]["name"] for t in base_schema]
+                f.write(
+                    f"  pool has web_search={'web_search' in names}, webfetch={'webfetch' in names}, curl={'curl' in names}\n"
+                )
+    except:
+        pass
     if drop_cdp:
         # The reduced builder for a ui/net task is handed the full TOOLS_SCHEMA
         # rather than the domain-filtered one, so removing cdp_* from
@@ -9058,8 +12315,10 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
             if nm not in protected:
                 tools.pop(i)
             i -= 1
-    print("🪶 reduced schema: %d -> %d tools, ~%d tokens"
-          % (len(base_schema or []), len(tools), _estimate_tokens(tools)))
+    print(
+        "🪶 reduced schema: %d -> %d tools, ~%d tokens"
+        % (len(base_schema or []), len(tools), _estimate_tokens(tools))
+    )
     return tools
 
 
@@ -9077,7 +12336,7 @@ _REDUCED_SYS = (
     "4. Only THEN call cdp_network_requests to inspect the resulting POST.\n"
     "Do NOT screenshot, dump the DOM, or evaluate anything else between steps 2 and 3. "
     "The submit must be the very next tool call after the last field is filled.\n"
-    "Emit ONE tool call per message as JSON: {\"tool\": \"<name>\", \"args\": {...}}.\n"
+    'Emit ONE tool call per message as JSON: {"tool": "<name>", "args": {...}}.\n'
     "Never narrate between calls (no 'I will', no commentary) - just call the next tool.\n"
     "When the task is done, stop calling tools and reply with a short plain report of the result.\n"
     "For anything about HTTP, status codes or request bodies, read the DevTools Network panel "
@@ -9131,7 +12390,7 @@ def _shrink_messages_for_retry(msgs, cut):
             out.append(m)
         return out
     if cut == 1:
-        head = (system[:1] + users[:1])
+        head = system[:1] + users[:1]
         tail = tools[-1:] + asst[-1:]
         return head + tail
     # cut 2: the task and nothing else.
@@ -9202,9 +12461,23 @@ def _clip_dump(text, limit):
         (nodes if seen_count else head).append(ln)
     if not nodes:
         return flat[:limit] + " [...]"
-    keep_words = ("select", "dropdown", "checkbox", "radio", "next", "submit",
-                  "accept", "agree", "confirm", "continue", "student number",
-                  "already have", "option", "spinner")
+    keep_words = (
+        "select",
+        "dropdown",
+        "checkbox",
+        "radio",
+        "next",
+        "submit",
+        "accept",
+        "agree",
+        "confirm",
+        "continue",
+        "student number",
+        "already have",
+        "option",
+        "spinner",
+    )
+
     def _tier(ln):
         """0 = a named form control, 1 = tappable, 2 = plain text.
 
@@ -9219,12 +12492,15 @@ def _clip_dump(text, limit):
         if " @ tap(" in ln:
             return 1
         return 2
+
     nodes_sorted = sorted(nodes, key=_tier)
     out, size, kept_nodes = [], 0, 0
+
     def _add(ln):
         nonlocal size
         out.append(ln)
         size += len(ln) + 1
+
     for ln in head:
         _add(ln)
     for ln in nodes_sorted:
@@ -9233,9 +12509,11 @@ def _clip_dump(text, limit):
         _add(ln)
         kept_nodes += 1
     if kept_nodes < len(nodes):
-        out.append("...[%d of %d node(s) hidden to fit the token budget; the "
-                   "controls you can act on are all above - re-run ui_dump for "
-                   "the full screen]" % (len(nodes) - kept_nodes, len(nodes)))
+        out.append(
+            "...[%d of %d node(s) hidden to fit the token budget; the "
+            "controls you can act on are all above - re-run ui_dump for "
+            "the full screen]" % (len(nodes) - kept_nodes, len(nodes))
+        )
     return "\n".join(out)
 
 
@@ -9264,16 +12542,22 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
     for i, m in enumerate(rest):
         role = m.get("role")
         if role == "tool":
-            keep.append({"role": "tool",
-                         "content": _clip_tool_result(m.get("name"),
-                                                       m.get("content"), 1200),
-                         "tool_call_id": m.get("tool_call_id"),
-                         "name": m.get("name")})
+            keep.append(
+                {
+                    "role": "tool",
+                    "content": _clip_tool_result(m.get("name"), m.get("content"), 1200),
+                    "tool_call_id": m.get("tool_call_id"),
+                    "name": m.get("name"),
+                }
+            )
         elif i == first_user_at:
             keep.append({"role": "user", "content": _clip(m.get("content"), 900)})
     # Recent conversational turns, minus anything already kept above.
-    tail = [m for i, m in enumerate(rest)
-            if m.get("role") in ("user", "assistant") and i != first_user_at]
+    tail = [
+        m
+        for i, m in enumerate(rest)
+        if m.get("role") in ("user", "assistant") and i != first_user_at
+    ]
     for m in tail[-2:]:
         keep.append({"role": m["role"], "content": _clip(m.get("content"), 600)})
 
@@ -9294,7 +12578,7 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
 
 
 def _first_user_text(messages):
-    for m in (messages or []):
+    for m in messages or []:
         if m.get("role") == "user":
             return m.get("content") or ""
     return ""
@@ -9314,7 +12598,8 @@ _MISSING_TOOL_REFUSAL_RE = re.compile(
     r"(?:cdp_[a-z_]+|devtools|chrome devtools protocol)[^.]{0,60}?"
     r"(?:not available|unavailable|isn't available|not present|missing|"
     r"cannot|can't|removed|disabled)",
-    re.IGNORECASE)
+    re.IGNORECASE,
+)
 
 
 def _device_tool_refusal(text):
@@ -9336,7 +12621,8 @@ _DEVICE_STALL_MSG = (
     "read the screen (it gives you tap(x,y) coordinates for every element), "
     "then ui_tap to act, and ui_dump again to verify. If the screen does not "
     "contain what the task needs, say what IS on the screen instead of "
-    "reporting that a tool is missing. Do not apologise; act.")
+    "reporting that a tool is missing. Do not apologise; act."
+)
 
 
 # Appended instead of _REDUCED_SYS's CDP protocol when the task is a device
@@ -9414,17 +12700,20 @@ def _load_ace_config():
     global _ACE_CONFIG, _ACE_CONTEXTS, _ACE_DEFAULT_CTX
     try:
         import yaml
-        path = os.path.join(DATA_DIR, 'ace_config.yaml')
+
+        path = os.path.join(DATA_DIR, "ace_config.yaml")
         if not os.path.isfile(path):
             return
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
         _ACE_CONFIG = cfg
-        _ACE_CONTEXTS = cfg.get('contexts') or {}
-        glob = cfg.get('global') or {}
-        _ACE_DEFAULT_CTX = glob.get('default_context', 'studentsyncsa')
-        print("🧠 ace_config.yaml loaded: contexts=%s default=%s" % (
-            ", ".join(_ACE_CONTEXTS.keys()), _ACE_DEFAULT_CTX))
+        _ACE_CONTEXTS = cfg.get("contexts") or {}
+        glob = cfg.get("global") or {}
+        _ACE_DEFAULT_CTX = glob.get("default_context", "studentsyncsa")
+        print(
+            "🧠 ace_config.yaml loaded: contexts=%s default=%s"
+            % (", ".join(_ACE_CONTEXTS.keys()), _ACE_DEFAULT_CTX)
+        )
     except Exception as e:
         print(f"⚠️ ace_config.yaml load failed (contexts disabled): {e}")
 
@@ -9437,7 +12726,11 @@ def _context_by_domain(domain):
     if not _ACE_CONTEXTS:
         return _ACE_DEFAULT_CTX or "studentsyncsa"
     if domain == "ui":
-        return "studentsyncsa" if "studentsyncsa" in _ACE_CONTEXTS else (_ACE_DEFAULT_CTX or "generic")
+        return (
+            "studentsyncsa"
+            if "studentsyncsa" in _ACE_CONTEXTS
+            else (_ACE_DEFAULT_CTX or "generic")
+        )
     if domain == "net":
         return "web_only" if "web_only" in _ACE_CONTEXTS else "generic"
     if domain == "code":
@@ -9448,38 +12741,45 @@ def _context_by_domain(domain):
 def _context_tool_policy(ctx_name):
     """(allowed_domains, allowed_tools) for a context, or (None, None) = no cap."""
     ctx = (_ACE_CONTEXTS or {}).get(ctx_name) or {}
-    caps_name = ctx.get('tool_caps')
-    caps = (_ACE_CONFIG.get('tool_caps') or {}).get(caps_name) if caps_name else None
+    caps_name = ctx.get("tool_caps")
+    caps = (_ACE_CONFIG.get("tool_caps") or {}).get(caps_name) if caps_name else None
     if not caps:
         return None, None
-    return caps.get('allowed'), set(caps.get('tools') or [])
+    return caps.get("allowed"), set(caps.get("tools") or [])
 
 
 def _context_overlay(ctx_name):
     """System-prompt overlay (known structure + persona) for the active context."""
     ctx = (_ACE_CONTEXTS or {}).get(ctx_name) or {}
-    overlay = (ctx.get('prompt_overlay') or '').strip()
-    known = (ctx.get('known_structure') or '').strip()
+    overlay = (ctx.get("prompt_overlay") or "").strip()
+    known = (ctx.get("known_structure") or "").strip()
     parts = []
     if overlay:
         parts.append(overlay)
     if known and known not in overlay:
         parts.append(known)
-    if ctx.get('type'):
-        parts.append("[Active context: %s (%s)]" % (ctx.get('name') or ctx_name, ctx.get('type')))
+    if ctx.get("type"):
+        parts.append(
+            "[Active context: %s (%s)]" % (ctx.get("name") or ctx_name, ctx.get("type"))
+        )
     return "\n".join(parts)
 
 
-@app.route('/context', methods=['GET'])
+@app.route("/context", methods=["GET"])
 def context_endpoint():
     st = _kill_state()
-    return jsonify({
-        "armed": st.get("armed"),
-        "default": _ACE_DEFAULT_CTX,
-        "contexts": {k: ((v or {}).get('name') or k) for k, v in (_ACE_CONTEXTS or {}).items()},
-        "active": _ctx_last.get('name'),
-        "active_overlay": _ctx_last.get('overlay'),
-    })
+    return jsonify(
+        {
+            "armed": st.get("armed"),
+            "default": _ACE_DEFAULT_CTX,
+            "contexts": {
+                k: ((v or {}).get("name") or k)
+                for k, v in (_ACE_CONTEXTS or {}).items()
+            },
+            "active": _ctx_last.get("name"),
+            "active_overlay": _ctx_last.get("overlay"),
+        }
+    )
 
 
 # Models routinely reach for snake_case / wrong-spelling variants of a tool
@@ -9489,15 +12789,28 @@ def context_endpoint():
 # and, for anything still unknown, return a normal tool error so the model can
 # correct itself instead of the request dying.
 _TOOL_ALIASES = {
-    "web_fetch": "webfetch", "webfetch_url": "webfetch", "fetch_url": "webfetch",
-    "web_search_tool": "web_search", "websearch": "web_search", "search_web": "web_search",
-    "google": "web_search", "browse": "webfetch", "browse_url": "webfetch",
-    "list_files": "list_user_files", "my_files": "list_user_files",
-    "open_file": "open_user_file", "view_file": "view_user_file",
-    "read_file": "read_user_file", "show_file": "view_user_file",
-    "screenshot": "ui_screenshot", "screen_dump": "ui_dump",
-    "tap": "ui_tap", "swipe": "ui_swipe", "type_text": "ui_type",
-    "press": "ui_key", "open_app": "ui_app_open",
+    "web_fetch": "webfetch",
+    "webfetch_url": "webfetch",
+    "fetch_url": "webfetch",
+    "web_search_tool": "web_search",
+    "websearch": "web_search",
+    "search_web": "web_search",
+    "google": "web_search",
+    "browse": "webfetch",
+    "browse_url": "webfetch",
+    "list_files": "list_user_files",
+    "my_files": "list_user_files",
+    "open_file": "open_user_file",
+    "view_file": "view_user_file",
+    "read_file": "read_user_file",
+    "show_file": "view_user_file",
+    "screenshot": "ui_screenshot",
+    "screen_dump": "ui_dump",
+    "tap": "ui_tap",
+    "swipe": "ui_swipe",
+    "type_text": "ui_type",
+    "press": "ui_key",
+    "open_app": "ui_app_open",
 }
 
 
@@ -9521,12 +12834,20 @@ def _call_tool(name, args):
         return False, "E-STOP is armed — no tools run."
     resolved = _resolve_tool_name(name)
     if resolved is None:
-        near = [t for t in TOOLS if str(name or "").lower() in t or t in str(name or "").lower()]
+        near = [
+            t
+            for t in TOOLS
+            if str(name or "").lower() in t or t in str(name or "").lower()
+        ]
         audit_write("tool", name, args or {}, False, "unknown tool name")
         return False, (
             "unknown tool %r. Valid tools: %s.%s"
-            % (name, ", ".join(sorted(TOOLS)[:40]),
-               (" Did you mean: %s?" % ", ".join(near)) if near else ""))
+            % (
+                name,
+                ", ".join(sorted(TOOLS)[:40]),
+                (" Did you mean: %s?" % ", ".join(near)) if near else "",
+            )
+        )
     if resolved != name:
         audit_write("tool", name, args or {}, True, "resolved alias -> %s" % resolved)
         name = resolved
@@ -9537,13 +12858,23 @@ def _call_tool(name, args):
         if k not in args or args[k] is None or args[k] == "":
             missing.append(k)
     if missing:
-        audit_write("tool", name, args, False, "missing args: %s" % ", ".join("%r" % m for m in missing))
-        return False, ("ui tool error: missing REQUIRED argument%s %s "
-                       "(you passed %r). Pass every argument as a non-null value, "
-                       "e.g. ui_tap {\"x\": 540, \"y\": 1200}."
-                       % ("s" if len(missing) > 1 else "",
-                          ", ".join("%r" % m for m in missing),
-                          {k: v for k, v in args.items()}))
+        audit_write(
+            "tool",
+            name,
+            args,
+            False,
+            "missing args: %s" % ", ".join("%r" % m for m in missing),
+        )
+        return False, (
+            "ui tool error: missing REQUIRED argument%s %s "
+            "(you passed %r). Pass every argument as a non-null value, "
+            'e.g. ui_tap {"x": 540, "y": 1200}.'
+            % (
+                "s" if len(missing) > 1 else "",
+                ", ".join("%r" % m for m in missing),
+                {k: v for k, v in args.items()},
+            )
+        )
     kwargs = {}
     for k in keys:
         if k in args and args[k] is not None:
@@ -9560,7 +12891,14 @@ def _call_tool(name, args):
     return res
 
 
-_UI_SCREEN_TOOLS = {"ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key", "ui_screenshot"}
+_UI_SCREEN_TOOLS = {
+    "ui_app_open",
+    "ui_tap",
+    "ui_swipe",
+    "ui_type",
+    "ui_key",
+    "ui_screenshot",
+}
 _BATCH_MAX = 6
 
 
@@ -9597,7 +12935,7 @@ _CERT_WARNING_MARKERS = (
 _CERT_WARNING_DIRECTIVE = (
     "⚠️ CHROME WARNING: the screen above is Chrome's HTTPS/cert/HSTS warning for "
     "the ITS portal (expired/invalid certificate — the site itself is reachable "
-    "and safe to continue). Bypass it by calling ui_type {\"text\": \"thisisunsafe\"} "
+    'and safe to continue). Bypass it by calling ui_type {"text": "thisisunsafe"} '
     "— type thisisunsafe anywhere on the warning page (no Enter key needed). Then "
     "call ui_dump to confirm the portal loaded. If the wizard then shows 'Access "
     "Denied / restart the wizard process in a new window', clear Chrome's omnibox "
@@ -9625,14 +12963,22 @@ def _auto_bypass_cert_warning(dump_text):
         return []
     msgs = []
     _bok, _bres = _call_tool("ui_type", {"text": "thisisunsafe"})
-    msgs.append({"role": "user", "content":
-        "I detected Chrome's HTTPS warning and ALREADY typed thisisunsafe myself "
-        "(ok=%s): %s" % (_bok, str(_bres)[:200])})
+    msgs.append(
+        {
+            "role": "user",
+            "content": "I detected Chrome's HTTPS warning and ALREADY typed thisisunsafe myself "
+            "(ok=%s): %s" % (_bok, str(_bres)[:200]),
+        }
+    )
     _dok, _dtxt = _ui_auto_dump()
     if _dok:
-        msgs.append({"role": "user", "content":
-            "SCREEN STATE after auto-bypassing the warning (auto ui_dump):\n%s%s" % (
-                str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+        msgs.append(
+            {
+                "role": "user",
+                "content": "SCREEN STATE after auto-bypassing the warning (auto ui_dump):\n%s%s"
+                % (str(_dtxt)[:2000], _cert_warning_directive(_dtxt)),
+            }
+        )
     else:
         msgs.append({"role": "user", "content": _dtxt})
     return msgs
@@ -9640,9 +12986,20 @@ def _auto_bypass_cert_warning(dump_text):
 
 def _nav_task(user_message):
     m = (user_message or "").lower()
-    return any(k in m for k in (
-        "screenshot", "portal", "navigate", "navigation", "open the app",
-        "go to", "show me", "show us", "take a"))
+    return any(
+        k in m
+        for k in (
+            "screenshot",
+            "portal",
+            "navigate",
+            "navigation",
+            "open the app",
+            "go to",
+            "show me",
+            "show us",
+            "take a",
+        )
+    )
 
 
 def _ui_situational_ask(user_message):
@@ -9651,12 +13008,27 @@ def _ui_situational_ask(user_message):
     'You are on the ITS portal', 'what does the screen show'). For these, the
     right first tool is ui_dump, not ui_app_open."""
     m = (user_message or "").lower()
-    return any(k in m for k in (
-        "you are on", "you're on", "we are on", "on the portal",
-        "on the its portal", "what does the screen show", "what do you see",
-        "read the screen", "look at the screen", "on the screen",
-        "see the screen", "the screen shows", "show the screen",
-        "what is on the screen", "what's on the screen", "screen state"))
+    return any(
+        k in m
+        for k in (
+            "you are on",
+            "you're on",
+            "we are on",
+            "on the portal",
+            "on the its portal",
+            "what does the screen show",
+            "what do you see",
+            "read the screen",
+            "look at the screen",
+            "on the screen",
+            "see the screen",
+            "the screen shows",
+            "show the screen",
+            "what is on the screen",
+            "what's on the screen",
+            "screen state",
+        )
+    )
 
 
 def _looks_like_plan_narration(text):
@@ -9667,11 +13039,31 @@ def _looks_like_plan_narration(text):
     if not text:
         return False
     t = text.lower()
-    markers = ("we need to", "we should", "i need to", "i'm going to", "i am going to",
-               "i will", "i'll", "then tap", "then call", "then run", "next,", "next step",
-               "first i", "let me", "now we", "we have to", "the plan", "then we",
-               "i would", "let's", "lets ")
+    markers = (
+        "we need to",
+        "we should",
+        "i need to",
+        "i'm going to",
+        "i am going to",
+        "i will",
+        "i'll",
+        "then tap",
+        "then call",
+        "then run",
+        "next,",
+        "next step",
+        "first i",
+        "let me",
+        "now we",
+        "we have to",
+        "the plan",
+        "then we",
+        "i would",
+        "let's",
+        "lets ",
+    )
     return any(m in t for m in markers)
+
 
 def _ui_task(user_message):
     """Broad detector for ANY on-device UI work request: explicit ui_* tool
@@ -9683,21 +13075,60 @@ def _ui_task(user_message):
     m = (user_message or "").lower()
     if _nav_task(m) or _ui_situational_ask(m) or _test_task(m):
         return True
-    if any(k in m for k in (
-            "ui_app_open", "ui_dump", "ui_tap", "ui_swipe", "ui_type",
-            "ui_key", "ui_screenshot", "ui_device", "ui_assert", "ui_expect",
-            "ui_test_run", "ui_fill", "fill the", "fill in", "fill up",
-            "fill the form", "fill the fields", "fill by himself",
-            "cdp_", "webview", "emulator",
-            "tap it", "tap on", "tap the", "tap ", "click on", "click the",
-            "press the", "tab on it", "in the dump")):
+    if any(
+        k in m
+        for k in (
+            "ui_app_open",
+            "ui_dump",
+            "ui_tap",
+            "ui_swipe",
+            "ui_type",
+            "ui_key",
+            "ui_screenshot",
+            "ui_device",
+            "ui_assert",
+            "ui_expect",
+            "ui_test_run",
+            "ui_fill",
+            "fill the",
+            "fill in",
+            "fill up",
+            "fill the form",
+            "fill the fields",
+            "fill by himself",
+            "cdp_",
+            "webview",
+            "emulator",
+            "tap it",
+            "tap on",
+            "tap the",
+            "tap ",
+            "click on",
+            "click the",
+            "press the",
+            "tab on it",
+            "in the dump",
+        )
+    ):
         return True
     # Element reference + action in the SAME message = a real tap target
     # ("search for My Profile and tap it", "find the Lets get Started button").
-    if any(k in m for k in ("profile", "button")) and \
-       any(k in m for k in ("tap", "click", "press", "find", "search",
-                            "open", "go to", "navigate", "get started",
-                            "let's get started", "lets get started")):
+    if any(k in m for k in ("profile", "button")) and any(
+        k in m
+        for k in (
+            "tap",
+            "click",
+            "press",
+            "find",
+            "search",
+            "open",
+            "go to",
+            "navigate",
+            "get started",
+            "let's get started",
+            "lets get started",
+        )
+    ):
         return True
     return False
 
@@ -9707,10 +13138,25 @@ def _test_task(user_message):
     ui_test_run, 'validate', 'test the', 'check the ui', 'verify'). These need
     more rounds/time than a quick navigation+screenshot."""
     m = (user_message or "").lower()
-    return any(k in m for k in (
-        "ui_test_run", "test run", "run the test", "run a test", "ui test",
-        "validate", "validation", "verif", "assert", "check the ui",
-        "test the ui", "assertion", "expected", "ui_expect"))
+    return any(
+        k in m
+        for k in (
+            "ui_test_run",
+            "test run",
+            "run the test",
+            "run a test",
+            "ui test",
+            "validate",
+            "validation",
+            "verif",
+            "assert",
+            "check the ui",
+            "test the ui",
+            "assertion",
+            "expected",
+            "ui_expect",
+        )
+    )
 
 
 def _nav_gate(user_message, names):
@@ -9724,26 +13170,34 @@ def _nav_gate(user_message, names):
         return None
     if "ui_screenshot" not in names:
         return None
-    navigated = any(n in names for n in ("ui_tap", "ui_swipe", "ui_type", "ui_key")) \
-        or any(n.startswith("cdp_") for n in names)
+    navigated = any(
+        n in names for n in ("ui_tap", "ui_swipe", "ui_type", "ui_key")
+    ) or any(n.startswith("cdp_") for n in names)
     verified = "ui_dump" in names or any(n.startswith("cdp_") for n in names)
     if not (navigated and verified):
         if not verified:
-            hint = ("you never called ui_dump to READ what is on screen (and you "
-                    "cannot see images), so you don't know what the screenshot "
-                    "shows")
+            hint = (
+                "you never called ui_dump to READ what is on screen (and you "
+                "cannot see images), so you don't know what the screenshot "
+                "shows"
+            )
         else:
-            hint = ("you never actually navigated — no ui_tap / ui_swipe / "
-                    "ui_type / ui_key (or cdp_navigate / cdp_evaluate for the "
-                    "WebView), so the screen "
-                    "was never changed")
-        return ("You took a screenshot but %s. Work step by step: ui_app_open, "
-                "then ui_dump to READ the screen, then ui_tap/ui_swipe/ui_type/"
-                "ui_key to move toward the target, ui_dump after each action to "
-                "confirm progress, and only then ui_screenshot. Once the ITS "
-                "WebView is open, verify the URL/DOM with cdp_connect + "
-                "cdp_dom_state. Do NOT emit FINAL yet." % hint)
+            hint = (
+                "you never actually navigated — no ui_tap / ui_swipe / "
+                "ui_type / ui_key (or cdp_navigate / cdp_evaluate for the "
+                "WebView), so the screen "
+                "was never changed"
+            )
+        return (
+            "You took a screenshot but %s. Work step by step: ui_app_open, "
+            "then ui_dump to READ the screen, then ui_tap/ui_swipe/ui_type/"
+            "ui_key to move toward the target, ui_dump after each action to "
+            "confirm progress, and only then ui_screenshot. Once the ITS "
+            "WebView is open, verify the URL/DOM with cdp_connect + "
+            "cdp_dom_state. Do NOT emit FINAL yet." % hint
+        )
     return None
+
 
 CODE_AGENT_PROMPT = """You are ACEsi, an autonomous coding agent for the StudentSyncSA Flutter project.
 You are on Windows; the project root is C:\\Users\\chris\\StudentSyncSA and `flutter`,
@@ -9847,6 +13301,7 @@ todo_list to check remaining. Always end your FINAL with:
 "Progress: 2/3 tasks done — 1 pending").
 """
 
+
 def _unwrap_typed(o):
     """Recursively unwrap Ollama 'JSON-schema style' args like
     {"expr": {"type": "string", "value": "42 * 2"}} -> {"expr": "42 * 2"}."""
@@ -9890,7 +13345,7 @@ def _extract_calls(reply):
         return []
     out = []
     # 1) fenced JSON blocks describing a tool call (qwen2.5-coder:1.5b style)
-    for m in re.finditer(r'```(?:json)?\s*\n?(.*?)```', reply, re.S):
+    for m in re.finditer(r"```(?:json)?\s*\n?(.*?)```", reply, re.S):
         blob = m.group(1).strip()
         try:
             obj = json.loads(blob)
@@ -9904,11 +13359,11 @@ def _extract_calls(reply):
         if not s:
             continue
         if s.startswith("CALL:"):
-            rest = s[len("CALL:"):].strip()
-            m = re.match(r'(\w+)\s*(\{.*\})\s*$', rest, re.S)
+            rest = s[len("CALL:") :].strip()
+            m = re.match(r"(\w+)\s*(\{.*\})\s*$", rest, re.S)
             if not m:
                 # tolerate "<function=NAME>{json>" or "<NAME>{json>" wrappers
-                m = re.match(r'<(?:function=)?(\w+)>\s*(\{.*\})\s*$', rest, re.S)
+                m = re.match(r"<(?:function=)?(\w+)>\s*(\{.*\})\s*$", rest, re.S)
             if m:
                 try:
                     out.append((m.group(1), _unwrap_typed(json.loads(m.group(2)))))
@@ -9932,14 +13387,16 @@ def _extract_calls(reply):
             uniq.append((name, args))
     return uniq
 
+
 def _extract_final(reply):
     if not reply:
         return None
     for line in reply.splitlines():
         s = line.strip()
         if s.startswith("FINAL:"):
-            return s[len("FINAL:"):].strip()
+            return s[len("FINAL:") :].strip()
     return None
+
 
 def _normalize_reply(text):
     """Clean model output for display: collapse Unicode spaces that terminals
@@ -9952,6 +13409,7 @@ def _normalize_reply(text):
         text = text.replace(ch, " ")
     return "".join(c for c in text if c >= " " or c in "\n\t")
 
+
 def _terse_reply(text, max_len=500):
     if not text:
         return text
@@ -9959,14 +13417,14 @@ def _terse_reply(text, max_len=500):
     for line in t.splitlines():
         s = line.strip()
         if s.startswith("FINAL:"):
-            return s[len("FINAL:"):].strip()[:max_len]
+            return s[len("FINAL:") :].strip()[:max_len]
     if len(t) <= max_len:
         return t
     # No FINAL: drop THOUGHT/CALL scaffolding, keep only the last sentence.
-    t = re.sub(r'\b(THOUGHT|CALL|OBSERVATION):?\s*', '', t)
-    t = re.sub(r'\{[^}]*\}', '', t)
-    t = re.sub(r'\s+', ' ', t).strip(' .')
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', t) if s.strip()]
+    t = re.sub(r"\b(THOUGHT|CALL|OBSERVATION):?\s*", "", t)
+    t = re.sub(r"\{[^}]*\}", "", t)
+    t = re.sub(r"\s+", " ", t).strip(" .")
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", t) if s.strip()]
     if not sentences:
         return "Done."
     last = sentences[-1]
@@ -9976,11 +13434,12 @@ def _terse_reply(text, max_len=500):
         return last
     # Truncate at a sentence boundary, not mid-sentence.
     truncated = last[:max_len]
-    for punct in ('. ', '! ', '? '):
+    for punct in (". ", "! ", "? "):
         idx = truncated.rfind(punct)
         if idx > max_len // 2:
-            return truncated[:idx + 1]
+            return truncated[: idx + 1]
     return truncated.rstrip() + "…"
+
 
 # Shortcut phrases that map to the saved ITS application-form task. Chris reruns
 # the Univen ITS application flow repeatedly (hunting the 404 error), so a short
@@ -9988,16 +13447,19 @@ def _terse_reply(text, max_len=500):
 # to reconstruct it from context each time.
 _ITS_TASK_KEY = "ui_task.its_application"
 _ITS_SHORTCUT_RE = re.compile(
-    r'\b(?:do|run|start|restart|open|again|re[- ]?run|repeat)\s+(?:the\s+)?'
-    r'(?:its|venda|univen)\s+(?:application|portal|form|app)\b'
-    r'|\b(?:again|re[- ]?run|repeat|restart)\b.*\b(?:its|venda|univen|application)\b',
-    re.IGNORECASE)
+    r"\b(?:do|run|start|restart|open|again|re[- ]?run|repeat)\s+(?:the\s+)?"
+    r"(?:its|venda|univen)\s+(?:application|portal|form|app)\b"
+    r"|\b(?:again|re[- ]?run|repeat|restart)\b.*\b(?:its|venda|univen|application)\b",
+    re.IGNORECASE,
+)
 # The actual "rerun the saved task" phrase inside a longer instruction list,
 # e.g. "do the ITS application again but this time ...". Its match span is
 # replaced by the saved task text so trailing new steps still parse.
 _ITS_RERUN_RE = re.compile(
-    r'\b(?:do\s+)?(?:the\s+)?(?:its|venda|univen)\s+(?:application|portal|form|app)'
-    r'\s+again\b', re.IGNORECASE)
+    r"\b(?:do\s+)?(?:the\s+)?(?:its|venda|univen)\s+(?:application|portal|form|app)"
+    r"\s+again\b",
+    re.IGNORECASE,
+)
 
 
 def _resolve_ui_task(user_message):
@@ -10023,17 +13485,19 @@ def _resolve_ui_task(user_message):
         # saved navigation task — it should parse into a ui_fill instead.
         if not _ITS_SHORTCUT_RE.search(user_message):
             return None
-        if re.search(r'\bfill', user_message, re.IGNORECASE) and \
-           re.search(r'\b(by\s+himself|by\s+herself|my\s+profile|use\s+my\s+profile|using\s+my\s+profile|fields?\s+by\s+himself|by\s+itself)\b',
-                    user_message, re.IGNORECASE):
+        if re.search(r"\bfill", user_message, re.IGNORECASE) and re.search(
+            r"\b(by\s+himself|by\s+herself|my\s+profile|use\s+my\s+profile|using\s+my\s+profile|fields?\s+by\s+himself|by\s+itself)\b",
+            user_message,
+            re.IGNORECASE,
+        ):
             return None
         if any(k in user_message.lower() for k in ("how", "what", "why", "?")):
             return None
         return task_text
     # Longer message: replace just the rerun phrase with the saved task, keeping
     # the trailing instructions ("but this time ... after Next ...").
-    before = user_message[:m.start()].rstrip()
-    after = user_message[m.end():].strip()
+    before = user_message[: m.start()].rstrip()
+    after = user_message[m.end() :].strip()
     head = task_text
     if before:
         head = before + "\n" + task_text
@@ -10064,36 +13528,49 @@ def _ui_script_steps(user_message):
         return None
     # Parenthetical asides ("(will be the first on on top)") are dropped so they
     # never pollute unquoted target labels. Relative order is preserved.
-    text = re.sub(r'\([^)]*\)', ' ', user_message)
+    text = re.sub(r"\([^)]*\)", " ", user_message)
     steps = []
     last_targets = []
     last_fields = []
     tokens = []
-    for m in re.finditer(r'\bui_app_open\b(?:\s+([A-Za-z0-9._]+))?', text):
+    for m in re.finditer(r"\bui_app_open\b(?:\s+([A-Za-z0-9._]+))?", text):
         tokens.append((m.start(), "open", m.group(1) or "StudentSyncSA"))
-    for m in re.finditer(r'\bui_dump\b', text):
+    for m in re.finditer(r"\bui_dump\b", text):
         tokens.append((m.start(), "dump", ""))
-    for m in re.finditer(r'\bui_screenshot\b', text):
+    for m in re.finditer(r"\bui_screenshot\b", text):
         tokens.append((m.start(), "screenshot", ""))
     # "fill in the ITS form / fill the fields by himself" -> ACEsi fills every
     # field on the current ITS page from the device profile. Recognised when
     # "fill" appears with a form/fields/page noun and an autonomous intent
     # ("by himself / my profile / using my profile").
-    if 'ui_fill' not in [s[0] for s in steps]:
-        fpos = text.lower().find('fill')
-        if fpos >= 0 and re.search(r'\b(?:fields?|form|page\b)', text, re.IGNORECASE) and \
-           re.search(r'\b(by\s+himself|by\s+herself|by\s+itself|using\s+my\s+profile|my\s+profile|by\s+itself)\b',
-                     text, re.IGNORECASE):
+    if "ui_fill" not in [s[0] for s in steps]:
+        fpos = text.lower().find("fill")
+        if (
+            fpos >= 0
+            and re.search(r"\b(?:fields?|form|page\b)", text, re.IGNORECASE)
+            and re.search(
+                r"\b(by\s+himself|by\s+herself|by\s+itself|using\s+my\s+profile|my\s+profile|by\s+itself)\b",
+                text,
+                re.IGNORECASE,
+            )
+        ):
             tokens.append((fpos, "fill", ""))
     # Explicit swipes: "swipe left", "swipe right", "swipe up/down"
-    for m in re.finditer(r'\bswipe\s+(left|right|up|down)\b', text, re.IGNORECASE):
+    for m in re.finditer(r"\bswipe\s+(left|right|up|down)\b", text, re.IGNORECASE):
         tokens.append((m.start(), "swipe", m.group(1).lower()))
     # Scrolls: "scroll down/up/to the bottom" → screen moves (finger opposite).
-    for m in re.finditer(r'\bscroll\s+(?:down|up|to\s+the\s+bottom)\b',
-                         text, re.IGNORECASE):
+    for m in re.finditer(
+        r"\bscroll\s+(?:down|up|to\s+the\s+bottom)\b", text, re.IGNORECASE
+    ):
         low = m.group(0).lower()
-        tokens.append((m.start(), "scroll",
-                       "down" if ("down" in low or "bottom" in low) else "up"))
+        tokens.append(
+            (
+                m.start(),
+                "scroll",
+                "down" if ("down" in low or "bottom" in low) else "up",
+            )
+        )
+
     # Quoted tap targets, both verb-prefixed ("search for "X"", 'find "X"',
     # "look for "X"", 'tap the "X"', 'tap on "X"', 'tap "X"') and bare quotes
     # ("...field "Do you already have a student number" and " Returning to
@@ -10102,53 +13579,75 @@ def _ui_script_steps(user_message):
     # plain label (dropdown field, checkbox, option) so "both fields select No"
     # can resolve to the right two fields.
     def _is_nav_target(end):
-        return bool(re.search(r'\b(?:tab|button|icon|tile|star)\b',
-                              text[end:end + 12], re.IGNORECASE))
+        return bool(
+            re.search(
+                r"\b(?:tab|button|icon|tile|star)\b",
+                text[end : end + 12],
+                re.IGNORECASE,
+            )
+        )
+
     # "find the line 'X'" / "find the "Y"" / "look for the line 'Z'" = verify a
     # dialog/text line is present (ui_dump), NOT a tap target.
-    for m in re.finditer(r'\b(?:find|look\s+for|search\s+for)\s+(?:the\s+)?'
-                         r'(?:line\s+|page\s+|text\s+|option\s+)?'
-                         r'["\']\s*([^"\']{2,60}?)\s*["\']', text, re.IGNORECASE):
+    for m in re.finditer(
+        r"\b(?:find|look\s+for|search\s+for)\s+(?:the\s+)?"
+        r"(?:line\s+|page\s+|text\s+|option\s+)?"
+        r'["\']\s*([^"\']{2,60}?)\s*["\']',
+        text,
+        re.IGNORECASE,
+    ):
         tokens.append((m.start(), "dump", ""))
     # "the star top right" / "star icon" -> tap the star (dialog opener).
     for m in re.finditer(
-            r'\b(?:the\s+)?(?:star|asterisk)\b(?:[^,;.\n]{0,25})', text, re.IGNORECASE):
-        label = re.sub(r'\s+', ' ', m.group(0)).strip()
+        r"\b(?:the\s+)?(?:star|asterisk)\b(?:[^,;.\n]{0,25})", text, re.IGNORECASE
+    ):
+        label = re.sub(r"\s+", " ", m.group(0)).strip()
         tokens.append((m.start(), "target", ("star", True)))
-    for m in re.finditer(r'(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+)?'
-                         r'(?:on\s+|the\s+)?|click\s+(?:on\s+)?)'
-                         r'\s*["\']\s*([^"\']{2,60}?)\s*["\']', text, re.IGNORECASE):
-        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+    for m in re.finditer(
+        r"(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+)?"
+        r"(?:on\s+|the\s+)?|click\s+(?:on\s+)?)"
+        r'\s*["\']\s*([^"\']{2,60}?)\s*["\']',
+        text,
+        re.IGNORECASE,
+    ):
+        label = re.sub(r"\s+", " ", m.group(1)).strip()
         tokens.append((m.start(), "target", (label, _is_nav_target(m.end()))))
     # Bare quoted labels (no verb prefix), e.g. dropdown field names. Skip
     # quotes already consumed by "find the line 'X'" / "find the "Y"" (a
     # verify-dump, not a tap).
     for m in re.finditer(r'["\']\s*([^"\']{2,60}?)\s*["\']', text):
-        before = text[max(0, m.start() - 40):m.start()].lower()
-        if re.search(r'\b(?:find|look\s+for|search\s+for)\s+the\s+'
-                     r'(?:line\s+|page\s+|text\s+|option\s+)?$', before):
+        before = text[max(0, m.start() - 40) : m.start()].lower()
+        if re.search(
+            r"\b(?:find|look\s+for|search\s+for)\s+the\s+"
+            r"(?:line\s+|page\s+|text\s+|option\s+)?$",
+            before,
+        ):
             continue
-        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        label = re.sub(r"\s+", " ", m.group(1)).strip()
         tokens.append((m.start(), "target", (label, _is_nav_target(m.end()))))
     # Unquoted tap targets: "search for Universities tab on it",
     # "look for Online Portal tab", "find the Lets get Started button".
     for m in re.finditer(
-            r'(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+|on\s+|the\s+)?|'
-            r'click\s+(?:on\s+)?)\s*([A-Za-z][A-Za-z0-9\'&., -]{2,50}?)\s+'
-            r'(?:tab|button|icon|tile)\b', text, re.IGNORECASE):
-        label = re.sub(r'\s+', ' ', m.group(1)).strip()
+        r"(?:search\s+for|look\s+for|find|(?:tap|tab)\s+(?:on\s+the\s+|on\s+|the\s+)?|"
+        r"click\s+(?:on\s+)?)\s*([A-Za-z][A-Za-z0-9\'&., -]{2,50}?)\s+"
+        r"(?:tab|button|icon|tile)\b",
+        text,
+        re.IGNORECASE,
+    ):
+        label = re.sub(r"\s+", " ", m.group(1)).strip()
         # "click on the Yes button" -> label "Yes", not "the Yes".
-        label = re.sub(r'^(?:the|a|an)\s+', '', label)
+        label = re.sub(r"^(?:the|a|an)\s+", "", label)
         tokens.append((m.start(), "target", (label, True)))
     # Dropdown selections: "On both fields select No!", "select No",
     # "select Yes on both fields", "On both fields select No! The third one will
     # automatically select a No."  (the third one needs no explicit step)
-    for m in re.finditer(r'\bselect\s+(No|Yes)\b', text, re.IGNORECASE):
+    for m in re.finditer(r"\bselect\s+(No|Yes)\b", text, re.IGNORECASE):
         option = m.group(1).capitalize()
         tokens.append((m.start(), "select", option))
     # standalone "tap it" / "click it" / "tap on it" / "tap that"
-    for m in re.finditer(r'\b(?:tap|click|tab)\s+(?:on\s+)?(it|that|this)\b',
-                         text, re.IGNORECASE):
+    for m in re.finditer(
+        r"\b(?:tap|click|tab)\s+(?:on\s+)?(it|that|this)\b", text, re.IGNORECASE
+    ):
         tokens.append((m.start(), "tap_last", ""))
     tokens.sort(key=lambda t: t[0])
     for pos, kind, detail in tokens:
@@ -10177,7 +13676,7 @@ def _ui_script_steps(user_message):
             # "select No/Yes" refers to the most recent non-navigation field
             # target(s); when the message says "both fields", select on the last
             # two field targets.
-            both = bool(re.search(r'\bboth\s+fields?\b', text, re.IGNORECASE))
+            both = bool(re.search(r"\bboth\s+fields?\b", text, re.IGNORECASE))
             fields = last_fields[-2:] if both else last_fields[-1:]
             for f in fields:
                 # Convert the field's plain ui_tap into a ui_select(field, option)
@@ -10190,13 +13689,15 @@ def _ui_script_steps(user_message):
                         replaced = True
                         break
                 if not replaced and not any(
-                        s[0] == "ui_select" and s[1][0] == f for s in steps):
+                    s[0] == "ui_select" and s[1][0] == f for s in steps
+                ):
                     steps.append(("ui_select", (f, detail)))
         elif kind == "tap_last":
             if last_targets:
                 tgt = last_targets[-1]
                 already = any(s == ("ui_tap", tgt) for s in steps) or any(
-                    s[0] == "ui_select" and s[1][0] == tgt for s in steps)
+                    s[0] == "ui_select" and s[1][0] == tgt for s in steps
+                )
                 if not already:
                     steps.append(("ui_tap", tgt))
     if not steps:
@@ -10214,7 +13715,7 @@ def _dump_tap_point(screen, target):
     Prefers an EXACT label match over a substring match so a short option like
     "No" hits the "No" row and not "No NBT". Returns (x, y, matched_text) so the
     caller knows whether the match was exact."""
-    target = re.sub(r'[^A-Za-z0-9 ]', '', target).strip().lower()
+    target = re.sub(r"[^A-Za-z0-9 ]", "", target).strip().lower()
     if not target:
         return None
 
@@ -10223,7 +13724,7 @@ def _dump_tap_point(screen, target):
         # the label on one line and the clickable's coords several lines below
         # ("University of Pretoria" ... "NBT Required @ tap(540,1216)").
         for j in range(i, min(i + 6, len(lines))):
-            m = re.search(r'tap\((\d+),(\d+)\)', lines[j])
+            m = re.search(r"tap\((\d+),(\d+)\)", lines[j])
             if m:
                 return int(m.group(1)), int(m.group(2))
         return None
@@ -10234,9 +13735,9 @@ def _dump_tap_point(screen, target):
     for i, line in enumerate(lines):
         # "label @ tap(x,y) [CLICKABLE]": the label is everything before " @ "
         # (split BEFORE normalizing, since normalization strips the "@").
-        raw_label = line.split(' @ ')[0].strip()
-        norm = re.sub(r'[^A-Za-z0-9 ]', '', line).lower()
-        label = re.sub(r'[^A-Za-z0-9 ]', '', raw_label).strip().lower()
+        raw_label = line.split(" @ ")[0].strip()
+        norm = re.sub(r"[^A-Za-z0-9 ]", "", line).lower()
+        label = re.sub(r"[^A-Za-z0-9 ]", "", raw_label).strip().lower()
         if not label or "labeled nodes" in label:
             continue
         if label == target:
@@ -10268,9 +13769,9 @@ def _scroll_search(screen, target, direction="down", max_scrolls=8):
             x1, y1, x2, y2 = 540, 2100, 540, 300
         else:
             x1, y1, x2, y2 = 540, 300, 540, 2100
-        ok, out = _call_tool("ui_swipe",
-                             {"x1": x1, "y1": y1, "x2": x2, "y2": y2,
-                              "duration": 250})
+        ok, out = _call_tool(
+            "ui_swipe", {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": 250}
+        )
         _ok, _d = _ui_auto_dump()
         if _ok:
             screen = _d
@@ -10287,7 +13788,7 @@ def _scroll_search(screen, target, direction="down", max_scrolls=8):
 # Protocol (devtools_service.py), which connects to the app's WebView through
 # an adb forward to its webview_devtools_remote_<pid> socket.
 
-_ITS_GROUP_JS = r'''(function(){
+_ITS_GROUP_JS = r"""(function(){
   var out = [];
   var ctrls = document.querySelectorAll('select, input[type=checkbox], input[type=radio], input[type=text], input[type=password], input[type=button], input[type=submit], button, textarea, a');
   for (var i=0;i<ctrls.length;i++){
@@ -10314,7 +13815,7 @@ _ITS_GROUP_JS = r'''(function(){
               grp: grp, opts: opts, checked: el.checked === true, txt: txt});
   }
   return JSON.stringify(out);
-})()'''
+})()"""
 
 
 _WEBVIEW_PROBE_CACHE = {"ts": 0.0, "val": None}
@@ -10358,7 +13859,7 @@ def _webview_controls():
 
 
 def _norm_label(s):
-    return re.sub(r'[^A-Za-z0-9 ]', ' ', (s or '').lower()).strip()
+    return re.sub(r"[^A-Za-z0-9 ]", " ", (s or "").lower()).strip()
 
 
 def _webview_find(controls, label):
@@ -10377,8 +13878,8 @@ def _webview_find(controls, label):
         # The control's own name/id are the strongest signal for programmatic
         # fills ("oapCitzCode", "custom-citz-code"); a human label matters for
         # buttons/links and for selects/inputs reached through their label.
-        name = _norm_label(c.get('name'))
-        cid = _norm_label(c.get('id'))
+        name = _norm_label(c.get("name"))
+        cid = _norm_label(c.get("id"))
         if name and (name == target or (target in name and sub is None)):
             if name == target:
                 exact = c
@@ -10395,8 +13896,8 @@ def _webview_find(controls, label):
             continue
         # The button's own text (value/textContent) is the strongest signal
         # for buttons/links; the group label matters for selects/inputs.
-        own = _norm_label(c.get('txt'))
-        g = _norm_label(c.get('grp'))
+        own = _norm_label(c.get("txt"))
+        g = _norm_label(c.get("grp"))
         if own and (own == target or (target in own and sub is None)):
             if own == target:
                 exact = c
@@ -10415,13 +13916,18 @@ def _webview_find(controls, label):
         gw = set(g.split())
         if tw:
             score = len(tw & gw) / float(len(tw))
+
             # Form controls (select/input/button) outrank links (<a>) on ties:
             # an <a>'s group text is surrounding content, not its own label.
             def _rank(ctrl):
-                return 0 if ctrl.get('tag') in ('SELECT', 'INPUT', 'BUTTON') else 1
+                return 0 if ctrl.get("tag") in ("SELECT", "INPUT", "BUTTON") else 1
+
             if score >= 0.6 and (
-                score > fuzzy_score or
-                (score == fuzzy_score and (not fuzzy_best or _rank(c) < _rank(fuzzy_best)))
+                score > fuzzy_score
+                or (
+                    score == fuzzy_score
+                    and (not fuzzy_best or _rank(c) < _rank(fuzzy_best))
+                )
             ):
                 fuzzy_score = score
                 fuzzy_best = c
@@ -10435,14 +13941,14 @@ def _webview_select(field, option):
     if not controls:
         return False, "no WebView reachable (cdp connect failed)"
     c = _webview_find(controls, field)
-    if not c or c.get('tag') != 'SELECT':
+    if not c or c.get("tag") != "SELECT":
         return False, "WebView field %r not found" % field
-    name = c['name']
+    name = c["name"]
     # Some injected selects (custom citizenship code, "heard about us") carry
     # no name attribute — fall back to their id.
-    sel = 'select[name="%s"]' % name if name else 'select[id="%s"]' % c['id']
+    sel = 'select[name="%s"]' % name if name else 'select[id="%s"]' % c["id"]
     opt = option.lower()
-    expr = r'''(function(){
+    expr = r"""(function(){
       var sel = document.querySelector(%r);
       if (!sel) return 'NO_SELECT';
       var target = %r;
@@ -10474,7 +13980,10 @@ def _webview_select(field, option):
         }
       }
       return 'NO_OPTION';
-    })()''' % (sel, opt)
+    })()""" % (
+        sel,
+        opt,
+    )
     ok, out = d.evaluate_js(expr)
     if not ok:
         return False, "webview evaluate failed: %s" % str(out)[:150]
@@ -10483,7 +13992,7 @@ def _webview_select(field, option):
     except Exception:
         pass
     if out == "NO_OPTION":
-        return False, "option %r not in %r" % (option, c.get('opts'))
+        return False, "option %r not in %r" % (option, c.get("opts"))
     if out == "NO_SELECT":
         return False, "select %r vanished" % name
     return True, "webview select %s=%s (%s)" % (field, option, out)
@@ -10497,14 +14006,20 @@ def _webview_type(field, value):
     if not controls:
         return False, "no WebView reachable (cdp connect failed)"
     c = _webview_find(controls, field)
-    if not c or c.get('tag') not in ('INPUT', 'TEXTAREA'):
-        return False, "WebView field %r not found (tag=%r)" % (field, c and c.get('tag'))
-    if c.get('type') in ('checkbox', 'radio', 'button', 'submit'):
-        return False, "WebView field %r is a %s, not a text field" % (field, c.get('type'))
-    name = c['name']
+    if not c or c.get("tag") not in ("INPUT", "TEXTAREA"):
+        return False, "WebView field %r not found (tag=%r)" % (
+            field,
+            c and c.get("tag"),
+        )
+    if c.get("type") in ("checkbox", "radio", "button", "submit"):
+        return False, "WebView field %r is a %s, not a text field" % (
+            field,
+            c.get("type"),
+        )
+    name = c["name"]
     # Prefer the real name; fall back to id for injected (un-named) fields.
-    sel = '[name="%s"]' % name if name else '[id="%s"]' % c['id']
-    expr = r'''(function(){
+    sel = '[name="%s"]' % name if name else '[id="%s"]' % c["id"]
+    expr = r"""(function(){
       var el = document.querySelector(%r);
       if (!el) return 'NO_EL';
       try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch(e){}
@@ -10516,7 +14031,10 @@ def _webview_type(field, value):
       el.dispatchEvent(new Event('change', {bubbles:true}));
       el.dispatchEvent(new Event('blur',   {bubbles:true}));
       return 'set:' + el.value;
-    })()''' % (sel, value)
+    })()""" % (
+        sel,
+        value,
+    )
     ok, out = d.evaluate_js(expr)
     if not ok:
         return False, "webview evaluate failed: %s" % str(out)[:150]
@@ -10538,13 +14056,14 @@ def _webview_click(label):
     c = _webview_find(controls, label)
     if not c:
         return False, "WebView control %r not found" % label
-    name = c.get('name')
+    name = c.get("name")
     if not name:
         # Buttons/links carry no name attribute: click by visible text.
-        txt = (c.get('txt') or '').strip()
+        txt = (c.get("txt") or "").strip()
         if not txt:
             return False, "control for %r has no name and no text" % label
-        expr = r'''(function(){
+        expr = (
+            r"""(function(){
           var els = Array.prototype.slice.call(document.querySelectorAll('button, input[type=button], input[type=submit], a'));
           for (var i=0;i<els.length;i++){
             var t = els[i].value || els[i].textContent || '';
@@ -10556,20 +14075,25 @@ def _webview_click(label):
             }
           }
           return 'NO_EL';
-        })()''' % txt[:60]
+        })()"""
+            % txt[:60]
+        )
         ok, out = d.evaluate_js(expr)
         if not ok:
             return False, "webview evaluate failed: %s" % str(out)[:150]
         if out == "NO_EL":
             return False, "button/link %r vanished" % label
         return True, "webview click %s (%s)" % (label, out)
-    expr = r'''(function(){
+    expr = (
+        r"""(function(){
       var el = document.querySelector('[name="%s"]');
       if (!el) return 'NO_EL';
       el.scrollIntoView({block:'center'});
       el.click();
       return 'clicked:'+el.tagName+':'+(el.checked!==undefined?el.checked:'');
-    })()''' % name
+    })()"""
+        % name
+    )
     ok, out = d.evaluate_js(expr)
     if not ok:
         return False, "webview evaluate failed: %s" % str(out)[:150]
@@ -10584,13 +14108,16 @@ def _webview_dump():
         return ""
     lines = []
     for c in controls:
-        g = re.sub(r'\s+', ' ', (c.get('grp') or '')).strip()
-        head = "%s %s name=%s" % (c.get('tag', ''), c.get('type', ''),
-                                  c.get('name', ''))
-        if c.get('tag') == 'SELECT':
-            head += " opts=[%s]" % ", ".join(c.get('opts', []))
-        if c.get('txt'):
-            head += " txt=%r" % c.get('txt')[:40]
+        g = re.sub(r"\s+", " ", (c.get("grp") or "")).strip()
+        head = "%s %s name=%s" % (
+            c.get("tag", ""),
+            c.get("type", ""),
+            c.get("name", ""),
+        )
+        if c.get("tag") == "SELECT":
+            head += " opts=[%s]" % ", ".join(c.get("opts", []))
+        if c.get("txt"):
+            head += " txt=%r" % c.get("txt")[:40]
         lines.append("%s | %s" % (head, g[:140]))
     return "\n".join(lines)
 
@@ -10598,9 +14125,15 @@ def _webview_dump():
 # Text markers that only appear once the ITS WebView page is showing. Cheap
 # gate so we don't run an adb/CDP probe on every native step (Universities
 # tab, app open, etc.) — the probe only fires when the screen looks like ITS.
-_ITS_SCREEN_MARKERS = ("comprehensive web application", "do you already have a student number",
-                       "--- please select ---", "qualification specific token",
-                       "application process", "wizardimg", "oapoldnew")
+_ITS_SCREEN_MARKERS = (
+    "comprehensive web application",
+    "do you already have a student number",
+    "--- please select ---",
+    "qualification specific token",
+    "application process",
+    "wizardimg",
+    "oapoldnew",
+)
 
 
 def _webview_active_screen(screen):
@@ -10629,9 +14162,17 @@ def _device_profile():
     raw = None
     try:
         proc = subprocess.run(
-            ["adb", "exec-out", "run-as", "com.studentsyncsa.studentsyncsa",
-             "cat", "app_flutter/student_profile.hive"],
-            capture_output=True, timeout=20)
+            [
+                "adb",
+                "exec-out",
+                "run-as",
+                "com.studentsyncsa.studentsyncsa",
+                "cat",
+                "app_flutter/student_profile.hive",
+            ],
+            capture_output=True,
+            timeout=20,
+        )
         if proc.returncode == 0 and proc.stdout:
             raw = proc.stdout
     except Exception as e:
@@ -10641,14 +14182,14 @@ def _device_profile():
         i = raw.find(b'{"id"')
         if i < 0:
             # fall back to first '{'
-            i = raw.find(b'{')
+            i = raw.find(b"{")
         if i >= 0:
             depth = 0
             end = None
             in_str = False
             esc = False
             for k in range(i, len(raw)):
-                ch = raw[k:k+1]  # work on bytes
+                ch = raw[k : k + 1]  # work on bytes
                 cb = raw[k]
                 if in_str:
                     if esc:
@@ -10717,7 +14258,7 @@ def _its_field_plan(profile):
     dm = profile.get("demographic", {})
     st = profile.get("status", {})
     id_no = (p.get("idNumber") or "").strip()
-    is_sa = bool(re.match(r'^\d{13}$', id_no))
+    is_sa = bool(re.match(r"^\d{13}$", id_no))
     dob_its = ""
     dob = (p.get("dateOfBirth") or "").split("T")[0][:10]
     if dob:
@@ -10726,20 +14267,36 @@ def _its_field_plan(profile):
         except Exception:
             dob_its = ""
     gender = (p.get("gender") or "").lower()
-    gval = "Female" if gender.startswith("f") else ("Male" if gender.startswith("m") else "")
+    gval = (
+        "Female"
+        if gender.startswith("f")
+        else ("Male" if gender.startswith("m") else "")
+    )
     title_code = ""
     tup = (p.get("title") or "").upper()
     for code in ("MR", "MRS", "MS"):
         if tup.startswith(code):
             title_code = code
             break
-    marital_map = {"single": "Single", "married": "Married", "divorced": "Divorced",
-                   "widow": "Widow", "widowed": "Widow", "widower": "Widow"}
+    marital_map = {
+        "single": "Single",
+        "married": "Married",
+        "divorced": "Divorced",
+        "widow": "Widow",
+        "widowed": "Widow",
+        "widower": "Widow",
+    }
     mval = marital_map.get((dm.get("maritalStatus") or "").lower(), "")
     homelang = (dm.get("homeLanguage") or "").strip()
     homelang = homelang.upper() if homelang else ""
-    eth_map = {"white": "WHITE", "black": "BLACK", "coloured": "Coloured",
-               "colored": "Coloured", "indian": "INDIAN", "african": "BLACK"}
+    eth_map = {
+        "white": "WHITE",
+        "black": "BLACK",
+        "coloured": "Coloured",
+        "colored": "Coloured",
+        "indian": "INDIAN",
+        "african": "BLACK",
+    }
     ecode = eth_map.get((dm.get("populationGroup") or "").lower(), "")
     emp = (st.get("employmentStatus") or "").lower()
     empval = ("No" if ("un" in emp or "none" in emp) else "Yes") if emp else ""
@@ -10754,12 +14311,19 @@ def _its_field_plan(profile):
 
     def prov_code(prov):
         pv = (prov or "").lower()
-        for tok, code in (("gauteng","Gauteng"),("western","Western Cape"),
-                          ("eastern","Eastern Cape"),("north west","North West"),
-                          ("northwest","North West"),("kwazulu","KwaZulu-Natal"),
-                          ("limpopo","Limpopo"),("mpumalanga","Mpumalanga"),
-                          ("northern cape","Northern Cape"),
-                          ("free state","Free State"),("freestate","Free State")):
+        for tok, code in (
+            ("gauteng", "Gauteng"),
+            ("western", "Western Cape"),
+            ("eastern", "Eastern Cape"),
+            ("north west", "North West"),
+            ("northwest", "North West"),
+            ("kwazulu", "KwaZulu-Natal"),
+            ("limpopo", "Limpopo"),
+            ("mpumalanga", "Mpumalanga"),
+            ("northern cape", "Northern Cape"),
+            ("free state", "Free State"),
+            ("freestate", "Free State"),
+        ):
             if tok in pv:
                 return code
         return (prov or "").strip()
@@ -10767,8 +14331,9 @@ def _its_field_plan(profile):
     plan = []
     plan.append(("oapCitizenType", "Yes" if is_sa else "No", "select"))
     if id_no:
-        plan.append(("oapIDnumber", id_no, "text") if is_sa else
-                    ("oapPPnumber", id_no, "text"))
+        plan.append(
+            ("oapIDnumber", id_no, "text") if is_sa else ("oapPPnumber", id_no, "text")
+        )
     if is_sa:
         plan.append(("custom-citz-code", "R.S.A", "select"))
         plan.append(("oapCitzCode", "RSA", "text"))
@@ -10834,11 +14399,13 @@ def _its_fill_batch(plan):
     # values are safely escaped; the field identifier is matched in JS by
     # name first, then by id (covers custom-citz-code / ssa-heard-select).
     import json as _json
+
     rows = []
     for fid, value, kind in plan:
         rows.append({"f": fid, "v": value, "t": kind})
     payload = _json.dumps(rows)
-    expr = r'''(function(){
+    expr = (
+        r"""(function(){
       var plan = %s;
       var res = [];
       function findEl(name){
@@ -10885,7 +14452,9 @@ def _its_fill_batch(plan):
       }
       for(var i=0;i<plan.length;i++){ try{ setVal(plan[i].f, plan[i].v, plan[i].t==='select'); }catch(e){ res.push({name:plan[i].f, ok:false, msg:'THROW:'+e.message}); } }
       return JSON.stringify(res);
-    })()''' % payload
+    })()"""
+        % payload
+    )
     ok, out = d.evaluate_js(expr)
     if not ok:
         return "webview evaluate failed: %s" % str(out)[:200]
@@ -10906,8 +14475,14 @@ def _its_fill_batch(plan):
 
 
 def _is_select_field(field):
-    return bool(re.search(r'citizen|gender|title|marital|homelang|ethn|employ|bursary|'
-                          r'resreq|cellind|heard|custom-citz|citizen', field, re.IGNORECASE))
+    return bool(
+        re.search(
+            r"citizen|gender|title|marital|homelang|ethn|employ|bursary|"
+            r"resreq|cellind|heard|custom-citz|citizen",
+            field,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _enrich_webview(screen, adb_ok):
@@ -10944,15 +14519,21 @@ def _execute_ui_script(user_message):
     # invoking the model. Returning None hands the task to the model-driven
     # loop, where the cdp_* tools are available.
     if _needs_model_driven_ui(user_message):
-        print("🧠 ui_script bail: URL/DevTools/CDP task - deferring to the "
-              "model-driven loop", flush=True)
+        print(
+            "🧠 ui_script bail: URL/DevTools/CDP task - deferring to the "
+            "model-driven loop",
+            flush=True,
+        )
         return None
     if _needs_phone_link(user_message):
         # A connect/diagnose ask has no step list to execute. Parsing it produced
         # a bare ui_dump, which with no phone attached reported browser DOM and
         # answered "Done - steps executed: ui_dump".
-        print("📱 ui_script bail: device connect/diagnose task - deferring to the "
-              "model-driven loop", flush=True)
+        print(
+            "📱 ui_script bail: device connect/diagnose task - deferring to the "
+            "model-driven loop",
+            flush=True,
+        )
         return None
     # Expand a saved-task shortcut ("do the ITS application again") into the
     # stored step list BEFORE parsing. ALWAYS try the shortcut first: the user's
@@ -11053,7 +14634,9 @@ def _execute_ui_script(user_message):
                 screen = _d
         elif action in ("ui_swipe", "ui_scroll"):
             if not seen_screen:
-                done.append("%s(%s:BLOCKED - ui_dump required first)" % (action, detail))
+                done.append(
+                    "%s(%s:BLOCKED - ui_dump required first)" % (action, detail)
+                )
                 print("  %s %r BLOCKED: ui_dump required first" % (action, detail))
                 continue
             dirn = detail
@@ -11068,8 +14651,9 @@ def _execute_ui_script(user_message):
                 x1, y1, x2, y2 = 540, 2100, 540, 300
             elif dirn == "up":
                 x1, y1, x2, y2 = 540, 300, 540, 2100
-            ok, out = _call_tool("ui_swipe",
-                                 {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": 250})
+            ok, out = _call_tool(
+                "ui_swipe", {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": 250}
+            )
             done.append("%s(%s)" % (action, dirn))
             print("  %s %s -> %s" % (action, dirn, ok))
             _ok, _d = _ui_auto_dump()
@@ -11171,8 +14755,13 @@ def _execute_ui_script(user_message):
     # "read all the fields / information" — the form is usually taller than the
     # screen, so after the navigation steps scroll through it and collect every
     # label until the screen stops changing (bottom reached).
-    wants_read = bool(re.search(r'\bread\b.*\b(?:all|every|fields|information|details|memoriz)',
-                                user_message, re.IGNORECASE))
+    wants_read = bool(
+        re.search(
+            r"\bread\b.*\b(?:all|every|fields|information|details|memoriz)",
+            user_message,
+            re.IGNORECASE,
+        )
+    )
     if wants_read and "ui_dump" in [s[0] for s in steps]:
         collected = []
         seen_labels = set()
@@ -11192,14 +14781,19 @@ def _execute_ui_script(user_message):
                     break  # bottom reached — no new content
                 prev_screen = screen
             # Scroll down to reveal the rest of the form.
-            ok, out = _call_tool("ui_swipe",
-                                 {"x1": 540, "y1": 2100, "x2": 540, "y2": 600, "duration": 250})
+            ok, out = _call_tool(
+                "ui_swipe",
+                {"x1": 540, "y1": 2100, "x2": 540, "y2": 600, "duration": 250},
+            )
             if not ok:
                 break
             done.append("ui_swipe")
         if collected:
             screen = "\n".join(collected)
-            print("  read-all: collected %d labels across %d screens" % (len(collected), done.count("ui_swipe") + 1))
+            print(
+                "  read-all: collected %d labels across %d screens"
+                % (len(collected), done.count("ui_swipe") + 1)
+            )
     # Build the reply: real screen labels from the last dump.
     fields = []
     for line in (screen or "").splitlines():
@@ -11211,16 +14805,23 @@ def _execute_ui_script(user_message):
         fields = ["(no screen state captured)"]
     body = "\n".join(fields[:45])
     summary = "Done — steps executed: %s.\nHere is what I last saw on screen:\n%s" % (
-        ", ".join(done), body)
+        ", ".join(done),
+        body,
+    )
     # Auto-save the ITS application task so a short phrase replays it next time.
     # NEVER overwrite the saved navigation skeleton on a *rerun* ("do the ITS
     # application again ..."): the "but this time X" tail is ephemeral and must
     # stay applied fresh. Only a fresh navigation definition (no rerun phrase)
     # is saved, and we save the ORIGINAL text so the navigation skeleton is
     # preserved without baking in a divergent post-Next tail.
-    if not is_rerun and steps and ("ui_select" in [s[0] for s in steps] or
-                                   any("student number" in str(d).lower()
-                                       for d in steps)):
+    if (
+        not is_rerun
+        and steps
+        and (
+            "ui_select" in [s[0] for s in steps]
+            or any("student number" in str(d).lower() for d in steps)
+        )
+    ):
         try:
             set_memory(_ITS_TASK_KEY, orig_message)
             print("🔄 saved ITS application task for quick re-run")
@@ -11249,32 +14850,47 @@ def run_agent(user_message):
             _AGENT["activity"] = "done"
             _AGENT["last_reply"] = script_reply
         return
-    messages = [{"role": "system", "content": CODE_AGENT_PROMPT},
-                {"role": "user", "content": user_message}]
+    messages = [
+        {"role": "system", "content": CODE_AGENT_PROMPT},
+        {"role": "user", "content": user_message},
+    ]
     max_iters = 30
     calls_history = []
     # Server-side app auto-open (same rationale as _chat_dispatch): if the user
     # explicitly asked to open the app, open it BEFORE the loop so the model's
     # first ui_dump reads the real app screen, not the Android home screen.
     auto_opened = False
-    if _ui_task(user_message) and not _ui_situational_ask(user_message) and (
-            re.search(r'\bui_app_open\b', user_message, re.IGNORECASE)):
+    if (
+        _ui_task(user_message)
+        and not _ui_situational_ask(user_message)
+        and (re.search(r"\bui_app_open\b", user_message, re.IGNORECASE))
+    ):
         try:
             _aok, _atxt = _call_tool("ui_app_open", {})
             if _aok:
                 auto_opened = True
                 with _AGENT_LOCK:
                     _AGENT["tools_used"] = 1
-                    _AGENT["steps"].append({"id": _agent_next_id(), "kind": "work",
-                                            "text": "ui_app_open (auto)", "state": "done",
-                                            "icon": "🔧"})
+                    _AGENT["steps"].append(
+                        {
+                            "id": _agent_next_id(),
+                            "kind": "work",
+                            "text": "ui_app_open (auto)",
+                            "state": "done",
+                            "icon": "🔧",
+                        }
+                    )
                 calls_history.append("ui_app_open")
                 print("🚀 run_agent auto-opened app (user asked for it)")
                 _dok, _dtxt = _ui_auto_dump()
                 if _dok:
-                    messages.append({"role": "user", "content":
-                        "APP LAUNCHED. Here is what is now on screen:\n%s%s" % (
-                            str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "APP LAUNCHED. Here is what is now on screen:\n%s%s"
+                            % (str(_dtxt)[:2000], _cert_warning_directive(_dtxt)),
+                        }
+                    )
         except Exception as e:
             print("⚠️ run_agent auto ui_app_open failed: %s" % e)
     # Same blind-tap guard as _chat_dispatch: taps/swipes are only allowed after
@@ -11286,8 +14902,9 @@ def run_agent(user_message):
     # exceeds it and every provider 4xx/413s, which surfaced as "all model
     # providers are unavailable". Mirrors _chat_dispatch's active_domain logic.
     _concrete = _classify_message(user_message) - {"general"}
-    _agent_domain = (_explicit_tool_domain(user_message)
-                     or (next(iter(_concrete)) if _concrete else "general"))
+    _agent_domain = _explicit_tool_domain(user_message) or (
+        next(iter(_concrete)) if _concrete else "general"
+    )
     if _agent_domain == "general" and _nav_task(user_message):
         _agent_domain = "ui"
     _agent_allowed = _domain_tool_names(_agent_domain)
@@ -11305,17 +14922,28 @@ def run_agent(user_message):
             # Force a structured tool call on UI tasks until a tool has run or
             # the previous round stalled (no tool call) — otherwise qwen2.5:3b
             # narrates a plan instead of acting.
-            force_tool = (_ui_task(user_message) and
-                          (_AGENT["tools_used"] == 0 or not last_had_tools) and
-                          i < 4)
-            reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3,
-                                            tool_choice="required" if force_tool else "auto",
-                                            allowed_names=_agent_allowed)
-            print("[agent] turn %d reply=%r native=%d" % (i + 1, (reply or "")[:400], len(native_calls)))
+            force_tool = (
+                _ui_task(user_message)
+                and (_AGENT["tools_used"] == 0 or not last_had_tools)
+                and i < 4
+            )
+            reply, native_calls = llm_reply(
+                messages,
+                max_tokens=2048,
+                temperature=0.3,
+                tool_choice="required" if force_tool else "auto",
+                allowed_names=_agent_allowed,
+            )
+            print(
+                "[agent] turn %d reply=%r native=%d"
+                % (i + 1, (reply or "")[:400], len(native_calls))
+            )
             with _AGENT_LOCK:
                 raw = reply or ""
                 if native_calls:
-                    raw += "\n" + "\n".join("CALL: %s %s" % (n, json.dumps(a)) for n, a in native_calls)
+                    raw += "\n" + "\n".join(
+                        "CALL: %s %s" % (n, json.dumps(a)) for n, a in native_calls
+                    )
                 _AGENT["last_raw"] = raw[:600]
             if not reply and not native_calls:
                 # Fallback still applies when the model is down: a file the user
@@ -11324,9 +14952,13 @@ def run_agent(user_message):
                 _auto_open_web_image_fallback(reply, messages, user_message)
                 with _AGENT_LOCK:
                     _AGENT["activity"] = "stopped (no model reply)"
-                    _AGENT["last_reply"] = "All model providers are unavailable right now."
+                    _AGENT["last_reply"] = (
+                        "All model providers are unavailable right now."
+                    )
                 return
-            calls = list(native_calls) + (_extract_calls(reply) if not native_calls else [])
+            calls = list(native_calls) + (
+                _extract_calls(reply) if not native_calls else []
+            )
             last_had_tools = bool(calls)
             final = _extract_final(reply)
             if calls:
@@ -11343,9 +14975,14 @@ def run_agent(user_message):
                 # the model from re-planning/losing its steps every turn.
                 batch = calls[:_BATCH_MAX]
                 asst = {"role": "assistant", "content": reply or ""}
-                asst["tool_calls"] = [{"id": "call_%d_%d" % (i, j), "type": "function",
-                                       "function": {"name": nm, "arguments": json.dumps(a)}}
-                                      for j, (nm, a) in enumerate(batch)]
+                asst["tool_calls"] = [
+                    {
+                        "id": "call_%d_%d" % (i, j),
+                        "type": "function",
+                        "function": {"name": nm, "arguments": json.dumps(a)},
+                    }
+                    for j, (nm, a) in enumerate(batch)
+                ]
                 messages.append(asst)
                 if _AGENT.get("abort"):
                     with _AGENT_LOCK:
@@ -11363,27 +15000,49 @@ def run_agent(user_message):
                     if _AGENT.get("abort"):
                         result = "Stopped by user before this call ran."
                         ok = False
-                        audit_write("tool", name, args or {}, False,
-                                    "skipped: aborted by user")
+                        audit_write(
+                            "tool", name, args or {}, False, "skipped: aborted by user"
+                        )
                         print("⛔ %s skipped, user aborted" % name, flush=True)
                         break
                     tcid = "call_%d_%d" % (i, j)
                     if name not in TOOLS:
                         sid = _agent_next_id()
                         with _AGENT_LOCK:
-                            _AGENT["steps"].append({"id": sid, "kind": "work",
-                                                    "text": name, "state": "error",
-                                                    "error": "unknown tool", "icon": "🔧"})
+                            _AGENT["steps"].append(
+                                {
+                                    "id": sid,
+                                    "kind": "work",
+                                    "text": name,
+                                    "state": "error",
+                                    "error": "unknown tool",
+                                    "icon": "🔧",
+                                }
+                            )
                             _AGENT["tools_used"] += 1
-                            _AGENT["last_call_sig"] = (name, json.dumps(args, sort_keys=True))
+                            _AGENT["last_call_sig"] = (
+                                name,
+                                json.dumps(args, sort_keys=True),
+                            )
                             _AGENT["last_call_ok"] = False
                             _AGENT["last_error"] = "unknown tool: %s" % name
-                        messages.append({"role": "tool", "tool_call_id": tcid,
-                                         "name": name, "content": "unknown tool: %s" % name})
-                        messages.append({"role": "user", "content":
-                            "Tool '%s' is not available. Check the tool list in the system prompt and "
-                            "use one of the real tools (read_file, edit_file, run_command, git_*, "
-                            "build_apk, pub_*, flutter_test, flutter_analyze, ui_*, cdp_*, restart)." % name})
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tcid,
+                                "name": name,
+                                "content": "unknown tool: %s" % name,
+                            }
+                        )
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": "Tool '%s' is not available. Check the tool list in the system prompt and "
+                                "use one of the real tools (read_file, edit_file, run_command, git_*, "
+                                "build_apk, pub_*, flutter_test, flutter_analyze, ui_*, cdp_*, restart)."
+                                % name,
+                            }
+                        )
                         executed_any = True
                         continue
                     sid = _agent_next_id()
@@ -11396,21 +15055,35 @@ def run_agent(user_message):
                     if sig == prev_sig and prev_ok:
                         with _AGENT_LOCK:
                             _AGENT["activity"] = "repeating a tool call"
-                        messages.append({"role": "user", "content":
-                            "You already called %s with identical arguments and received its result "
-                            "above. Repeating it will not help. State the NEXT distinct action "
-                            "(edit_file / run_command) instead of re-calling the same tool." % name})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": "You already called %s with identical arguments and received its result "
+                                "above. Repeating it will not help. State the NEXT distinct action "
+                                "(edit_file / run_command) instead of re-calling the same tool."
+                                % name,
+                            }
+                        )
                         continue
                     with _AGENT_LOCK:
-                        _AGENT["steps"].append({"id": sid, "kind": "work", "text": desc,
-                                                "state": "running", "icon": icon})
+                        _AGENT["steps"].append(
+                            {
+                                "id": sid,
+                                "kind": "work",
+                                "text": desc,
+                                "state": "running",
+                                "icon": icon,
+                            }
+                        )
                     # HARD GUARD: block ui_tap/ui_swipe unless the model has read the
                     # screen (ui_dump in this batch, or a successful ui_dump /
                     # auto-dump in a previous round) since the last screen change.
                     if name in ("ui_tap", "ui_swipe") and not seen_screen:
-                        result = ("BLOCKED: You must run ui_dump in the same round "
-                                  "before ui_tap/ui_swipe. Run ui_dump first to read "
-                                  "the screen, then decide your tap coordinates.")
+                        result = (
+                            "BLOCKED: You must run ui_dump in the same round "
+                            "before ui_tap/ui_swipe. Run ui_dump first to read "
+                            "the screen, then decide your tap coordinates."
+                        )
                         ok = False
                     else:
                         ok, result = _call_tool(name, args)
@@ -11427,32 +15100,58 @@ def run_agent(user_message):
                                 s["state"] = "done" if ok else "error"
                                 s["error"] = "" if ok else result
                                 # Store viewable result for frontend inline rendering
-                                if ok and name in ("view_user_file", "open_user_file", "view_web_image"):
+                                if ok and name in (
+                                    "view_user_file",
+                                    "open_user_file",
+                                    "view_web_image",
+                                ):
                                     if isinstance(result, _ViewResult):
                                         s["view"] = result.view
                                     elif isinstance(result, dict):
                                         s["view"] = result
-                    messages.append({"role": "tool", "tool_call_id": tcid,
-                                     "name": name, "content": str(result)})
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tcid,
+                            "name": name,
+                            "content": str(result),
+                        }
+                    )
                     if ok and name in _UI_SCREEN_TOOLS:
                         _dok, _dtxt = _ui_auto_dump()
                         seen_screen = _dok
                         if _dok:
-                            messages.append({"role": "user", "content":
-                                "SCREEN STATE after your %s action (auto ui_dump):\n%s%s" % (
-                                    name, str(_dtxt)[:2000], _cert_warning_directive(_dtxt))})
+                            messages.append(
+                                {
+                                    "role": "user",
+                                    "content": "SCREEN STATE after your %s action (auto ui_dump):\n%s%s"
+                                    % (
+                                        name,
+                                        str(_dtxt)[:2000],
+                                        _cert_warning_directive(_dtxt),
+                                    ),
+                                }
+                            )
                             messages.extend(_auto_bypass_cert_warning(_dtxt))
                             if name in ("ui_tap", "ui_swipe", "ui_type", "ui_key"):
-                                messages.append({"role": "user", "content":
-                                    "STOP. Read the SCREEN STATE above carefully. "
-                                    "Based on what you see, decide your NEXT action. "
-                                    "Do NOT guess coordinates — use the text/bounds "
-                                    "from the screen state above."})
+                                messages.append(
+                                    {
+                                        "role": "user",
+                                        "content": "STOP. Read the SCREEN STATE above carefully. "
+                                        "Based on what you see, decide your NEXT action. "
+                                        "Do NOT guess coordinates — use the text/bounds "
+                                        "from the screen state above.",
+                                    }
+                                )
                     if not ok:
-                        messages.append({"role": "user", "content":
-                            "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
-                            "root cause first (read the file / inspect the state), then take a "
-                            "corrective action. This is self-healing: fix the actual problem."})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": "That tool call FAILED. Do NOT blindly retry it. Diagnose the "
+                                "root cause first (read the file / inspect the state), then take a "
+                                "corrective action. This is self-healing: fix the actual problem.",
+                            }
+                        )
                 if _AGENT.get("abort"):
                     with _AGENT_LOCK:
                         _AGENT["activity"] = "stopped by user"
@@ -11479,29 +15178,39 @@ def run_agent(user_message):
                                     "cannot reach an Android phone. Use the device "
                                     "tools instead: ui_connect to reach the phone, "
                                     "then ui_dump to read the screen, then ui_tap "
-                                    "to interact." % " and ".join(_tail))
-                            messages.append({"role": "assistant", "content":
-                                             _AGENT["last_reply"]})
+                                    "to interact." % " and ".join(_tail)
+                                )
+                            messages.append(
+                                {"role": "assistant", "content": _AGENT["last_reply"]}
+                            )
                             return _AGENT["last_reply"]
                     from collections import Counter as _Counter
+
                     _counts = _Counter(calls_history)
                     _loop_tool = _counts.most_common(1)[0]
                     # Repeated web_search with no display: the model is stuck
                     # gathering links. Tell it exactly how to show the picture
                     # before giving up, so the image still appears.
-                    if (_loop_tool[1] >= 2 and _loop_tool[0] in ("web_search", "webfetch")
-                            and "view_web_image" not in _seen_tool_names()
-                            and _wants_web_image(user_message)
-                            and _AGENT["corrective"] < corrective_max):
+                    if (
+                        _loop_tool[1] >= 2
+                        and _loop_tool[0] in ("web_search", "webfetch")
+                        and "view_web_image" not in _seen_tool_names()
+                        and _wants_web_image(user_message)
+                        and _AGENT["corrective"] < corrective_max
+                    ):
                         with _AGENT_LOCK:
                             _AGENT["corrective"] += 1
                         messages.append({"role": "assistant", "content": reply})
-                        messages.append({"role": "user", "content":
-                            "STOP searching. You already have the image URL in the results above. "
-                            "Call view_web_image NOW with that direct image link "
-                            "(the .jpg/.png/.gif URL itself) so the picture pops up in the chat. "
-                            "Then reply with FINAL: the answer plus a one-line confirmation that "
-                            "the image is displayed above. Do NOT call web_search again."})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": "STOP searching. You already have the image URL in the results above. "
+                                "Call view_web_image NOW with that direct image link "
+                                "(the .jpg/.png/.gif URL itself) so the picture pops up in the chat. "
+                                "Then reply with FINAL: the answer plus a one-line confirmation that "
+                                "the image is displayed above. Do NOT call web_search again.",
+                            }
+                        )
                         continue
                     if _loop_tool[1] >= 3:
                         with _AGENT_LOCK:
@@ -11509,13 +15218,23 @@ def run_agent(user_message):
                             _advance_indicator()
                         # Auto-open fallback (same as /chat): the model looped on
                         # list/grep without ever opening the requested file.
-                        _auto_open_user_file_fallback(calls_history, messages, user_message)
-                        _auto_open_web_image_fallback(final or reply, messages, user_message)
-                        _AGENT["last_reply"] = _terse_reply(reply) if reply else (
+                        _auto_open_user_file_fallback(
+                            calls_history, messages, user_message
+                        )
+                        _auto_open_web_image_fallback(
+                            final or reply, messages, user_message
+                        )
+                        _AGENT["last_reply"] = (
+                            _terse_reply(reply)
+                            if reply
+                            else (
                                 "I attempted the task multiple times but couldn't find a "
-                                "reliable answer. Check the steps above for what I found.")
-                        messages.append({"role": "assistant", "content":
-                            _AGENT["last_reply"]})
+                                "reliable answer. Check the steps above for what I found."
+                            )
+                        )
+                        messages.append(
+                            {"role": "assistant", "content": _AGENT["last_reply"]}
+                        )
                         return
                 if executed_any:
                     continue
@@ -11530,25 +15249,32 @@ def run_agent(user_message):
                         messages.append({"role": "assistant", "content": reply})
                         messages.append({"role": "user", "content": nav_push})
                         continue
-                if _is_device_task(user_message) and _device_tool_refusal(final) \
-                        and _AGENT["corrective"] < corrective_max:
+                if (
+                    _is_device_task(user_message)
+                    and _device_tool_refusal(final)
+                    and _AGENT["corrective"] < corrective_max
+                ):
                     with _AGENT_LOCK:
                         _AGENT["corrective"] += 1
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "user", "content": _DEVICE_STALL_MSG})
                     continue
                 if used == 0 and _AGENT["corrective"] < corrective_max:
-                        with _AGENT_LOCK:
-                            _AGENT["corrective"] += 1
-                        messages.append({"role": "assistant", "content": reply})
-                        messages.append({"role": "user", "content":
-                            "You haven't used any tools yet. Pick the RIGHT tool for THIS task: "
+                    with _AGENT_LOCK:
+                        _AGENT["corrective"] += 1
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "You haven't used any tools yet. Pick the RIGHT tool for THIS task: "
                             "ui_* tools for device/app actions (ui_app_open, ui_tap, ui_swipe, "
                             "ui_type, ui_key, ui_dump, ui_screenshot), file tools + run_command / "
                             "flutter_* for code work, cdp_* for the WebView. Emit THOUGHT + CALL "
                             "now — do NOT emit FINAL until you have actually performed the work "
-                            "and verified the result. Never defer back to the user."})
-                        continue
+                            "and verified the result. Never defer back to the user.",
+                        }
+                    )
+                    continue
                 # Auto-open fallback (same as /chat): the model may have FINAL'd
                 # without ever calling view_user_file/open_user_file.
                 _auto_open_user_file_fallback(calls_history, messages, user_message)
@@ -11573,13 +15299,17 @@ def run_agent(user_message):
                     with _AGENT_LOCK:
                         _AGENT["corrective"] += 1
                     messages.append({"role": "assistant", "content": reply})
-                    messages.append({"role": "user", "content":
-                        "You haven't used any tools yet. Pick the RIGHT tool for THIS task: "
-                        "ui_* tools for device/app actions (ui_app_open, ui_tap, ui_swipe, "
-                        "ui_type, ui_key, ui_dump, ui_screenshot), file tools + run_command / "
-                        "flutter_* for code work, cdp_* for the WebView. Emit THOUGHT + CALL "
-                        "now — do NOT emit FINAL until you have actually performed the work "
-                        "and verified the result. Never defer back to the user."})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "You haven't used any tools yet. Pick the RIGHT tool for THIS task: "
+                            "ui_* tools for device/app actions (ui_app_open, ui_tap, ui_swipe, "
+                            "ui_type, ui_key, ui_dump, ui_screenshot), file tools + run_command / "
+                            "flutter_* for code work, cdp_* for the WebView. Emit THOUGHT + CALL "
+                            "now — do NOT emit FINAL until you have actually performed the work "
+                            "and verified the result. Never defer back to the user.",
+                        }
+                    )
                     continue
                 # Auto-open fallback (same as /chat): FINAL text without any file
                 # view still resolves and opens the requested file server-side.
@@ -11592,7 +15322,11 @@ def run_agent(user_message):
                 messages.append({"role": "assistant", "content": reply})
                 return
             # No CALL and no FINAL — push the model toward tools.
-            nav_push = _nav_gate(user_message, calls_history) if (not calls and not final) else None
+            nav_push = (
+                _nav_gate(user_message, calls_history)
+                if (not calls and not final)
+                else None
+            )
             if nav_push and _AGENT["corrective"] < corrective_max:
                 with _AGENT_LOCK:
                     _AGENT["corrective"] += 1
@@ -11603,13 +15337,17 @@ def run_agent(user_message):
                 with _AGENT_LOCK:
                     _AGENT["corrective"] += 1
                 messages.append({"role": "assistant", "content": reply})
-                messages.append({"role": "user", "content":
-                    "Continue. Emit THOUGHT and CALL tool lines using the RIGHT tool for this "
-                    "task (ui_* for device/app actions, file/dev tools for code work). Do NOT "
-                    "emit FINAL until you have used at least one tool and verified the result."})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Continue. Emit THOUGHT and CALL tool lines using the RIGHT tool for this "
+                        "task (ui_* for device/app actions, file/dev tools for code work). Do NOT "
+                        "emit FINAL until you have used at least one tool and verified the result.",
+                    }
+                )
                 continue
-            # Auto-open fallback (same as /chat): no CALL and no FINAL — still try
-            # to open a file the user explicitly asked for.
+                # Auto-open fallback (same as /chat): no CALL and no FINAL — still try
+                # to open a file the user explicitly asked for.
                 _auto_open_user_file_fallback(calls_history, messages, user_message)
                 _auto_open_web_image_fallback(final, messages, user_message)
                 with _AGENT_LOCK:
@@ -11624,6 +15362,7 @@ def run_agent(user_message):
                 _AGENT["last_reply"] = "Reached the action limit; see the steps above."
     except Exception as e:
         import traceback
+
         with _AGENT_LOCK:
             _AGENT["activity"] = "error"
             _AGENT["last_error"] = ("%s: %s" % (type(e).__name__, e))[:400]
@@ -11640,17 +15379,23 @@ def run_agent(user_message):
         if used_tools and not _kill_armed():
             playbook_note(user_message, used_tools, outcome)
 
+
 # Shared provider-fallback LLM call (Groq -> Cerebras -> OpenRouter -> Ollama).
 # Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
 # Passes the native tools= schema to the provider so the model can emit
 # structured tool_calls instead of free-form prose (the stall fix).
-def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
-              allowed_names=None):
+def llm_reply(
+    messages, max_tokens=2048, temperature=0.3, tool_choice="auto", allowed_names=None
+):
     # Free-tier providers cap input tokens per minute (Groq ITPM = 7000). Sending
     # the full 54-tool schema (~8.9k tok) with the agent prompt trips a 413, which
     # made every /opencode task look like "all providers are down". Restrict to the
     # task's domain tools first, then trim further if still over budget.
-    tools_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names) if allowed_names else TOOLS_SCHEMA
+    tools_schema = (
+        _filter_tools_schema(TOOLS_SCHEMA, allowed_names)
+        if allowed_names
+        else TOOLS_SCHEMA
+    )
     tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
 
     def one(name, endpoint, api_key, model):
@@ -11668,16 +15413,27 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                 # before the bytes go out, not after the response comes back.
                 if _normalize_tool_messages(messages):
                     print(f"🧹 {name}: rewrote null tool args to match the schema")
-                r = requests.post(f"{endpoint}/chat/completions",
-                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": messages, "temperature": temperature,
-                          "max_tokens": max_tokens, "tools": tools_schema, "tool_choice": tool_choice},
-                    timeout=(10, 120))
+                r = requests.post(
+                    f"{endpoint}/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {api_key}",
+                    },
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "tools": tools_schema,
+                        "tool_choice": tool_choice,
+                    },
+                    timeout=(10, 120),
+                )
                 if r.status_code == 200:
                     msg = r.json()["choices"][0]["message"]
                     text = (msg.get("content") or "").strip()
                     tcs = []
-                    for tc in (msg.get("tool_calls") or []):
+                    for tc in msg.get("tool_calls") or []:
                         fn = tc.get("function") or {}
                         nm = fn.get("name")
                         try:
@@ -11701,14 +15457,17 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                     continue
                 if r.status_code == 429 and attempt < 2:
                     wait = 20 * (attempt + 1)
-                    print(f"⏳ {name} 429 rate limit; waiting {wait}s for the token window")
+                    print(
+                        f"⏳ {name} 429 rate limit; waiting {wait}s for the token window"
+                    )
                     time.sleep(wait)
                     continue
                 # A 400 validation failure kills the whole request, so log what
                 # the model actually sent. Previously only the provider's error
                 # text was visible, which says the field but not its value.
-                if r.status_code == 400 and ("did not match schema" in r.text
-                                             or "expected" in r.text):
+                if r.status_code == 400 and (
+                    "did not match schema" in r.text or "expected" in r.text
+                ):
                     _log_rejected_tool_args(name, messages, r.text)
                 print(f"❌ {name} {r.status_code}: {r.text[:160]}")
             except Exception as e:
@@ -11722,107 +15481,110 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                 continue
             return None
         return None
+
     # Offline mode: skip cloud providers entirely, go straight to local Ollama.
     if os.environ.get("ACE_OFFLINE") == "1":
         print("🔌 ACE_OFFLINE=1 set — skipping cloud providers, using local Ollama")
     else:
-        for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-                                     ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-                                     ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-                                     ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL)):
+        for name, ep, key, model in (
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+            ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+            ("OpenCode", OPENCODE_ENDPOINT, OPENCODE_API_KEY, OPENCODE_MODEL),
+            ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
+        ):
             res = one(name, ep, key, model)
             if res is not None:
                 return res
-        for model in OPENROUTER_FALLBACKS:
-            res = one("OpenRouter-fallback", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, model)
+        for model in OPENCODE_FALLBACKS:
+            res = one(
+                "OpenCode-fallback", OPENCODE_ENDPOINT, OPENCODE_API_KEY, model
+            )
             if res is not None:
                 return res
-    # Last resort: local Ollama — offline + tool-capable so ACEsi stays autonomous
-    # with NO network. Uses the full tools schema so cdp_*/edit_file are callable.
+    # Last resort: local Ollama — uses requests.Session() with trust_env=False,
+    # which bypasses ALL environment proxy variables (the wsarecv cause).
     if not OLLAMA_ENABLED:
+        print("⚠️ Ollama not reachable — skipping local fallback")
         return "", []
     try:
         print(" llama llm_reply via Ollama model=%s" % OLLAMA_MODEL)
-        # Ollama crashes on this hardware with any prompt over ~500 chars
-        # (2GB VRAM, no AVX2). Replace the 15k-char system prompt with a
-        # minimal one so the model can actually respond.
-        ollama_messages = [{"role": "system", "content": _OLLAMA_MINIMAL_PROMPT}]
-        for m in messages:
-            role = m.get("role", "")
-            content = m.get("content", "")
-            if role == "system":
-                continue
-            ollama_messages.append({"role": role, "content": content})
-        payload = {"model": OLLAMA_MODEL, "messages": ollama_messages, "stream": False,
-                   "max_tokens": min(max_tokens, 512), "temperature": temperature}
-        if tool_choice:
-            payload["tool_choice"] = tool_choice
-        r = requests.post(f"{OLLAMA_ENDPOINT}/chat/completions", json=payload,
-                         timeout=(15, 420))
-        if r.status_code == 200:
-            msg = r.json()["choices"][0]["message"]
-            t = (msg.get("content") or "").strip()
-            tcs = []
-            for tc in (msg.get("tool_calls") or []):
-                fn = tc.get("function") or {}
-                nm = fn.get("name")
-                am = fn.get("arguments")
-                if isinstance(am, str):
-                    try:
-                        args = json.loads(am)
-                    except Exception:
-                        args = {}
-                elif isinstance(am, dict):
-                    args = am
-                else:
-                    args = {}
-                if nm:
-                    tcs.append((nm, args))
-            if tcs:
-                print(f"✅ llm_reply via Ollama ({len(tcs)} tool_call(s))")
-                return t, tcs
-            if t:
-                print(f"✅ llm_reply via Ollama ({len(t)} chars, no tools)")
-                return t, []
-            return None
-        print(f"❌ Ollama {r.status_code}: {r.text[:160]}")
+        session = requests.Session()
+        session.trust_env = False
+        # DIAGNOSTIC: print proxy env vars from inside the Flask process
+        _proxies = {k: v for k, v in os.environ.items() if "proxy" in k.lower()}
+        print(f"🚨 FLASK PROXY ENV: {_proxies}")
+        payload = {
+            "model": OLLAMA_MODEL,
+            "messages": [{"role": "user", "content": "Hello from Python!"}],
+            "stream": False,
+        }
+        # DIAGNOSTIC: print exactly what we are sending
+        print(
+            f"🚨 OLLAMA REQUEST: URL=http://127.0.0.1:11434/api/chat, PAYLOAD={payload}"
+        )
+        response = session.post(
+            "http://127.0.0.1:11434/api/chat", json=payload, timeout=(5, 120)
+        )
+        print(
+            f"🚨 Ollama response status: {response.status_code} body={response.text[:200]}"
+        )
+        response.raise_for_status()
+        data = response.json()
+        t = (data.get("message", {}).get("content") or "").strip()
+        if t:
+            print(f"✅ llm_reply via Ollama ({len(t)} chars, no tools)")
+            return t, []
+        return None
     except Exception as e:
-        print(f"❌ Ollama exc: {e}")
+        print(f"❌ Ollama session error: {type(e).__name__}: {e}")
     return "", []
 
+
 # ---- CDP REST endpoints (inspect ITS WebView / local Chrome without the agent loop) ----
+
 
 def _cdp_json(result):
     ok, payload = result
     return jsonify({"ok": ok, "result": payload}), (200 if ok else 502)
 
-@app.route('/cdp/connect', methods=['GET'])
-@app.route('/cdp/connect', methods=['POST'])
+
+@app.route("/cdp/connect", methods=["GET"])
+@app.route("/cdp/connect", methods=["POST"])
 def cdp_route_connect():
     return _cdp_json(d.connect_cmd())
 
-@app.route('/cdp/evaluate', methods=['POST'])
+
+@app.route("/cdp/evaluate", methods=["POST"])
 def cdp_route_evaluate():
-    expr = (request.json or {}).get("expr") if request.is_json else request.form.get("expr")
+    expr = (
+        (request.json or {}).get("expr")
+        if request.is_json
+        else request.form.get("expr")
+    )
     return _cdp_json(d.evaluate_js(expr))
 
-@app.route('/cdp/console', methods=['GET'])
+
+@app.route("/cdp/console", methods=["GET"])
 def cdp_route_console():
     return _cdp_json(d.get_console_logs())
 
-@app.route('/cdp/dom', methods=['GET'])
+
+@app.route("/cdp/dom", methods=["GET"])
 def cdp_route_dom():
     return _cdp_json(d.get_dom_state())
 
-@app.route('/cdp/network', methods=['GET'])
+
+@app.route("/cdp/network", methods=["GET"])
 def cdp_route_network():
     return _cdp_json(d.get_network_requests())
 
-@app.route('/cdp/status', methods=['GET'])
+
+@app.route("/cdp/status", methods=["GET"])
 def cdp_route_status():
     return jsonify({"ok": True, "result": d.status()})
 
-@app.route('/screenshot/latest', methods=['GET'])
+
+@app.route("/screenshot/latest", methods=["GET"])
 def screenshot_latest():
     """Serve the most recent in-memory screenshot (the popup image). No PNG
     buffered -> tell the caller there is nothing to show yet."""
@@ -11830,7 +15592,8 @@ def screenshot_latest():
         return jsonify({"ok": False, "result": "no screenshot captured yet"}), 404
     return Response(_LAST_SHOT["png"], mimetype="image/png")
 
-@app.route('/screenshot/save', methods=['POST'])
+
+@app.route("/screenshot/save", methods=["POST"])
 def screenshot_save():
     """Write the buffered screenshot to ui_screenshots/ (Chris clicked Save in
     the popup). Returns the real on-disk path so nothing is ever fabricated."""
@@ -11847,18 +15610,23 @@ def screenshot_save():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@app.route('/opencode', methods=['POST'])
+
+@app.route("/opencode", methods=["POST"])
 def opencode():
     try:
         data = request.json or {}
-        user_message = (data.get('message') or '').strip()
+        user_message = (data.get("message") or "").strip()
         if not user_message:
             return jsonify({"reply": "No message."}), 400
         if _kill_armed():
             return jsonify({"reply": "E-STOP is armed — ACEsi is stopped."}), 403
         with _AGENT_LOCK:
             if _AGENT["running"]:
-                return jsonify({"reply": "ACEsi is already working on a task. Let it finish or click stop."})
+                return jsonify(
+                    {
+                        "reply": "ACEsi is already working on a task. Let it finish or click stop."
+                    }
+                )
             _AGENT["running"] = True
             _AGENT["abort"] = False
             _AGENT["activity"] = "starting…"
@@ -11872,42 +15640,57 @@ def opencode():
             _AGENT["last_reply"] = f"Error: {type(e).__name__}: {e}"
         return jsonify({"reply": f"Error: {str(e)}"})
 
-@app.route('/opencode/status', methods=['GET'])
+
+@app.route("/opencode/status", methods=["GET"])
 def opencode_status():
     with _AGENT_LOCK:
-        return jsonify({
-            "status": "busy" if _AGENT["running"] else "idle",
-            "activity": _AGENT["activity"],
-            "indicator": _current_indicator(),
-            "steps": list(_AGENT["steps"]),
-            "last_reply": _AGENT["last_reply"],
-            "last_raw": _AGENT["last_raw"],
-            "tools_used": _AGENT["tools_used"],
-            "corrective": _AGENT["corrective"],
-            "last_error": _AGENT["last_error"],
-            "shot_ts": _LAST_SHOT["ts"],
-            "ui_test": dict(_UI_LAST_TEST),
-        })
+        return jsonify(
+            {
+                "status": "busy" if _AGENT["running"] else "idle",
+                "activity": _AGENT["activity"],
+                "indicator": _current_indicator(),
+                "steps": list(_AGENT["steps"]),
+                "last_reply": _AGENT["last_reply"],
+                "last_raw": _AGENT["last_raw"],
+                "tools_used": _AGENT["tools_used"],
+                "corrective": _AGENT["corrective"],
+                "last_error": _AGENT["last_error"],
+                "shot_ts": _LAST_SHOT["ts"],
+                "ui_test": dict(_UI_LAST_TEST),
+            }
+        )
 
-@app.route('/opencode/heal', methods=['POST', 'GET'])
+
+@app.route("/opencode/heal", methods=["POST", "GET"])
 def opencode_heal():
     """Self-healing: feed the last run's failures back to ACEsi and let it fix them."""
     with _AGENT_LOCK:
         if _AGENT["running"]:
-            return jsonify({"reply": "ACEsi is already working — let it finish or stop first."}), 409
+            return (
+                jsonify(
+                    {"reply": "ACEsi is already working — let it finish or stop first."}
+                ),
+                409,
+            )
         steps = list(_AGENT["steps"])
         last_error = _AGENT.get("last_error", "")
         last_reply = _AGENT.get("last_reply", "")
     failed = [s for s in steps if s.get("state") == "error"]
     if not failed and not last_error:
-        return jsonify({"reply": "Nothing to heal — the last run had no failing steps."})
-    detail = "\n".join("• %s: %s" % (s.get("text", s.get("id")), (s.get("error") or "")[:400])
-                       for s in failed[-5:])
-    msg = ("SELF-HEALING RUN. A previous ACEsi run left errors behind. Recover from them:\n"
-           "FAILING STEPS:\n%s\nLAST ERROR: %s\nLAST REPLY: %s\n\n"
-           "Diagnose the root cause, fix it (edit_file / run_command / flutter_test / "
-           "flutter_analyze / git_commit), and confirm with FINAL. Do not redo work that "
-           "already succeeded." % (detail or "(none)", last_error or "(none)", last_reply))
+        return jsonify(
+            {"reply": "Nothing to heal — the last run had no failing steps."}
+        )
+    detail = "\n".join(
+        "• %s: %s" % (s.get("text", s.get("id")), (s.get("error") or "")[:400])
+        for s in failed[-5:]
+    )
+    msg = (
+        "SELF-HEALING RUN. A previous ACEsi run left errors behind. Recover from them:\n"
+        "FAILING STEPS:\n%s\nLAST ERROR: %s\nLAST REPLY: %s\n\n"
+        "Diagnose the root cause, fix it (edit_file / run_command / flutter_test / "
+        "flutter_analyze / git_commit), and confirm with FINAL. Do not redo work that "
+        "already succeeded." % (detail or "(none)", last_error or "(none)", last_reply)
+    )
     with _AGENT_LOCK:
         _AGENT["running"] = True
         _AGENT["abort"] = False
@@ -11916,7 +15699,8 @@ def opencode_heal():
     t.start()
     return jsonify({"reply": "Heal started — fixing %d failing step(s)." % len(failed)})
 
-@app.route('/opencode/stop', methods=['POST'])
+
+@app.route("/opencode/stop", methods=["POST"])
 def opencode_stop():
     with _AGENT_LOCK:
         _AGENT["abort"] = True
@@ -11925,7 +15709,8 @@ def opencode_stop():
         _AGENT["last_reply"] = "Stopped by user."
     return jsonify({"ok": True})
 
-@app.route('/dispatcher/run', methods=['POST'])
+
+@app.route("/dispatcher/run", methods=["POST"])
 def dispatcher_run():
     """Run ace_dispatcher TaskRunner for robust multi-subtask execution.
 
@@ -11938,28 +15723,32 @@ def dispatcher_run():
     successes listed before failures, with counts and per-step detail.
     """
     data = request.json or {}
-    user_message = (data.get('message') or '').strip()
-    if not user_message and not data.get('subtasks'):
+    user_message = (data.get("message") or "").strip()
+    if not user_message and not data.get("subtasks"):
         return jsonify({"error": "Provide 'message' or 'subtasks'."}), 400
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed."}), 403
 
     subtasks = None
-    raw_tasks = data.get('subtasks')
+    raw_tasks = data.get("subtasks")
     if raw_tasks:
-        subtasks = [ace_dispatcher.Subtask.from_dict(t) if isinstance(t, dict)
-                     else t for t in raw_tasks]
+        subtasks = [
+            ace_dispatcher.Subtask.from_dict(t) if isinstance(t, dict) else t
+            for t in raw_tasks
+        ]
     try:
-        result = _run_dispatcher(user_message, subtasks=subtasks,
-                                 max_steps=int(data.get('max_steps', 50)))
+        result = _run_dispatcher(
+            user_message, subtasks=subtasks, max_steps=int(data.get("max_steps", 50))
+        )
     except Exception as e:
         return jsonify({"error": "%s: %s" % (type(e).__name__, e)}), 500
     return jsonify(result)
 
-@app.route('/auto_fix_stream', methods=['GET'])
+
+@app.route("/auto_fix_stream", methods=["GET"])
 def auto_fix_stream():
-    file_path = request.args.get('file_path')
-    error_text = request.args.get('error_text')
+    file_path = request.args.get("file_path")
+    error_text = request.args.get("error_text")
 
     if not file_path or not error_text:
         return "Missing parameters", 400
@@ -11975,7 +15764,7 @@ def auto_fix_stream():
             if os.path.exists(joined):
                 target = joined
         try:
-            with open(target, 'r', encoding='utf-8') as f:
+            with open(target, "r", encoding="utf-8") as f:
                 content = f.read()
             yield "File read successfully.\n\n"
             time.sleep(0.5)
@@ -11989,8 +15778,11 @@ def auto_fix_stream():
         yield "Generating fix...\n\n"
         time.sleep(0.5)
         fix_messages = [
-            {"role": "system", "content": f"You are ACEsi, an expert debugger. Fix the following code. The error is: {error_text}. Respond with only the fixed code — no explanations."},
-            {"role": "user", "content": content}
+            {
+                "role": "system",
+                "content": f"You are ACEsi, an expert debugger. Fix the following code. The error is: {error_text}. Respond with only the fixed code — no explanations.",
+            },
+            {"role": "user", "content": content},
         ]
         fixed_code = None
         for name, endpoint, api_key, model in (
@@ -12003,9 +15795,17 @@ def auto_fix_stream():
             try:
                 resp = requests.post(
                     f"{endpoint}/chat/completions",
-                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-                    json={"model": model, "messages": fix_messages, "temperature": 0.3, "max_tokens": 400},
-                    timeout=(10, 120)
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {api_key}",
+                    },
+                    json={
+                        "model": model,
+                        "messages": fix_messages,
+                        "temperature": 0.3,
+                        "max_tokens": 400,
+                    },
+                    timeout=(10, 120),
                 )
                 if resp.status_code == 200:
                     fixed_code = resp.json()["choices"][0]["message"]["content"]
@@ -12025,7 +15825,7 @@ def auto_fix_stream():
         time.sleep(0.5)
         cleaned = strip_code_fences(fixed_code)
         try:
-            with open(target, 'w', encoding='utf-8') as f:
+            with open(target, "w", encoding="utf-8") as f:
                 f.write(cleaned)
             yield "Fix applied successfully!\n\n"
             # Surface the result inline in the chat stream
@@ -12045,7 +15845,7 @@ def auto_fix_stream():
                 f"{NTFY_SERVER}/{NTFY_TOPIC}",
                 data=f"ACEsi fixed it! Auto-fix applied to {file_path}.",
                 headers={"Priority": "high", "Title": "ACEsi fixed it!"},
-                timeout=10
+                timeout=10,
             )
             yield "Notification sent.\n\n"
         except Exception as e:
@@ -12053,99 +15853,115 @@ def auto_fix_stream():
 
         yield "Auto-fix complete.\n\n"
 
-    response = Response(generate(), mimetype='text/plain')
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    response = Response(generate(), mimetype="text/plain")
+    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
+
 # ===== Memory endpoints =====
-@app.route('/memory/all', methods=['GET'])
+@app.route("/memory/all", methods=["GET"])
 def memory_all():
     return jsonify({"memory": get_memories()})
 
-@app.route('/memory/set', methods=['POST'])
+
+@app.route("/memory/set", methods=["POST"])
 def memory_set():
     data = request.json or {}
-    key = data.get('key', '').strip()
-    value = data.get('value', '').strip()
+    key = data.get("key", "").strip()
+    value = data.get("value", "").strip()
     if not key or not value:
         return jsonify({"error": "key and value required"})
     set_memory(key, value)
     return jsonify({"ok": True, "key": key})
 
-@app.route('/memory/bulk', methods=['POST'])
+
+@app.route("/memory/bulk", methods=["POST"])
 def memory_bulk():
-    items = (request.json or {}).get('items')
+    items = (request.json or {}).get("items")
     if not isinstance(items, dict):
         return jsonify({"error": "items must be an object"})
     for k, v in items.items():
         set_memory(str(k), str(v))
     return jsonify({"count": len(items)})
 
-@app.route('/memory/forget', methods=['POST'])
+
+@app.route("/memory/forget", methods=["POST"])
 def memory_forget():
-    key = (request.json or {}).get('key', '')
+    key = (request.json or {}).get("key", "")
     forget_memory(key)
     return jsonify({"ok": True})
 
-# ===== Journal endpoints =====
-@app.route('/journal', methods=['GET'])
-def journal_get():
-    return jsonify({"entries": get_journal(int(request.args.get('limit', 10)))})
 
-@app.route('/journal', methods=['POST'])
+# ===== Journal endpoints =====
+@app.route("/journal", methods=["GET"])
+def journal_get():
+    return jsonify({"entries": get_journal(int(request.args.get("limit", 10)))})
+
+
+@app.route("/journal", methods=["POST"])
 def journal_post():
-    entry = (request.json or {}).get('entry', '').strip()
+    entry = (request.json or {}).get("entry", "").strip()
     if not entry:
         return jsonify({"error": "entry required"})
     add_journal(entry)
     return jsonify({"ok": True, "entry": entry})
 
-# ===== Summary endpoints =====
-@app.route('/summary', methods=['GET'])
-def summary_get():
-    return jsonify({
-        "summary": build_summary_text(),
-        "config": {
-            "time": get_config('summary_time', '07:00'),
-            "enabled": get_config('summary_enabled', 'true') != 'false'
-        }
-    })
 
-@app.route('/summary/config', methods=['POST'])
+# ===== Summary endpoints =====
+@app.route("/summary", methods=["GET"])
+def summary_get():
+    return jsonify(
+        {
+            "summary": build_summary_text(),
+            "config": {
+                "time": get_config("summary_time", "07:00"),
+                "enabled": get_config("summary_enabled", "true") != "false",
+            },
+        }
+    )
+
+
+@app.route("/summary/config", methods=["POST"])
 def summary_config():
     data = request.json or {}
-    time = data.get('time', '07:00')
-    enabled = bool(data.get('enabled', True))
-    set_config('summary_time', time)
-    set_config('summary_enabled', 'true' if enabled else 'false')
+    time = data.get("time", "07:00")
+    enabled = bool(data.get("enabled", True))
+    set_config("summary_time", time)
+    set_config("summary_enabled", "true" if enabled else "false")
     return jsonify({"ok": True, "config": {"time": time, "enabled": enabled}})
 
-@app.route('/summary/now', methods=['POST'])
+
+@app.route("/summary/now", methods=["POST"])
 def summary_now():
     text = build_summary_text()
     ok = send_ntfy("ACEsi — Daily summary", text)
     return jsonify({"ok": ok, "summary": text})
 
+
 # ===== Notification endpoints =====
-@app.route('/notify/topic', methods=['GET'])
+@app.route("/notify/topic", methods=["GET"])
 def notify_topic():
     return jsonify({"topic": NTFY_TOPIC})
 
-@app.route('/notify', methods=['POST'])
+
+@app.route("/notify", methods=["POST"])
 def notify_post():
     data = request.json or {}
-    title = data.get('title', 'ACEsi')
-    message = data.get('message', '').strip()
+    title = data.get("title", "ACEsi")
+    message = data.get("message", "").strip()
     if not message:
         return jsonify({"error": "message required"})
     ok = send_ntfy(title, message)
     return jsonify({"ok": ok})
 
+
 # ===== Kill switch endpoints (web UI control from the PC) =====
 def _probe_json(url, headers=None, timeout=6):
     """Cheap reachability probe. Returns (ok, detail, payload)."""
     try:
-        r = requests.get(url, headers=headers or {}, timeout=timeout)
+        s = requests.Session()
+        s.trust_env = False
+        r = s.get(url, headers=headers or {}, timeout=timeout)
         if r.status_code != 200:
             return False, "HTTP %d: %s" % (r.status_code, _prov_reason(r.text)), None
         try:
@@ -12164,17 +15980,22 @@ def provider_health(probe=True):
     reported exactly; the others expose no quota API, so they get an honest
     reachability result and a measured latency instead of a made-up number.
     """
-    out = {"ts": datetime.now().isoformat(), "reduced_mode_providers":
-           sorted(REDUCED_MODE_PROVIDERS),
-           "groq_model_chat": GROQ_MODEL,
-           "groq_model_browser": GROQ_MODEL_BROWSER,
-           "browser_domains": list(_BROWSER_DOMAINS),
-           "providers": []}
+    out = {
+        "ts": datetime.now().isoformat(),
+        "reduced_mode_providers": sorted(REDUCED_MODE_PROVIDERS),
+        "groq_model_chat": GROQ_MODEL,
+        "groq_model_browser": GROQ_MODEL_BROWSER,
+        "browser_domains": list(_BROWSER_DOMAINS),
+        "providers": [],
+    }
     for name, ep, key, mdl in _chat_providers():
-        rec = {"name": name, "model": mdl,
-               "has_key": bool(key),
-               "reduced_payload": name in REDUCED_MODE_PROVIDERS
-                                  or name.startswith("OpenRouter")}
+        rec = {
+            "name": name,
+            "model": mdl,
+            "has_key": bool(key),
+            "reduced_payload": name in REDUCED_MODE_PROVIDERS
+            or name.startswith("OpenRouter"),
+        }
         if not key:
             rec.update({"reachable": False, "detail": "no API key configured"})
             out["providers"].append(rec)
@@ -12187,7 +16008,8 @@ def provider_health(probe=True):
         if name == "OpenRouter":
             # Real remaining balance, not a guess.
             ok, detail, pay = _probe_json(
-                ep + "/credits", {"Authorization": "Bearer %s" % key})
+                ep + "/credits", {"Authorization": "Bearer %s" % key}
+            )
             rec["reachable"] = ok
             rec["detail"] = detail
             rec["latency_ms"] = int((time.time() - t0) * 1000)
@@ -12200,32 +16022,46 @@ def provider_health(probe=True):
                     if isinstance(used, (int, float)):
                         rec["remaining_credits"] = round(total - used, 4)
         else:
-            ok, detail, _ = _probe_json(ep + "/models",
-                                        {"Authorization": "Bearer %s" % key})
+            ok, detail, _ = _probe_json(
+                ep + "/models", {"Authorization": "Bearer %s" % key}
+            )
             rec["reachable"] = ok
             rec["detail"] = detail
             rec["latency_ms"] = int((time.time() - t0) * 1000)
         out["providers"].append(rec)
     if OLLAMA_ENABLED:
         t0 = time.time()
-        ok, detail, pay = _probe_json(OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags",
-                                      timeout=4)
-        rec = {"name": "Ollama", "model": OLLAMA_CHAT_MODEL, "has_key": True,
-               "reduced_payload": False, "reachable": ok, "detail": detail,
-               "latency_ms": int((time.time() - t0) * 1000)}
+        ok, detail, pay = _probe_json(
+            OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags", timeout=4
+        )
+        rec = {
+            "name": "Ollama",
+            "model": OLLAMA_CHAT_MODEL,
+            "has_key": True,
+            "reduced_payload": False,
+            "reachable": ok,
+            "detail": detail,
+            "latency_ms": int((time.time() - t0) * 1000),
+        }
         if ok and isinstance(pay, dict):
             rec["models"] = [m.get("name") for m in (pay.get("models") or [])][:10]
         out["providers"].append(rec)
     else:
-        out["providers"].append({
-            "name": "Ollama", "model": OLLAMA_CHAT_MODEL, "has_key": False,
-            "reduced_payload": False, "reachable": False,
-            "detail": "disabled (ACE_OLLAMA unset and no local server)"})
+        out["providers"].append(
+            {
+                "name": "Ollama",
+                "model": OLLAMA_CHAT_MODEL,
+                "has_key": False,
+                "reduced_payload": False,
+                "reachable": False,
+                "detail": "disabled (ACE_OLLAMA unset and no local server)",
+            }
+        )
     out["any_reachable"] = any(p.get("reachable") for p in out["providers"])
     return out
 
 
-@app.route('/health/providers', methods=['GET'])
+@app.route("/health/providers", methods=["GET"])
 def health_providers():
     """So a test can be preceded by a quota check instead of a mid-run surprise.
 
@@ -12238,24 +16074,27 @@ def health_providers():
         return jsonify({"error": "%s: %s" % (type(e).__name__, e)}), 500
 
 
-@app.route('/kill/status', methods=['GET'])
+@app.route("/kill/status", methods=["GET"])
 def kill_status():
     return jsonify(_kill_state())
 
-@app.route('/kill', methods=['POST'])
+
+@app.route("/kill", methods=["POST"])
 def kill_now():
-    reason = (request.json or {}).get('reason', 'Web UI force stop')
-    _kill_arm(reason=reason, source='web')
+    reason = (request.json or {}).get("reason", "Web UI force stop")
+    _kill_arm(reason=reason, source="web")
     return jsonify({"armed": True, "message": _KILL_CONFIRM})
 
-@app.route('/kill/resume', methods=['POST'])
+
+@app.route("/kill/resume", methods=["POST"])
 def kill_resume_web():
     data = request.json or {}
-    unword = (data.get('password') or '').strip()
+    unword = (data.get("password") or "").strip()
     if not _kill_unword_match(unword):
         return jsonify({"ok": False, "error": "un-kill word incorrect"}), 403
     _kill_resume()
     return jsonify({"armed": False, "ok": True})
+
 
 # ===== Tasks =====
 def _norm_priority(raw):
@@ -12265,46 +16104,65 @@ def _norm_priority(raw):
         return 3
     return max(1, min(5, p))
 
-@app.route('/tasks', methods=['GET'])
-def tasks_get():
-    return jsonify({"tasks": read_items('tasks.json', 'tasks')})
 
-@app.route('/tasks', methods=['POST'])
+@app.route("/tasks", methods=["GET"])
+def tasks_get():
+    return jsonify({"tasks": read_items("tasks.json", "tasks")})
+
+
+@app.route("/tasks", methods=["POST"])
 def tasks_post():
     data = request.json or {}
-    title = (data.get('title') or '').strip()
+    title = (data.get("title") or "").strip()
     if not title:
         return jsonify({"error": "title required"})
+
     def add_task(items):
-        items.append({
-            "id": uuid.uuid4().hex,
-            "title": title,
-            "notes": (data.get('notes') or ''),
-            "priority": _norm_priority(data.get('priority', 3)),
-            "status": data.get('status', 'pending'),
-            "created_at": datetime.now().isoformat(),
-            "done_at": None
-        })
+        items.append(
+            {
+                "id": uuid.uuid4().hex,
+                "title": title,
+                "notes": (data.get("notes") or ""),
+                "priority": _norm_priority(data.get("priority", 3)),
+                "status": data.get("status", "pending"),
+                "created_at": datetime.now().isoformat(),
+                "done_at": None,
+            }
+        )
         return items
-    mutate_items('tasks.json', 'tasks', add_task)
+
+    mutate_items("tasks.json", "tasks", add_task)
     return jsonify({"ok": True})
 
-@app.route('/tasks/<tid>/status', methods=['POST'])
+
+@app.route("/tasks/<tid>/status", methods=["POST"])
 def tasks_status(tid):
-    status = (request.json or {}).get('status', 'pending')
+    status = (request.json or {}).get("status", "pending")
+
     def update(items):
         for t in items:
-            if t['id'] == tid:
-                t['status'] = status if status in ('pending', 'in_progress', 'done') else 'pending'
-                t['done_at'] = datetime.now().isoformat() if t['status'] == 'done' else None
+            if t["id"] == tid:
+                t["status"] = (
+                    status
+                    if status in ("pending", "in_progress", "done")
+                    else "pending"
+                )
+                t["done_at"] = (
+                    datetime.now().isoformat() if t["status"] == "done" else None
+                )
         return items
-    mutate_items('tasks.json', 'tasks', update)
+
+    mutate_items("tasks.json", "tasks", update)
     return jsonify({"ok": True})
 
-@app.route('/tasks/<tid>', methods=['DELETE'])
+
+@app.route("/tasks/<tid>", methods=["DELETE"])
 def tasks_delete(tid):
-    mutate_items('tasks.json', 'tasks', lambda items: [t for t in items if t['id'] != tid])
+    mutate_items(
+        "tasks.json", "tasks", lambda items: [t for t in items if t["id"] != tid]
+    )
     return jsonify({"ok": True})
+
 
 # ===== Job scheduler (autonomous triggers) =====
 # Jobs let ACEsi run a full autonomous task on a schedule — like "every morning
@@ -12314,7 +16172,7 @@ def tasks_delete(tid):
 #   {"type": "once",      "run_at": "2026-09-18T08:00:00"}
 #   {"type": "daily",     "time": "HH:MM"}
 #   {"type": "interval",  "minutes": N}
-_JOBS_FILE = 'jobs.json'
+_JOBS_FILE = "jobs.json"
 _JOBS_LOCK = threading.RLock()
 _JOBS_RUNNING = {}  # job_id -> Thread, so a long job can't double-fire
 
@@ -12322,102 +16180,115 @@ _JOBS_RUNNING = {}  # job_id -> Thread, so a long job can't double-fire
 def _jobs_read():
     with _JOBS_LOCK:
         d = load_json(_JOBS_FILE, {})
-        items = d.get('jobs', []) if isinstance(d, dict) else d
+        items = d.get("jobs", []) if isinstance(d, dict) else d
         return [j for j in items if isinstance(j, dict)]
 
 
 def _jobs_save(items):
     with _JOBS_LOCK:
-        save_json(_JOBS_FILE, {'jobs': list(items or [])})
+        save_json(_JOBS_FILE, {"jobs": list(items or [])})
 
 
 def _job_add(item):
     def add(jobs):
         jobs.append(item)
         return jobs
+
     with _JOBS_LOCK:
-        mutate_items(_JOBS_FILE, 'jobs', add)
+        mutate_items(_JOBS_FILE, "jobs", add)
 
 
 def _jobs_due_estimate(job, now=None):
     """True if this job is scheduled to fire now. Idempotent per (type, key)."""
     now = now or datetime.now()
-    sched = job.get('schedule') or {}
-    st = sched.get('type', 'daily')
+    sched = job.get("schedule") or {}
+    st = sched.get("type", "daily")
     key = None
-    if st == 'once':
+    if st == "once":
         try:
-            run_at = datetime.fromisoformat(sched['run_at'])
+            run_at = datetime.fromisoformat(sched["run_at"])
         except Exception:
             return False, None
-        key = ('once', sched.get('run_at'))
+        key = ("once", sched.get("run_at"))
         return now >= run_at, key
-    if st == 'interval':
-        last = job.get('last_run_ts') or 0
-        key = ('interval', sched.get('minutes'))
-        return int(time.time()) - last >= int(sched.get('minutes', 60)) * 60, key
+    if st == "interval":
+        last = job.get("last_run_ts") or 0
+        key = ("interval", sched.get("minutes"))
+        return int(time.time()) - last >= int(sched.get("minutes", 60)) * 60, key
     # daily. Compare (time passed, not yet fired today) rather than exact
     # "HH:MM" equality: with a 20s poll, one GC pause, a slow request or a
     # laptop sleep at exactly 07:00 used to skip that day's job permanently.
-    at = str(sched.get('time') or '07:00')
-    key = ('daily', now.strftime('%Y-%m-%d') + ' ' + at)
+    at = str(sched.get("time") or "07:00")
+    key = ("daily", now.strftime("%Y-%m-%d") + " " + at)
     # Compare against the SAME string form that _job_fire persists, otherwise
     # a stored "daily|2026-09-25 07:00" never matches this tuple and a daily
     # job re-fires all day.
-    if job.get('last_fire_key') == '|'.join(str(p) for p in key):
-        return False, key          # already ran for this date+time
+    if job.get("last_fire_key") == "|".join(str(p) for p in key):
+        return False, key  # already ran for this date+time
     try:
         due_at = datetime.combine(now.date(), datetime.strptime(at, "%H:%M").time())
     except ValueError:
-        return False, key          # malformed time: never fire, never wedge
+        return False, key  # malformed time: never fire, never wedge
     return now >= due_at, key
 
 
 def _job_fire(job, fire_key=None):
     """Run one autonomous job through the /chat brain (full determinism + tools),
     then push the outcome to Chris. Runs in its own thread."""
+
     def runner():
-        jid = job.get('id')
+        jid = job.get("id")
         try:
-            prompt = (job.get('prompt') or '').strip() or ("Run "+ (job.get('name') or 'task') + " for Chris.")
-            r = requests.post(f"http://127.0.0.1:{SERVER_PORT}/chat",
-                              json={"message": prompt}, timeout=(15, 900))
+            prompt = (job.get("prompt") or "").strip() or (
+                "Run " + (job.get("name") or "task") + " for Chris."
+            )
+            r = requests.post(
+                f"http://127.0.0.1:{SERVER_PORT}/chat",
+                json={"message": prompt},
+                timeout=(15, 900),
+            )
             reply = ""
             if r.status_code == 200:
                 d = r.json() or {}
                 reply = d.get("reply") or ""
                 if d.get("type") == "stream":
                     reply = "That task needs code fixes — see the ACEsi web UI for the auto-fix stream."
-            send_ntfy("ACEsi — Job: %s" % (job.get('name') or 'task'),
-                      ("Done.\n\n%s" % reply if reply else "Job finished (no text reply)."))
+            send_ntfy(
+                "ACEsi — Job: %s" % (job.get("name") or "task"),
+                ("Done.\n\n%s" % reply if reply else "Job finished (no text reply)."),
+            )
             # Persist last-run markers so the job doesn't refire.
             jobs = _jobs_read()
             for j in jobs:
-                if j.get('id') == jid:
-                    j['last_run'] = datetime.now().isoformat()
-                    j['last_run_ts'] = int(time.time())
+                if j.get("id") == jid:
+                    j["last_run"] = datetime.now().isoformat()
+                    j["last_run_ts"] = int(time.time())
                     # Remember which (date,time) slot this job consumed so a
                     # daily job cannot re-fire later the same day.
                     if fire_key:
-                        j['last_fire_key'] = '|'.join(str(p) for p in fire_key)
-                    if (j.get('schedule') or {}).get('type') == 'once':
-                        j['enabled'] = False
+                        j["last_fire_key"] = "|".join(str(p) for p in fire_key)
+                    if (j.get("schedule") or {}).get("type") == "once":
+                        j["enabled"] = False
             _jobs_save(jobs)
         except Exception as e:
             print(f"⚠️ job {jid} error: {e}")
             try:
-                send_ntfy("ACEsi — Job error", "Job '%s' failed: %s" % ((job.get('name') or 'task'), e))
+                send_ntfy(
+                    "ACEsi — Job error",
+                    "Job '%s' failed: %s" % ((job.get("name") or "task"), e),
+                )
             except Exception:
                 pass
         finally:
             with _JOBS_LOCK:
                 _JOBS_RUNNING.pop(jid, None)
+
     with _JOBS_LOCK:
-        if job.get('id') in _JOBS_RUNNING:
+        if job.get("id") in _JOBS_RUNNING:
             return False  # already running
     th = threading.Thread(target=runner, daemon=True)
     with _JOBS_LOCK:
-        _JOBS_RUNNING[job['id']] = th
+        _JOBS_RUNNING[job["id"]] = th
     th.start()
     return True
 
@@ -12432,12 +16303,12 @@ def job_watch():
                 time.sleep(20)
                 continue
             for job in _jobs_read():
-                if not job.get('enabled', True):
+                if not job.get("enabled", True):
                     continue
                 due, key = _jobs_due_estimate(job)
                 if due:
                     # Only run if we haven't fired for this (type, key) yet.
-                    if _JOBS_RUNNING.get(job.get('id')):
+                    if _JOBS_RUNNING.get(job.get("id")):
                         continue
                     _job_fire(job, fire_key=key)
         except Exception as e:
@@ -12445,258 +16316,321 @@ def job_watch():
         time.sleep(20)
 
 
-@app.route('/jobs', methods=['GET'])
+@app.route("/jobs", methods=["GET"])
 def jobs_get():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     return jsonify({"jobs": _jobs_read()})
 
-@app.route('/jobs', methods=['POST'])
+
+@app.route("/jobs", methods=["POST"])
 def jobs_post():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     data = request.json or {}
-    name = (data.get('name') or '').strip()
-    prompt = (data.get('prompt') or '').strip()
+    name = (data.get("name") or "").strip()
+    prompt = (data.get("prompt") or "").strip()
     if not name or not prompt:
         return jsonify({"error": "name and prompt required"})
-    schedule = data.get('schedule') or {}
+    schedule = data.get("schedule") or {}
     jid = uuid.uuid4().hex
-    _job_add({
-        "id": jid, "name": name, "prompt": prompt,
-        "schedule": schedule, "enabled": data.get('enabled', True),
-        "created_at": datetime.now().isoformat(),
-        "last_run": None, "last_run_ts": 0,
-    })
+    _job_add(
+        {
+            "id": jid,
+            "name": name,
+            "prompt": prompt,
+            "schedule": schedule,
+            "enabled": data.get("enabled", True),
+            "created_at": datetime.now().isoformat(),
+            "last_run": None,
+            "last_run_ts": 0,
+        }
+    )
     return jsonify({"ok": True, "id": jid})
 
-@app.route('/jobs/<jid>', methods=['DELETE'])
+
+@app.route("/jobs/<jid>", methods=["DELETE"])
 def jobs_delete(jid):
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
-    _jobs_save([j for j in _jobs_read() if j.get('id') != jid])
+    _jobs_save([j for j in _jobs_read() if j.get("id") != jid])
     return jsonify({"ok": True})
 
-@app.route('/jobs/<jid>/run', methods=['POST'])
+
+@app.route("/jobs/<jid>/run", methods=["POST"])
 def jobs_run_now(jid):
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     for j in _jobs_read():
-        if j.get('id') == jid and j.get('enabled', True) and _job_fire(j):
+        if j.get("id") == jid and j.get("enabled", True) and _job_fire(j):
             return jsonify({"ok": True, "started": True})
     return jsonify({"ok": False, "error": "job not found or already running"}), 400
 
+
 # ===== Playbook + audit log =====
-@app.route('/playbook', methods=['GET'])
+@app.route("/playbook", methods=["GET"])
 def playbook_get():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     return jsonify({"playbook": _playbook_read()})
 
-@app.route('/playbook', methods=['DELETE'])
+
+@app.route("/playbook", methods=["DELETE"])
 def playbook_clear():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     _playbook_save([])
     return jsonify({"ok": True})
 
-@app.route('/audit/tail', methods=['GET'])
+
+@app.route("/audit/tail", methods=["GET"])
 def audit_tail():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     try:
-        with open(_AUDIT_LOG, 'r', encoding='utf-8', errors='replace') as f:
+        with open(_AUDIT_LOG, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         return jsonify({"tail": lines[-200:]})
     except FileNotFoundError:
         return jsonify({"tail": [], "error": ""})
 
-# ===== Calendar events =====
-@app.route('/events', methods=['GET'])
-def events_get():
-    return jsonify({"events": read_items('events.json', 'events')})
 
-@app.route('/events', methods=['POST'])
+# ===== Calendar events =====
+@app.route("/events", methods=["GET"])
+def events_get():
+    return jsonify({"events": read_items("events.json", "events")})
+
+
+@app.route("/events", methods=["POST"])
 def events_post():
     data = request.json or {}
-    title = (data.get('title') or '').strip()
-    date = (data.get('date') or '').strip()
+    title = (data.get("title") or "").strip()
+    date = (data.get("date") or "").strip()
     if not title or not date:
         return jsonify({"error": "title and date required"})
+
     def add_event(items):
-        items.append({
-            "id": uuid.uuid4().hex,
-            "title": title,
-            "date": date,
-            "time": (data.get('time') or '').strip()
-        })
+        items.append(
+            {
+                "id": uuid.uuid4().hex,
+                "title": title,
+                "date": date,
+                "time": (data.get("time") or "").strip(),
+            }
+        )
         return items
-    mutate_items('events.json', 'events', add_event)
+
+    mutate_items("events.json", "events", add_event)
     return jsonify({"ok": True})
 
-@app.route('/events/<eid>', methods=['DELETE'])
+
+@app.route("/events/<eid>", methods=["DELETE"])
 def events_delete(eid):
-    mutate_items('events.json', 'events', lambda items: [e for e in items if e['id'] != eid])
+    mutate_items(
+        "events.json", "events", lambda items: [e for e in items if e["id"] != eid]
+    )
     return jsonify({"ok": True})
+
 
 # ===== Timers =====
-@app.route('/timers', methods=['GET'])
+@app.route("/timers", methods=["GET"])
 def timers_get():
     now = time.time()
-    timers = read_items('timers.json', 'timers')
-    out = [{
-        "id": t.get("id"),
-        "label": t.get("label", "Timer"),
-        "total": t.get("total", 0),
-        "remaining": max(0, int(t.get("ends_at", 0) - now))
-    } for t in timers]
+    timers = read_items("timers.json", "timers")
+    out = [
+        {
+            "id": t.get("id"),
+            "label": t.get("label", "Timer"),
+            "total": t.get("total", 0),
+            "remaining": max(0, int(t.get("ends_at", 0) - now)),
+        }
+        for t in timers
+    ]
     return jsonify({"timers": out})
 
-@app.route('/timers', methods=['POST'])
+
+@app.route("/timers", methods=["POST"])
 def timers_post():
     data = request.json or {}
     try:
-        minutes = int(data.get('minutes', 0))
+        minutes = int(data.get("minutes", 0))
     except (TypeError, ValueError):
         return jsonify({"error": "minutes must be a number"})
     if minutes < 1:
         return jsonify({"error": "minutes must be at least 1"})
-    label = (data.get('label') or 'Timer').strip() or 'Timer'
+    label = (data.get("label") or "Timer").strip() or "Timer"
+
     def add_timer(items):
-        items.append({
-            "id": uuid.uuid4().hex,
-            "label": label,
-            "minutes": minutes,
-            "total": minutes * 60,
-            "ends_at": time.time() + minutes * 60,
-            "created_at": datetime.now().isoformat()
-        })
+        items.append(
+            {
+                "id": uuid.uuid4().hex,
+                "label": label,
+                "minutes": minutes,
+                "total": minutes * 60,
+                "ends_at": time.time() + minutes * 60,
+                "created_at": datetime.now().isoformat(),
+            }
+        )
         return items
-    mutate_items('timers.json', 'timers', add_timer)
+
+    mutate_items("timers.json", "timers", add_timer)
     return jsonify({"ok": True})
 
-@app.route('/timers/<tid>', methods=['DELETE'])
+
+@app.route("/timers/<tid>", methods=["DELETE"])
 def timers_delete(tid):
-    mutate_items('timers.json', 'timers', lambda items: [t for t in items if t['id'] != tid])
+    mutate_items(
+        "timers.json", "timers", lambda items: [t for t in items if t["id"] != tid]
+    )
     return jsonify({"ok": True})
+
 
 # ===== Alarms =====
-@app.route('/alarms', methods=['GET'])
+@app.route("/alarms", methods=["GET"])
 def alarms_get():
-    return jsonify({"alarms": read_items('alarms.json', 'alarms')})
+    return jsonify({"alarms": read_items("alarms.json", "alarms")})
 
-@app.route('/alarms', methods=['POST'])
+
+@app.route("/alarms", methods=["POST"])
 def alarms_post():
     data = request.json or {}
-    time_str = (data.get('time') or '').strip()
-    label = (data.get('label') or 'Alarm').strip() or 'Alarm'
+    time_str = (data.get("time") or "").strip()
+    label = (data.get("label") or "Alarm").strip() or "Alarm"
     if not time_str:
         return jsonify({"error": "time required"})
+
     def add_alarm(items):
-        items.append({
-            "id": uuid.uuid4().hex,
-            "time": time_str,
-            "label": label,
-            "daily": bool(data.get('daily', True)),
-            "enabled": True,
-            "last_fired": None
-        })
+        items.append(
+            {
+                "id": uuid.uuid4().hex,
+                "time": time_str,
+                "label": label,
+                "daily": bool(data.get("daily", True)),
+                "enabled": True,
+                "last_fired": None,
+            }
+        )
         return items
-    mutate_items('alarms.json', 'alarms', add_alarm)
+
+    mutate_items("alarms.json", "alarms", add_alarm)
     return jsonify({"ok": True})
 
-@app.route('/alarms/<aid>/toggle', methods=['POST'])
+
+@app.route("/alarms/<aid>/toggle", methods=["POST"])
 def alarms_toggle(aid):
     def toggle(items):
         for a in items:
-            if a['id'] == aid:
-                a['enabled'] = not a.get('enabled', True)
-                a['last_fired'] = None
+            if a["id"] == aid:
+                a["enabled"] = not a.get("enabled", True)
+                a["last_fired"] = None
         return items
-    mutate_items('alarms.json', 'alarms', toggle)
+
+    mutate_items("alarms.json", "alarms", toggle)
     return jsonify({"ok": True})
 
-@app.route('/alarms/<aid>', methods=['DELETE'])
+
+@app.route("/alarms/<aid>", methods=["DELETE"])
 def alarms_delete(aid):
-    mutate_items('alarms.json', 'alarms', lambda items: [a for a in items if a['id'] != aid])
+    mutate_items(
+        "alarms.json", "alarms", lambda items: [a for a in items if a["id"] != aid]
+    )
     return jsonify({"ok": True})
+
 
 # ===== Work sessions =====
-@app.route('/sessions', methods=['GET'])
+@app.route("/sessions", methods=["GET"])
 def sessions_get():
-    return jsonify({"sessions": read_items('sessions.json', 'sessions')})
+    return jsonify({"sessions": read_items("sessions.json", "sessions")})
 
-@app.route('/sessions/start', methods=['POST'])
+
+@app.route("/sessions/start", methods=["POST"])
 def sessions_start():
-    sessions = read_items('sessions.json', 'sessions')
-    if any(s.get('ended_at') is None for s in sessions):
+    sessions = read_items("sessions.json", "sessions")
+    if any(s.get("ended_at") is None for s in sessions):
         return jsonify({"error": "A session is already running."})
     data = request.json or {}
-    label = (data.get('label') or 'Work session').strip() or 'Work session'
+    label = (data.get("label") or "Work session").strip() or "Work session"
     started = datetime.now()
+
     def add_session(items):
-        items.append({
-            "id": uuid.uuid4().hex,
-            "label": label,
-            "started_at": started.isoformat(),
-            "started_epoch": int(started.timestamp()),
-            "ended_at": None,
-            "duration": None
-        })
+        items.append(
+            {
+                "id": uuid.uuid4().hex,
+                "label": label,
+                "started_at": started.isoformat(),
+                "started_epoch": int(started.timestamp()),
+                "ended_at": None,
+                "duration": None,
+            }
+        )
         return items
-    mutate_items('sessions.json', 'sessions', add_session)
+
+    mutate_items("sessions.json", "sessions", add_session)
     return jsonify({"ok": True})
 
-@app.route('/sessions/end', methods=['POST'])
+
+@app.route("/sessions/end", methods=["POST"])
 def sessions_end():
     ended = datetime.now()
+
     def close_session(items):
         for s in reversed(items):
-            if s.get('ended_at') is None:
-                s['ended_at'] = ended.isoformat()
-                secs = max(0, int(ended.timestamp() - s.get('started_epoch', ended.timestamp())))
+            if s.get("ended_at") is None:
+                s["ended_at"] = ended.isoformat()
+                secs = max(
+                    0,
+                    int(ended.timestamp() - s.get("started_epoch", ended.timestamp())),
+                )
                 h, rem = divmod(secs, 3600)
                 m, ss = divmod(rem, 60)
-                s['duration'] = f"{h}:{m:02d}:{ss:02d}"
+                s["duration"] = f"{h}:{m:02d}:{ss:02d}"
                 return items
         return items
-    mutate_items('sessions.json', 'sessions', close_session)
+
+    mutate_items("sessions.json", "sessions", close_session)
     return jsonify({"ok": True})
 
+
 # ===== Notifications (delivered to the browser via /notifications/pending) =====
-@app.route('/notifications/pending', methods=['GET'])
+@app.route("/notifications/pending", methods=["GET"])
 def notifications_pending():
     try:
-        after = float(request.args.get('after', 0))
+        after = float(request.args.get("after", 0))
     except ValueError:
         after = 0
-    events = load_json('notifications.json', [])
-    events = [e for e in events if e.get('ts', 0) > after]
-    events.sort(key=lambda e: e['ts'])
+    events = load_json("notifications.json", [])
+    events = [e for e in events if e.get("ts", 0) > after]
+    events.sort(key=lambda e: e["ts"])
     return jsonify({"events": events})
 
 
 # ===== Email watch: poll now, and manage the rules that trigger a PHONE push =====
-@app.route('/email/check', methods=['POST', 'GET'])
+@app.route("/email/check", methods=["POST", "GET"])
 def email_check():
     """Poll Gmail/Yahoo immediately and ntfy-push anything matching a rule."""
-    data = request.json or {} if request.method == 'POST' else {}
-    force = data.get('force_all', True) if isinstance(data, dict) else True
+    data = request.json or {} if request.method == "POST" else {}
+    force = data.get("force_all", True) if isinstance(data, dict) else True
     if request.args:
-        force = request.args.get('force_all', '1') != '0'
+        force = request.args.get("force_all", "1") != "0"
     ok, out = check_email_now(force_all=bool(force))
     return jsonify({"ok": ok, "result": out}), (200 if ok else 400)
 
 
-@app.route('/preferences', methods=['GET'])
+@app.route("/preferences", methods=["GET"])
 def preferences_get():
     res = list_preferences()
     prefs = res["preferences"]
-    return jsonify({"ok": True, "count": res["count"], "preferences": prefs,
-                    "file": os.path.join(DATA_DIR, _PREFERENCES_FILE)})
+    return jsonify(
+        {
+            "ok": True,
+            "count": res["count"],
+            "preferences": prefs,
+            "file": os.path.join(DATA_DIR, _PREFERENCES_FILE),
+        }
+    )
 
 
-@app.route('/preferences', methods=['POST'])
+@app.route("/preferences", methods=["POST"])
 def preferences_set():
     """Store a standing preference. Body: {key, value}."""
     d = request.json or {}
@@ -12708,7 +16642,7 @@ def preferences_set():
     return jsonify(res)
 
 
-@app.route('/preferences/<path:key>', methods=['DELETE'])
+@app.route("/preferences/<path:key>", methods=["DELETE"])
 def preferences_delete(key):
     res = forget_preference(key)
     if not res.get("ok"):
@@ -12716,13 +16650,17 @@ def preferences_delete(key):
     return jsonify(res)
 
 
-@app.route('/email/rules', methods=['GET'])
+@app.route("/email/rules", methods=["GET"])
 def email_rules_get():
-    return jsonify({"rules": _load_email_rules(),
-                    "accounts": sorted(_load_email_accounts().keys())})
+    return jsonify(
+        {
+            "rules": _load_email_rules(),
+            "accounts": sorted(_load_email_accounts().keys()),
+        }
+    )
 
 
-@app.route('/email/rules', methods=['POST'])
+@app.route("/email/rules", methods=["POST"])
 def email_rules_set():
     """Create/replace a watch rule. Body: {from|subject|body, account, name}."""
     d = request.json or {}
@@ -12730,28 +16668,38 @@ def email_rules_set():
         return jsonify({"ok": False, "error": "JSON object required"}), 400
     needles = {f: (d.get(f) or "").strip() for f in ("from", "subject", "body")}
     if not any(needles.values()):
-        return jsonify({"ok": False,
-                        "error": "give at least one of from / subject / body"}), 400
+        return (
+            jsonify(
+                {"ok": False, "error": "give at least one of from / subject / body"}
+            ),
+            400,
+        )
     rules = _load_email_rules()
-    rules.append({"name": d.get("name") or next((v for v in needles.values() if v), "rule"),
-                  "account": d.get("account") or "both",
-                  "enabled": bool(d.get("enabled", True)),
-                  "notifyOnce": bool(d.get("notifyOnce", True)),
-                  **needles})
+    rules.append(
+        {
+            "name": d.get("name") or next((v for v in needles.values() if v), "rule"),
+            "account": d.get("account") or "both",
+            "enabled": bool(d.get("enabled", True)),
+            "notifyOnce": bool(d.get("notifyOnce", True)),
+            **needles,
+        }
+    )
     _save_email_rules(rules)
     return jsonify({"ok": True, "rules": rules})
 
 
-@app.route('/email/test-push', methods=['POST', 'GET'])
+@app.route("/email/test-push", methods=["POST", "GET"])
 def email_test_push():
     """Send one ntfy push so Chris can confirm the phone actually receives them."""
-    ok = send_ntfy("ACEsi — Email alerts on",
-                   "Email watching is live. I'll ping this phone the moment an "
-                   "NSFAS (or other watched) email lands.")
+    ok = send_ntfy(
+        "ACEsi — Email alerts on",
+        "Email watching is live. I'll ping this phone the moment an "
+        "NSFAS (or other watched) email lands.",
+    )
     return jsonify({"ok": ok, "channel": "ntfy", "topic": NTFY_TOPIC})
 
 
-@app.route('/whatsapp/send', methods=['POST'])
+@app.route("/whatsapp/send", methods=["POST"])
 def whatsapp_send():
     """Prepare a WhatsApp message for a contact.
 
@@ -12761,15 +16709,25 @@ def whatsapp_send():
     server-side instead, set WHATSAPP_TOKEN/WHATSAPP_PHONE_ID.
     """
     d = request.json or {}
-    phone = re.sub(r'\D', '', str(d.get("phone") or ""))
+    phone = re.sub(r"\D", "", str(d.get("phone") or ""))
     message = str(d.get("message") or "").strip()
     if not phone:
-        return jsonify({"ok": False, "error": "phone is required (international format)"}), 400
+        return (
+            jsonify({"ok": False, "error": "phone is required (international format)"}),
+            400,
+        )
     if not message:
         return jsonify({"ok": False, "error": "message is required"}), 400
     if not (8 <= len(phone) <= 15):
-        return jsonify({"ok": False,
-                        "error": "that does not look like an international number"}), 400
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "that does not look like an international number",
+                }
+            ),
+            400,
+        )
     link = "https://wa.me/%s?text=%s" % (phone, quote_plus(message[:2000]))
     tok = os.environ.get("WHATSAPP_TOKEN")
     pnum = os.environ.get("WHATSAPP_PHONE_ID")
@@ -12777,47 +16735,67 @@ def whatsapp_send():
         try:
             r = requests.post(
                 "https://graph.facebook.com/v19.0/%s/messages" % pnum,
-                headers={"Authorization": "Bearer %s" % tok,
-                         "Content-Type": "application/json"},
-                json={"messaging_product": "whatsapp",
-                      "to": phone,
-                      "type": "text",
-                      "text": {"body": message[:2000]}}, timeout=15)
+                headers={
+                    "Authorization": "Bearer %s" % tok,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "messaging_product": "whatsapp",
+                    "to": phone,
+                    "type": "text",
+                    "text": {"body": message[:2000]},
+                },
+                timeout=15,
+            )
             ok = r.status_code < 300
-            return jsonify({"ok": ok, "delivered": "whatsapp_api",
-                            "reply": ("Sent on WhatsApp." if ok
-                                      else "WhatsApp API refused: %s" % r.text[:160])})
+            return jsonify(
+                {
+                    "ok": ok,
+                    "delivered": "whatsapp_api",
+                    "reply": (
+                        "Sent on WhatsApp."
+                        if ok
+                        else "WhatsApp API refused: %s" % r.text[:160]
+                    ),
+                }
+            )
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)[:160]}), 502
-    return jsonify({
-        "ok": True, "delivered": "link", "link": link,
-        "reply": "No WhatsApp API key is set, so I prepared the message instead "
-                 "of sending it. Opening WhatsApp now — press send there."})
+    return jsonify(
+        {
+            "ok": True,
+            "delivered": "link",
+            "link": link,
+            "reply": "No WhatsApp API key is set, so I prepared the message instead "
+            "of sending it. Opening WhatsApp now — press send there.",
+        }
+    )
 
 
-@app.route('/security/test-alert', methods=['POST'])
+@app.route("/security/test-alert", methods=["POST"])
 def security_test_alert():
     """Fire a test security alert through the same ntfy channel real alerts use."""
-    ok = send_ntfy("ACEsi — Security test",
-                   "Test security alert. This is what a suspicious email or "
-                   "login attempt would look like on your phone.")
+    ok = send_ntfy(
+        "ACEsi — Security test",
+        "Test security alert. This is what a suspicious email or "
+        "login attempt would look like on your phone.",
+    )
     return jsonify({"ok": ok, "channel": "ntfy"})
 
 
-
 # ===== Google Drive (raw REST, no extra deps) =====
-DRIVE_CRED_FILE = os.path.join(DATA_DIR, 'drive_credentials.json')
-DRIVE_TOKEN_FILE = os.path.join(DATA_DIR, 'drive_token.json')
-DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
-DRIVE_AUTH_URL = 'https://accounts.google.com/o/oauth2/auth'
-DRIVE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-DRIVE_API = 'https://www.googleapis.com/drive/v3'
-DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
+DRIVE_CRED_FILE = os.path.join(DATA_DIR, "drive_credentials.json")
+DRIVE_TOKEN_FILE = os.path.join(DATA_DIR, "drive_token.json")
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
+DRIVE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
+DRIVE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+DRIVE_API = "https://www.googleapis.com/drive/v3"
+DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 
 
 def load_drive_credentials():
     try:
-        with open(DRIVE_CRED_FILE, 'r', encoding='utf-8') as f:
+        with open(DRIVE_CRED_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return None
@@ -12825,7 +16803,7 @@ def load_drive_credentials():
 
 def load_drive_token():
     try:
-        with open(DRIVE_TOKEN_FILE, 'r', encoding='utf-8') as f:
+        with open(DRIVE_TOKEN_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return None
@@ -12833,8 +16811,8 @@ def load_drive_token():
 
 def save_drive_token(token):
     with _data_lock:
-        tmp = DRIVE_TOKEN_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
+        tmp = DRIVE_TOKEN_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(token, f, indent=2)
         os.replace(tmp, DRIVE_TOKEN_FILE)
 
@@ -12844,22 +16822,28 @@ def drive_access_token(force=False):
     token = load_drive_token()
     if not token:
         return None
-    if force or token.get('expires_at', 0) - time.time() < 60:
+    if force or token.get("expires_at", 0) - time.time() < 60:
         cred = load_drive_credentials()
-        if not cred or 'refresh_token' not in token:
+        if not cred or "refresh_token" not in token:
             return None
         try:
-            r = requests.post(DRIVE_TOKEN_URL, data={
-                'client_id': cred['client_id'],
-                'client_secret': cred['client_secret'],
-                'refresh_token': token['refresh_token'],
-                'grant_type': 'refresh_token'
-            }, timeout=20)
+            r = requests.post(
+                DRIVE_TOKEN_URL,
+                data={
+                    "client_id": cred["client_id"],
+                    "client_secret": cred["client_secret"],
+                    "refresh_token": token["refresh_token"],
+                    "grant_type": "refresh_token",
+                },
+                timeout=20,
+            )
             data = r.json()
-            if r.status_code == 200 and data.get('access_token'):
-                token['access_token'] = data['access_token']
-                token['expires_in'] = data.get('expires_in', 3599)
-                token['expires_at'] = time.time() + int(data.get('expires_in', 3599)) - 30
+            if r.status_code == 200 and data.get("access_token"):
+                token["access_token"] = data["access_token"]
+                token["expires_in"] = data.get("expires_in", 3599)
+                token["expires_at"] = (
+                    time.time() + int(data.get("expires_in", 3599)) - 30
+                )
                 save_drive_token(token)
             else:
                 print(f"Drive token refresh failed: {r.status_code} {data}")
@@ -12867,28 +16851,28 @@ def drive_access_token(force=False):
         except Exception as e:
             print(f"Drive token refresh error: {e}")
             return None
-    return token.get('access_token')
+    return token.get("access_token")
 
 
 def drive_request(method, url, **kwargs):
     """Drive API call with automatic one-shot refresh-and-retry on 401/403."""
     tok = drive_access_token()
     if not tok:
-        return None, 'not_authenticated'
-    kwargs.setdefault('headers', {})['Authorization'] = 'Bearer ' + tok
+        return None, "not_authenticated"
+    kwargs.setdefault("headers", {})["Authorization"] = "Bearer " + tok
     r = requests.request(method, url, timeout=60, **kwargs)
     if r.status_code in (401, 403):
         tok = drive_access_token(force=True)
         if not tok:
-            return r, 'http_%d' % r.status_code
-        kwargs['headers']['Authorization'] = 'Bearer ' + tok
+            return r, "http_%d" % r.status_code
+        kwargs["headers"]["Authorization"] = "Bearer " + tok
         r = requests.request(method, url, timeout=60, **kwargs)
     if r.status_code >= 400:
-        return r, 'http_%d' % r.status_code
+        return r, "http_%d" % r.status_code
     return r, None
 
 
-@app.route('/drive/status', methods=['GET'])
+@app.route("/drive/status", methods=["GET"])
 def drive_status():
     cred = load_drive_credentials()
     if not cred:
@@ -12898,103 +16882,114 @@ def drive_status():
         return jsonify({"configured": True, "authorized": False})
     user = {}
     try:
-        r, err = drive_request('GET', DRIVE_API + '/about?fields=user')
+        r, err = drive_request("GET", DRIVE_API + "/about?fields=user")
         if not err:
-            u = r.json().get('user', {})
-            user = {'displayName': u.get('displayName', ''), 'emailAddress': u.get('emailAddress', '')}
+            u = r.json().get("user", {})
+            user = {
+                "displayName": u.get("displayName", ""),
+                "emailAddress": u.get("emailAddress", ""),
+            }
     except Exception:
         pass
     return jsonify({"configured": True, "authorized": True, "user": user})
 
 
-@app.route('/drive/auth', methods=['GET'])
+@app.route("/drive/auth", methods=["GET"])
 def drive_auth():
     cred = load_drive_credentials()
     if not cred:
         return "Drive not configured", 400
-    cb = request.url_root.rstrip('/') + '/drive/callback'
+    cb = request.url_root.rstrip("/") + "/drive/callback"
     params = {
-        'client_id': cred['client_id'],
-        'redirect_uri': cb,
-        'response_type': 'code',
-        'scope': DRIVE_SCOPE,
-        'access_type': 'offline',
-        'prompt': 'consent'
+        "client_id": cred["client_id"],
+        "redirect_uri": cb,
+        "response_type": "code",
+        "scope": DRIVE_SCOPE,
+        "access_type": "offline",
+        "prompt": "consent",
     }
-    return redirect(DRIVE_AUTH_URL + '?' + urlencode(params))
+    return redirect(DRIVE_AUTH_URL + "?" + urlencode(params))
 
 
-@app.route('/drive/callback', methods=['GET'])
+@app.route("/drive/callback", methods=["GET"])
 def drive_callback():
-    error = request.args.get('error')
+    error = request.args.get("error")
     if error:
         return "Auth failed: %s" % error, 400
-    code = request.args.get('code')
+    code = request.args.get("code")
     if not code:
         return "Missing code", 400
     cred = load_drive_credentials()
     if not cred:
         return "Drive not configured", 400
-    cb = request.url_root.rstrip('/') + '/drive/callback'
+    cb = request.url_root.rstrip("/") + "/drive/callback"
     try:
-        r = requests.post(DRIVE_TOKEN_URL, data={
-            'client_id': cred['client_id'],
-            'client_secret': cred['client_secret'],
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': cb
-        }, timeout=20)
+        r = requests.post(
+            DRIVE_TOKEN_URL,
+            data={
+                "client_id": cred["client_id"],
+                "client_secret": cred["client_secret"],
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": cb,
+            },
+            timeout=20,
+        )
         data = r.json()
-        if r.status_code != 200 or 'access_token' not in data:
+        if r.status_code != 200 or "access_token" not in data:
             return "Token exchange failed: %s" % data, 400
-        data['expires_at'] = time.time() + int(data.get('expires_in', 3599)) - 30
+        data["expires_at"] = time.time() + int(data.get("expires_in", 3599)) - 30
         save_drive_token(data)
     except Exception as e:
         return "Token exchange error: %s" % e, 400
     return "<h3>Connected to Google Drive. You can close this tab.</h3>"
 
 
-@app.route('/drive/list', methods=['GET'])
+@app.route("/drive/list", methods=["GET"])
 def drive_list():
-    parent = request.args.get('parent', 'root')
-    r, err = drive_request('GET', DRIVE_API + '/files', params={
-        'q': "'%s' in parents and trashed=false" % parent,
-        'pageSize': 200,
-        'fields': 'files(id,name,mimeType,size,modifiedTime)',
-        'orderBy': 'folder,name'
-    })
+    parent = request.args.get("parent", "root")
+    r, err = drive_request(
+        "GET",
+        DRIVE_API + "/files",
+        params={
+            "q": "'%s' in parents and trashed=false" % parent,
+            "pageSize": 200,
+            "fields": "files(id,name,mimeType,size,modifiedTime)",
+            "orderBy": "folder,name",
+        },
+    )
     if err:
         return jsonify({"error": err})
-    return jsonify({"files": r.json().get('files', [])})
+    return jsonify({"files": r.json().get("files", [])})
 
 
-@app.route('/drive/download', methods=['GET'])
+@app.route("/drive/download", methods=["GET"])
 def drive_download():
-    fid = request.args.get('id')
+    fid = request.args.get("id")
     if not fid:
         return jsonify({"error": "Missing file id"})
-    r, err = drive_request('GET', DRIVE_API + '/files/%s?alt=media' % fid)
+    r, err = drive_request("GET", DRIVE_API + "/files/%s?alt=media" % fid)
     if err:
         return jsonify({"error": err})
     return jsonify({"content": r.text})
 
 
-@app.route('/drive/upload', methods=['POST'])
+@app.route("/drive/upload", methods=["POST"])
 def drive_upload():
     try:
         body = request.get_json(force=True)
     except Exception:
         return jsonify({"error": "Invalid JSON body"})
-    name = (body.get('name') or '').strip()
-    content = body.get('content') or ''
-    parent = body.get('parent') or 'root'
+    name = (body.get("name") or "").strip()
+    content = body.get("content") or ""
+    parent = body.get("parent") or "root"
     if not name or not content:
         return jsonify({"error": "Name and content are required"})
-    mime = 'application/octet-stream'
+    mime = "application/octet-stream"
     b64 = content
-    if content.startswith('data:'):
-        header, _, b64 = content.partition(',')
-        m = re.match(r'data:([^;]+)', header)
+    if content.startswith("data:"):
+        header, _, b64 = content.partition(",")
+        m = re.match(r"data:([^;]+)", header)
         if m:
             mime = m.group(1)
     try:
@@ -13003,41 +16998,58 @@ def drive_upload():
         return jsonify({"error": "Could not decode file data"})
     metadata = {"name": name, "parents": [parent]}
     try:
-        r, err = drive_request('POST', DRIVE_UPLOAD, params={'uploadType': 'multipart'},
-                               files={
-                                   'metadata': (None, json.dumps(metadata), 'application/json; charset=UTF-8'),
-                                   'file': (name, raw, mime)
-                               })
+        r, err = drive_request(
+            "POST",
+            DRIVE_UPLOAD,
+            params={"uploadType": "multipart"},
+            files={
+                "metadata": (
+                    None,
+                    json.dumps(metadata),
+                    "application/json; charset=UTF-8",
+                ),
+                "file": (name, raw, mime),
+            },
+        )
         if err:
             return jsonify({"error": err})
         d = r.json()
-        if 'id' not in d:
+        if "id" not in d:
             return jsonify({"error": "Upload failed: %s" % d})
-        return jsonify({"name": name, "id": d.get('id')})
+        return jsonify({"name": name, "id": d.get("id")})
     except Exception as e:
         return jsonify({"error": str(e)})
 
 
 # ===== Live counts =====
-@app.route('/devices', methods=['GET'])
+@app.route("/devices", methods=["GET"])
 def devices():
     try:
-        r = _run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
-        devs = [ln.split('\t')[0] for ln in r.stdout.splitlines()[1:]
-                if ln.strip() and 'device' in ln and 'offline' not in ln]
+        r = _run(["adb", "devices"], capture_output=True, text=True, timeout=10)
+        devs = [
+            ln.split("\t")[0]
+            for ln in r.stdout.splitlines()[1:]
+            if ln.strip() and "device" in ln and "offline" not in ln
+        ]
         return jsonify({"count": len(devs), "devices": devs})
     except Exception:
         return jsonify({"count": 0, "devices": []})
 
-@app.route('/agents', methods=['GET'])
+
+@app.route("/agents", methods=["GET"])
 def agents():
     try:
-        r = _run(['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
-                           capture_output=True, text=True, timeout=10)
+        r = _run(
+            ["tasklist", "/FI", "IMAGENAME eq python.exe", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         count = max(0, len([l for l in r.stdout.strip().splitlines() if l.strip()]))
         return jsonify({"count": count, "agents": []})
     except Exception:
         return jsonify({"count": 0, "agents": []})
+
 
 # ===== Proactive check-in: sends the daily summary from ACEsi, not a timer =====
 def summary_scheduler():
@@ -13047,26 +17059,32 @@ def summary_scheduler():
                 time.sleep(30)
                 continue
             now = datetime.now()
-            enabled = get_config('summary_enabled', 'true') != 'false'
-            target = str(get_config('summary_time', '07:00') or '07:00')
+            enabled = get_config("summary_enabled", "true") != "false"
+            target = str(get_config("summary_time", "07:00") or "07:00")
             today = now.date().isoformat()
             # "time has passed today and not yet sent" instead of exact HH:MM
             # equality: sleeping the laptop through 07:00 used to skip the
             # briefing for the whole day.
             try:
-                due_at = datetime.combine(now.date(),
-                                          datetime.strptime(target, "%H:%M").time())
+                due_at = datetime.combine(
+                    now.date(), datetime.strptime(target, "%H:%M").time()
+                )
             except ValueError:
                 due_at = None
-            if (enabled and due_at and now >= due_at
-                    and get_config('last_summary_date', '') != today):
-                set_config('last_summary_date', today)
+            if (
+                enabled
+                and due_at
+                and now >= due_at
+                and get_config("last_summary_date", "") != today
+            ):
+                set_config("last_summary_date", today)
                 text = build_summary_text()
                 send_ntfy("ACEsi — Good morning", "Good morning, Chris.\n\n" + text)
                 print("📱 Proactive check-in sent")
         except Exception as e:
             print(f"⚠️ Scheduler error: {e}")
         time.sleep(30)
+
 
 threading.Thread(target=summary_scheduler, daemon=True).start()
 
@@ -13077,13 +17095,14 @@ threading.Thread(target=job_watch, daemon=True).start()
 # /queue/run. Without this the queue was inert.
 threading.Thread(target=_task_queue_worker, daemon=True).start()
 
-@app.route('/test_ping')
+
+@app.route("/test_ping")
 def test_ping():
     send_test_ping()
     return "Test ping sent! Check your phone."
 
 
-@app.route('/check-portal')
+@app.route("/check-portal")
 def check_portal():
     """One-click health check for the Venda ITS portal. Reuses the same `curl`
     tool ACEsi uses so the diagnosis is identical to what the model reports.
@@ -13095,7 +17114,7 @@ def check_portal():
     reachable = bool(ok)
     status = "up" if ok else "down"
     # Distinguish 'no service' from 'service answered with an HTTP error'.
-    answered = ("HTTP" in detail)
+    answered = "HTTP" in detail
     result = {
         "url": url,
         "reachable": reachable and (answered or "HTTP" not in detail[:20]),
@@ -13108,19 +17127,19 @@ def check_portal():
     return jsonify(result)
 
 
-@app.route('/portal')
+@app.route("/portal")
 def portal_redirect():
     """Convenience: open the StudentSyncSA ITS portal in a new tab, and probe it
     in the same request so the dashboard can show live status before navigating."""
     url = request.args.get("url") or UNIVEN_ITS_STARTUP_URL
     ok, detail = tool_curl(url, timeout=12, allow_redirects=True)
-    return jsonify({"url": url, "portal_up": ok and "HTTP" in detail,
-                     "detail": detail})
+    return jsonify({"url": url, "portal_up": ok and "HTTP" in detail, "detail": detail})
 
 
 # ===== ACEsi general-purpose task routes =====
 
-@app.route('/context', methods=['GET'])
+
+@app.route("/context", methods=["GET"])
 def context_get():
     """Return the current active Context (or list all if names param)."""
     if ace_context:
@@ -13128,7 +17147,7 @@ def context_get():
     return jsonify({"error": "ace_context not available"})
 
 
-@app.route('/context', methods=['POST'])
+@app.route("/context", methods=["POST"])
 def context_set():
     """Switch the active Context: {'name': '...'}."""
     name = (request.json or {}).get("name", "")
@@ -13139,25 +17158,25 @@ def context_set():
     return jsonify({"ok": True, "active": name})
 
 
-@app.route('/run_task', methods=['POST'])
+@app.route("/run_task", methods=["POST"])
 def run_task():
     """Execute a scripted step-list task (general-purpose executor).
     Body: {"steps": [{"tool": "ui_tap", "args": {"x": 540, "y": 1200}}, ...],
            "name": "task label", "auto_dump": true}
     Returns the TaskResult summary + per-step outputs."""
     from ace_task import run_task_steps
+
     data = request.json or {}
     steps = data.get("steps", [])
     name = data.get("name", "run_task")
     auto_dump = data.get("auto_dump", True)
     if not steps or not isinstance(steps, list):
         return jsonify({"error": "steps (list of {tool, args} dicts) required"}), 400
-    result = run_task_steps(steps, task_name=name, server=app,
-                            auto_dump=auto_dump)
+    result = run_task_steps(steps, task_name=name, server=app, auto_dump=auto_dump)
     return jsonify(result.summary())
 
 
-@app.route('/autonomous', methods=['POST'])
+@app.route("/autonomous", methods=["POST"])
 def autonomous():
     """Run a task in autonomous model-driven mode.
     Body: {"prompt": "navigate to the ITS portal and confirm the login button",
@@ -13169,6 +17188,7 @@ def autonomous():
     so ACEsi follows search → fetch → extract → save correctly."""
     from ace_task import run_task_autonomous
     from ace_research import RESEARCH_WORKFLOW_INSTRUCTIONS
+
     data = request.json or {}
     prompt = data.get("prompt", "")
     name = data.get("name", "autonomous")
@@ -13176,15 +17196,18 @@ def autonomous():
     research_mode = data.get("research", None)
     if research_mode is None:
         lower = str(prompt).lower()
-        research_mode = any(k in lower for k in
-                            ("research", "find", "list", "search", "web", "note", "save"))
+        research_mode = any(
+            k in lower
+            for k in ("research", "find", "list", "search", "web", "note", "save")
+        )
     if not prompt.strip():
         return jsonify({"error": "prompt required"}), 400
     kwargs = {}
     if research_mode:
         kwargs["extra_system_prompt"] = RESEARCH_WORKFLOW_INSTRUCTIONS
-    result = run_task_autonomous(prompt, task_name=name, server=app,
-                                 max_turns=max_turns, **kwargs)
+    result = run_task_autonomous(
+        prompt, task_name=name, server=app, max_turns=max_turns, **kwargs
+    )
     return jsonify(result.summary())
 
 
@@ -13207,22 +17230,24 @@ def _load_saved_task(name):
         return None
 
 
-@app.route('/task/<name>', methods=['POST'])
+@app.route("/task/<name>", methods=["POST"])
 def run_saved_task(name):
     """Execute a saved step-list task from tasks_lib/<name>.json."""
     from ace_task import run_task_steps
+
     task_def = _load_saved_task(name)
     if not task_def:
         return jsonify({"error": f"task '{name}' not found in tasks_lib/"}), 404
     steps = task_def.get("steps", [])
     opts = request.json or {}
     auto_dump = opts.get("auto_dump", task_def.get("auto_dump", True))
-    result = run_task_steps(steps, task_name=task_def.get("name", name),
-                            server=app, auto_dump=auto_dump)
+    result = run_task_steps(
+        steps, task_name=task_def.get("name", name), server=app, auto_dump=auto_dump
+    )
     return jsonify(result.summary())
 
 
-@app.route('/task/<name>', methods=['GET'])
+@app.route("/task/<name>", methods=["GET"])
 def get_saved_task(name):
     """Retrieve a saved task definition (step list + metadata)."""
     task_def = _load_saved_task(name)
@@ -13231,7 +17256,7 @@ def get_saved_task(name):
     return jsonify(task_def)
 
 
-@app.route('/tasks/lib', methods=['GET'])
+@app.route("/tasks/lib", methods=["GET"])
 def list_saved_tasks():
     """List all saved tasks in tasks_lib/."""
     if not os.path.isdir(TASKS_DIR):
@@ -13242,10 +17267,14 @@ def list_saved_tasks():
             name = fn[:-5]
             task_def = _load_saved_task(name)
             if task_def:
-                items.append({"name": name,
-                              "label": task_def.get("name", name),
-                              "steps": len(task_def.get("steps", [])),
-                              "auto_dump": task_def.get("auto_dump", True)})
+                items.append(
+                    {
+                        "name": name,
+                        "label": task_def.get("name", name),
+                        "steps": len(task_def.get("steps", [])),
+                        "auto_dump": task_def.get("auto_dump", True),
+                    }
+                )
     return jsonify({"tasks": items})
 
 
@@ -13278,134 +17307,155 @@ def build_system_prompt(mode="code"):
 # agent turn over the per-minute input cap and the task died as "all providers
 # unavailable". assert_prompt_matches still passes because every tool name appears.
 CODE_AGENT_PROMPT = CODE_AGENT_PROMPT.replace(
-    "{TOOLS}", "\n".join("- `%s`" % REGISTRY.signature(n) for n in REGISTRY.names()))
+    "{TOOLS}", "\n".join("- `%s`" % REGISTRY.signature(n) for n in REGISTRY.names())
+)
 
 # Startup drift check: the prompt must mention every registered tool.
 try:
-    REGISTRY.assert_prompt_matches(CODE_AGENT_PROMPT, source="server.py[CODE_AGENT_PROMPT]")
+    REGISTRY.assert_prompt_matches(
+        CODE_AGENT_PROMPT, source="server.py[CODE_AGENT_PROMPT]"
+    )
 except Exception as e:
     print("⚠️ Prompt drift check failed:", e)
 
 
 # ===== Task Queue API Endpoints =====
-@app.route('/queue/add', methods=['POST'])
+@app.route("/queue/add", methods=["POST"])
 def queue_add():
     data = request.json or {}
-    tasks = data.get('tasks', [])
-    on_failure = data.get('on_failure', 'stop')  # skip|retry|stop
+    tasks = data.get("tasks", [])
+    on_failure = data.get("on_failure", "stop")  # skip|retry|stop
     if not tasks:
         return jsonify({"error": "Provide 'tasks' array"}), 400
     q = _queue_add(tasks, on_failure)
     return jsonify({"status": "added", "queue_length": len(q["queue"]), "queue": q})
 
-@app.route('/queue/status', methods=['GET'])
+
+@app.route("/queue/status", methods=["GET"])
 def queue_status():
     q = _queue_status()
     return jsonify(q)
 
-@app.route('/queue/clear', methods=['POST'])
+
+@app.route("/queue/clear", methods=["POST"])
 def queue_clear():
     q = _queue_clear()
     return jsonify({"status": "cleared", "queue": q})
 
-@app.route('/queue/stop', methods=['POST'])
+
+@app.route("/queue/stop", methods=["POST"])
 def queue_stop():
     q = _queue_stop()
     return jsonify({"status": "stopped", "queue": q})
 
-@app.route('/queue/resume', methods=['POST'])
+
+@app.route("/queue/resume", methods=["POST"])
 def queue_resume():
     q = _queue_resume()
     return jsonify({"status": "resumed", "queue": q})
 
-@app.route('/queue/skip', methods=['POST'])
+
+@app.route("/queue/skip", methods=["POST"])
 def queue_skip():
     q = _queue_skip_current()
     return jsonify({"status": "skipped", "queue": q})
 
-@app.route('/queue/retry', methods=['POST'])
+
+@app.route("/queue/retry", methods=["POST"])
 def queue_retry():
     q = _queue_retry_current()
     return jsonify({"status": "retry", "queue": q})
 
-@app.route('/queue/run', methods=['POST'])
+
+@app.route("/queue/run", methods=["POST"])
 def queue_run():
     """Run the next task in the queue (or all if run_all=true)."""
     data = request.json or {}
-    run_all = data.get('run_all', False)
+    run_all = data.get("run_all", False)
     results = []
     if run_all:
         while True:
             res = _queue_run_next()
             if res is None:
                 break
-            results.append({"task": res[0]["task"], "result": res[1], "success": res[2]})
+            results.append(
+                {"task": res[0]["task"], "result": res[1], "success": res[2]}
+            )
     else:
         res = _queue_run_next()
         if res:
-            results.append({"task": res[0]["task"], "result": res[1], "success": res[2]})
+            results.append(
+                {"task": res[0]["task"], "result": res[1], "success": res[2]}
+            )
     q = _queue_status()
     return jsonify({"executed": len(results), "results": results, "queue": q})
 
 
 # ===== Memory / Profile API =====
-@app.route('/memory/conversations/date/<date>', methods=['GET'])
+@app.route("/memory/conversations/date/<date>", methods=["GET"])
 def memory_conversations_by_date(date):
     """Get all conversations for a specific date (YYYY-MM-DD)."""
-    limit = int(request.args.get('limit', 50))
+    limit = int(request.args.get("limit", 50))
     return jsonify(get_conversations_by_date(date, limit))
 
-@app.route('/memory/conversations/search', methods=['GET'])
+
+@app.route("/memory/conversations/search", methods=["GET"])
 def memory_conversations_search():
     """Search conversations by keyword."""
-    keyword = request.args.get('q', '')
-    limit = int(request.args.get('limit', 50))
-    days = int(request.args.get('days', 30))
+    keyword = request.args.get("q", "")
+    limit = int(request.args.get("limit", 50))
+    days = int(request.args.get("days", 30))
     if not keyword:
         return jsonify({"error": "Provide 'q' parameter"}), 400
     return jsonify(get_conversations_by_topic(keyword, limit, days))
 
-@app.route('/memory/conversations/range', methods=['GET'])
+
+@app.route("/memory/conversations/range", methods=["GET"])
 def memory_conversations_range():
     """Get conversations in an ID range."""
-    start = int(request.args.get('start', 0))
-    end = int(request.args.get('end', 0))
+    start = int(request.args.get("start", 0))
+    end = int(request.args.get("end", 0))
     if not start or not end:
         return jsonify({"error": "Provide 'start' and 'end' parameters"}), 400
     return jsonify(get_conversation_range(start, end))
 
-@app.route('/memory/conversations/dates', methods=['GET'])
+
+@app.route("/memory/conversations/dates", methods=["GET"])
 def memory_conversations_dates():
     """Get list of dates with conversation counts."""
-    days = int(request.args.get('days', 90))
+    days = int(request.args.get("days", 90))
     return jsonify(get_dates_with_conversations(days))
 
-@app.route('/memory/session/summarize', methods=['POST'])
+
+@app.route("/memory/session/summarize", methods=["POST"])
 def memory_session_summarize():
     """Summarize a conversation session."""
     data = request.json or {}
-    messages = data.get('messages', [])
+    messages = data.get("messages", [])
     summary = summarize_session(messages)
     return jsonify({"summary": summary})
 
-@app.route('/memory/session/save', methods=['POST'])
+
+@app.route("/memory/session/save", methods=["POST"])
 def memory_session_save():
     """Save a session summary."""
     data = request.json or {}
-    summary = data.get('summary', '')
-    session_date = data.get('session_date')
-    session_id = data.get('session_id')
+    summary = data.get("summary", "")
+    session_date = data.get("session_date")
+    session_id = data.get("session_id")
     if not summary:
         return jsonify({"error": "Provide 'summary'"}), 400
     key = save_session_summary(summary, session_date, session_id)
     return jsonify({"saved": True, "key": key})
 
-@app.route('/profile', methods=['GET'])
+
+@app.route("/profile", methods=["GET"])
 def profile_get():
     """Get the built profile of Chris."""
     return jsonify(get_profile())
 
-@app.route('/profile/refresh', methods=['POST'])
+
+@app.route("/profile/refresh", methods=["POST"])
 def profile_refresh():
     """Force rebuild the profile from conversation history."""
     fresh = extract_profile_traits()
@@ -13415,14 +17465,15 @@ def profile_refresh():
     set_memory("profile.derived", json.dumps(fresh))
     return jsonify({"refreshed": True, "profile": fresh})
 
-@app.route('/memory/conversations/recent', methods=['GET'])
+
+@app.route("/memory/conversations/recent", methods=["GET"])
 def memory_conversations_recent():
     """Get recent conversation turns."""
-    limit = int(request.args.get('limit', 20))
+    limit = int(request.args.get("limit", 20))
     return jsonify(get_recent_conversation(limit))
 
 
-@app.route('/conversations', methods=['GET'])
+@app.route("/conversations", methods=["GET"])
 def conversations_list():
     """Recent conversation turns WITH timestamps, oldest first.
 
@@ -13432,17 +17483,23 @@ def conversations_list():
     empty catch block.
     """
     try:
-        limit = max(1, min(500, int(request.args.get('limit', 60))))
+        limit = max(1, min(500, int(request.args.get("limit", 60))))
     except (TypeError, ValueError):
         limit = 60
-    conn = sqlite3.connect('ace_memory.db')
+    conn = sqlite3.connect("ace_memory.db")
     rows = conn.execute(
         "SELECT role, content, timestamp FROM conversations ORDER BY id DESC LIMIT ?",
-        (limit,)).fetchall()
+        (limit,),
+    ).fetchall()
     conn.close()
-    return jsonify({"conversations": [
-        {"role": r[0], "content": r[1], "timestamp": r[2] or ""}
-        for r in reversed(rows)]})
+    return jsonify(
+        {
+            "conversations": [
+                {"role": r[0], "content": r[1], "timestamp": r[2] or ""}
+                for r in reversed(rows)
+            ]
+        }
+    )
 
 
 # Deep-memory bootstrap: fold the legacy rich table in, seed the relationship
@@ -13453,6 +17510,7 @@ try:
     print("🧠 Deep memory bootstrapped (consolidate + seed + prune done)")
 except Exception as e:
     print(f"⚠️ Deep-memory bootstrap failed: {e}")
+
 
 def _boot_banner():
     """Print exactly what code this process loaded.
@@ -13467,11 +17525,18 @@ def _boot_banner():
     import sys as _sys
     import datetime as _dt
     import subprocess as _sp
+
     here = _os.path.dirname(_os.path.abspath(__file__))
     try:
-        head = (_sp.run(["git", "-C", here, "rev-parse", "--short", "HEAD"],
-                        capture_output=True, text=True, timeout=8
-                        ).stdout or "").strip() or "?"
+        head = (
+            _sp.run(
+                ["git", "-C", here, "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+            ).stdout
+            or ""
+        ).strip() or "?"
     except Exception:
         head = "?"
     # HEAD alone is misleading when the tree is dirty, which is the normal state
@@ -13479,11 +17544,30 @@ def _boot_banner():
     # would otherwise swamp the number (there are >100 in this repo) and hide
     # whether the code actually being served differs from HEAD.
     try:
-        dirty = (_sp.run(["git", "-C", here, "status", "--porcelain",
-                          "--untracked-files=no"],
-                         capture_output=True, text=True, timeout=8
-                         ).stdout or "").strip().splitlines()
-        head = "%s%s" % (head, "  (+%d modified)" % len(dirty) if dirty else "  (clean)")
+        dirty = (
+            (
+                _sp.run(
+                    [
+                        "git",
+                        "-C",
+                        here,
+                        "status",
+                        "--porcelain",
+                        "--untracked-files=no",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                ).stdout
+                or ""
+            )
+            .strip()
+            .splitlines()
+        )
+        head = "%s%s" % (
+            head,
+            "  (+%d modified)" % len(dirty) if dirty else "  (clean)",
+        )
     except Exception:
         pass
     bar = "-" * 66
@@ -13493,9 +17577,14 @@ def _boot_banner():
     for fn in ("server.py", "devtools_service.py", "ace_config.yaml"):
         try:
             st = _os.stat(_os.path.join(here, fn))
-            print("[boot] %-10s: mtime=%s  %d bytes"
-                  % (fn, _dt.datetime.fromtimestamp(st.st_mtime).strftime("%H:%M:%S"),
-                     st.st_size))
+            print(
+                "[boot] %-10s: mtime=%s  %d bytes"
+                % (
+                    fn,
+                    _dt.datetime.fromtimestamp(st.st_mtime).strftime("%H:%M:%S"),
+                    st.st_size,
+                )
+            )
         except Exception as e:
             print("[boot] %-10s: unavailable (%s)" % (fn, e))
     try:
@@ -13511,13 +17600,15 @@ def _boot_banner():
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
     if _kill_armed():
         _st = _kill_state()
-        print("🔴 E-STOP PERSISTED ON BOOT (reason=%s, source=%s) — ACEsi is silent until "
-              "the un-kill word arrives." % (_st.get("reason"), _st.get("source")))
+        print(
+            "🔴 E-STOP PERSISTED ON BOOT (reason=%s, source=%s) — ACEsi is silent until "
+            "the un-kill word arrives." % (_st.get("reason"), _st.get("source"))
+        )
     else:
         print("🟢 Kill switch: safe (disarmed) at boot.")
     # debug=False: Flask's dev reloader spawns a child that fights for port
@@ -13525,4 +17616,4 @@ if __name__ == '__main__':
     # stale code (seen: qwen going off to Google because the deterministic
     # executor wasn't loaded). Reloads are handled by the ace_host watchdog
     # via its restart flag instead.
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=False)

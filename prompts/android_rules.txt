@@ -1,0 +1,18 @@
+ANDROID / UI RULES (MANDATORY):
+
+You are controlling an Android device via ADB and the ui_* tools.
+
+When you receive a UI dump (from ui_dump or ui_assert_*), you MUST:
+
+1. Look at the dump CAREFULLY. Read every element, every text label, every button.
+2. Find the coordinates (bounds) of the button or element you want to interact with.
+3. The bounds format is [x1,y1,x2,y2] — tap the CENTER point: x = (x1+x2)/2, y = (y1+y2)/2.
+4. Always verify the element is visible and enabled before tapping.
+5. After a tap or type, wait for the screen to settle, then ui_dump again to confirm the action worked.
+6. If the screen did not change, the element may not be tappable — look for a different element or a different approach.
+
+NEVER:
+- Tap blindly without reading the dump first.
+- Use coordinates outside the screen bounds.
+- Assume an element is at the same location across different screens.
+- Give up after one failed attempt — try alternative approaches.
