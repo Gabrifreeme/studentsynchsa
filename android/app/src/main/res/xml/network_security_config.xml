@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The UNIVEN ITS portal (univenierp01.univen.ac.za) chains to:
+
+      *.univen.ac.za
+        -> Sectigo Public Server Authentication CA OV R36
+          -> Sectigo Public Server Authentication Root R46
+
+  "Sectigo Public Server Authentication Root R46" is a newer root that is NOT
+  in this tablet's (Android 11) system CA store, which only ships the older
+  USERTrust ECC/RSA roots. The result is a WebView-only failure:
+
+      net_error -202  ERR_CERT_AUTHORITY_INVALID
+
+  Chrome on the same tablet works because it validates against its own
+  bundled root store. WebView uses the system store, so it refuses the load
+  and the screen stays black with no document attached.
+
+  Trust that one root for univen.ac.za only. Everything else keeps the normal
+  system trust, and no blanket "accept any certificate" handler is needed.
+-->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">univen.ac.za</domain>
+        <trust-anchors>
+            <certificates src="@raw/univen_sectigo_root_r46"/>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
