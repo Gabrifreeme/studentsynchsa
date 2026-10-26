@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
@@ -21,6 +23,7 @@ import 'package:lipsyncstudent/presentation/screens/universities/universities_sc
 import 'package:lipsyncstudent/presentation/screens/universities/university_detail_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/universities/university_webview_screen.dart';
 import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
 
 final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
 
@@ -28,6 +31,31 @@ final _authRefresh = ValueNotifier<int>(0);
 
 void triggerAuthRedirect() {
   _authRefresh.value++;
+}
+
+/// Opens a university or bursary portal in the in-app browser, with the
+/// student's profile attached.
+///
+/// Star Auto-Fill needs the profile as a JSON object; without it the screen
+/// injects nothing and the ⭐ button never appears. The profile loads
+/// asynchronously at startup, so this watches [profileProvider] rather than
+/// reading it once: if the user opens a portal before the profile is ready,
+/// the screen receives the JSON the moment it arrives and re-injects into the
+/// page that is already on screen.
+Widget _portalWebView(BuildContext context, GoRouterState state) {
+  final rawUrl = state.uri.queryParameters['url'] ?? '';
+  final rawName = state.uri.queryParameters['name'] ?? 'University';
+
+  return Consumer(
+    builder: (context, ref, _) {
+      final profile = ref.watch(profileProvider).valueOrNull;
+      return UniversityWebViewScreen(
+        url: Uri.decodeComponent(rawUrl),
+        universityName: Uri.decodeComponent(rawName),
+        profileJson: profile == null ? null : jsonEncode(profile.toJson()),
+      );
+    },
+  );
 }
 
 final appRouter = GoRouter(
@@ -104,14 +132,7 @@ final appRouter = GoRouter(
                     GoRoute(
                       path: 'webview',
                       name: 'university-webview',
-                      builder: (context, state) {
-                        final rawUrl = state.uri.queryParameters['url'] ?? '';
-                        final rawName = state.uri.queryParameters['name'] ?? 'University';
-                        return UniversityWebViewScreen(
-                          url: Uri.decodeComponent(rawUrl),
-                          universityName: Uri.decodeComponent(rawName),
-                        );
-                      },
+                      builder: _portalWebView,
                     ),
                   ],
                 ),
@@ -145,14 +166,7 @@ final appRouter = GoRouter(
                     GoRoute(
                       path: 'webview',
                       name: 'funding-webview',
-                      builder: (context, state) {
-                        final rawUrl = state.uri.queryParameters['url'] ?? '';
-                        final rawName = state.uri.queryParameters['name'] ?? 'Funding';
-                        return UniversityWebViewScreen(
-                          url: Uri.decodeComponent(rawUrl),
-                          universityName: Uri.decodeComponent(rawName),
-                        );
-                      },
+                      builder: _portalWebView,
                     ),
                   ],
                 ),

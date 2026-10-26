@@ -110,6 +110,18 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     _controller.loadRequest(Uri.parse(initialUrl));
   }
 
+  @override
+  void didUpdateWidget(covariant UniversityWebViewScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.profileJson == oldWidget.profileJson) return;
+
+    // The profile finished loading after this screen opened. onPageFinished
+    // will not fire again for the page already on screen, so inject now or the
+    // star button never appears. Re-injection is safe: both scripts de-dup.
+    _profileJson = widget.profileJson;
+    if (!_loading) _injectPageScripts();
+  }
+
   /// True when this screen is showing UNIVEN's Oracle ITS wizard.
   bool get _isUnivenIts {
     final raw = widget.url.toLowerCase();
@@ -170,7 +182,10 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     }
 
     final json = _profileJson;
-    if (json == null || json.isEmpty) return;
+    if (json == null || json.isEmpty) {
+      debugPrint('Autofill skipped: no profile data on this screen');
+      return;
+    }
     try {
       await _controller.runJavaScript(star.buildAutofillScript(json));
     } catch (e) {

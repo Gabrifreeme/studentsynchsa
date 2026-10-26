@@ -444,8 +444,11 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       for (var j = 0; j < aliases.length; j++) {
         if (text.indexOf(aliases[j]) !== -1) {
           var score = aliases[j].length * 2;
+          // Keep scanning: the longest matching alias is the most specific one.
+          // Breaking on the first hit made "Email Address" score 10 (from
+          // "email") and lose to "address" at 14, so the street address was
+          // typed into the email field.
           if (score > bestScore) { bestScore = score; bestKey = key; }
-          break;
         }
       }
     }
