@@ -1,5 +1,4 @@
-package com.studentsyncsa.studentsyncsa
-
+package com.lipsyncstudent.lipsyncstudent
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.WebView

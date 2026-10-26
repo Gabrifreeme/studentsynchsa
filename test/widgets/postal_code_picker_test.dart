@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studentsyncsa/models/postal_code.dart';
-import 'package:studentsyncsa/services/postal_code_repository.dart';
-import 'package:studentsyncsa/widgets/postal_code_picker.dart';
+import 'package:lipsyncstudent/models/postal_code.dart';
+import 'package:lipsyncstudent/services/postal_code_repository.dart';
+import 'package:lipsyncstudent/widgets/postal_code_picker.dart';
 
 void main() {
   testWidgets('selection returns the tapped postal code', (tester) async {

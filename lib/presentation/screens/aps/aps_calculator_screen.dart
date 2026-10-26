@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:studentsyncsa/core/constants/app_constants.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/core/constants/app_constants.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 
 class ApsCalculatorScreen extends StatefulWidget {
   const ApsCalculatorScreen({super.key});

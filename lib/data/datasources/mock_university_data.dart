@@ -1,5 +1,5 @@
-import 'package:studentsyncsa/domain/models/offline_resource.dart';
-import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:lipsyncstudent/domain/models/offline_resource.dart';
+import 'package:lipsyncstudent/domain/models/university.dart';
 
 class MockUniversityData {
   static OfflineResource _webview(

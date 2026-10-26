@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/domain/repositories/profile_repository.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/domain/repositories/profile_repository.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   @override

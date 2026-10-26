@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/sync_service.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/presentation/providers/auth_provider.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/services/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

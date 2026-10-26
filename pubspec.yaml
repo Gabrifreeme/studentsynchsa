@@ -1,6 +1,6 @@
-name: studentsyncsa
-description: "StudentSyncSA - Your university application companion"
-publish_to: 'none'
+name: lipsyncstudent
+description: "LipSyncStudent - Your university application companion"
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
@@ -25,6 +25,7 @@ dependencies:
   pdf: ^3.12.0
   webview_flutter: ^4.14.1
   webview_flutter_android: ^4.13.0
+  flutter_inappwebview: ^6.0.0
   flutter_dotenv: ^6.0.1
   webview_win_floating: ^3.0.3
   universal_html: ^2.3.0
@@ -64,3 +65,5 @@ flutter:
     - assets/offline/wits/
     - assets/offline/wsu/
     - assets/offline/zululand/
+dependency_overrides:
+  jni: ^1.1.0

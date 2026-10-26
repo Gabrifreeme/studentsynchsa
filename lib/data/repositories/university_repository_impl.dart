@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/data/datasources/mock_university_data.dart';
-import 'package:studentsyncsa/domain/models/university.dart';
-import 'package:studentsyncsa/domain/repositories/university_repository.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/data/datasources/mock_university_data.dart';
+import 'package:lipsyncstudent/domain/models/university.dart';
+import 'package:lipsyncstudent/domain/repositories/university_repository.dart';
 
 class UniversityRepositoryImpl implements UniversityRepository {
   @override

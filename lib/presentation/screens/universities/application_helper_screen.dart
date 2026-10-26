@@ -1,8 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
 
 class ApplicationHelperScreen extends StatefulWidget {
   final String universityName;

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studentsyncsa/services/autofill_script.dart' as star;
+import 'package:lipsyncstudent/services/autofill_script.dart' as star;
 
 void main() {
   group('buildNavigationFixScript', () {

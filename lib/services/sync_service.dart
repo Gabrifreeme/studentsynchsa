@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:studentsyncsa/core/constants/app_constants.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/core/constants/app_constants.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
 
 enum SyncStatus { offline, syncing, synced, failed }
 

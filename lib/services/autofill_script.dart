@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+// autofill_script.dart  –  LipSyncStudent Star Auto-Fill
 //
 // Built specifically for ITS (Oracle PL/SQL) university portals used by
 // UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
@@ -313,15 +313,15 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   function findOption(sel, want) {    if (!want) return null;
     var wl = want.toLowerCase().trim();
-    var wlWords = wl.split(/\s+/);
+    var wlWords = wl.split(/s+/);
     var best = null, bestScore = -1;
     for (var i = 0; i < sel.options.length; i++) {
       var opt = sel.options[i];
       if (isPlaceholder(opt.text)) continue;
       var tl = opt.text.toLowerCase().trim();
       var vl = opt.value.toLowerCase().trim();
-      var tlWords = tl.split(/\s+/);
-      var vlWords = vl.split(/\s+/);
+      var tlWords = tl.split(/s+/);
+      var vlWords = vl.split(/s+/);
       var score = -1;
       // 100: exact text/value equals want
       if (tl === wl || vl === wl) score = 100;
@@ -757,4 +757,179 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
 })();
 ''';
+}
+
+/// Returns JS that hooks the portal's Apply/Submit/Next button and resolves
+/// relative URLs against the page's own base URI. Re-injection safe: it
+/// de-dups listeners via a per-element data attribute and never bails out
+/// early so sub-page navigations keep working.
+String buildNavigationFixScript() {
+  return '${'''
+(function() {
+  var SELECTOR = 'button[type="submit"], input[type="submit"], button[data-id="NEXT"], #B_NEXT, button[data-id="APPLY"], button[data-id="SUBMIT"], input[value="Apply"], input[value="Submit"], input[value="Next"], button[class*="t-Button"], a[class*="t-Button"], button[class*="button"]';
+
+  function resolveUrl(url) {
+    try {
+      // Relative URLs (common on ITS portals: "gw1view", "../oap", "?p=1")
+      // must be resolved against the page's own base URI, not the app's.
+      return new URL(url, document.baseURI).href;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function hook(el) {
+    if (!el) return;
+    // De-dup: never attach twice to the same element, even across re-injections.
+    if (el.getAttribute('data-ssa-nav-hooked') === '1') return;
+    el.setAttribute('data-ssa-nav-hooked', '1');
+
+    el.addEventListener('click', function(e) {
+      var href = el.getAttribute('href');
+      if (!href) return;   // no href -> let the native submit happen
+      var resolved = resolveUrl(href);
+      console.log('[ssa-nav] ' + (el.textContent || '').trim() +
+                   ' -> ' + href + ' (resolved: ' + resolved + ')');
+      window.location.assign(resolved);
+    }, true);   // capture: true -> runs before other scripts / preventDefault
+  }
+
+  function scan() {
+    var nodes = document.querySelectorAll(SELECTOR);
+    for (var i = 0; i < nodes.length; i++) {
+      hook(nodes[i]);
+    }
+  }
+
+  // Initial scan on every injection (re-injection safe: no global early return).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scan);
+  } else {
+    scan();
+  }
+
+  // Re-scan on sub-page navigation: the portal re-renders the button bar and
+  // a one-time injection would miss it. Guard the interval so repeated
+  // injections never stack timers.
+  if (!window.__ssaNavTimer) {
+    var _t = setInterval(scan, 1500);
+    window.__ssaNavTimer = true;
+    setTimeout(function() {
+      try { clearInterval(_t); window.__ssaNavTimer = false; } catch (e) {}
+    }, 15000);
+  }
+
+  console.log('[ssa-nav] navigation fix installed: ' + SELECTOR);
+})();
+'''
+  .trim()}\n';
+}
+
+/// Returns JS that removes the old/stale postal-code picker markup from the
+/// page so the new one can take its place without duplicate rows.
+String buildRemoveOldPostalPickerScript() {
+  return '${'''
+(function() {
+  // Remove any previously injected postal-code picker UI (old styling /
+  // duplicate rows) before the new one is added.
+  var old = document.getElementById('ssa-postal-picker');
+  if (old) {
+    old.remove();
+    console.log('[ssa-postal] removed old picker');
+  }
+  var legacy = document.querySelector('[data-ssa-postal-picker]');
+  if (legacy) {
+    legacy.remove();
+    console.log('[ssa-postal] removed legacy picker');
+  }
+})();
+'''
+  .trim()}\n';
+}
+
+/// Returns JS that injects the new postal-code picker into the page.
+/// The picker is a small dropdown populated from the profile's postal code;
+/// selecting a value writes it back into the portal's postal fields.
+String buildPostalCodePickerScript(String profileJson) {
+  return '${'''
+(function() {
+  var profile = $profileJson;
+
+  function gv(path) {
+    var parts = path.split('.');
+    var o = profile;
+    for (var i = 0; i < parts.length; i++) {
+      if (o == null || typeof o !== 'object') return '';
+      o = o[parts[i]];
+    }
+    return (o !== null && o !== undefined) ? String(o) : '';
+  }
+
+  var postalCode = gv('address.postalCode');
+
+  if (document.getElementById('ssa-postal-picker')) return; // already injected
+
+  var sel = document.createElement('select');
+  sel.id = 'ssa-postal-picker';
+  sel.title = 'Postal code';
+  sel.style.cssText = 'font-size:13px;padding:4px 6px;border:1px solid #999;border-radius:4px;';
+
+  var placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '-- Select postal code --';
+  sel.appendChild(placeholder);
+
+  if (postalCode) {
+    var opt = document.createElement('option');
+    opt.value = postalCode;
+    opt.textContent = postalCode;
+    opt.selected = true;
+    sel.appendChild(opt);
+  }
+
+  sel.addEventListener('change', function() {
+    var val = sel.value;
+    if (!val) return;
+    // Write the selected postal code into the portal's postal fields.
+    var targets = [
+      'input[name="oapStreetAddrPCodeRq"]',
+      'input[name="oapStreetAddrPCodeRq_desc"]',
+      'input[name="oapPostalAddrPCodeRq"]',
+      'input[name="oapPostalAddrPCodeRq_desc"]',
+      'input[name="P_POSTAL_CODE"]',
+      'input[name="P_POST_CODE"]',
+      'input[name="P_POSTAL"]',
+      'input[name="postal_code"]',
+      'input[name="postalcode"]',
+      'input[name="post_code"]',
+      'input[name="postcode"]'
+    ];
+    for (var i = 0; i < targets.length; i++) {
+      var el = document.querySelector(targets[i]);
+      if (!el) continue;
+      try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch (e) {}
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+    console.log('[ssa-postal] postal code set to ' + val);
+  });
+
+  // Attach to the postal-code row if one exists, otherwise float it.
+  var anchor =
+    document.querySelector('input[name="oapStreetAddrPCodeRq"]') ||
+    document.querySelector('input[name="P_POSTAL_CODE"]') ||
+    document.querySelector('input[name="postalcode"]');
+  if (anchor && anchor.parentElement) {
+    anchor.parentElement.appendChild(sel);
+  } else if (document.body) {
+    sel.style.cssText += 'position:fixed;top:80px;right:20px;z-index:2147483646;';
+    document.body.appendChild(sel);
+  }
+
+  console.log('[ssa-postal] picker injected (code: ' + (postalCode || 'none') + ')');
+})();
+'''
+  .trim()}\n';
 }

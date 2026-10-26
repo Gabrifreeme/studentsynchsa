@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/domain/models/application.dart';
-import 'package:studentsyncsa/presentation/providers/application_provider.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/domain/models/application.dart';
+import 'package:lipsyncstudent/presentation/providers/application_provider.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 import 'package:uuid/uuid.dart';
 
 class ApplicationTrackerScreen extends ConsumerStatefulWidget {

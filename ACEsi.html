@@ -7,20 +7,20 @@
     :root {
       --bg: #000000;
       --bg-panel: #000000;
-      --bg-elev: #0a0a0a;
-      --bg-hover: rgba(204, 85, 0, 0.15);
-    --border: rgba(255, 123, 0, 0.5);
-    --border-strong: rgba(255, 123, 0, 0.7);
-      --text: #ffe8cc;
-      --text-dim: rgba(255, 232, 204, 0.7);
-      --text-mute: rgba(255, 232, 204, 0.4);
+      --bg-elev: #000000;
+      --bg-hover: rgba(255, 123, 0, 0.15);
+    --border: #ff7b00;
+    --border-strong: #ff7b00;
+      --text: #ff7b00;
+      --text-dim: rgba(255, 123, 0, 0.7);
+      --text-mute: rgba(255, 123, 0, 0.4);
       --accent: #ff7b00;
       --accent-2: #ff7b00;
-      --accent-soft: rgba(204, 85, 0, 0.12);
-      --success: #34d399;
+      --accent-soft: rgba(255, 123, 0, 0.12);
+      --success: #ff7b00;
       --danger: #ff7b00;
-      --warning: #fbbf24;
-      --info: #38bdf8;
+      --warning: #ff7b00;
+      --info: #ff7b00;
       --radius: 10px;
       --radius-sm: 7px;
       --mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
@@ -28,6 +28,7 @@
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
+    button { color: var(--text); font-family: inherit; }
     body {
       background: var(--bg); color: var(--text); font-family: var(--sans);
       height: 100vh; overflow: hidden; display: flex; flex-direction: column;
@@ -45,8 +46,8 @@
     #header {
       display: flex; align-items: center; gap: 14px; flex-shrink: 0;
       padding: 0 18px; height: 52px;
-      background: linear-gradient(180deg, #0a0500, #1a0f00);
-      border-bottom: 1px solid var(--border);
+      background: #000000;
+      border-bottom: 1px solid #000000;
       flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
     }
     #header::-webkit-scrollbar { display: none; }
@@ -63,49 +64,61 @@
     }
     .brand-name { font-weight: 700; font-size: 17px; letter-spacing: 1.5px; color: var(--text); }
     .brand-name em { font-style: normal; color: var(--accent); }
-    .header-sub { font-size: 12px; color: var(--text); padding-left: 12px; border-left: 1px solid var(--border); }
+    .header-sub { font-size: 12px; color: var(--text); padding-left: 12px; border-left: 1px solid #000000; }
     .header-spacer { flex: 1; }
     .icon-btn {
       width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px;
-      background: var(--bg-elev); color: var(--accent); font-size: 16px; cursor: pointer;
+      background: var(--bg-elev); color: var(--accent) !important; font-size: 16px; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
     }
-    .icon-btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
+    .icon-btn:hover, .icon-btn:focus, .icon-btn:active { background: var(--bg-hover); color: var(--accent-2) !important; border-color: var(--border-strong); }
 
     /* ---------- Main layout ---------- */
     #header { position: relative; z-index: 20; background: var(--bg-panel); }
-    #main { position: relative; z-index: 2; display: flex; flex: 1; overflow: hidden; }
+    #main { position: relative; z-index: 2; display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 
     /* ---------- Chat ---------- */
-    #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; background: rgba(0, 0, 0, 0); }
+    #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; min-height: 0; background: #000000; border: 1px solid var(--border); box-shadow: 0 0 15px rgba(255, 157, 0, 0.15); }
     .panel-title {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
       padding: 0 16px; height: 52px; font-size: 11px; font-weight: 700;
       letter-spacing: 1.2px; text-transform: uppercase; color: var(--text);
-      border-bottom: 1px solid var(--border); background: var(--bg-panel);
+      border-bottom: 1px solid #000000; background: var(--bg-panel);
     }
-    #chat { flex: 1; min-height: 0; padding: 18px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .panel-label {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-elev); color: var(--text); cursor: default;
+      font-size: 12px; font-family: var(--mono); padding: 4px 10px; white-space: nowrap;
+    }
+    #chat { flex: 1; min-height: 0; min-width: 0; padding: 18px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
     .msg {
       padding: 10px 14px; line-height: 1.65; font-size: 14px;
       white-space: pre-wrap; word-wrap: break-word; max-width: 82%;
-      border-radius: 14px;
+      border-radius: 0;
     }
     .chat-ts {
-      align-self: center; font-size: 10px; color: var(--text-mute); opacity: 0.7;
+      align-self: center; font-size: 10px; color: rgba(255, 157, 0, 0.6);
       letter-spacing: 0.5px; text-transform: uppercase; margin: 4px 0 2px;
     }
     .msg.user {
-      align-self: flex-start;
-      background: #1a0f00;
-      color: #ffe8cc;
-      border: 1px solid #ff7b00;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 0 8px rgba(255, 123, 0, 0.45), 0 0 18px rgba(255, 123, 0, 0.18);
+      align-self: flex-end; text-align: right;
+      background: transparent; color: rgba(255, 157, 0, 0.7);
+      border: none; border-radius: 0; box-shadow: none;
     }
      .msg.ace {
-       align-self: flex-start;
-       background: var(--bg-elev); color: var(--text);
-       border: 1px solid var(--border); border-bottom-left-radius: 4px;
+       align-self: flex-start; text-align: left;
+       background: transparent; color: var(--text);
+       border: none; border-radius: 0; box-shadow: none;
+     }
+     .msg-prefix {
+       display: inline-block; vertical-align: middle;
+       color: #ff7b00 !important; font-size: 16px;
+       background: transparent !important; box-shadow: none !important;
+       animation: pulseGlow 1.5s ease-in-out infinite alternate;
+     }
+     @keyframes pulseGlow {
+       0% { opacity: 1; text-shadow: 0 0 8px var(--accent); }
+       100% { opacity: 0.5; text-shadow: none; }
      }
       .msg.ace a { color: var(--info); }
       .msg.ace .af-hourglass { font-family: var(--mono); opacity: 0.75; }
@@ -113,7 +126,7 @@
         margin: 6px 0 0 0; padding: 10px 12px; border-radius: 6px;
         background: #0a0a0a; border: 1px solid var(--border);
         font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
-        color: #d1d1d1; white-space: pre-wrap; word-break: break-word;
+        color: var(--text); white-space: pre-wrap; word-break: break-word;
         overflow-x: auto;
       }
      .mode-chip {
@@ -125,28 +138,32 @@
      .chip-build { background: rgba(255, 123, 0, 0.15); color: var(--accent-2); border: 1px solid rgba(255, 123, 0, 0.5); }
 .msg.ace-thinking {
        align-self: flex-start;
-       background: var(--bg-elev); color: var(--text-mute);
-       border: 1px solid var(--border); border-bottom-left-radius: 4px;
+       background: transparent; color: var(--text-mute);
+       border: none; border-radius: 0; box-shadow: none;
        font-style: italic; font-size: 13px; opacity: 0.8;
      }
      .dot { display: inline-block; width: 4px; height: 4px; margin: 0 1px; border-radius: 50%;
             background: currentColor; animation: dotBounce 1.2s infinite; }
      .dot:nth-child(2) { animation-delay: 0.2s; }
      .dot:nth-child(3) { animation-delay: 0.4s; }
-     @keyframes dotBounce {
-       0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
-       30% { transform: translateY(-4px); opacity: 1; }
-     }
+      @keyframes dotBounce {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+        30% { transform: translateY(-4px); opacity: 1; }
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
       .msg.ace-stoppable { display: flex; align-items: center; gap: 10px; }
       .ace-stop-btn {
         flex-shrink: 0; padding: 3px 10px; border-radius: 6px; cursor: pointer;
         font-size: 12px; font-weight: 700; font-family: var(--mono); letter-spacing: 0.3px;
-        background: rgba(239, 68, 68, 0.15); color: #f87171;
-        border: 1px solid rgba(255, 123, 0, 0.5); font-style: normal;
+        background: rgba(255, 123, 0, 0.15); color: var(--accent) !important;
+        border: 1px solid var(--border); font-style: normal;
         transition: background 0.15s, border-color 0.15s;
       }
-       .ace-stop-btn:hover { background: rgba(255, 123, 0, 0.3); border-color: #ff7b00; }
-      .ace-stop-btn:active { background: rgba(239, 68, 68, 0.45); }
+       .ace-stop-btn:hover { background: rgba(255, 123, 0, 0.3); border-color: var(--accent-2); color: var(--accent-2) !important; }
+      .ace-stop-btn:active { background: rgba(255, 123, 0, 0.45); color: var(--accent-2) !important; }
       .ace-stop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
       /* Inline work steps — rendered directly in the chat thread like opencode's tool steps */
       .msg.ace-step {
@@ -158,26 +175,26 @@
       .msg.ace-step .w-text { flex: 1; word-break: break-word; }
       .msg.ace-step .w-state { flex-shrink: 0; font-size: 12px; }
       /* grey = what ACEsi is doing (tools); white = ACEsi talking to you (reply) */
-       .msg.ace-step.work { background: #0a0a0a; border: 1px solid var(--border); }
+.msg.ace-step.work { background: transparent; border: none; }
        .msg.ace-step.work .w-text { color: #9a9a9a; }
        .msg.ace-step.work .w-icon { opacity: 0.85; }
-       .msg.ace-step.talk { background: #151515; border: 1px solid var(--border-strong); }
-      .msg.ace-step.talk .w-text { color: #ffe8cc; font-weight: 600; }
-       .msg.ace-step.running { border-color: var(--border-strong); }
-      .msg.ace-step.running .w-state { color: var(--info); }
-      .msg.ace-step.pending .w-state { color: var(--text-mute); }
-      .msg.ace-step.done .w-state { color: var(--success); }
-       .msg.ace-step.error { border-color: var(--danger); }
-      .msg.ace-step.error .w-state { color: var(--danger); }
+       .msg.ace-step.talk { background: transparent; border: none; }
+       .msg.ace-step.talk .w-text { color: var(--text); font-weight: 600; }
+       .msg.ace-step.running { border: none; }
+       .msg.ace-step.running .w-state { color: var(--info); }
+       .msg.ace-step.pending .w-state { color: var(--text-mute); }
+       .msg.ace-step.done .w-state { color: var(--success); }
+       .msg.ace-step.error { border: none; }
+       .msg.ace-step.error .w-state { color: var(--danger); }
 
     /* ---------- Resizers ---------- */
     #resizer1, #resizer2 { width: 1px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; }
     #resizer1:hover, #resizer2:hover { background: var(--accent); }
 
     /* ---------- Code panel ---------- */
-    #code-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 200px; }
+    #code-panel { flex: 1; display: flex; flex-direction: column; background: #000000; border: 1px solid var(--border); box-shadow: 0 0 15px rgba(255, 157, 0, 0.15); min-width: 200px; position: relative; }
     #code-header {
-      padding: 8px 10px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      padding: 8px 10px; background: var(--bg-panel); border-bottom: 1px solid #000000;
       display: flex; align-items: center; gap: 6px; height: 52px; flex-wrap: nowrap;
       position: relative; z-index: 10;
     }
@@ -229,23 +246,38 @@
       font-family: var(--mono);
     }
     #searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-    #code-editor-wrap { display: flex; flex: 1; overflow: hidden; background: var(--bg); }
-    #line-numbers {
-      padding: 16px 10px; font-family: var(--mono); font-size: 13px; color: rgba(255, 232, 204, 0.35);
-      text-align: right; min-width: 42px; user-select: none; background: #0a0500;
-      overflow: hidden; white-space: pre; line-height: 1.65; border-right: 1px solid var(--border);
+    #code-editor-wrap { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg); }
+#line-numbers {
+      padding: 16px 10px; font-family: var(--mono); font-size: 13.5px; color: #555555;
+      text-align: right; min-width: 42px; flex-shrink: 0; user-select: none; background: #000000;
+      overflow: hidden; white-space: pre; line-height: 1.65; border-right: 1px solid #000000;
     }
-    #code-editor {
-      flex: 1; padding: 16px 18px; overflow: auto; font-family: var(--mono); font-size: 13.5px;
-      color: var(--text); background: var(--bg); white-space: pre; outline: none; tab-size: 2;
-      transition: background 0.5s ease; line-height: 1.65;
+    /* Live log terminal mode: hide the line-number gutter entirely */
+    #code-editor-wrap.live-log-mode #line-numbers {
+      display: none; width: 0; min-width: 0; flex-shrink: 0;
+    }
+    #code-editor-wrap.live-log-mode #code-editor {
+      padding: 12px 16px; font-size: 12px; line-height: 1.5;
+      white-space: pre-wrap; word-wrap: break-word; word-break: break-all;
+      overflow-x: hidden; overflow-y: auto;
+      font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+      color: #ff7b00; background: #000000;
+    }
+    #code-editor-wrap.live-log-mode #code-editor::-webkit-scrollbar {
+      width: 8px;
+    }
+    #code-editor-wrap.live-log-mode #code-editor::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    #code-editor-wrap.live-log-mode #code-editor::-webkit-scrollbar-thumb {
+      background: #ff7b00; border-radius: 4px;
     }
 
     /* ---------- Explorer ---------- */
-    #explore-panel { flex: 0.7; display: flex; flex-direction: column; background: var(--bg-panel); min-width: 140px; max-width: 280px; }
+    #explore-panel { flex: 0.7; display: flex; flex-direction: column; background: #000000; border: 1px solid var(--border); box-shadow: 0 0 15px rgba(255, 157, 0, 0.15); min-width: 140px; max-width: 280px; }
     #explore-header {
       flex-shrink: 0; padding: 0 12px; height: 52px; background: var(--bg-panel);
-      border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700;
+      border-bottom: 1px solid #000000; font-size: 11px; font-weight: 700;
       letter-spacing: 1.2px; text-transform: uppercase; color: var(--text);
       display: flex; justify-content: space-between; align-items: center;
     }
@@ -276,18 +308,20 @@
 
     #explorer { flex: 1; padding: 8px 8px; overflow-y: auto; font-size: 13px; color: var(--text); word-break: break-all; }
     #explorer .file {
-      color: var(--accent); cursor: pointer; padding: 5px 10px; border-radius: 6px;
+      color: #ff7b00; cursor: pointer; padding: 5px 10px; border-radius: 0;
       display: flex; align-items: center; gap: 8px; margin-bottom: 1px; transition: background 0.1s;
-      border: 1px solid transparent;
-      background: var(--accent-soft);
+      border: none; background: transparent; box-shadow: none;
     }
-    #explorer .file:hover { background: var(--accent); color: #000; border-color: var(--border-strong); }
-    #explorer .file .f-icon { color: var(--accent); font-size: 12px; flex-shrink: 0; }
+    #explorer .file:hover { background: rgba(255, 123, 0, 0.15); color: #ff7b00; border: none; }
+    .file-icon {
+      display: inline-block; width: 8px; height: 10px; background: #ff7b00;
+      border: none; border-radius: 2px; margin-right: 8px; vertical-align: middle; opacity: 0.8;
+    }
 
     /* ---------- Input area ---------- */
     #input-area {
       padding: 12px 16px; background: var(--bg-panel);
-      border-top: 1px solid var(--border); flex-shrink: 0;
+      border-top: 1px solid #000000; flex-shrink: 0;
     }
     #input-row { display: flex; gap: 10px; align-items: flex-end; }
     #attach-preview {
@@ -325,17 +359,17 @@
     }
     #sendBtn {
       padding: 0 20px; height: 42px; border: 1px solid var(--border); border-radius: 8px;
-      background: var(--bg-elev); color: var(--accent);
+      background: var(--bg-elev); color: #ff7b00 !important;
       font-weight: 700; font-size: 14px; cursor: pointer; letter-spacing: 0.4px;
       transition: all 0.15s;
     }
-    #sendBtn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); transform: translateY(-1px); }
+    #sendBtn:hover, #sendBtn:focus, #sendBtn:active { background: var(--bg-hover); color: #ff7b00 !important; border-color: var(--border-strong); transform: translateY(-1px); }
     #sendBtn:active { transform: translateY(0); }
     .attach-btn {
       width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 21px;
-      background: var(--bg-elev); color: var(--accent); font-size: 20px; cursor: pointer; transition: all 0.15s;
+      background: var(--bg-elev); color: #ff7b00 !important; font-size: 20px; cursor: pointer; transition: all 0.15s;
     }
-    .attach-btn:hover { background: var(--bg-hover); color: var(--accent-2); border-color: var(--border-strong); }
+    .attach-btn:hover, .attach-btn:focus, .attach-btn:active { background: var(--bg-hover); color: #ff7b00 !important; border-color: var(--border-strong); }
 
     .chat-attach-img {
       max-width: 260px; max-height: 220px; width: auto; height: auto;
@@ -362,8 +396,8 @@
     /* ---------- Status bar ---------- */
     #status {
       font-size: 12px; color: var(--text-mute); padding: 0 16px; height: 28px;
-      display: flex; align-items: center; gap: 10px; background: var(--bg-panel);
-      border-top: 1px solid var(--border); flex-shrink: 0; font-family: var(--mono);
+      display: flex; align-items: center; gap: 10px; background: #000000;
+      border-top: 1px solid #000000; flex-shrink: 0; font-family: var(--mono);
       position: relative;
     }
     #status .st-item { display: flex; align-items: center; gap: 6px; }
@@ -378,6 +412,14 @@
       font-family: var(--mono); font-size: 12px; cursor: pointer; transition: all 0.15s;
     }
     .st-model-btn:hover { border-color: var(--accent); }
+    .st-pill {
+      display: inline-flex; align-items: center; gap: 0;
+      border: 1px solid var(--border); background: var(--bg-elev);
+      border-radius: 14px; padding: 3px 10px; font-family: var(--mono); font-size: 12px;
+    }
+    .st-pill .st-item { display: flex; align-items: center; gap: 6px; color: var(--text); }
+    .st-pill .st-item .neon-green { color: var(--accent); font-weight: 700; }
+    .st-pill-sep { color: var(--border-strong); padding: 0 8px; font-weight: 700; }
     .st-model-menu {
       display: none; position: absolute; bottom: 34px; right: 0; z-index: 2000;
       background: var(--bg-panel); border: 1px solid var(--border-strong); border-radius: 12px;
@@ -541,9 +583,23 @@
   </div>
 </div>
 <div id="main">
-  <div id="chat-panel">
-    <div class="panel-title"><span>Conversation</span> <span style="display:flex;align-items:center;gap:10px;"><button class="min-btn" onclick="minPanel('chat-panel')" title="Minimize panel">-</button></span></div>
+  <div id="chat-panel" style="position: relative;">
+    <div class="panel-title"><span class="panel-label">Conversation</span>
+      <div class="dropdown-container" style="position:relative;flex-shrink:0;">
+        <button class="btn" id="historyBtn" title="Conversation History" onclick="toggleHistoryDropdown()" style="font-size:12px;padding:4px 10px;flex-shrink:0;">📜 History ▾</button>
+        <div id="historyDropdown" class="dropdown-menu" style="display:none;min-width:280px;max-height:300px;overflow:auto;">
+          <div id="historyList" style="padding:4px;"></div>
+          <hr style="margin:4px 0;">
+          <div class="u-item" onclick="clearAllHistory();closeHistoryDropdown();" style="color:#ff7b00;">🗑️ Clear All History</div>
+        </div>
+      </div>
+      <button class="btn" id="newChatBtn" title="New Chat — save current & start fresh" onclick="clearConversation()" style="font-size:12px;padding:4px 10px;flex-shrink:0;">🆕 New Chat</button>
+      <button class="min-btn" onclick="minPanel('chat-panel')" title="Minimize panel" style="flex-shrink:0;">-</button>
+    </div>
     <div id="chat"><div class="msg ace">Hi, Chris. I'm here.</div></div>
+    <div id="chat-spinner-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 100; display: none;">
+      <iframe src="assets/web/loading-spinner.html" width="200" height="200" style="border: none; background: transparent;" frameborder="0"></iframe>
+    </div>
     <div id="indicator-bar" style="display:none;text-align:center;padding:6px 0;font-size:13px;color:var(--accent);">
     <button id="ctrl-stop" class="ace-stop-btn" title="Stop" disabled>⏹ Stop</button>
     <span style="display:inline-block;width:6px;"></span>
@@ -560,10 +616,13 @@
         <textarea id="userInput" rows="1" placeholder="Type a message..." spellcheck="true" lang="en"></textarea>
         <button id="sendBtn" type="button">Send</button>
       </div>
-    </div>
   </div>
+</div>
   <div id="resizer1"></div>
   <div id="code-panel">
+    <div id="spinner-wrap" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; z-index: 10; display: none;">
+      <div id="spinner" style="width: 100%; height: 100%; box-sizing: border-box; border: 8px solid rgba(217, 108, 0, 0.2); border-top: 8px solid #D96C00; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    </div>
     <div id="code-header">
       <div class="toolbar-spacer"></div>
       <div id="code-actions">
@@ -583,16 +642,18 @@
   </div>
   <div id="resizer2"></div>
   <div id="explore-panel">
-    <div id="explore-header"><span>Explorer</span> <span style="display:flex;align-items:center;gap:6px;"><button class="icon-btn" onclick="loadExplorer()" title="Refresh">⟳</button><button class="min-btn" onclick="minPanel('explore-panel')" title="Minimize panel">-</button></span></div>
+    <div id="explore-header"><span class="panel-label">Explorer</span> <span style="display:flex;align-items:center;gap:6px;"><button class="icon-btn" onclick="loadExplorer()" title="Refresh">⟳</button><button class="min-btn" onclick="minPanel('explore-panel')" title="Minimize panel">-</button></span></div>
     <div id="explorer">Loading...</div>
   </div>
 </div>
 <div id="status">
-  <span class="st-item">📱 <span id="device-count" class="neon-green">0</span> devices</span>
-  <span class="st-dot"></span>
-  <span class="st-item">🤖 <span id="agent-count" class="neon-green">0</span> agents</span>
-  <span class="st-dot"></span>
-  <span class="st-item" id="stIndicator" style="display:none;"></span>
+<span class="st-pill" id="stDeviceAgentPill">
+      <span class="st-item">📱 <span id="device-count" class="neon-green">0</span> devices</span>
+      <span class="st-pill-sep">|</span>
+      <span class="st-item">🤖 <span id="agent-count" class="neon-green">0</span> agents</span>
+    </span>
+    <span class="st-dot"></span>
+    <span class="st-item" id="stIndicator" style="display:none;"></span>
   <div id="min-dock"></div>
   <span class="st-spacer"></span>
   <span class="st-model" id="stModelWrap">
@@ -906,17 +967,23 @@
     scheduleHighlight();
   });
 
-   function addMessage(text, sender) {
-     const div = document.createElement('div');
-     div.className = 'msg ' + sender;
-     const urlRegex = /(https?:\/\/[^\s]+)/g;
-     text = text.replace(urlRegex, function(url) {
-       return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
-     });
-     div.innerHTML = text;
-     appendChat(div);
-     return div;
-   }
+  // Sync line-number gutter scroll with the code editor scroll
+  codeEditor.addEventListener('scroll', function() {
+    lineNumbers.scrollTop = codeEditor.scrollTop;
+  });
+
+function addMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + sender;
+      const prefix = (sender === 'user') ? '<span class="msg-prefix">✨</span> ' : '';
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      text = text.replace(urlRegex, function(url) {
+        return '<a href="' + url + '" target="_blank" style="color:var(--info);">' + url + '</a>';
+      });
+      div.innerHTML = prefix + text;
+      appendChat(div);
+      return div;
+    }
    // Centralized insertion + scroll-anchoring so the chat always grows at the
    // bottom and the view follows new content (mirrors the terminal chat feel).
    function appendChat(el) {
@@ -967,17 +1034,18 @@
      try {
        const r = await fetch('/history');
        const d = await r.json();
-       if (d && Array.isArray(d.messages) && d.messages.length) {
-         chat.innerHTML = '';
-         d.messages.forEach(m => {
-           const div = document.createElement('div');
-           div.className = 'msg ' + (m.role === 'user' ? 'user' : 'ace');
-           div.textContent = m.content || '';
-           chat.appendChild(div);
-         });
-         scrollToBottom();
-         return;
-       }
+if (d && Array.isArray(d.messages) && d.messages.length) {
+          chat.innerHTML = '';
+          d.messages.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'msg ' + (m.role === 'user' ? 'user' : 'ace');
+            const prefix = (m.role === 'user') ? '<span class="msg-prefix">✨</span> ' : '';
+            div.innerHTML = prefix + (m.content || '');
+            chat.appendChild(div);
+          });
+          scrollToBottom();
+          return;
+        }
      } catch (e) {}
      // Fallback: browser-local history
      try {
@@ -996,6 +1064,132 @@
      } catch (e) {}
    }
    restoreChat();
+
+    // ===== CHAT HISTORY (localStorage) — persistent saved conversations =====
+    const HISTORY_STORAGE_KEY = 'ace_chat_history_saved';
+    const MAX_HISTORY_ENTRIES = 50;
+
+    function getSavedHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; }
+    }
+
+    function saveHistoryEntry(messages, title) {
+      const history = getSavedHistory();
+      const entry = {
+        id: Date.now(),
+        title: title || 'Conversation ' + new Date().toLocaleString(),
+        timestamp: new Date().toISOString(),
+        messages: messages
+      };
+      history.unshift(entry);
+      if (history.length > MAX_HISTORY_ENTRIES) history.length = MAX_HISTORY_ENTRIES;
+      try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history)); } catch (e) {}
+      return entry;
+    }
+
+    function loadHistoryEntry(id) {
+      const history = getSavedHistory();
+      const entry = history.find(e => e.id === id);
+      if (!entry) return false;
+      chat.innerHTML = '';
+      entry.messages.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'msg ' + (m.sender === 'user' ? 'user' : 'ace');
+        div.innerHTML = m.html || '';
+        chat.appendChild(div);
+      });
+      scrollToBottom();
+      closeHistoryDropdown();
+      return true;
+    }
+
+    function deleteHistoryEntry(id) {
+      let history = getSavedHistory();
+      history = history.filter(e => e.id !== id);
+      try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history)); } catch (e) {}
+      renderHistoryDropdown();
+    }
+
+    function clearAllHistory() {
+      if (!confirm('Delete all saved conversations?')) return;
+      try { localStorage.removeItem(HISTORY_STORAGE_KEY); } catch (e) {}
+      renderHistoryDropdown();
+    }
+
+    function renderHistoryDropdown() {
+      const list = document.getElementById('historyList');
+      if (!list) return;
+      const history = getSavedHistory();
+      if (!history.length) {
+        list.innerHTML = '<div style="padding:8px;color:var(--text-mute);font-size:12px;">No saved conversations</div>';
+        return;
+      }
+      list.innerHTML = history.map(e => {
+        const date = new Date(e.timestamp).toLocaleString();
+        const preview = e.messages.slice(0,2).map(m => (m.sender==='user'?'You:':'Ace: ') + (m.html||m.text||'').replace(/<[^>]+>/g,'').slice(0,60)).join(' | ');
+        return '<div class="u-item" onclick="loadHistoryEntry(' + e.id + ')" style="text-align:left;padding:8px 10px;">' +
+               '<div style="font-weight:600;font-size:12px;">' + e.title + '</div>' +
+               '<div style="font-size:11px;color:var(--text-mute);margin-top:2px;">' + date + '</div>' +
+               '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + preview + '</div>' +
+               '<button class="u-item" onclick="event.stopPropagation();deleteHistoryEntry(' + e.id + ')" style="margin-top:6px;padding:2px 8px;font-size:10px;color:#ff7b00;">🗑️ Delete</button>' +
+               '</div>';
+      }).join('');
+    }
+
+    function toggleHistoryDropdown() {
+      const dd = document.getElementById('historyDropdown');
+      if (!dd) return;
+      const isOpen = dd.style.display === 'block';
+      dd.style.display = isOpen ? 'none' : 'block';
+      if (!isOpen) renderHistoryDropdown();
+    }
+
+    function closeHistoryDropdown() {
+      const dd = document.getElementById('historyDropdown');
+      if (dd) dd.style.display = 'none';
+    }
+
+    // Close history dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const dd = document.getElementById('historyDropdown');
+      const btn = document.getElementById('historyBtn');
+      if (dd && dd.style.display === 'block' && !dd.contains(e.target) && e.target !== btn) {
+        dd.style.display = 'none';
+      }
+    });
+
+    // Clear conversation - SAVES current to history first, then wipes and resets
+    async function clearConversation() {
+      // Save current conversation to history BEFORE clearing
+      const currentMessages = collectChatMessages();
+      if (currentMessages.length > 0) {
+        saveHistoryEntry(currentMessages);
+      }
+      try {
+        const res = await fetch('/conversation/clear', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) {
+          console.warn('Backend clear failed:', data);
+        }
+      } catch (e) {
+        console.warn('Clear conversation request failed:', e);
+      }
+      // Clear localStorage
+      try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch (e) {}
+      // Reset UI to welcome state
+      chat.innerHTML = '<div class="msg ace">Hi, Chris. I\'m here.</div>';
+      // Also clear thinking indicator if any
+      if (thinkingEl && thinkingEl.parentNode) {
+        thinkingEl.parentNode.removeChild(thinkingEl);
+        thinkingEl = null;
+      }
+      hideThinking();
+      // Reset send button state
+      window._sendInProgress = false;
+    }
 let thinkingEl = null;
   let activityTimer = null;
   let timerStart = 0;
@@ -1220,6 +1414,8 @@ function showThinking(text) {
     thinkingEl = null;
     const ctrlBar = document.getElementById('indicator-bar');
     if (ctrlBar) ctrlBar.style.display = 'none';
+    const chatSpinnerEl = document.getElementById('chat-spinner-overlay');
+    if (chatSpinnerEl) chatSpinnerEl.style.display = 'none';
     const indName = document.getElementById('indicator-name');
     if (indName) indName.textContent = '';
     const timerEl = document.getElementById('ctrl-timer');
@@ -1485,7 +1681,10 @@ if (watched && s.state === 'done' && !wasDone) {
         d.files.forEach(f => {
           const div = document.createElement('div');
           div.className = 'file';
-          div.textContent = '📄 ' + f;
+          const icon = document.createElement('span');
+          icon.className = 'file-icon';
+          div.appendChild(icon);
+          div.appendChild(document.createTextNode(' ' + f));
           div.onclick = () => loadFile(f);
           el.appendChild(div);
         });
@@ -1597,14 +1796,20 @@ if (watched && s.state === 'done' && !wasDone) {
     return t;
   }
 
-  async function sendMessage() {
-    if (window._sendInProgress) return;
-    window._sendInProgress = true;
-    const text = input.value.trim();
-    if (!text && !pendingAttachments.length) {
-      window._sendInProgress = false;
-      return;
-    }
+   async function sendMessage() {
+     if (window._sendInProgress) return;
+     window._sendInProgress = true;
+     const spinnerEl = document.getElementById('spinner-wrap');
+     if (spinnerEl) spinnerEl.style.display = 'block';
+     const chatSpinnerElS = document.getElementById('chat-spinner-overlay');
+     if (chatSpinnerElS) chatSpinnerElS.style.display = 'flex';
+     const text = input.value.trim();
+     if (!text && !pendingAttachments.length) {
+       window._sendInProgress = false;
+       const sp0 = document.getElementById('spinner-wrap'); if (sp0) sp0.style.display = 'none';
+       const cs0 = document.getElementById('chat-spinner-overlay'); if (cs0) cs0.style.display = 'none';
+       return;
+     }
 
     // Show thinking indicator above user's chat bubble
     showThinking();
@@ -1636,16 +1841,20 @@ if (watched && s.state === 'done' && !wasDone) {
       if (editor) {
         editor.style.backgroundImage = '';
       }
-    addMessage('Switching to work mode. I\'m here to help.', 'ace');
-      hideThinking();
-      return;
+     addMessage('Switching to work mode. I\'m here to help.', 'ace');
+       hideThinking();
+       const sp1 = document.getElementById('spinner-wrap'); if (sp1) sp1.style.display = 'none';
+       const cs1 = document.getElementById('chat-spinner-overlay'); if (cs1) cs1.style.display = 'none';
+       return;
     }
 
     // Run commands directly from chat: "do flutter run", "run git status", etc.
     const cmd = extractCommand(text);
-    if (cmd) {
-      runCommand(cmd);
-      return;
+     if (cmd) {
+       runCommand(cmd);
+       const sp2 = document.getElementById('spinner-wrap'); if (sp2) sp2.style.display = 'none';
+       const cs2 = document.getElementById('chat-spinner-overlay'); if (cs2) cs2.style.display = 'none';
+       return;
     }
 
     showThinking(text);
@@ -1703,6 +1912,7 @@ if (watched && s.state === 'done' && !wasDone) {
             addMessage('⚠️ The opencode server is off. Auto-switched to GPT-OSS 20B (free cloud) — pick a cloud or local model from the menu, or start opencode serve to use opencode models.', 'ace');
           } else {
             finalizeStreamedReply(d.reply);
+            updateModelDisplay(d.model || 'OpenRouter');
             speakReply(d.reply.replace(/^\s*\\[(PLAN|BUILD|REPLY)\\]\s*/i, ''));
           }
         } catch (err) {
@@ -1713,7 +1923,7 @@ if (watched && s.state === 'done' && !wasDone) {
             addMessage('⏹ Stopped the last request.', 'ace');
           } else {
             hideThinking();
-            addMessage('Server error.', 'ace');
+            addMessage('❌ Server error: ' + (err && err.message ? err.message : err), 'ace');
           }
         } finally {
           currentAbort = null;
@@ -1747,7 +1957,9 @@ if (watched && s.state === 'done' && !wasDone) {
           signal: currentAbort.signal
         });
         if (!res.ok) {
-          throw new Error('HTTP ' + res.status);
+          let errMsg = 'HTTP ' + res.status;
+          try { const errBody = await res.json(); if (errBody) errMsg = errBody.error || errBody.reply || errMsg; } catch (_) {}
+          throw new Error(errMsg);
         }
         d = await res.json();
       } finally {
@@ -1769,6 +1981,7 @@ if (watched && s.state === 'done' && !wasDone) {
         await streamAutoFix(d.url);
       } else {
         window.__aceShownReply = d.reply;
+        updateModelDisplay(d.model);
         addAceReply(d.reply);
         hideThinking();
         speakReply(d.reply.replace(/^\s*\\[(PLAN|BUILD|REPLY)\\]\s*/i, ''));
@@ -1784,30 +1997,62 @@ if (watched && s.state === 'done' && !wasDone) {
         buildModelPicker();
         addMessage('⚠️ The cloud model took too long. Auto-switched to ' + modelLabel('google/gemma-4-26b-a4b-it:free') + ' (cloud) — try your message again.', 'ace');
       } else {
-        addMessage('Server error.', 'ace');
+        addMessage('❌ Server error: ' + (err && err.message ? err.message : err), 'ace');
       }
     } finally {
       // Do NOT reset userStopped here — stopRequest() needs it to stay true
       // until the next new request starts. pollActivity() checks it to avoid
       // re-showing the thinking bubble after a manual stop.
-      currentAbort = null;
-      uiRequestActive = false;
-      window._sendInProgress = false;
+       currentAbort = null;
+       uiRequestActive = false;
+       window._sendInProgress = false;
+       const spf = document.getElementById('spinner-wrap'); if (spf) spf.style.display = 'none';
+       const csf = document.getElementById('chat-spinner-overlay'); if (csf) csf.style.display = 'none';
     }
   }
 
-  // Live auto-fix progress: consume the text/plain step stream from the server
-  // and append each step as a chat message with a spinning hourglass. The
-  // hourglass keeps spinning while that step is in progress; when the next step
-  // arrives the previous one freezes into a checkmark.
-  async function streamAutoFix(url) {
-    let streamRes;
-    try {
-      streamRes = await fetch(url);
-    } catch (e) {
-      addMessage('Auto-fix stream error: ' + e.message, 'ace');
-      return;
+// Model Confirmation — shows which AI answered the last /chat request.
+    // The top badge was removed; the active model now displays in the
+    // bottom-right Model Picker (stModelName) instead.
+    function updateModelDisplay(model) {
+      const el = document.getElementById('stModelName');
+      if (!el) return;
+      // Always show the server's actual model — never fall back to a default
+      // that hides what the backend is really using.
+      let label = model || '';
+      if (!label || label === '(idle)') {
+        label = localStorage.getItem('ace_modelSelect') || 'Local Ollama';
+      }
+      el.textContent = label;
+      window.__lastServerModel = label;
     }
+
+    // Refresh the model display from the server (works even when no chat is running).
+    async function pollModelDisplay() {
+      try {
+        const r = await fetch('/model', { cache: 'no-store' });
+        if (r.ok) {
+          const d = await r.json();
+          updateModelDisplay(d.model);
+        }
+      } catch (_) {}
+    }
+    pollModelDisplay();
+    // Poll every 2 seconds so the picker always shows the active model instantly
+    setInterval(pollModelDisplay, 2000);
+
+    // Live auto-fix progress: consume the text/plain step stream from the server
+    // and append each step as a chat message with a spinning hourglass. The
+    // hourglass keeps spinning while that step is in progress; when the next
+    // step arrives the previous one freezes into a checkmark.
+    async function streamAutoFix(url) {
+      let streamRes;
+      try {
+        streamRes = await fetch(url);
+      } catch (e) {
+        addMessage('Auto-fix stream error: ' + e.message, 'ace');
+        return;
+      }
     if (!streamRes.ok) { addMessage('Auto-fix HTTP ' + streamRes.status, 'ace'); return; }
     const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const spinTimer = { h: null, el: null };
@@ -2429,7 +2674,9 @@ const DEFAULT_MODELS = [
 
   const GROQ_MODELS = [
     ['qwen/qwen3.8-27b', 'Qwen 3.8 27B · smart · free'],
-    ['openai/gpt-oss-20b', 'GPT-OSS 20B · free (backup)']
+    ['openai/gpt-oss-20b', 'GPT-OSS 20B · free (backup)'],
+    ['llava-70b', 'LLaVA 70B · vision · free (backup)'],
+    ['meta-llama/llama-4-maverick-17b-128e-instruct', 'Llama 4 Maverick · vision · free']
   ];
 
   const OPENCODE_MODELS = [
@@ -2617,7 +2864,15 @@ const DEFAULT_MODELS = [
 
   function refreshStatusModel() {
     const el = document.getElementById('stModelName');
-    if (el) el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free');
+    if (!el) return;
+    // Prefer the server's actual active model (from /model endpoint) over the
+    // local localStorage pick, so the badge always reflects what answered.
+    const serverModel = (window.__lastServerModel || '').trim();
+    if (serverModel && serverModel !== '(idle)') {
+      el.textContent = serverModel;
+      return;
+    }
+    el.textContent = (aceAdminUnlocked ? '' : '🔒 ') + modelLabel(localStorage.getItem('ace_modelSelect') || 'openai/gpt-oss-20b:free');
   }
 
   function toggleModelMenu() {
@@ -3943,44 +4198,255 @@ const DEFAULT_MODELS = [
 #aceInspectBody pre{white-space:pre-wrap;word-break:break-word;margin:0;color:#cbd5e1}
 .ace-tab{background:#1e293b;border:1px solid rgba(255,123,0,0.5);color:#cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px}
 .ace-tab.active{background:#38bdf8;color:#0f172a}
-</style>
-<script>
-(function(){
-  if (document.getElementById('aceInspectPanel')) return;
-  const btn = document.getElementById('aceInspectBtn');
-  const panel = document.createElement('div');
-  panel.id = 'aceInspectPanel';
-   panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:rgba(255,123,0,0.7);color:#ffaa33">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
-  document.body.appendChild(panel);
-  let cur = 'status', expanded = false;
-  const pre = panel.querySelector('#aceInspectBody pre');
-  const head = panel.querySelector('#aceInspectHead');
-  head.onclick = function(e){ if (e.target.tagName==='BUTTON') return; expanded = !expanded; panel.classList.toggle('expanded', expanded); aceInspect.render(); };
-  btn.onclick = function(){ aceInspect.open = true; panel.style.display = 'flex'; aceInspect.connect(); };
-  async function api(path){ const r = await fetch(path); return r.json(); }
-  window.aceInspect = {
-    open: false,
-    connect: async function(){ try{ await fetch('/cdp/connect',{method:'GET'}); }catch(e){} this.render(); },
-    toggle: function(tab){ cur = tab; this.render(); },
-    close: function(){ this.open = false; panel.style.display = 'none'; },
-    render: async function(){
-      pre.textContent = 'loading…';
-      let data;
-      try{
-        if (cur==='status') data = await api('/cdp/status');
-        else if (cur==='dom') data = await api('/cdp/dom');
-        else if (cur==='console') data = await api('/cdp/console');
-        else data = await api('/cdp/network');
-      }catch(e){ pre.textContent = 'error: '+e; return; }
-      const val = (data && data.result !== undefined) ? data.result : data;
-      pre.textContent = (data.ok !== false ? '✅ ' : '⚠️ ') + JSON.stringify(val, null, 2);
+    /* Custom tooltip — replaces native browser title tooltips */
+    #ace-tooltip {
+      position: fixed; z-index: 99999; pointer-events: none;
+      background: #000000; color: #ff7b00; font-family: var(--mono);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+      border: 1px solid #ff7b00; border-radius: 4px;
+      padding: 4px 8px; white-space: nowrap;
+      box-shadow: 0 0 12px rgba(255, 123, 0, 0.3);
+      opacity: 0; display: none; transition: opacity 0.2s; transform: translateY(2px);
     }
-  };
-})();
-</script>
+    #ace-tooltip.visible { opacity: 1; display: block; transform: translateY(0); }
 
-</body>
-</html>
+    /* CSS-only data-tooltip fallback (works without JS) */
+    [data-tooltip] {
+      position: relative; cursor: help;
+    }
+    [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute; z-index: 99998; pointer-events: none;
+      bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-4px);
+      background: #000000; color: #ff7b00; font-family: var(--mono);
+      font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+      border: 1px solid #ff7b00; border-radius: 4px;
+      padding: 3px 7px; white-space: nowrap;
+      box-shadow: 0 0 10px rgba(255, 123, 0, 0.25);
+      opacity: 0; transition: opacity 0.2s; transform: translateX(-50%) translateY(0);
+    }
+    [data-tooltip]:hover::after { opacity: 1; }
+  </style>
+  <script>
+  (function(){
+    if (document.getElementById('ace-tooltip')) return;
+    const tip = document.createElement('div');
+    tip.id = 'ace-tooltip';
+    document.body.appendChild(tip);
+
+    // Cache all elements that have a title attribute
+    let tip = document.getElementById('ace-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'ace-tooltip';
+      document.body.appendChild(tip);
+    }
+    function showTip(el) {
+      const text = el._aceTitle || el.getAttribute('title') || el.getAttribute('data-tooltip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('visible');
+      positionTip(el, tip);
+    }
+    function hideTip() { tip.classList.remove('visible'); }
+    function positionTip(el, tip) {
+      const rect = el.getBoundingClientRect();
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let x = rect.left + rect.width / 2 - tw / 2;
+      let y = rect.top - th - 8;
+      // Keep on screen
+      if (x < 8) x = 8;
+      if (x + tw > window.innerWidth - 8) x = window.innerWidth - tw - 8;
+      if (y < 8) y = rect.bottom + 8;
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    }
+
+    // Delegate: catch title tooltips on any element
+    document.addEventListener('mouseenter', function(e) {
+      const el = e.target.closest('[title], [data-tooltip]');
+      if (el) {
+        const text = el._aceTitle || el.getAttribute('title') || el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.classList.add('visible');
+        positionTip(el, tip);
+      }
+    }, true);
+    document.addEventListener('mouseleave', function(e) {
+      const el = e.target.closest('[title], [data-tooltip]');
+      if (el) hideTip();
+    }, true);
+    document.addEventListener('scroll', hideTip, true);
+    window.addEventListener('resize', hideTip);
+
+    // Re-apply for dynamically added elements with title attributes
+    const obs = new MutationObserver(() => {
+      document.querySelectorAll('[title], [data-tooltip]').forEach(el => {
+        if (!el._aceTitle) {
+          el._aceTitle = el.getAttribute('title') || el.getAttribute('data-tooltip');
+          el.removeAttribute('title');
+          if (el._aceTitle && !el.hasAttribute('data-tooltip')) el.setAttribute('data-tooltip', el._aceTitle);
+        }
+      });
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+// Initial scan
+    document.querySelectorAll('[title]').forEach(el => {
+      if (!el._aceTitle) { el._aceTitle = el.getAttribute('title'); el.removeAttribute('title'); }
+    });
+    // Also copy title -> data-tooltip so the CSS-only fallback works if JS is disabled
+    document.querySelectorAll('[data-tooltip]').forEach(el => {
+      if (!el._aceTitle) { el._aceTitle = el.getAttribute('data-tooltip'); }
+    });
+    // Auto-convert any remaining title attributes on buttons to data-tooltip
+    document.querySelectorAll('button[title], a[title], [title]').forEach(el => {
+      if (!el._aceTitle) { el._aceTitle = el.getAttribute('title'); el.removeAttribute('title'); el.setAttribute('data-tooltip', el._aceTitle); }
+    });
+  })();
+  (function(){
+    if (document.getElementById('aceInspectPanel')) return;
+    const btn = document.getElementById('aceInspectBtn');
+    const panel = document.createElement('div');
+    panel.id = 'aceInspectPanel';
+    panel.innerHTML = '<div id="aceInspectHead"><span>🔍 CDP Inspect</span><div class="right"><button onclick="aceInspect.toggle(\'status\')">Status</button><button onclick="aceInspect.toggle(\'dom\')">DOM</button><button onclick="aceInspect.toggle(\'console\')">Console</button><button onclick="aceInspect.toggle(\'network\')">Network</button><button onclick="aceInspect.close()" title="Close panel" style="margin-left:auto;border-color:rgba(255,123,0,0.7);color:#ffaa33">✕</button></div></div><div id="aceInspectBody"><pre></pre></div>';
+    document.body.appendChild(panel);
+    let cur = 'status', expanded = false;
+    const pre = panel.querySelector('#aceInspectBody pre');
+    const head = panel.querySelector('#aceInspectHead');
+    head.onclick = function(e){ if (e.target.tagName==='BUTTON') return; expanded = !expanded; panel.classList.toggle('expanded', expanded); aceInspect.render(); };
+    btn.onclick = function(){ aceInspect.open = true; panel.style.display = 'flex'; aceInspect.connect(); };
+    async function api(path){ const r = await fetch(path); return r.json(); }
+    window.aceInspect = {
+      open: false,
+      connect: async function(){ try{ await fetch('/cdp/connect',{method:'GET'}); }catch(e){} this.render(); },
+      toggle: function(tab){ cur = tab; this.render(); },
+      close: function(){ this.open = false; panel.style.display = 'none'; },
+      render: async function(){
+        pre.textContent = 'loading…';
+        let data;
+        try{
+          if (cur==='status') data = await api('/cdp/status');
+          else if (cur==='dom') data = await api('/cdp/dom');
+          else if (cur==='console') data = await api('/cdp/console');
+          else data = await api('/cdp/network');
+        }catch(e){ pre.textContent = 'error: '+e; return; }
+        const val = (data && data.result !== undefined) ? data.result : data;
+        pre.textContent = (data.ok !== false ? '✅ ' : '⚠️ ') + JSON.stringify(val, null, 2);
+      }
+    };
+})();
+  </script>
+
+  <!-- Custom tooltip — appended to body so it can never be clipped by overflow:hidden -->
+  <div id="ace-tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <script>
+  (function(){
+    let liveLogActive = false;
+    let liveLogInterval = null;
+    let liveLogPaused = false;
+    let _savedEditorContent = '';
+
+    function toggleLiveLog() {
+      liveLogActive = !liveLogActive;
+      const btn = document.getElementById('live-log-btn');
+      const wrap = document.getElementById('code-editor-wrap');
+      if (btn) {
+        btn.classList.toggle('active', liveLogActive);
+        btn.title = liveLogActive ? 'Hide live log' : 'Show live log';
+      }
+      if (wrap) wrap.classList.toggle('live-log-mode', liveLogActive);
+      if (liveLogActive) {
+        _savedEditorContent = codeEditor.textContent;
+        codeEditor.textContent = '';
+        updateLineNumbers();
+        if (liveLogInterval) clearInterval(liveLogInterval);
+        liveLogPaused = false;
+        updatePauseBtn();
+        liveLogInterval = setInterval(fetchLiveLogs, 1000);
+        fetchLiveLogs();
+      } else {
+        if (liveLogInterval) { clearInterval(liveLogInterval); liveLogInterval = null; }
+        codeEditor.textContent = _savedEditorContent;
+        updateLineNumbers();
+      }
+    }
+
+    function togglePause() {
+      liveLogPaused = !liveLogPaused;
+      const btn = document.getElementById('live-log-pause-btn');
+      if (btn) {
+        btn.innerHTML = liveLogPaused ? '▶️' : '⏸️';
+        btn.title = liveLogPaused ? 'Resume live log' : 'Pause live log';
+      }
+      if (liveLogPaused) {
+        if (liveLogInterval) { clearInterval(liveLogInterval); liveLogInterval = null; }
+      } else {
+        liveLogInterval = setInterval(fetchLiveLogs, 1000);
+        fetchLiveLogs();
+      }
+    }
+
+    function updatePauseBtn() {
+      const btn = document.getElementById('live-log-pause-btn');
+      if (btn) {
+        btn.innerHTML = liveLogPaused ? '▶️' : '⏸️';
+        btn.title = liveLogPaused ? 'Resume live log' : 'Pause live log';
+      }
+    }
+
+    async function clearLiveLog() {
+      try {
+        await fetch('/api/live_logs/clear', { method: 'POST' });
+      } catch (_) {}
+      codeEditor.textContent = '';
+      updateLineNumbers();
+    }
+
+    async function fetchLiveLogs() {
+      try {
+        const r = await fetch('/api/live_logs?limit=200');
+        const d = await r.json();
+        if (!d.logs) return;
+        codeEditor.textContent = d.logs.join('\n');
+        codeEditor.scrollTop = codeEditor.scrollHeight;
+      } catch (e) {}
+    }
+
+    window.addEventListener('load', function() {
+      const actions = document.getElementById('code-actions');
+      if (actions) {
+        // Show live log toggle
+        const btn = document.createElement('button');
+        btn.id = 'live-log-btn';
+        btn.className = 'btn btn-icon';
+        btn.innerHTML = '📋';
+        btn.title = 'Show live log';
+        btn.onclick = toggleLiveLog;
+        actions.appendChild(btn);
+
+        // Pause/Resume
+        const pauseBtn = document.createElement('button');
+        pauseBtn.id = 'live-log-pause-btn';
+        pauseBtn.className = 'btn btn-icon';
+        pauseBtn.innerHTML = '⏸️';
+        pauseBtn.title = 'Pause live log';
+        pauseBtn.onclick = togglePause;
+        actions.appendChild(pauseBtn);
+
+        // Clear
+        const clearBtn = document.createElement('button');
+        clearBtn.id = 'live-log-clear-btn';
+        clearBtn.className = 'btn btn-icon';
+        clearBtn.innerHTML = '🗑️';
+        clearBtn.title = 'Clear live log';
+        clearBtn.onclick = clearLiveLog;
+        actions.appendChild(clearBtn);
+      }
+    });
+  })();
+  </script>
 
 
 

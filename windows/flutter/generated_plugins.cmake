@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
+  flutter_inappwebview_windows
   fullscreen_window
   url_launcher_windows
   webview_win_floating

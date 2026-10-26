@@ -3,14 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsyncsa/core/constants/app_constants.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/core/constants/app_constants.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
 
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
-import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 import 'package:uuid/uuid.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
@@ -30,8 +29,6 @@ class _ProfileOnboardingScreenState
   int _visibleChars = 0;
   late AnimationController _floatCtrl;
   late Animation<double> _floatAnim;
-
-
 
   // Page 2 - Biographical
   String _isSACitizen = '';
@@ -128,7 +125,7 @@ class _ProfileOnboardingScreenState
   static const _greetingText =
       "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
-  static const _countryList = [
+static const _countryList = [
     'Afghanistan',
     'Albania',
     'Algeria',
@@ -2576,31 +2573,46 @@ class _ProfileOnboardingScreenState
 
   void _loadExistingProfile() async {
     var profile = ref.read(profileProvider).valueOrNull;
-    debugPrint('📂 _loadExistingProfile: profileProvider.valueOrNull = ${profile?.personal.idNumber}');
+    debugPrint(
+      '📂 _loadExistingProfile: profileProvider.valueOrNull = ${profile?.personal.idNumber}',
+    );
     if (profile == null) {
-      try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
-      debugPrint('📂 _loadExistingProfile: Hive direct = ${profile?.personal.idNumber}');
+      try {
+        profile = await ProfileRepositoryImpl().getProfile();
+      } catch (_) {}
+      debugPrint(
+        '📂 _loadExistingProfile: Hive direct = ${profile?.personal.idNumber}',
+      );
     }
     if (profile == null) {
       await Future.delayed(const Duration(milliseconds: 500));
       profile = ref.read(profileProvider).valueOrNull;
       if (profile == null) {
-        try { profile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+        try {
+          profile = await ProfileRepositoryImpl().getProfile();
+        } catch (_) {}
       }
-      debugPrint('📂 _loadExistingProfile: retry result = ${profile?.personal.idNumber}');
+      debugPrint(
+        '📂 _loadExistingProfile: retry result = ${profile?.personal.idNumber}',
+      );
     }
     if (profile == null) return;
     final p = profile;
-    setState(() { _applyProfile(p); });
+    setState(() {
+      _applyProfile(p);
+    });
   }
 
   void _applyProfile(StudentProfile p) {
-    debugPrint('📋 _applyProfile: idNumber="${p.personal.idNumber}" gender="${p.personal.gender}" id="${p.id}"');
-    _isSACitizen = [
-      'SA Citizen',
-      'Permanent Resident',
-      'Foreign National',
-    ].contains(p.demographic.nationality.trim())
+    debugPrint(
+      '📋 _applyProfile: idNumber="${p.personal.idNumber}" gender="${p.personal.gender}" id="${p.id}"',
+    );
+    _isSACitizen =
+        [
+          'SA Citizen',
+          'Permanent Resident',
+          'Foreign National',
+        ].contains(p.demographic.nationality.trim())
         ? p.demographic.nationality.trim()
         : '';
     _citizenshipCodeCtrl.text = p.demographic.citizenshipCode;
@@ -2617,12 +2629,13 @@ class _ProfileOnboardingScreenState
     final rawPop = p.demographic.populationGroup.trim();
     _ethnicGroup = rawPop == 'Black' ? 'African' : rawPop;
     final es = p.status.employmentStatus.trim();
-    _isEmployed = const {
-      'Unemployed',
-      'Employed (part-time)',
-      'Employed (full-time)',
-      'Self-employed',
-    }.contains(es)
+    _isEmployed =
+        const {
+          'Unemployed',
+          'Employed (part-time)',
+          'Employed (full-time)',
+          'Self-employed',
+        }.contains(es)
         ? es
         : '';
     _bursaryRequired = p.status.bursaryRequired.trim();
@@ -2632,7 +2645,8 @@ class _ProfileOnboardingScreenState
     _streetAddr3Ctrl.text = p.address.addressLine3;
     _streetProvince = p.address.province.trim();
     _streetPostalCodeCtrl.text = p.address.postalCode;
-    _postalDifferent = p.address.postalAddress.isNotEmpty &&
+    _postalDifferent =
+        p.address.postalAddress.isNotEmpty &&
         p.address.postalAddress != p.address.address;
     if (_postalDifferent) {
       final lines = p.address.postalAddress.split('\n');
@@ -2655,8 +2669,12 @@ class _ProfileOnboardingScreenState
     _schoolLeavingCertificate = p.results.schoolLeavingCertificate;
     _resultsSubjects = p.results.subjects;
     _academicYear = p.qualification.academicYear;
-    _facultyCtrl.text = p.qualification.choices.isNotEmpty ? p.qualification.choices.first.faculty : '';
-    _programmeCtrl.text = p.qualification.choices.isNotEmpty ? p.qualification.choices.first.programme : '';
+    _facultyCtrl.text = p.qualification.choices.isNotEmpty
+        ? p.qualification.choices.first.faculty
+        : '';
+    _programmeCtrl.text = p.qualification.choices.isNotEmpty
+        ? p.qualification.choices.first.programme
+        : '';
     _applicationPeriod = p.qualification.applicationPeriod.trim();
     _studyMode = p.qualification.studyMode.trim();
     _studyTiming = p.qualification.studyTiming.trim();
@@ -2894,7 +2912,9 @@ class _ProfileOnboardingScreenState
       // Load base from Hive via profileProvider (not authProvider) — auth can be stale
       StudentProfile? existingProfile = ref.read(profileProvider).valueOrNull;
       if (existingProfile == null) {
-        try { existingProfile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+        try {
+          existingProfile = await ProfileRepositoryImpl().getProfile();
+        } catch (_) {}
       }
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
@@ -2904,93 +2924,215 @@ class _ProfileOnboardingScreenState
         id: base.id,
         personal: PersonalDetails(
           title: _title.isNotEmpty ? _title : base.personal.title,
-          initials: _initialsCtrl.text.trim().isNotEmpty ? _initialsCtrl.text.trim() : base.personal.initials,
-          firstName: _firstNamesCtrl.text.trim().isNotEmpty ? _firstNamesCtrl.text.trim() : base.personal.firstName,
-          lastName: _surnameCtrl.text.trim().isNotEmpty ? _surnameCtrl.text.trim() : base.personal.lastName,
-          maidenName: _maidenNameCtrl.text.trim().isNotEmpty ? _maidenNameCtrl.text.trim() : base.personal.maidenName,
+          initials: _initialsCtrl.text.trim().isNotEmpty
+              ? _initialsCtrl.text.trim()
+              : base.personal.initials,
+          firstName: _firstNamesCtrl.text.trim().isNotEmpty
+              ? _firstNamesCtrl.text.trim()
+              : base.personal.firstName,
+          lastName: _surnameCtrl.text.trim().isNotEmpty
+              ? _surnameCtrl.text.trim()
+              : base.personal.lastName,
+          maidenName: _maidenNameCtrl.text.trim().isNotEmpty
+              ? _maidenNameCtrl.text.trim()
+              : base.personal.maidenName,
           gender: _gender.isNotEmpty ? _gender : base.personal.gender,
           dateOfBirth: _selectedDob ?? base.personal.dateOfBirth,
-          idNumber: _idNumberCtrl.text.trim().isNotEmpty ? _idNumberCtrl.text.trim() : base.personal.idNumber,
+          idNumber: _idNumberCtrl.text.trim().isNotEmpty
+              ? _idNumberCtrl.text.trim()
+              : base.personal.idNumber,
         ),
         contact: ContactInfo(
-          email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : base.contact.email,
-          phone: _homePhoneCtrl.text.trim().isNotEmpty ? _homePhoneCtrl.text.trim() : base.contact.phone,
-          workPhone: _workPhoneCtrl.text.trim().isNotEmpty ? _workPhoneCtrl.text.trim() : base.contact.workPhone,
-          hasSACellphone: _hasSACellphone.isNotEmpty ? _hasSACellphone : base.contact.hasSACellphone,
-          verifyEmail: _verifyEmailCtrl.text.trim().isNotEmpty ? _verifyEmailCtrl.text.trim() : base.contact.verifyEmail,
+          email: _emailCtrl.text.trim().isNotEmpty
+              ? _emailCtrl.text.trim()
+              : base.contact.email,
+          phone: _homePhoneCtrl.text.trim().isNotEmpty
+              ? _homePhoneCtrl.text.trim()
+              : base.contact.phone,
+          workPhone: _workPhoneCtrl.text.trim().isNotEmpty
+              ? _workPhoneCtrl.text.trim()
+              : base.contact.workPhone,
+          hasSACellphone: _hasSACellphone.isNotEmpty
+              ? _hasSACellphone
+              : base.contact.hasSACellphone,
+          verifyEmail: _verifyEmailCtrl.text.trim().isNotEmpty
+              ? _verifyEmailCtrl.text.trim()
+              : base.contact.verifyEmail,
         ),
         address: AddressInfo(
-          address: _streetAddr1Ctrl.text.trim().isNotEmpty ? _streetAddr1Ctrl.text.trim() : base.address.address,
-          addressLine2: _streetAddr2Ctrl.text.trim().isNotEmpty ? _streetAddr2Ctrl.text.trim() : base.address.addressLine2,
-          addressLine3: _streetAddr3Ctrl.text.trim().isNotEmpty ? _streetAddr3Ctrl.text.trim() : base.address.addressLine3,
-          province: _streetProvince.isNotEmpty ? _streetProvince : base.address.province,
-          postalCode: _streetPostalCodeCtrl.text.trim().isNotEmpty ? _streetPostalCodeCtrl.text.trim() : base.address.postalCode,
+          address: _streetAddr1Ctrl.text.trim().isNotEmpty
+              ? _streetAddr1Ctrl.text.trim()
+              : base.address.address,
+          addressLine2: _streetAddr2Ctrl.text.trim().isNotEmpty
+              ? _streetAddr2Ctrl.text.trim()
+              : base.address.addressLine2,
+          addressLine3: _streetAddr3Ctrl.text.trim().isNotEmpty
+              ? _streetAddr3Ctrl.text.trim()
+              : base.address.addressLine3,
+          province: _streetProvince.isNotEmpty
+              ? _streetProvince
+              : base.address.province,
+          postalCode: _streetPostalCodeCtrl.text.trim().isNotEmpty
+              ? _streetPostalCodeCtrl.text.trim()
+              : base.address.postalCode,
           postalAddress: _postalDifferent
-              ? (_postalAddr1Ctrl.text.trim().isNotEmpty ? _postalAddr1Ctrl.text.trim() : base.address.postalAddress)
-              : (_streetAddr1Ctrl.text.trim().isNotEmpty ? _streetAddr1Ctrl.text.trim() : base.address.postalAddress),
+              ? (_postalAddr1Ctrl.text.trim().isNotEmpty
+                    ? _postalAddr1Ctrl.text.trim()
+                    : base.address.postalAddress)
+              : (_streetAddr1Ctrl.text.trim().isNotEmpty
+                    ? _streetAddr1Ctrl.text.trim()
+                    : base.address.postalAddress),
         ),
         demographic: DemographicInfo(
-          nationality: _isSACitizen.isNotEmpty ? _isSACitizen : base.demographic.nationality,
-          homeLanguage: _homeLanguageCtrl.text.trim().isNotEmpty ? _homeLanguageCtrl.text.trim() : base.demographic.homeLanguage,
-          populationGroup: _ethnicGroup.isNotEmpty ? _ethnicGroup : base.demographic.populationGroup,
-          maritalStatus: _maritalStatus.isNotEmpty ? _maritalStatus : base.demographic.maritalStatus,
-          citizenshipCode: _citizenshipCodeCtrl.text.trim().isNotEmpty ? _citizenshipCodeCtrl.text.trim() : base.demographic.citizenshipCode,
-          heardAboutUs: _heardAboutUsCtrl.text.trim().isNotEmpty ? _heardAboutUsCtrl.text.trim() : base.demographic.heardAboutUs,
+          nationality: _isSACitizen.isNotEmpty
+              ? _isSACitizen
+              : base.demographic.nationality,
+          homeLanguage: _homeLanguageCtrl.text.trim().isNotEmpty
+              ? _homeLanguageCtrl.text.trim()
+              : base.demographic.homeLanguage,
+          populationGroup: _ethnicGroup.isNotEmpty
+              ? _ethnicGroup
+              : base.demographic.populationGroup,
+          maritalStatus: _maritalStatus.isNotEmpty
+              ? _maritalStatus
+              : base.demographic.maritalStatus,
+          citizenshipCode: _citizenshipCodeCtrl.text.trim().isNotEmpty
+              ? _citizenshipCodeCtrl.text.trim()
+              : base.demographic.citizenshipCode,
+          heardAboutUs: _heardAboutUsCtrl.text.trim().isNotEmpty
+              ? _heardAboutUsCtrl.text.trim()
+              : base.demographic.heardAboutUs,
         ),
         status: StatusInfo(
-          disabilityStatus: (_hasDisability ? 'Yes' : 'No').isNotEmpty ? (_hasDisability ? 'Yes' : 'No') : base.status.disabilityStatus,
-          bursaryRequired: _bursaryRequired.isNotEmpty ? _bursaryRequired : base.status.bursaryRequired,
-          employmentStatus: _isEmployed.isNotEmpty ? _isEmployed : base.status.employmentStatus,
-          wantsResidence: _wantsResidence.isNotEmpty ? _wantsResidence : base.status.wantsResidence,
+          disabilityStatus: (_hasDisability ? 'Yes' : 'No').isNotEmpty
+              ? (_hasDisability ? 'Yes' : 'No')
+              : base.status.disabilityStatus,
+          bursaryRequired: _bursaryRequired.isNotEmpty
+              ? _bursaryRequired
+              : base.status.bursaryRequired,
+          employmentStatus: _isEmployed.isNotEmpty
+              ? _isEmployed
+              : base.status.employmentStatus,
+          wantsResidence: _wantsResidence.isNotEmpty
+              ? _wantsResidence
+              : base.status.wantsResidence,
         ),
         nextOfKin: NextOfKin(
-          name: _nextOfKinNameCtrl.text.trim().isNotEmpty ? _nextOfKinNameCtrl.text.trim() : base.nextOfKin.name,
-          mobilePhone: _nextOfKinMobileCtrl.text.trim().isNotEmpty ? _nextOfKinMobileCtrl.text.trim() : base.nextOfKin.mobilePhone,
-          homePhone: _nextOfKinHomePhoneCtrl.text.trim().isNotEmpty ? _nextOfKinHomePhoneCtrl.text.trim() : base.nextOfKin.homePhone,
-          workPhone: _nextOfKinWorkPhoneCtrl.text.trim().isNotEmpty ? _nextOfKinWorkPhoneCtrl.text.trim() : base.nextOfKin.workPhone,
-          addressLine1: _nextOfKinAddr1Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr1Ctrl.text.trim() : base.nextOfKin.addressLine1,
-          addressLine2: _nextOfKinAddr2Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr2Ctrl.text.trim() : base.nextOfKin.addressLine2,
-          addressLine3: _nextOfKinAddr3Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr3Ctrl.text.trim() : base.nextOfKin.addressLine3,
-          addressLine4: _nextOfKinAddr4Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr4Ctrl.text.trim() : base.nextOfKin.addressLine4,
-          postalCode: _nextOfKinPostalCodeCtrl.text.trim().isNotEmpty ? _nextOfKinPostalCodeCtrl.text.trim() : base.nextOfKin.postalCode,
-          email: _nextOfKinEmailCtrl.text.trim().isNotEmpty ? _nextOfKinEmailCtrl.text.trim() : base.nextOfKin.email,
+          name: _nextOfKinNameCtrl.text.trim().isNotEmpty
+              ? _nextOfKinNameCtrl.text.trim()
+              : base.nextOfKin.name,
+          mobilePhone: _nextOfKinMobileCtrl.text.trim().isNotEmpty
+              ? _nextOfKinMobileCtrl.text.trim()
+              : base.nextOfKin.mobilePhone,
+          homePhone: _nextOfKinHomePhoneCtrl.text.trim().isNotEmpty
+              ? _nextOfKinHomePhoneCtrl.text.trim()
+              : base.nextOfKin.homePhone,
+          workPhone: _nextOfKinWorkPhoneCtrl.text.trim().isNotEmpty
+              ? _nextOfKinWorkPhoneCtrl.text.trim()
+              : base.nextOfKin.workPhone,
+          addressLine1: _nextOfKinAddr1Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr1Ctrl.text.trim()
+              : base.nextOfKin.addressLine1,
+          addressLine2: _nextOfKinAddr2Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr2Ctrl.text.trim()
+              : base.nextOfKin.addressLine2,
+          addressLine3: _nextOfKinAddr3Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr3Ctrl.text.trim()
+              : base.nextOfKin.addressLine3,
+          addressLine4: _nextOfKinAddr4Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr4Ctrl.text.trim()
+              : base.nextOfKin.addressLine4,
+          postalCode: _nextOfKinPostalCodeCtrl.text.trim().isNotEmpty
+              ? _nextOfKinPostalCodeCtrl.text.trim()
+              : base.nextOfKin.postalCode,
+          email: _nextOfKinEmailCtrl.text.trim().isNotEmpty
+              ? _nextOfKinEmailCtrl.text.trim()
+              : base.nextOfKin.email,
         ),
         accountContact: AccountContact(
-          name: _accountContactNameCtrl.text.trim().isNotEmpty ? _accountContactNameCtrl.text.trim() : base.accountContact.name,
-          mobilePhone: _accountContactMobileCtrl.text.trim().isNotEmpty ? _accountContactMobileCtrl.text.trim() : base.accountContact.mobilePhone,
-          homePhone: _accountContactHomePhoneCtrl.text.trim().isNotEmpty ? _accountContactHomePhoneCtrl.text.trim() : base.accountContact.homePhone,
-          addressLine1: _accountContactAddr1Ctrl.text.trim().isNotEmpty ? _accountContactAddr1Ctrl.text.trim() : base.accountContact.addressLine1,
-          addressLine2: _accountContactAddr2Ctrl.text.trim().isNotEmpty ? _accountContactAddr2Ctrl.text.trim() : base.accountContact.addressLine2,
-          addressLine3: _accountContactAddr3Ctrl.text.trim().isNotEmpty ? _accountContactAddr3Ctrl.text.trim() : base.accountContact.addressLine3,
-          addressLine4: _accountContactAddr4Ctrl.text.trim().isNotEmpty ? _accountContactAddr4Ctrl.text.trim() : base.accountContact.addressLine4,
-          postalCode: _accountContactPostalCodeCtrl.text.trim().isNotEmpty ? _accountContactPostalCodeCtrl.text.trim() : base.accountContact.postalCode,
-          email: _accountContactEmailCtrl.text.trim().isNotEmpty ? _accountContactEmailCtrl.text.trim() : base.accountContact.email,
+          name: _accountContactNameCtrl.text.trim().isNotEmpty
+              ? _accountContactNameCtrl.text.trim()
+              : base.accountContact.name,
+          mobilePhone: _accountContactMobileCtrl.text.trim().isNotEmpty
+              ? _accountContactMobileCtrl.text.trim()
+              : base.accountContact.mobilePhone,
+          homePhone: _accountContactHomePhoneCtrl.text.trim().isNotEmpty
+              ? _accountContactHomePhoneCtrl.text.trim()
+              : base.accountContact.homePhone,
+          addressLine1: _accountContactAddr1Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr1Ctrl.text.trim()
+              : base.accountContact.addressLine1,
+          addressLine2: _accountContactAddr2Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr2Ctrl.text.trim()
+              : base.accountContact.addressLine2,
+          addressLine3: _accountContactAddr3Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr3Ctrl.text.trim()
+              : base.accountContact.addressLine3,
+          addressLine4: _accountContactAddr4Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr4Ctrl.text.trim()
+              : base.accountContact.addressLine4,
+          postalCode: _accountContactPostalCodeCtrl.text.trim().isNotEmpty
+              ? _accountContactPostalCodeCtrl.text.trim()
+              : base.accountContact.postalCode,
+          email: _accountContactEmailCtrl.text.trim().isNotEmpty
+              ? _accountContactEmailCtrl.text.trim()
+              : base.accountContact.email,
         ),
         results: ResultsInfo(
           matricYear: _matricYear != 0 ? _matricYear : base.results.matricYear,
-          applicationLevel: _applicationLevel.isNotEmpty ? _applicationLevel : base.results.applicationLevel,
-          upgrading: _isUpgrading.isNotEmpty ? _isUpgrading : base.results.upgrading,
-          matricType: _matricType.isNotEmpty ? _matricType : base.results.matricType,
-          examinationNumber: _examNumberCtrl.text.trim().isNotEmpty ? _examNumberCtrl.text.trim() : base.results.examinationNumber,
-          schoolLeavingCertificate: _schoolLeavingCertificate.isNotEmpty ? _schoolLeavingCertificate : base.results.schoolLeavingCertificate,
-          subjects: _resultsSubjects.isNotEmpty ? _resultsSubjects : base.results.subjects,
+          applicationLevel: _applicationLevel.isNotEmpty
+              ? _applicationLevel
+              : base.results.applicationLevel,
+          upgrading: _isUpgrading.isNotEmpty
+              ? _isUpgrading
+              : base.results.upgrading,
+          matricType: _matricType.isNotEmpty
+              ? _matricType
+              : base.results.matricType,
+          examinationNumber: _examNumberCtrl.text.trim().isNotEmpty
+              ? _examNumberCtrl.text.trim()
+              : base.results.examinationNumber,
+          schoolLeavingCertificate: _schoolLeavingCertificate.isNotEmpty
+              ? _schoolLeavingCertificate
+              : base.results.schoolLeavingCertificate,
+          subjects: _resultsSubjects.isNotEmpty
+              ? _resultsSubjects
+              : base.results.subjects,
         ),
         qualification: QualificationInfo(
-          academicYear: _academicYear != 0 ? _academicYear : base.qualification.academicYear,
-          choices: _qualificationChoices.isNotEmpty ? _qualificationChoices : base.qualification.choices,
-          applicationPeriod: _applicationPeriod.isNotEmpty ? _applicationPeriod : base.qualification.applicationPeriod,
-          studyMode: _studyMode.isNotEmpty ? _studyMode : base.qualification.studyMode,
-          studyTiming: _studyTiming.isNotEmpty ? _studyTiming : base.qualification.studyTiming,
-          applicationType: _applicationType.isNotEmpty ? _applicationType : base.qualification.applicationType,
-          applicationTypeDescription: _applicationTypeDesc.isNotEmpty ? _applicationTypeDesc : base.qualification.applicationTypeDescription,
-          numApplicationsAllowed: _numAppsAllowed != 4 ? _numAppsAllowed : base.qualification.numApplicationsAllowed,
+          academicYear: _academicYear != 0
+              ? _academicYear
+              : base.qualification.academicYear,
+          choices: _qualificationChoices.isNotEmpty
+              ? _qualificationChoices
+              : base.qualification.choices,
+          applicationPeriod: _applicationPeriod.isNotEmpty
+              ? _applicationPeriod
+              : base.qualification.applicationPeriod,
+          studyMode: _studyMode.isNotEmpty
+              ? _studyMode
+              : base.qualification.studyMode,
+          studyTiming: _studyTiming.isNotEmpty
+              ? _studyTiming
+              : base.qualification.studyTiming,
+          applicationType: _applicationType.isNotEmpty
+              ? _applicationType
+              : base.qualification.applicationType,
+          applicationTypeDescription: _applicationTypeDesc.isNotEmpty
+              ? _applicationTypeDesc
+              : base.qualification.applicationTypeDescription,
+          numApplicationsAllowed: _numAppsAllowed != 4
+              ? _numAppsAllowed
+              : base.qualification.numApplicationsAllowed,
         ),
         onboardingComplete: true,
         createdAt: base.createdAt,
         updatedAt: DateTime.now(),
       );
 
-      debugPrint('SAVEPROFILE save: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"');
+      debugPrint(
+        'SAVEPROFILE save: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"',
+      );
 
       // Write directly to Hive, then sync providers
       await ProfileRepositoryImpl().saveProfile(profile);
@@ -2999,7 +3141,9 @@ class _ProfileOnboardingScreenState
       // Verify read-back
       try {
         final verify = await ProfileRepositoryImpl().getProfile();
-        debugPrint('🔍 _saveProfile verify Hive: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}');
+        debugPrint(
+          '🔍 _saveProfile verify Hive: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}',
+        );
       } catch (e) {
         debugPrint('🔍 _saveProfile verify FAILED: $e');
       }
@@ -3242,7 +3386,11 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 20),
             const Text(
               'Nationality',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -3253,17 +3401,31 @@ class _ProfileOnboardingScreenState
             DropdownButtonFormField<String>(
               initialValue: _isSACitizen.isEmpty ? null : _isSACitizen,
               decoration: const InputDecoration(
-                labelText: 'Are you a SA Citizen in possession of a valid SA ID/Birth Certificate? *',
+                labelText:
+                    'Are you a SA Citizen in possession of a valid SA ID/Birth Certificate? *',
                 prefixIcon: Icon(Icons.flag_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
-                DropdownMenuItem(value: 'SA Citizen', child: Text('SA Citizen')),
-                DropdownMenuItem(value: 'Permanent Resident', child: Text('Permanent Resident')),
-                DropdownMenuItem(value: 'Foreign National', child: Text('Foreign National')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(
+                  value: 'SA Citizen',
+                  child: Text('SA Citizen'),
+                ),
+                DropdownMenuItem(
+                  value: 'Permanent Resident',
+                  child: Text('Permanent Resident'),
+                ),
+                DropdownMenuItem(
+                  value: 'Foreign National',
+                  child: Text('Foreign National'),
+                ),
               ],
               onChanged: (v) => setState(() => _isSACitizen = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -3271,7 +3433,10 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Citizenship Code *',
                 prefixIcon: Icon(Icons.badge_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
@@ -3358,8 +3523,16 @@ class _ProfileOnboardingScreenState
                   'ZAMBIA',
                   'ZIMBABWE',
                 ];
-                final result = await _showSearchablePicker(context, title: 'Citizenship Code', options: codes, initialValue: _citizenshipCodeCtrl.text.isNotEmpty ? _citizenshipCodeCtrl.text : 'RSA');
-                if (result != null) setState(() => _citizenshipCodeCtrl.text = result);
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Citizenship Code',
+                  options: codes,
+                  initialValue: _citizenshipCodeCtrl.text.isNotEmpty
+                      ? _citizenshipCodeCtrl.text
+                      : 'RSA',
+                );
+                if (result != null)
+                  setState(() => _citizenshipCodeCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
@@ -3373,31 +3546,58 @@ class _ProfileOnboardingScreenState
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
             const SizedBox(height: 24),
-            const Text('Personal Information', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            const Text(
+              'Personal Information',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Please enter your personal information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const Text(
+              'Please enter your personal information.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _gender.isEmpty ? null : _gender,
-              decoration: const InputDecoration(labelText: 'Gender *', prefixIcon: Icon(Icons.wc_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Gender *',
+                prefixIcon: Icon(Icons.wc_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                DropdownMenuItem(
+                  value: 'Prefer not to say',
+                  child: Text('Prefer not to say'),
+                ),
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
-                  context: context, initialDate: _selectedDob ?? DateTime(2006),
-                  firstDate: DateTime(1950), lastDate: DateTime.now(),
+                  context: context,
+                  initialDate: _selectedDob ?? DateTime(2006),
+                  firstDate: DateTime(1950),
+                  lastDate: DateTime.now(),
                   builder: (ctx, child) => Theme(
-                    data: Theme.of(context).copyWith(colorScheme: const ColorScheme.dark(primary: AppColors.primary, surface: AppColors.surface)),
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.dark(
+                        primary: AppColors.primary,
+                        surface: AppColors.surface,
+                      ),
+                    ),
                     child: child!,
                   ),
                 );
@@ -3408,11 +3608,16 @@ class _ProfileOnboardingScreenState
                   labelText: 'Date of birth (DD-MON-YYYY) *',
                   prefixIcon: const Icon(Icons.calendar_today_outlined),
                   suffixIcon: _selectedDob != null
-                      ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() => _selectedDob = null))
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _selectedDob = null),
+                        )
                       : null,
                 ),
                 child: Text(
-                  _selectedDob != null ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}' : '',
+                  _selectedDob != null
+                      ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}'
+                      : '',
                   style: const TextStyle(color: AppColors.textPrimary),
                 ),
               ),
@@ -3420,9 +3625,15 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _title.isEmpty ? null : _title,
-              decoration: const InputDecoration(labelText: 'Title *', prefixIcon: Icon(Icons.badge_outlined, size: 20)),
+              decoration: const InputDecoration(
+                labelText: 'Title *',
+                prefixIcon: Icon(Icons.badge_outlined, size: 20),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Mr', child: Text('Mr')),
                 DropdownMenuItem(value: 'Ms', child: Text('Ms')),
                 DropdownMenuItem(value: 'Mx', child: Text('Mx')),
@@ -3430,85 +3641,196 @@ class _ProfileOnboardingScreenState
                 DropdownMenuItem(value: 'Prof', child: Text('Prof')),
               ],
               onChanged: (v) => setState(() => _title = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            TextFormField(controller: _initialsCtrl, decoration: const InputDecoration(labelText: 'Initials *', prefixIcon: Icon(Icons.short_text, size: 20)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _initialsCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Initials *',
+                prefixIcon: Icon(Icons.short_text, size: 20),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _surnameCtrl, decoration: const InputDecoration(labelText: 'Surname *', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _surnameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Surname *',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _firstNamesCtrl, decoration: const InputDecoration(labelText: 'First names *', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _firstNamesCtrl,
+              decoration: const InputDecoration(
+                labelText: 'First names *',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _maidenNameCtrl, decoration: const InputDecoration(labelText: 'Maiden name', prefixIcon: Icon(Icons.person_outline))),
+            TextFormField(
+              controller: _maidenNameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Maiden name',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
-              decoration: const InputDecoration(labelText: 'Marital status *', prefixIcon: Icon(Icons.favorite_outline)),
+              decoration: const InputDecoration(
+                labelText: 'Marital status *',
+                prefixIcon: Icon(Icons.favorite_outline),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Single', child: Text('Single')),
                 DropdownMenuItem(value: 'Married', child: Text('Married')),
                 DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
                 DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
               ],
               onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
-              controller: _homeLanguageCtrl, readOnly: true,
-              decoration: const InputDecoration(labelText: 'Home language *', prefixIcon: Icon(Icons.language_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
+              controller: _homeLanguageCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Home language *',
+                prefixIcon: Icon(Icons.language_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(context, title: 'Language', options: _languages, initialValue: _homeLanguageCtrl.text);
-                if (result != null) setState(() => _homeLanguageCtrl.text = result);
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Language',
+                  options: _languages,
+                  initialValue: _homeLanguageCtrl.text,
+                );
+                if (result != null)
+                  setState(() => _homeLanguageCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _ethnicGroup.isEmpty ? null : _ethnicGroup,
-              decoration: const InputDecoration(labelText: 'Ethnic group *', prefixIcon: Icon(Icons.people_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Ethnic group *',
+                prefixIcon: Icon(Icons.people_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'African', child: Text('African')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
-                DropdownMenuItem(value: 'Indian/Asian', child: Text('Indian/Asian')),
+                DropdownMenuItem(
+                  value: 'Indian/Asian',
+                  child: Text('Indian/Asian'),
+                ),
                 DropdownMenuItem(value: 'White', child: Text('White')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
-                DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                DropdownMenuItem(
+                  value: 'Prefer not to say',
+                  child: Text('Prefer not to say'),
+                ),
               ],
               onChanged: (v) => setState(() => _ethnicGroup = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _isEmployed.isEmpty ? null : _isEmployed,
-              decoration: const InputDecoration(labelText: 'Are you Employed?', prefixIcon: Icon(Icons.work_outline)),
+              decoration: const InputDecoration(
+                labelText: 'Are you Employed?',
+                prefixIcon: Icon(Icons.work_outline),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
-                DropdownMenuItem(value: 'Unemployed', child: Text('Unemployed')),
-                DropdownMenuItem(value: 'Employed (part-time)', child: Text('Employed (part-time)')),
-                DropdownMenuItem(value: 'Employed (full-time)', child: Text('Employed (full-time)')),
-                DropdownMenuItem(value: 'Self-employed', child: Text('Self-employed')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
+                DropdownMenuItem(
+                  value: 'Unemployed',
+                  child: Text('Unemployed'),
+                ),
+                DropdownMenuItem(
+                  value: 'Employed (part-time)',
+                  child: Text('Employed (part-time)'),
+                ),
+                DropdownMenuItem(
+                  value: 'Employed (full-time)',
+                  child: Text('Employed (full-time)'),
+                ),
+                DropdownMenuItem(
+                  value: 'Self-employed',
+                  child: Text('Self-employed'),
+                ),
               ],
               onChanged: (v) => setState(() => _isEmployed = v ?? ''),
             ),
             const SizedBox(height: 14),
             TextFormField(
-              controller: _heardAboutUsCtrl, readOnly: true,
-              decoration: const InputDecoration(labelText: 'Where did you hear about us?', prefixIcon: Icon(Icons.info_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
+              controller: _heardAboutUsCtrl,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Where did you hear about us?',
+                prefixIcon: Icon(Icons.info_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
               onTap: () async {
-                const sources = ['--- Please select ---', 'Radio', 'Television', 'Newspaper', 'Internet', 'Friend/Family', 'School/Teacher', 'Career Fair', 'Social Media', 'Other'];
-                final result = await _showSearchablePicker(context, title: 'Source', options: sources, initialValue: _heardAboutUsCtrl.text);
-                if (result != null) setState(() => _heardAboutUsCtrl.text = result);
+                const sources = [
+                  '--- Please select ---',
+                  'Radio',
+                  'Television',
+                  'Newspaper',
+                  'Internet',
+                  'Friend/Family',
+                  'School/Teacher',
+                  'Career Fair',
+                  'Social Media',
+                  'Other',
+                ];
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Source',
+                  options: sources,
+                  initialValue: _heardAboutUsCtrl.text,
+                );
+                if (result != null)
+                  setState(() => _heardAboutUsCtrl.text = result);
               },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
-              decoration: const InputDecoration(labelText: 'Is a bursary required?', prefixIcon: Icon(Icons.monetization_on_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Is a bursary required?',
+                prefixIcon: Icon(Icons.monetization_on_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
                 DropdownMenuItem(value: 'Unsure', child: Text('Unsure')),
@@ -3516,146 +3838,368 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _bursaryRequired = v ?? ''),
             ),
             const SizedBox(height: 28),
-            Container(width: double.infinity, height: 1, color: AppColors.border),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
             const SizedBox(height: 20),
-            const Text('Address Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Address Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Please enter your address information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Please enter your address information.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 16),
-            const Text('Street Address', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            const Text(
+              'Street Address',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
-            TextFormField(controller: _streetAddr1Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 1 (e.g. Street Name) *', prefixIcon: Icon(Icons.home_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _streetAddr1Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 1 (e.g. Street Name) *',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _streetAddr2Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 2 (e.g. Suburb Name) *', prefixIcon: Icon(Icons.home_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _streetAddr2Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 2 (e.g. Suburb Name) *',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _streetAddr3Ctrl, decoration: const InputDecoration(labelText: 'Street Address Line 3 (e.g. Town Name)', prefixIcon: Icon(Icons.home_outlined))),
+            TextFormField(
+              controller: _streetAddr3Ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 3 (e.g. Town Name)',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+            ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _streetProvince.isEmpty ? null : _streetProvince,
-              decoration: const InputDecoration(labelText: 'Street Address Line 4 (Province Name) *', prefixIcon: Icon(Icons.map_outlined)),
-              items: AppConstants.provinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+              decoration: const InputDecoration(
+                labelText: 'Street Address Line 4 (Province Name) *',
+                prefixIcon: Icon(Icons.map_outlined),
+              ),
+              items: AppConstants.provinces
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
               onChanged: (v) => setState(() => _streetProvince = v ?? ''),
               validator: (v) => v == null ? 'Select your province' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _streetPostalCodeCtrl,
-              decoration: const InputDecoration(labelText: 'Postal Code *', prefixIcon: Icon(Icons.pin_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
+              decoration: const InputDecoration(
+                labelText: 'Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
+              ),
               readOnly: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
-                final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _streetPostalCodeCtrl.text, displayTransformer: (p) => p);
-                if (result != null) setState(() => _streetPostalCodeCtrl.text = result.split(' - ').first.trim());
+                final result = await _showSearchablePicker(
+                  context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _streetPostalCodeCtrl.text,
+                  displayTransformer: (p) => p,
+                );
+                if (result != null)
+                  setState(
+                    () => _streetPostalCodeCtrl.text = result
+                        .split(' - ')
+                        .first
+                        .trim(),
+                  );
               },
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _streetPostalCodeConfirmCtrl,
-              decoration: const InputDecoration(labelText: 'Confirm Postal Code *', prefixIcon: Icon(Icons.pin_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Confirm Postal Code *',
+                prefixIcon: Icon(Icons.pin_outlined),
+              ),
               validator: (v) {
                 if (v?.trim().isEmpty == true) return 'Required';
-                if (v!.trim() != _streetPostalCodeCtrl.text.trim()) return 'Postal codes do not match';
+                if (v!.trim() != _streetPostalCodeCtrl.text.trim())
+                  return 'Postal codes do not match';
                 return null;
               },
             ),
             const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Tick if your Postal Address is different from your Street Address', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              title: const Text(
+                'Tick if your Postal Address is different from your Street Address',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
               value: _postalDifferent,
               onChanged: (v) => setState(() => _postalDifferent = v ?? false),
-              controlAffinity: ListTileControlAffinity.leading, dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
             ),
             if (_postalDifferent) ...[
               const SizedBox(height: 12),
-              const Text('Postal Address', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text(
+                'Postal Address',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 12),
-              TextFormField(controller: _postalAddr1Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 1 *', prefixIcon: Icon(Icons.mail_outlined)), validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null),
+              TextFormField(
+                controller: _postalAddr1Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 1 *',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+                validator: (v) => _postalDifferent && v?.trim().isEmpty == true
+                    ? 'Required'
+                    : null,
+              ),
               const SizedBox(height: 14),
-              TextFormField(controller: _postalAddr2Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 2 *', prefixIcon: Icon(Icons.mail_outlined)), validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null),
+              TextFormField(
+                controller: _postalAddr2Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 2 *',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+                validator: (v) => _postalDifferent && v?.trim().isEmpty == true
+                    ? 'Required'
+                    : null,
+              ),
               const SizedBox(height: 14),
-              TextFormField(controller: _postalAddr3Ctrl, decoration: const InputDecoration(labelText: 'Postal Address Line 3', prefixIcon: Icon(Icons.mail_outlined))),
+              TextFormField(
+                controller: _postalAddr3Ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 3',
+                  prefixIcon: Icon(Icons.mail_outlined),
+                ),
+              ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 initialValue: _postalProvince.isEmpty ? null : _postalProvince,
-                decoration: const InputDecoration(labelText: 'Postal Address Line 4 (Province) *', prefixIcon: Icon(Icons.map_outlined)),
-                items: AppConstants.provinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                decoration: const InputDecoration(
+                  labelText: 'Postal Address Line 4 (Province) *',
+                  prefixIcon: Icon(Icons.map_outlined),
+                ),
+                items: AppConstants.provinces
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                    .toList(),
                 onChanged: (v) => setState(() => _postalProvince = v ?? ''),
-                validator: (v) => _postalDifferent && v == null ? 'Select province' : null,
+                validator: (v) =>
+                    _postalDifferent && v == null ? 'Select province' : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _postalPostalCodeCtrl,
-                decoration: const InputDecoration(labelText: 'Postal Code *', prefixIcon: Icon(Icons.pin_outlined), suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted)),
+                decoration: const InputDecoration(
+                  labelText: 'Postal Code *',
+                  prefixIcon: Icon(Icons.pin_outlined),
+                  suffixIcon: Icon(
+                    Icons.arrow_drop_down,
+                    color: AppColors.textMuted,
+                  ),
+                ),
                 readOnly: true,
-                validator: (v) => _postalDifferent && v?.trim().isEmpty == true ? 'Required' : null,
+                validator: (v) => _postalDifferent && v?.trim().isEmpty == true
+                    ? 'Required'
+                    : null,
                 onTap: () async {
-                  final result = await _showSearchablePicker(context, title: 'Postal Code', options: _postalCodes, initialValue: _postalPostalCodeCtrl.text, displayTransformer: (p) => p);
-                  if (result != null) setState(() => _postalPostalCodeCtrl.text = result.split(' - ').first.trim());
+                  final result = await _showSearchablePicker(
+                    context,
+                    title: 'Postal Code',
+                    options: _postalCodes,
+                    initialValue: _postalPostalCodeCtrl.text,
+                    displayTransformer: (p) => p,
+                  );
+                  if (result != null)
+                    setState(
+                      () => _postalPostalCodeCtrl.text = result
+                          .split(' - ')
+                          .first
+                          .trim(),
+                    );
                 },
               ),
             ],
             const SizedBox(height: 28),
-            Container(width: double.infinity, height: 1, color: AppColors.border),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
             const SizedBox(height: 20),
-            const Text('Contact Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Contact Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Please enter your contact information.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Please enter your contact information.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
               initialValue: _hasSACellphone.isEmpty ? null : _hasSACellphone,
-              decoration: const InputDecoration(labelText: 'Do you have a South African Cell Phone Number? *', prefixIcon: Icon(Icons.phone_android_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Do you have a South African Cell Phone Number? *',
+                prefixIcon: Icon(Icons.phone_android_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _hasSACellphone = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            TextFormField(controller: _workPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Work Telephone Number', prefixIcon: Icon(Icons.phone_forwarded_outlined))),
+            TextFormField(
+              controller: _workPhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Work Telephone Number',
+                prefixIcon: Icon(Icons.phone_forwarded_outlined),
+              ),
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _homePhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Home Telephone Number', prefixIcon: Icon(Icons.phone_outlined))),
+            TextFormField(
+              controller: _homePhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Home Telephone Number',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email *', prefixIcon: Icon(Icons.email_outlined)), validator: (v) => v?.trim().isEmpty == true ? 'Required' : null),
+            TextFormField(
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+            ),
             const SizedBox(height: 14),
-            TextFormField(controller: _verifyEmailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Verify email *', prefixIcon: Icon(Icons.email_outlined)), validator: (v) {
-              if (v?.trim().isEmpty == true) return 'Required';
-              if (v!.trim() != _emailCtrl.text.trim()) return 'Emails do not match';
-              return null;
-            }),
+            TextFormField(
+              controller: _verifyEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Verify email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) {
+                if (v?.trim().isEmpty == true) return 'Required';
+                if (v!.trim() != _emailCtrl.text.trim())
+                  return 'Emails do not match';
+                return null;
+              },
+            ),
             const SizedBox(height: 28),
-            Container(width: double.infinity, height: 1, color: AppColors.border),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
             const SizedBox(height: 20),
-            const Text('Residence Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Residence Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Please select whether you want to apply for residence.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Please select whether you want to apply for residence.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _wantsResidence.isEmpty ? null : _wantsResidence,
-              decoration: const InputDecoration(labelText: 'Do you want to apply for residence? *', prefixIcon: Icon(Icons.bed_outlined)),
+              decoration: const InputDecoration(
+                labelText: 'Do you want to apply for residence? *',
+                prefixIcon: Icon(Icons.bed_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: '--- Please select ---', child: Text('--- Please select ---')),
+                DropdownMenuItem(
+                  value: '--- Please select ---',
+                  child: Text('--- Please select ---'),
+                ),
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _wantsResidence = v ?? ''),
-              validator: (v) => v == null || v == '--- Please select ---' ? 'Required' : null,
+              validator: (v) =>
+                  v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 28),
-            Container(width: double.infinity, height: 1, color: AppColors.border),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: AppColors.border,
+            ),
             const SizedBox(height: 20),
-            const Text('Disability Information', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Disability Information',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Please indicate whether you have any disabilities.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Please indicate whether you have any disabilities.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Do you have a disability or impairment?', style: TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+              title: const Text(
+                'Do you have a disability or impairment?',
+                style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              ),
               value: _hasDisability,
               onChanged: (v) => setState(() => _hasDisability = v ?? false),
-              controlAffinity: ListTileControlAffinity.leading, dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
             ),
             const SizedBox(height: 32),
           ],
@@ -3691,20 +4235,22 @@ class _ProfileOnboardingScreenState
                 if (v?.trim().isEmpty == true) return 'Required';
                 final year = int.tryParse(v!.trim());
                 if (year == null) return 'Enter a valid year';
-                if (year > DateTime.now().year) return 'Year cannot be in the future';
+                if (year > DateTime.now().year)
+                  return 'Year cannot be in the future';
                 return null;
               },
-              onChanged: (v) => setState(
-                () => _matricYear = int.tryParse(v) ?? 0,
-              ),
+              onChanged: (v) =>
+                  setState(() => _matricYear = int.tryParse(v) ?? 0),
             ),
             const SizedBox(height: 14),
             // Undergraduate / Postgraduate
             DropdownButtonFormField<String>(
-              initialValue:
-                  _applicationLevel.isEmpty ? null : _applicationLevel,
+              initialValue: _applicationLevel.isEmpty
+                  ? null
+                  : _applicationLevel,
               decoration: const InputDecoration(
-                labelText: 'Are you applying for Undergraduate or Postgraduate? *',
+                labelText:
+                    'Are you applying for Undergraduate or Postgraduate? *',
                 prefixIcon: Icon(Icons.school_outlined),
               ),
               items: const [
@@ -3892,13 +4438,28 @@ class _ProfileOnboardingScreenState
                 prefixIcon: Icon(Icons.assessment_outlined),
               ),
               items: const [
-                DropdownMenuItem(value: 'Not Achieved', child: Text('Not Achieved')),
-                DropdownMenuItem(value: 'Elementary', child: Text('Elementary')),
+                DropdownMenuItem(
+                  value: 'Not Achieved',
+                  child: Text('Not Achieved'),
+                ),
+                DropdownMenuItem(
+                  value: 'Elementary',
+                  child: Text('Elementary'),
+                ),
                 DropdownMenuItem(value: 'Moderate', child: Text('Moderate')),
                 DropdownMenuItem(value: 'Adequate', child: Text('Adequate')),
-                DropdownMenuItem(value: 'Substantial', child: Text('Substantial')),
-                DropdownMenuItem(value: 'Meritorius', child: Text('Meritorius')),
-                DropdownMenuItem(value: 'Outstanding', child: Text('Outstanding')),
+                DropdownMenuItem(
+                  value: 'Substantial',
+                  child: Text('Substantial'),
+                ),
+                DropdownMenuItem(
+                  value: 'Meritorius',
+                  child: Text('Meritorius'),
+                ),
+                DropdownMenuItem(
+                  value: 'Outstanding',
+                  child: Text('Outstanding'),
+                ),
               ],
               onChanged: (v) => setState(() => _subjectResult = v ?? ''),
             ),
@@ -3963,12 +4524,14 @@ class _ProfileOnboardingScreenState
                   return;
                 }
                 setState(() {
-                  _resultsSubjects.add(SubjectDetail(
-                    subject: _subjectCtrl.text.trim(),
-                    grade: _gradeCtrl.text.trim(),
-                    result: _subjectResult,
-                    symbol: _subjectSymbol,
-                  ));
+                  _resultsSubjects.add(
+                    SubjectDetail(
+                      subject: _subjectCtrl.text.trim(),
+                      grade: _gradeCtrl.text.trim(),
+                      result: _subjectResult,
+                      symbol: _subjectSymbol,
+                    ),
+                  );
                   _subjectCtrl.clear();
                   _gradeCtrl.clear();
                   _subjectResult = '';
@@ -4018,7 +4581,9 @@ class _ProfileOnboardingScreenState
 
             // Academic Year
             DropdownButtonFormField<String>(
-              initialValue: _academicYear == 0 ? null : _academicYear.toString(),
+              initialValue: _academicYear == 0
+                  ? null
+                  : _academicYear.toString(),
               decoration: const InputDecoration(
                 labelText: 'Academic Year *',
                 prefixIcon: Icon(Icons.calendar_today_outlined),
@@ -4030,7 +4595,8 @@ class _ProfileOnboardingScreenState
                   child: Text(year.toString()),
                 );
               }),
-              onChanged: (v) => setState(() => _academicYear = int.tryParse(v ?? '0') ?? 0),
+              onChanged: (v) =>
+                  setState(() => _academicYear = int.tryParse(v ?? '0') ?? 0),
               validator: (v) => v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
@@ -4040,9 +4606,13 @@ class _ProfileOnboardingScreenState
               controller: _facultyCtrl,
               readOnly: true,
               decoration: const InputDecoration(
-                labelText: 'Limit your selection to a specific Faculty/School *',
+                labelText:
+                    'Limit your selection to a specific Faculty/School *',
                 prefixIcon: Icon(Icons.account_balance_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
@@ -4071,14 +4641,21 @@ class _ProfileOnboardingScreenState
               decoration: const InputDecoration(
                 labelText: 'Choose a programme *',
                 prefixIcon: Icon(Icons.school_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
                 final result = await _showSearchablePicker(
                   context,
                   title: 'Programme',
-                  options: const ['HSBAMS - BA (MEDIA STUDIES)', 'HSBADS - BA IN DEVELOPMENT STUDIES', 'HSBAIR - BA IN INTERNATIONAL RELATIONS'],
+                  options: const [
+                    'HSBAMS - BA (MEDIA STUDIES)',
+                    'HSBADS - BA IN DEVELOPMENT STUDIES',
+                    'HSBAIR - BA IN INTERNATIONAL RELATIONS',
+                  ],
                   initialValue: _programmeCtrl.text,
                 );
                 if (result != null) {
@@ -4090,12 +4667,17 @@ class _ProfileOnboardingScreenState
 
             // Application Period
             TextFormField(
-              controller: TextEditingController(text: _applicationPeriod.isEmpty ? null : _applicationPeriod),
+              controller: TextEditingController(
+                text: _applicationPeriod.isEmpty ? null : _applicationPeriod,
+              ),
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'For which period are you applying? *',
                 prefixIcon: Icon(Icons.date_range_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
@@ -4114,12 +4696,17 @@ class _ProfileOnboardingScreenState
 
             // Study Mode
             TextFormField(
-              controller: TextEditingController(text: _studyMode.isEmpty ? null : _studyMode),
+              controller: TextEditingController(
+                text: _studyMode.isEmpty ? null : _studyMode,
+              ),
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'How would you like to study for this programme? *',
                 prefixIcon: Icon(Icons.school_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
@@ -4138,12 +4725,18 @@ class _ProfileOnboardingScreenState
 
             // Study Timing
             TextFormField(
-              controller: TextEditingController(text: _studyTiming.isEmpty ? null : _studyTiming),
+              controller: TextEditingController(
+                text: _studyTiming.isEmpty ? null : _studyTiming,
+              ),
               readOnly: true,
               decoration: const InputDecoration(
-                labelText: 'When would you like to study for the qualification? *',
+                labelText:
+                    'When would you like to study for the qualification? *',
                 prefixIcon: Icon(Icons.access_time_outlined),
-                suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                suffixIcon: Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.textMuted,
+                ),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
               onTap: () async {
@@ -4181,15 +4774,24 @@ class _ProfileOnboardingScreenState
                   const SizedBox(height: 8),
                   Text(
                     'AT: $_applicationType',
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                    ),
                   ),
                   Text(
                     _applicationTypeDesc,
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
                   Text(
                     'Number of applications allowed for this Application type: $_numAppsAllowed',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -4227,11 +4829,22 @@ class _ProfileOnboardingScreenState
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    title: Text(q.programme, style: const TextStyle(fontSize: 13)),
-                    subtitle: Text(q.faculty, style: const TextStyle(fontSize: 11)),
+                    title: Text(
+                      q.programme,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    subtitle: Text(
+                      q.faculty,
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 20),
-                      onPressed: () => setState(() => _qualificationChoices.removeAt(i)),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          setState(() => _qualificationChoices.removeAt(i)),
                     ),
                   ),
                 );
@@ -4257,7 +4870,9 @@ class _ProfileOnboardingScreenState
       return;
     }
     setState(() {
-      _qualificationChoices.add(QualificationChoice(faculty: faculty, programme: programme));
+      _qualificationChoices.add(
+        QualificationChoice(faculty: faculty, programme: programme),
+      );
       _facultyCtrl.clear();
       _programmeCtrl.clear();
     });
@@ -4269,105 +4884,231 @@ class _ProfileOnboardingScreenState
       // Load base from Hive via profileProvider (not authProvider) — auth can be stale
       StudentProfile? existingProfile = ref.read(profileProvider).valueOrNull;
       if (existingProfile == null) {
-        try { existingProfile = await ProfileRepositoryImpl().getProfile(); } catch (_) {}
+        try {
+          existingProfile = await ProfileRepositoryImpl().getProfile();
+        } catch (_) {}
       }
       final id = existingProfile?.id ?? const Uuid().v4();
       final base = existingProfile ?? StudentProfile(id: id);
 
-      debugPrint('SAVECURRENT base: idNumber="${base.personal.idNumber}" gender="${base.personal.gender}"');
+      debugPrint(
+        'SAVECURRENT base: idNumber="${base.personal.idNumber}" gender="${base.personal.gender}"',
+      );
 
       // Build directly, preserving existing data for empty controller values
       final profile = StudentProfile(
         id: base.id,
         personal: PersonalDetails(
           title: _title.isNotEmpty ? _title : base.personal.title,
-          initials: _initialsCtrl.text.trim().isNotEmpty ? _initialsCtrl.text.trim() : base.personal.initials,
-          firstName: _firstNamesCtrl.text.trim().isNotEmpty ? _firstNamesCtrl.text.trim() : base.personal.firstName,
-          lastName: _surnameCtrl.text.trim().isNotEmpty ? _surnameCtrl.text.trim() : base.personal.lastName,
-          maidenName: _maidenNameCtrl.text.trim().isNotEmpty ? _maidenNameCtrl.text.trim() : base.personal.maidenName,
+          initials: _initialsCtrl.text.trim().isNotEmpty
+              ? _initialsCtrl.text.trim()
+              : base.personal.initials,
+          firstName: _firstNamesCtrl.text.trim().isNotEmpty
+              ? _firstNamesCtrl.text.trim()
+              : base.personal.firstName,
+          lastName: _surnameCtrl.text.trim().isNotEmpty
+              ? _surnameCtrl.text.trim()
+              : base.personal.lastName,
+          maidenName: _maidenNameCtrl.text.trim().isNotEmpty
+              ? _maidenNameCtrl.text.trim()
+              : base.personal.maidenName,
           gender: _gender.isNotEmpty ? _gender : base.personal.gender,
           dateOfBirth: _selectedDob ?? base.personal.dateOfBirth,
-          idNumber: _idNumberCtrl.text.trim().isNotEmpty ? _idNumberCtrl.text.trim() : base.personal.idNumber,
+          idNumber: _idNumberCtrl.text.trim().isNotEmpty
+              ? _idNumberCtrl.text.trim()
+              : base.personal.idNumber,
         ),
         contact: ContactInfo(
-          email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : base.contact.email,
-          phone: _homePhoneCtrl.text.trim().isNotEmpty ? _homePhoneCtrl.text.trim() : base.contact.phone,
-          workPhone: _workPhoneCtrl.text.trim().isNotEmpty ? _workPhoneCtrl.text.trim() : base.contact.workPhone,
-          hasSACellphone: _hasSACellphone.isNotEmpty ? _hasSACellphone : base.contact.hasSACellphone,
-          verifyEmail: _verifyEmailCtrl.text.trim().isNotEmpty ? _verifyEmailCtrl.text.trim() : base.contact.verifyEmail,
+          email: _emailCtrl.text.trim().isNotEmpty
+              ? _emailCtrl.text.trim()
+              : base.contact.email,
+          phone: _homePhoneCtrl.text.trim().isNotEmpty
+              ? _homePhoneCtrl.text.trim()
+              : base.contact.phone,
+          workPhone: _workPhoneCtrl.text.trim().isNotEmpty
+              ? _workPhoneCtrl.text.trim()
+              : base.contact.workPhone,
+          hasSACellphone: _hasSACellphone.isNotEmpty
+              ? _hasSACellphone
+              : base.contact.hasSACellphone,
+          verifyEmail: _verifyEmailCtrl.text.trim().isNotEmpty
+              ? _verifyEmailCtrl.text.trim()
+              : base.contact.verifyEmail,
         ),
         address: AddressInfo(
-          address: _streetAddr1Ctrl.text.trim().isNotEmpty ? _streetAddr1Ctrl.text.trim() : base.address.address,
-          addressLine2: _streetAddr2Ctrl.text.trim().isNotEmpty ? _streetAddr2Ctrl.text.trim() : base.address.addressLine2,
-          addressLine3: _streetAddr3Ctrl.text.trim().isNotEmpty ? _streetAddr3Ctrl.text.trim() : base.address.addressLine3,
-          province: _streetProvince.isNotEmpty ? _streetProvince : base.address.province,
-          postalCode: _streetPostalCodeCtrl.text.trim().isNotEmpty ? _streetPostalCodeCtrl.text.trim() : base.address.postalCode,
+          address: _streetAddr1Ctrl.text.trim().isNotEmpty
+              ? _streetAddr1Ctrl.text.trim()
+              : base.address.address,
+          addressLine2: _streetAddr2Ctrl.text.trim().isNotEmpty
+              ? _streetAddr2Ctrl.text.trim()
+              : base.address.addressLine2,
+          addressLine3: _streetAddr3Ctrl.text.trim().isNotEmpty
+              ? _streetAddr3Ctrl.text.trim()
+              : base.address.addressLine3,
+          province: _streetProvince.isNotEmpty
+              ? _streetProvince
+              : base.address.province,
+          postalCode: _streetPostalCodeCtrl.text.trim().isNotEmpty
+              ? _streetPostalCodeCtrl.text.trim()
+              : base.address.postalCode,
           postalAddress: _postalDifferent
-              ? (_postalAddr1Ctrl.text.trim().isNotEmpty ? _postalAddr1Ctrl.text.trim() : base.address.postalAddress)
-              : (_streetAddr1Ctrl.text.trim().isNotEmpty ? _streetAddr1Ctrl.text.trim() : base.address.postalAddress),
+              ? (_postalAddr1Ctrl.text.trim().isNotEmpty
+                    ? _postalAddr1Ctrl.text.trim()
+                    : base.address.postalAddress)
+              : (_streetAddr1Ctrl.text.trim().isNotEmpty
+                    ? _streetAddr1Ctrl.text.trim()
+                    : base.address.postalAddress),
         ),
         demographic: DemographicInfo(
-          nationality: _isSACitizen.isNotEmpty ? _isSACitizen : base.demographic.nationality,
-          homeLanguage: _homeLanguageCtrl.text.trim().isNotEmpty ? _homeLanguageCtrl.text.trim() : base.demographic.homeLanguage,
-          populationGroup: _ethnicGroup.isNotEmpty ? _ethnicGroup : base.demographic.populationGroup,
-          maritalStatus: _maritalStatus.isNotEmpty ? _maritalStatus : base.demographic.maritalStatus,
-          citizenshipCode: _citizenshipCodeCtrl.text.trim().isNotEmpty ? _citizenshipCodeCtrl.text.trim() : base.demographic.citizenshipCode,
-          heardAboutUs: _heardAboutUsCtrl.text.trim().isNotEmpty ? _heardAboutUsCtrl.text.trim() : base.demographic.heardAboutUs,
+          nationality: _isSACitizen.isNotEmpty
+              ? _isSACitizen
+              : base.demographic.nationality,
+          homeLanguage: _homeLanguageCtrl.text.trim().isNotEmpty
+              ? _homeLanguageCtrl.text.trim()
+              : base.demographic.homeLanguage,
+          populationGroup: _ethnicGroup.isNotEmpty
+              ? _ethnicGroup
+              : base.demographic.populationGroup,
+          maritalStatus: _maritalStatus.isNotEmpty
+              ? _maritalStatus
+              : base.demographic.maritalStatus,
+          citizenshipCode: _citizenshipCodeCtrl.text.trim().isNotEmpty
+              ? _citizenshipCodeCtrl.text.trim()
+              : base.demographic.citizenshipCode,
+          heardAboutUs: _heardAboutUsCtrl.text.trim().isNotEmpty
+              ? _heardAboutUsCtrl.text.trim()
+              : base.demographic.heardAboutUs,
         ),
         status: StatusInfo(
-          disabilityStatus: (_hasDisability ? 'Yes' : 'No').isNotEmpty ? (_hasDisability ? 'Yes' : 'No') : base.status.disabilityStatus,
-          bursaryRequired: _bursaryRequired.isNotEmpty ? _bursaryRequired : base.status.bursaryRequired,
-          employmentStatus: _isEmployed.isNotEmpty ? _isEmployed : base.status.employmentStatus,
-          wantsResidence: _wantsResidence.isNotEmpty ? _wantsResidence : base.status.wantsResidence,
+          disabilityStatus: (_hasDisability ? 'Yes' : 'No').isNotEmpty
+              ? (_hasDisability ? 'Yes' : 'No')
+              : base.status.disabilityStatus,
+          bursaryRequired: _bursaryRequired.isNotEmpty
+              ? _bursaryRequired
+              : base.status.bursaryRequired,
+          employmentStatus: _isEmployed.isNotEmpty
+              ? _isEmployed
+              : base.status.employmentStatus,
+          wantsResidence: _wantsResidence.isNotEmpty
+              ? _wantsResidence
+              : base.status.wantsResidence,
         ),
         qualification: QualificationInfo(
-          academicYear: _academicYear != 0 ? _academicYear : base.qualification.academicYear,
-          choices: _qualificationChoices.isNotEmpty ? _qualificationChoices : base.qualification.choices,
-          applicationPeriod: _applicationPeriod.isNotEmpty ? _applicationPeriod : base.qualification.applicationPeriod,
-          studyMode: _studyMode.isNotEmpty ? _studyMode : base.qualification.studyMode,
-          studyTiming: _studyTiming.isNotEmpty ? _studyTiming : base.qualification.studyTiming,
-          applicationType: _applicationType.isNotEmpty ? _applicationType : base.qualification.applicationType,
-          applicationTypeDescription: _applicationTypeDesc.isNotEmpty ? _applicationTypeDesc : base.qualification.applicationTypeDescription,
-          numApplicationsAllowed: _numAppsAllowed != 4 ? _numAppsAllowed : base.qualification.numApplicationsAllowed,
+          academicYear: _academicYear != 0
+              ? _academicYear
+              : base.qualification.academicYear,
+          choices: _qualificationChoices.isNotEmpty
+              ? _qualificationChoices
+              : base.qualification.choices,
+          applicationPeriod: _applicationPeriod.isNotEmpty
+              ? _applicationPeriod
+              : base.qualification.applicationPeriod,
+          studyMode: _studyMode.isNotEmpty
+              ? _studyMode
+              : base.qualification.studyMode,
+          studyTiming: _studyTiming.isNotEmpty
+              ? _studyTiming
+              : base.qualification.studyTiming,
+          applicationType: _applicationType.isNotEmpty
+              ? _applicationType
+              : base.qualification.applicationType,
+          applicationTypeDescription: _applicationTypeDesc.isNotEmpty
+              ? _applicationTypeDesc
+              : base.qualification.applicationTypeDescription,
+          numApplicationsAllowed: _numAppsAllowed != 4
+              ? _numAppsAllowed
+              : base.qualification.numApplicationsAllowed,
         ),
         nextOfKin: NextOfKin(
-          name: _nextOfKinNameCtrl.text.trim().isNotEmpty ? _nextOfKinNameCtrl.text.trim() : base.nextOfKin.name,
-          mobilePhone: _nextOfKinMobileCtrl.text.trim().isNotEmpty ? _nextOfKinMobileCtrl.text.trim() : base.nextOfKin.mobilePhone,
-          homePhone: _nextOfKinHomePhoneCtrl.text.trim().isNotEmpty ? _nextOfKinHomePhoneCtrl.text.trim() : base.nextOfKin.homePhone,
-          workPhone: _nextOfKinWorkPhoneCtrl.text.trim().isNotEmpty ? _nextOfKinWorkPhoneCtrl.text.trim() : base.nextOfKin.workPhone,
-          addressLine1: _nextOfKinAddr1Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr1Ctrl.text.trim() : base.nextOfKin.addressLine1,
-          addressLine2: _nextOfKinAddr2Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr2Ctrl.text.trim() : base.nextOfKin.addressLine2,
-          addressLine3: _nextOfKinAddr3Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr3Ctrl.text.trim() : base.nextOfKin.addressLine3,
-          addressLine4: _nextOfKinAddr4Ctrl.text.trim().isNotEmpty ? _nextOfKinAddr4Ctrl.text.trim() : base.nextOfKin.addressLine4,
-          postalCode: _nextOfKinPostalCodeCtrl.text.trim().isNotEmpty ? _nextOfKinPostalCodeCtrl.text.trim() : base.nextOfKin.postalCode,
-          email: _nextOfKinEmailCtrl.text.trim().isNotEmpty ? _nextOfKinEmailCtrl.text.trim() : base.nextOfKin.email,
+          name: _nextOfKinNameCtrl.text.trim().isNotEmpty
+              ? _nextOfKinNameCtrl.text.trim()
+              : base.nextOfKin.name,
+          mobilePhone: _nextOfKinMobileCtrl.text.trim().isNotEmpty
+              ? _nextOfKinMobileCtrl.text.trim()
+              : base.nextOfKin.mobilePhone,
+          homePhone: _nextOfKinHomePhoneCtrl.text.trim().isNotEmpty
+              ? _nextOfKinHomePhoneCtrl.text.trim()
+              : base.nextOfKin.homePhone,
+          workPhone: _nextOfKinWorkPhoneCtrl.text.trim().isNotEmpty
+              ? _nextOfKinWorkPhoneCtrl.text.trim()
+              : base.nextOfKin.workPhone,
+          addressLine1: _nextOfKinAddr1Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr1Ctrl.text.trim()
+              : base.nextOfKin.addressLine1,
+          addressLine2: _nextOfKinAddr2Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr2Ctrl.text.trim()
+              : base.nextOfKin.addressLine2,
+          addressLine3: _nextOfKinAddr3Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr3Ctrl.text.trim()
+              : base.nextOfKin.addressLine3,
+          addressLine4: _nextOfKinAddr4Ctrl.text.trim().isNotEmpty
+              ? _nextOfKinAddr4Ctrl.text.trim()
+              : base.nextOfKin.addressLine4,
+          postalCode: _nextOfKinPostalCodeCtrl.text.trim().isNotEmpty
+              ? _nextOfKinPostalCodeCtrl.text.trim()
+              : base.nextOfKin.postalCode,
+          email: _nextOfKinEmailCtrl.text.trim().isNotEmpty
+              ? _nextOfKinEmailCtrl.text.trim()
+              : base.nextOfKin.email,
         ),
         accountContact: AccountContact(
-          name: _accountContactNameCtrl.text.trim().isNotEmpty ? _accountContactNameCtrl.text.trim() : base.accountContact.name,
-          mobilePhone: _accountContactMobileCtrl.text.trim().isNotEmpty ? _accountContactMobileCtrl.text.trim() : base.accountContact.mobilePhone,
-          homePhone: _accountContactHomePhoneCtrl.text.trim().isNotEmpty ? _accountContactHomePhoneCtrl.text.trim() : base.accountContact.homePhone,
-          addressLine1: _accountContactAddr1Ctrl.text.trim().isNotEmpty ? _accountContactAddr1Ctrl.text.trim() : base.accountContact.addressLine1,
-          addressLine2: _accountContactAddr2Ctrl.text.trim().isNotEmpty ? _accountContactAddr2Ctrl.text.trim() : base.accountContact.addressLine2,
-          addressLine3: _accountContactAddr3Ctrl.text.trim().isNotEmpty ? _accountContactAddr3Ctrl.text.trim() : base.accountContact.addressLine3,
-          addressLine4: _accountContactAddr4Ctrl.text.trim().isNotEmpty ? _accountContactAddr4Ctrl.text.trim() : base.accountContact.addressLine4,
-          postalCode: _accountContactPostalCodeCtrl.text.trim().isNotEmpty ? _accountContactPostalCodeCtrl.text.trim() : base.accountContact.postalCode,
-          email: _accountContactEmailCtrl.text.trim().isNotEmpty ? _accountContactEmailCtrl.text.trim() : base.accountContact.email,
+          name: _accountContactNameCtrl.text.trim().isNotEmpty
+              ? _accountContactNameCtrl.text.trim()
+              : base.accountContact.name,
+          mobilePhone: _accountContactMobileCtrl.text.trim().isNotEmpty
+              ? _accountContactMobileCtrl.text.trim()
+              : base.accountContact.mobilePhone,
+          homePhone: _accountContactHomePhoneCtrl.text.trim().isNotEmpty
+              ? _accountContactHomePhoneCtrl.text.trim()
+              : base.accountContact.homePhone,
+          addressLine1: _accountContactAddr1Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr1Ctrl.text.trim()
+              : base.accountContact.addressLine1,
+          addressLine2: _accountContactAddr2Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr2Ctrl.text.trim()
+              : base.accountContact.addressLine2,
+          addressLine3: _accountContactAddr3Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr3Ctrl.text.trim()
+              : base.accountContact.addressLine3,
+          addressLine4: _accountContactAddr4Ctrl.text.trim().isNotEmpty
+              ? _accountContactAddr4Ctrl.text.trim()
+              : base.accountContact.addressLine4,
+          postalCode: _accountContactPostalCodeCtrl.text.trim().isNotEmpty
+              ? _accountContactPostalCodeCtrl.text.trim()
+              : base.accountContact.postalCode,
+          email: _accountContactEmailCtrl.text.trim().isNotEmpty
+              ? _accountContactEmailCtrl.text.trim()
+              : base.accountContact.email,
         ),
         results: ResultsInfo(
           matricYear: _matricYear != 0 ? _matricYear : base.results.matricYear,
-          applicationLevel: _applicationLevel.isNotEmpty ? _applicationLevel : base.results.applicationLevel,
-          upgrading: _isUpgrading.isNotEmpty ? _isUpgrading : base.results.upgrading,
-          matricType: _matricType.isNotEmpty ? _matricType : base.results.matricType,
-          examinationNumber: _examNumberCtrl.text.trim().isNotEmpty ? _examNumberCtrl.text.trim() : base.results.examinationNumber,
-          schoolLeavingCertificate: _schoolLeavingCertificate.isNotEmpty ? _schoolLeavingCertificate : base.results.schoolLeavingCertificate,
-          subjects: _resultsSubjects.isNotEmpty ? _resultsSubjects : base.results.subjects,
+          applicationLevel: _applicationLevel.isNotEmpty
+              ? _applicationLevel
+              : base.results.applicationLevel,
+          upgrading: _isUpgrading.isNotEmpty
+              ? _isUpgrading
+              : base.results.upgrading,
+          matricType: _matricType.isNotEmpty
+              ? _matricType
+              : base.results.matricType,
+          examinationNumber: _examNumberCtrl.text.trim().isNotEmpty
+              ? _examNumberCtrl.text.trim()
+              : base.results.examinationNumber,
+          schoolLeavingCertificate: _schoolLeavingCertificate.isNotEmpty
+              ? _schoolLeavingCertificate
+              : base.results.schoolLeavingCertificate,
+          subjects: _resultsSubjects.isNotEmpty
+              ? _resultsSubjects
+              : base.results.subjects,
         ),
         onboardingComplete: base.onboardingComplete,
         createdAt: base.createdAt,
         updatedAt: DateTime.now(),
       );
 
-      debugPrint('SAVECURRENT save: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"');
+      debugPrint(
+        'SAVECURRENT save: idNumber="${profile.personal.idNumber}" gender="${profile.personal.gender}"',
+      );
 
       // Write directly to Hive, then sync providers
       await ProfileRepositoryImpl().saveProfile(profile);
@@ -4376,7 +5117,9 @@ class _ProfileOnboardingScreenState
       // Verify read-back
       try {
         final verify = await ProfileRepositoryImpl().getProfile();
-        debugPrint('SAVECURRENT verify: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}');
+        debugPrint(
+          'SAVECURRENT verify: idNumber="${verify?.personal.idNumber}" gender="${verify?.personal.gender}" found=${verify != null}',
+        );
       } catch (e) {
         debugPrint('SAVECURRENT verify FAILED: $e');
       }

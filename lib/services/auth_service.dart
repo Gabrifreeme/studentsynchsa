@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:uuid/uuid.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/domain/repositories/auth_repository.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/domain/repositories/auth_repository.dart';
 
 class AuthService implements AuthRepository {
   GoogleSignIn? _googleSignIn;

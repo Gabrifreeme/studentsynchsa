@@ -1,4 +1,4 @@
-import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
 
 abstract class AuthRepository {
   Future<AuthResult> signInWithEmail(String email, String password);

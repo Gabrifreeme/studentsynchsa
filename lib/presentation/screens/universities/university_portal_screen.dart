@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/services/autofill_script.dart' as star;
-import 'package:studentsyncsa/services/its_url_fixer.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/services/autofill_script.dart' as star;
+import 'package:lipsyncstudent/services/its_url_fixer.dart';
 
 class UniversityPortalScreen extends StatefulWidget {
   final String universityName;
