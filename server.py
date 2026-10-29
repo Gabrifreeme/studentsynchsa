@@ -3055,9 +3055,9 @@ def _find_provider_for_model(preferred_model):
 _PROV_TLS = threading.local()
 _PROV_429_RETRIES = 3
 _PROV_429_BASE_S = 2.0
-_PROV_429_CAP_S = 20.0
+_PROV_429_CAP_S = 5.0
 # Never let retries stall a single /chat request for longer than this.
-_PROV_RETRY_BUDGET_S = 45.0
+_PROV_RETRY_BUDGET_S = 8.0
 
 # Substrings that mean "the quota is gone for the day" - retrying is pointless
 # and just burns the round timeout.
@@ -5441,6 +5441,44 @@ def chat():
             }
         )
     save_conversation("user", user_message)
+
+    # Deterministic greeting - answer directly so a simple "hello" never hangs
+    # on a rate-limited provider.
+    _greet_q = re.match(
+        r"\s*(hi|hello|hey|yo|howdy|greetings|good\s+(?:morning|afternoon|evening|night))\s*[!.?]*\s*$",
+        user_message.strip(),
+        re.IGNORECASE,
+    )
+    if _greet_q:
+        _h = datetime.now().hour
+        if _h < 12:
+            _sal = "Good morning"
+        elif _h < 17:
+            _sal = "Good afternoon"
+        else:
+            _sal = "Good evening"
+        reply = "%s. I'm here." % _sal
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply, "model": _LAST_MODEL_USED})
+
+    # Deterministic "what is the time/date?" - answer directly so tool-using
+    # queries never hang on a rate-limited provider. Mirrors tool_get_time().
+    _time_q = re.search(
+        r"(?i)\b(?:what\s+(?:is|'s|s)\s+the\s+time|what\s+time\s+is\s+it|"
+        r"current\s+time|tell\s+me\s+the\s+time|what(?:'s|s)?\s+the\s+date|"
+        r"today(?:'s|s)?\s+date)\b",
+        user_message,
+    )
+    if _time_q:
+        now = datetime.now()
+        wk = (now + timedelta(days=7)).date().isoformat()
+        reply = "Now: %s. Tomorrow: %s. One week out: %s." % (
+            now.strftime("%A, %d %B %Y, %I:%M %p"),
+            (now + timedelta(days=1)).date().isoformat(),
+            wk,
+        )
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply, "model": _LAST_MODEL_USED})
 
     # Emotional memory: notice tiredness/frustration/sadness in what Chris says
     # and remember it for the day (and soften the reply if he's low).
