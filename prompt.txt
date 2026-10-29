@@ -1,0 +1,7 @@
+The file loading works perfectly now! The code appears in the editor. However, right after it loads, a popup says "localhost:5000 says: Failed to load file: updateLineNumbers is not defined". 
+
+Please review @ACESi.html and fix this. 
+1. Find where `updateLineNumbers()` is being called in the JavaScript (likely inside the `fileDiv.onclick` block).
+2. Since that function doesn't exist, either remove the call to it entirely, or create a dummy function `function updateLineNumbers() { }` so the browser stops throwing the error.
+
+Please show me the diff.

@@ -1,6 +1,6 @@
 {
   "provider": "groq",
-  "model": "qwen2.5-coder:7b",
+  "model": "llama-3.1-8b-instant",
   "system_prompt": "",
   "show_toolbar": true,
   "chat_history": [],
