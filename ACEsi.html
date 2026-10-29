@@ -88,6 +88,8 @@
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #ff9d00; border-radius: 4px; }
+        .spinner { display: none; width: 16px; height: 16px; border: 2px solid #ff9d00; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -249,13 +251,17 @@
             <div class="panel-header">CONVERSATION</div>
             <div id="chat-messages" style="flex:1;overflow-y:auto;padding:10px;"><div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> Hi Chris. I'm here. Ready to fix your project.</div></div>
             <div style="display:flex;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
-                <button onclick="sendMessage()" title="Send" style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;" onmousedown="console.log('Send clicked')">Send</button>
                 <input id="chat-input" type="text" placeholder="Ask ACEsi..." style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
+                <button onclick="sendMessage()" title="Send" style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;" onmousedown="console.log('Send clicked')">Send</button>
+            </div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
+                <div id="spinner-left" class="spinner"></div>
                 <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">🎤</button>
                 <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">🔊</button>
                 <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">➕</button>
-                <input id="chat-file" type="file" style="display:none;" onchange="if(this.files[0]) document.getElementById('chat-messages').innerHTML += '<div style=\'background:#111;padding:6px;border:1px solid #ff9d00;margin-top:4px;\'>📎 ' + this.files[0].name + '</div>'">
+                <div id="spinner-right" class="spinner"></div>
             </div>
+            <input id="chat-file" type="file" style="display:none;" onchange="if(this.files[0]) document.getElementById('chat-messages').innerHTML += '<div style=\'background:#111;padding:6px;border:1px solid #ff9d00;margin-top:4px;\'>📎 ' + this.files[0].name + '</div>'">
         </div>
 
         <!-- Code Editor Panel -->
@@ -322,15 +328,23 @@
             const msgEl = document.getElementById('chat-messages');
             msgEl.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-top:4px;color:#ff9d00;"><b>You:</b> ' + msg + '</div>';
             input.value = '';
+            const sl = document.getElementById('spinner-left');
+            const sr = document.getElementById('spinner-right');
+            if (sl) sl.style.display = 'block';
+            if (sr) sr.style.display = 'block';
             // Send to server
             fetch('http://127.0.0.1:5000/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msg })
             }).then(r => r.text()).then(t => {
+                if (sl) sl.style.display = 'none';
+                if (sr) sr.style.display = 'none';
                 msgEl.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-top:4px;color:#ff9d00;"><b>ACEsi:</b> ' + t + '</div>';
                 msgEl.scrollTop = msgEl.scrollHeight;
             }).catch(e => {
+                if (sl) sl.style.display = 'none';
+                if (sr) sr.style.display = 'none';
                 msgEl.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-top:4px;color:#ff9d00;">❌ Error: ' + e.message + '</div>';
                 msgEl.scrollTop = msgEl.scrollHeight;
             });
