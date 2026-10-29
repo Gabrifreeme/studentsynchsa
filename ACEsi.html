@@ -254,14 +254,17 @@
                 <input id="chat-input" type="text" placeholder="Ask ACEsi..." style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
                 <button onclick="sendMessage()" title="Send" style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;" onmousedown="console.log('Send clicked')">Send</button>
             </div>
-            <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
-                <div id="spinner-left" class="spinner"></div>
-                <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">🎤</button>
-                <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">🔊</button>
-                <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 10px;border-radius:3px;cursor:pointer;font-family:inherit;">➕</button>
-                <div id="spinner-right" class="spinner"></div>
-            </div>
-            <input id="chat-file" type="file" style="display:none;" onchange="if(this.files[0]) document.getElementById('chat-messages').innerHTML += '<div style=\'background:#111;padding:6px;border:1px solid #ff9d00;margin-top:4px;\'>📎 ' + this.files[0].name + '</div>'">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-top:1px solid #ff9d00; background:#000; width:100%; box-sizing:border-box;">
+    <div id="spinner-left" class="spinner" style="width:20px;"></div>
+    
+    <div style="display:flex; gap:6px; flex:1; justify-content:center;">
+        <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🎤</button>
+        <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🔊</button>
+        <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">➕</button>
+    </div>
+
+    <div id="spinner-right" class="spinner" style="width:20px;"></div>
+</div>
         </div>
 
         <!-- Code Editor Panel -->
