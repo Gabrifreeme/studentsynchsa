@@ -104,3 +104,9 @@ audit.log
 
 # Standing preferences (personal: name, location, study) - local only
 preferences.json
+web-app/.next/
+web-app/node_modules/
+__pycache__/
+*.pyc
+.dart_tool/
+build/
