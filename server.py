@@ -159,7 +159,7 @@ def _load_local_keys():
 
 
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "qwen/qwen3.8-27b"
+GROQ_MODEL = "llama-3.1-8b-instant"
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
 # form and then reads the network panel instead of submitting, which prompting
 # did not fix. This is a config key, not a constant, so the model can be
@@ -188,6 +188,18 @@ OLLAMA_CHAT_MODEL = "qwen2.5-coder:1.5b"
 # Ollama Tools Schema - minimal set for web search to avoid wsarecv crash on 7b model.
 # Only web_search and webfetch are included; the 1.5b model handles this fine.
 OLLAMA_TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_local_file",
+            "description": "Read the contents of a local file. Args: filepath (REQUIRED).",
+            "parameters": {
+                "type": "object",
+                "properties": {"filepath": {"type": "string"}},
+                "required": ["filepath"],
+            },
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -442,6 +454,16 @@ def _popen(*args, **kw):
 def _check_output(*args, **kw):
     kw.setdefault("creationflags", _NO_WINDOW)
     return subprocess.check_output(*args, **kw)
+
+
+def read_local_file(filepath):
+    """Reads the content of a local file and returns it as a string."""
+    try:
+        abs_path = os.path.abspath(filepath)
+        with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except Exception as e:
+        return f"Error reading file {filepath}: {str(e)}"
 
 
 def ocr_image(img_path):
@@ -1317,28 +1339,33 @@ def _job_prompts_for_tools(tool_names):
 # so the AI sees it last and it overrides everything else. Forces a clean
 # bulleted list instead of raw search output pasted verbatim.
 _WEB_SEARCH_FORMAT_RULE = (
-    "\n\nOUTPUT STYLE: Be brief. Answer in 1-2 sentences max. No tool names, no "
-    "JSON, no IP addresses, no 'Based on search results'. Just the answer.\n\n"
+    "\\n\\nOUTPUT STYLE: Be brief. Answer in 1-2 sentences max. No tool names, no "
+    "JSON, no IP addresses, no 'Based on search results'. Just the answer.\\n\\n"
     "CRITICAL RULE: After calling web_search, you MUST synthesize the "
-    "results into a clean bulleted list. DO NOT copy-paste the raw search "
-    'output. DO NOT use dashes like "- -" or ellipses "...". Format exactly '
-    "like this:\n\n"
-    "Name: [Name] | Location: [Location] | Price: [Price]\n\n"
-    "Pick the best 3 results. Never output URLs, HTML, or raw search text.\n\n"
+    "results into a clean, natural-language answer. You are FORBIDDEN from "
+    "copy-pasting raw tool output, snippets, or markers like 'URL:', 'Source:', "
+    "'TITLE:', or 'Snippet:'. Read the content and answer the question directly "
+    "in your own words. Example: If results say 'City: Johannesburg, Country: SA', "
+    "you MUST write 'You are located in Johannesburg, South Africa.'\\n\\n"
+    "If the results do not contain the answer, say exactly: 'The searches did not establish this.' "
+    "DO NOT answer from memory.\\n\\n"
+    "Format strictly as a direct answer or a clean bulleted list if multiple "
+    "facts are found. Pick the best 3 results. Never output raw URLs or HTML.\\n\\n"
     "LIVE INFO RULE: If the user asks for live information, current events, "
     "current prices, current weather, or anything that changes over time, "
     "you MUST use the web_search tool. Do not guess or use outdated knowledge. "
-    "Search first, then answer from the search results.\n\n"
+    "Search first, then answer from the search results.\\n\\n"
     "DISTANCE/ROUTE RULE: If the user asks for a distance, route, driving time, "
     "or how far/long to a location, you MUST chain tools: first find the user's "
     "location (if not given), then use web_search to find the driving distance "
     "and time. Do NOT output raw JSON from IP lookup or location tools. Give a "
     "human-readable answer with the distance in km and driving time in hours/minutes. "
-    "Example: 'Mabula Game Lodge is ~180 km from Johannesburg, about 2 hours 15 minutes by car via the N1 and R516.'\n\n"
+    "Example: 'Mabula Game Lodge is ~180 km from Johannesburg, about 2 hours 15 minutes by car via the N1 and R516.'\\n\\n"
     "GENERAL KNOWLEDGE: For static facts (capitals, math, history, definitions), "
     "answer directly from your training. Do NOT use web_search for things that "
     "don't change. Only search for live/current data."
 )
+
 
 # Resolve provider keys now that DATA_DIR exists (env var takes priority over file).
 _LK = _load_local_keys()
@@ -2989,7 +3016,7 @@ def _match_file_request(message):
 # replying "please provide the commands".
 def _chat_providers(domain=""):
     """The provider chain, with Groq's model chosen for the task.
-
+    
     Browser work gets GROQ_MODEL_BROWSER. The default chat model is fine for
     conversation but unreliable at the one thing a browser task hinges on:
     actually submitting a form. Returns (name, endpoint, key, model).
@@ -2999,13 +3026,14 @@ def _chat_providers(domain=""):
         if domain in _BROWSER_DOMAINS and GROQ_MODEL_BROWSER
         else GROQ_MODEL
     )
-    # Primary: OpenCode Zen (free tier)
-    # Secondary: Groq for best tool-use capability
+    # Primary: Groq (fastest for tool-use)
+    # Secondary: Cerebras (extremely fast inference)
+    # Tertiary: OpenCode Zen (free tier)
     # Fallback: Local Ollama if cloud hits rate limits / quota
     providers = [
-        ("OpenCode", OPENCODE_ENDPOINT, OPENCODE_API_KEY, OPENCODE_MODEL),
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
         ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+        ("OpenCode", OPENCODE_ENDPOINT, OPENCODE_API_KEY, OPENCODE_MODEL),
         ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
     ]
     if OLLAMA_ENABLED:
@@ -4080,12 +4108,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     Rounds cap so a stuck model still terminates.
     Publishes live work-steps to _AGENT so the frontend (which polls
     /opencode/status) renders progress inline, exactly like run_agent does."""
+    # Fast Path: Detect simple requests to route to faster model and light context
+    is_simple = bool(re.search(r"\b(date|time|today|weather|fact|who is|what is)\b", user_message or "", re.I))
+    if is_simple:
+        preferred_model = "qwen2.5-coder:7b" if not preferred_model else preferred_model
+        if llm_messages and llm_messages[0].get("role") == "system":
+            # Use light context for simple queries to reduce TTFT
+            ctx_light = build_context_block(light=True)
+            llm_messages[0] = {"role": "system", "content": llm_messages[0].get("content", "").replace(build_context_block(light=False), ctx_light)}
+
     # Track which provider/model actually answered, so the UI badge can show it.
     global _LAST_MODEL_USED
     _LAST_MODEL_USED = ""
     # Fresh provider-failure diagnostics for THIS dispatch only.
     _prov_reset()
     _prov_spend()
+    # ... (rest of function remains same)
 
     # --- Domain separation (checked BEFORE marking the agent running): keep UI /
     # code / network work in distinct contexts so ACEsi stops mixing them. One
@@ -9183,7 +9221,7 @@ def _search_tavily(query, max_results, include_images=False):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with _urlreq.urlopen(req, timeout=20) as resp:
+    with _urlreq.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
     items = []
@@ -9243,7 +9281,7 @@ def _search_serper(query, max_results):
         },
         method="POST",
     )
-    with _urlreq.urlopen(req, timeout=20) as resp:
+    with _urlreq.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
     items = []
@@ -9274,7 +9312,7 @@ def _search_duckduckgo(query, max_results):
     q = _up.quote_plus(str(query).strip())
     url = "https://lite.duckduckgo.com/lite/?q=" + q
     req = _urlreq.Request(url, headers={"User-Agent": "Mozilla/5.0 (ACEsi)"})
-    with _urlreq.urlopen(req, timeout=20) as resp:
+    with _urlreq.urlopen(req, timeout=10) as resp:
         html = resp.read(200000).decode("utf-8", "replace")
 
     items = []
@@ -9313,7 +9351,7 @@ def _search_bing(query, max_results):
             "Accept-Language": "en-US,en;q=0.5",
         },
     )
-    with _urlreq.urlopen(req, timeout=20) as resp:
+    with _urlreq.urlopen(req, timeout=10) as resp:
         html = resp.read(200000).decode("utf-8", "replace")
 
     items = []
@@ -9383,7 +9421,7 @@ def _fetch_raw_tavily(query, max_results):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with _urlreq.urlopen(req, timeout=20) as resp:
+        with _urlreq.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         lines = []
         for r in data.get("results", []):
@@ -9397,6 +9435,7 @@ def _fetch_raw_tavily(query, max_results):
 
 
 def tool_web_search(query, max_results=6):
+    print("SEARCH STARTED")
     """Multi-provider web search with fallback chain:
     1. Tavily (API key)
     2. Serper (API key)
@@ -9448,23 +9487,28 @@ def tool_web_search(query, max_results=6):
             print(f"[web_search] Trying {name}...")
             items = search_fn()
             if items:
-                # If we got fewer than 3 clean results, append the raw Tavily
-                # URL + content so Chris can see what the search engine found.
-                if len(items) < 3 and name == "Tavily":
-                    raw = _fetch_raw_tavily(q, max_results)
-                    if raw:
-                        items.append("\n--- RAW TAVILY (debug) ---\n" + raw)
-                # Clean and truncate every result before returning
+                # Clean and truncate every result before returning.
+                # We ensure these are clean snippets for the AI to read, not raw dumps.
                 items = [_clean_search_result(item) for item in items]
                 result = "\n".join(items)
                 print(f"[web_search] SUCCESS via {name} ({len(items)} results)")
+                print("SEARCH FINISHED")
                 return True, result
             else:
                 print(f"[web_search] {name} returned no results")
+        except TimeoutError as te:
+            print(f"[web_search] {name} timeout: {te}")
+            import traceback
+            traceback.print_exc()
+            return False, str(te)
         except Exception as e:
             print(f"[web_search] {name} failed: {e}")
+            import traceback
+            traceback.print_exc()
 
+    print("SEARCH FINISHED")
     return False, "web_search failed: all providers exhausted"
+
 
 
 def tool_webfetch(url, format="markdown"):
@@ -9762,7 +9806,7 @@ def tool_get_distance(origin, destination):
             % coords
         )
         req = _urlreq.Request(url, headers={"User-Agent": "ACEsi/1.0"})
-        with _urlreq.urlopen(req, timeout=20) as resp:
+        with _urlreq.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         if data.get("code") != "Ok" or not data.get("routes"):
             return False, "get_distance: no route found"
@@ -17756,8 +17800,11 @@ def _boot_banner():
         pass
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return Response(status=204)
+
 # ===== Explorer file routes =====
-@app.route("/api/files", methods=["GET"])
 @app.route("/api/files", methods=["GET"])
 def api_files():
     import os
@@ -17773,20 +17820,32 @@ def api_files():
                     rel = rel.replace("\\", "/")
                     # Return paths relative to lib, prefixed with lib/
                     files.append("lib/" + rel)
+    print("EXPLORER FETCHED FILES")
     print("Explorer files found:", sorted(files)[:5], "... total:", len(files))
     return jsonify(sorted(files))
 
 @app.route("/api/file-content", methods=["GET"])
 def api_file_content():
     path = (request.args.get("path") or "").strip()
+    print(f"[api/file-content] Request for path: {path}")
     if not path or ".." in path:
         return jsonify({"ok": False, "error": "bad path"}), 400
+    
+    # Ensure path is relative to the 'lib' directory
     full = path if path.startswith("lib/") else os.path.join("lib", path)
+    
     try:
-        with open(full, "r", encoding="utf-8") as fh:
-            return Response(fh.read(), mimetype="text/plain")
+        if not os.path.exists(full):
+            print(f"[api/file-content] File not found: {full}")
+            return jsonify({"ok": False, "error": f"File not found: {full}"}), 404
+            
+        with open(full, "r", encoding="utf-8", errors="replace") as fh:
+            content = fh.read()
+            print(f"[api/file-content] Successfully read {len(content)} chars from {full}")
+            return Response(content, mimetype="text/plain")
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 404
+        print(f"[api/file-content] Error reading file {full}: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/save-file", methods=["POST"])
 def api_save_file():
@@ -17881,7 +17940,9 @@ def api_ping():
     print("📡 Send Ping triggered")
     return jsonify({"status": "ping sent"})
 
-
+@app.route('/favicon.ico')
+def ignore_favicon_crash():
+    return '', 204
 if __name__ == "__main__":
     _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
