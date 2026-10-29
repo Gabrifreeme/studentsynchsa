@@ -17849,17 +17849,25 @@ def api_file_content():
 
 @app.route("/api/save-file", methods=["POST"])
 def api_save_file():
-    data = request.get_json(silent=True) or {}
-    path = (data.get("path") or "").strip()
-    content = data.get("content", "")
-    if not path or ".." in path:
-        return jsonify({"ok": False, "error": "bad path"}), 400
-    full = path if path.startswith("lib/") else os.path.join("lib", path)
+    print("RECEIVED SAVE DATA (FORM):", request.form)
     try:
-        with open(full, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        return jsonify({"ok": True, "saved": path})
+        filename = request.form.get('filename')
+        content = request.form.get('content')
+        if not filename or content is None:
+            return jsonify({"ok": False, "error": "Missing filename or content in form data"}), 400
+        
+        print(f"ATTEMPTING TO SAVE FILE: {filename}")
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception as file_err:
+            import traceback
+            print(f"FILE WRITE EXCEPTION:\n{traceback.format_exc()}")
+            return jsonify({"ok": False, "error": f"Write Error: {str(file_err)}"}), 500
+            
+        return jsonify({"ok": True, "message": "Saved!"})
     except Exception as e:
+        print(f"[api/save-file] Route Error: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 # ── ACEsi System Settings ──────────────────────────────────────────────
@@ -17921,6 +17929,28 @@ def api_settings_post():
     return jsonify(s)
 
 
+@app.route("/api/autofix", methods=["POST"])
+def api_autofix_v2():
+    print("AUTOFIX API HIT")
+    data = request.get_json(silent=True) or {}
+    code = data.get("code", "")
+    if not code.strip():
+        return jsonify({"ok": False, "error": "No code provided"}), 400
+    
+    prompt = f"Fix the syntax errors in this code and return ONLY the corrected code. Do not include any explanations, markdown blocks, or preamble. Just the code:\n\n{code}"
+    
+    try:
+        msgs = [{"role": "user", "content": prompt}]
+        reply = _chat_dispatch(msgs, user_message=prompt, preferred_model="llama-3.3-70b-versatile")
+        
+        if reply:
+            return jsonify({"ok": True, "fixed_code": reply})
+        else:
+            return jsonify({"ok": False, "error": "AI could not fix the code"}), 500
+    except Exception as e:
+        print(f"[api/autofix] Error: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route("/api/reminders", methods=["POST"])
 def api_reminders():
     data = request.get_json(silent=True) or {}
@@ -17940,9 +17970,42 @@ def api_ping():
     print("📡 Send Ping triggered")
     return jsonify({"status": "ping sent"})
 
+@app.route('/api/logs')
+def api_logs():
+    import time
+    from flask import Response
+    def generate():
+        while True:
+            yield f"data: Server heartbeat... {time.strftime('%H:%M:%S')}\n\n"
+            time.sleep(2)
+    return Response(generate(), mimetype='text/event-stream')
+
 @app.route('/favicon.ico')
 def ignore_favicon_crash():
     return '', 204
+@app.route('/api/save-file', methods=['POST'])
+def save_file_route():
+    from flask import request, jsonify
+    import traceback
+    
+    print("=== SAVE ENDPOINT HIT ===")
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return jsonify({"ok": False, "error": "No JSON data received"}), 400
+        
+    filepath = data.get('filename') or data.get('path')
+    content = data.get('content')
+    
+    if not filepath or content is None:
+        return jsonify({"ok": False, "error": "Missing filename or content"}), 400
+        
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return jsonify({"ok": True, "message": "Saved!"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 if __name__ == "__main__":
     _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
