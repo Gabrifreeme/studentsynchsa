@@ -1,0 +1,118 @@
+⚠️ Ollama reachability check failed: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=11434): Max retries exceeded with url: /api/tags (Caused by NewConnectionError
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 12676
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:44:01  723982 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:44:32] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=761
+[normalize] run_command in={"command": "ls -la /app 2>/dev/null; ls -la /workspace 2>/dev/null; pwd; ls -la"} out={"command": "ls -la /app 2>/dev/null; ls -la /workspace 2>/dev/null; pwd; ls -la"}
+📋 [21:44:32] Tool: run_command({"command": "ls -la /app 2>/dev/null; ls -la /workspace 2>/dev/null; pwd; ls -la"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:44:32] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=730
+[normalize] run_command in={"command": "ls /app 2>/dev/null; ls / 2>/dev/null"} out={"command": "ls /app 2>/dev/null; ls / 2>/dev/null"}
+📋 [21:44:33] Tool: run_command({"command": "ls /app 2>/dev/null; ls / 2>/dev/null"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:44:33] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=686
+[normalize] run_command in={"command": "dir"} out={"command": "dir"}
+📋 [21:44:33] Tool: run_command({"command": "dir"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:44:33] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=688
+[normalize] run_command in={"command": "dir /b"} out={"command": "dir /b"}
+📋 [21:44:34] Tool: run_command({"command": "dir /b"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:44:34] Sending to Groq (qwen/qwen3.8-27b) — 8 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+⏳ Groq 429: waiting 10.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:44:44] Sending to Groq (qwen/qwen3.8-27b) — 8 messages, tools=yes
+📥 [Groq] HTTP 200 len=878
+[normalize] run_command in={"command": "cd C:/Users/chris/Downloads/ace/ace_main_cvdp && dir /b *.py 2>nul | findstr /i \"server main app\" & echo --- & dir /b *.py 2>nul | findstr /i \"task\""} out={"command": "cd C:/Users/chris/Downloads/ace/ace_main_cvdp && dir /b *.py 2>nul | findstr /i \"server main app\" & echo --- & dir /b *.py 2>nul | findstr /i \"task\""}
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+📋 [21:44:45] Tool: run_command({"command": "cd C:/Users/chris/Downloads/ace/ace_main_cvdp && dir /b *.py 2>nul | findstr /i \"server main app\" & echo ) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:44:45] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 429 len=389
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:45:05] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+⏳ Groq 429: waiting 2.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:45:07] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 200 len=545
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:45:08] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 429 len=389
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:45:28] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 4459, Requested 2728. Plea [retry budget exhausted]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=21 timeout=(10, 90) tools=yes
+📋 [21:45:28] Sending to Cerebras (gpt-oss-120b) — 21 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=21 timeout=(10, 90) tools=yes
+📋 [21:45:29] Sending to FreeLLM (auto) — 21 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode-fallback (opencode/zen-fast) nokey: no API key configured for this provider
+[ACE-DISPATCH] All providers exhausted. tried=['OpenCode', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📋 [21:45:29] Dispatch complete: 21 messages, model=deepseek/deepseek-v4-flash-0731:free

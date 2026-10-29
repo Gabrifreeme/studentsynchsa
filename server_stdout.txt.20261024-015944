@@ -1,0 +1,19 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 6952
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=01:57:50  713446 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 5  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_get_response_body, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=False. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 /model_chat incoming: 28 chars
+🪶 reduced schema: 28 -> 11 tools, ~965 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj)
+✅ Groq recovered on attempt 2 (max_tokens=4096)

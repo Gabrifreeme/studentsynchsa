@@ -1,0 +1,159 @@
+import 'dart:math';
+
+/// Fixes the ITS Oracle PL/SQL URL truncation bug.
+///
+/// The Oracle WebLogic/PLSQL gateway sometimes truncates
+/// `gen.gw1pkg.gw1view` to `gen.gw1pkg.gw1v` (404 error).
+///
+/// This class intercepts and normalizes these malformed URLs
+/// BEFORE the WebView loads them.
+class ItsUrlFixer {
+  /// The base ITS portal domain.
+  static const String _itsDomain = 'univenierp01.univen.ac.za';
+
+  /// Known truncated procedure name patterns and their corrections.
+  /// These are Oracle PL/SQL package procedure names that must NOT
+  /// be truncated. The gateway sometimes cuts off everything after
+  /// the 7-character procedure boundary.
+  static const Map<String, String> _knownFixes = {
+    'gen.gw1pkg.gw1v': 'gen.gw1pkg.gw1view',
+    'gen.gw1pkg.gw1p': 'gen.gw1pkg.gw1print',
+    'gen.gw1pkg.gw1c': 'gen.gw1pkg.gw1call',
+    'gen.gw1pkg.gw1i': 'gen.gw1pkg.gw1init',
+    'gen.gw1pkg.gw1s': 'gen.gw1pkg.gw1submit',
+    'gen.gw1pkg.gw1u': 'gen.gw1pkg.gw1update',
+    'gen.gw1pkg.gw1d': 'gen.gw1pkg.gw1delete',
+  };
+
+  /// Known PL/SQL procedure name suffixes that Oracle may truncate.
+  /// If a procedure name ends with one of these prefixes but is
+  /// shorter than expected, restore the full suffix.
+  static const List<String> _procedureSuffixes = [
+    'view', 'print', 'call', 'init', 'submit', 'update', 'delete',
+  ];
+
+  /// Normalizes an ITS URL by fixing truncated procedure names.
+  ///
+  /// [url] The potentially malformed URL string.
+  /// Returns the corrected URL, or the original if no fix was needed.
+  static String normalize(String url) {
+    if (!_looksLikeItsUrl(url)) {
+      return url;
+    }
+
+    String fixed = _fixTruncatedProcedureNames(url);
+    return fixed;
+  }
+
+  /// Checks if the URL looks like an ITS PL/SQL URL.
+  static bool _looksLikeItsUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.contains(_itsDomain) ||
+        lowerUrl.contains('/pls/prodi41/') ||
+        lowerUrl.contains('/pls/') && lowerUrl.contains('.gw1pkg.');
+  }
+
+  /// Fixes truncated procedure names in ITS URLs.
+  static String _fixTruncatedProcedureNames(String url) {
+    // Check direct known fixes first
+    for (final entry in _knownFixes.entries) {
+      final badPattern = entry.key;
+      final goodPattern = entry.value;
+
+      // Case 1: URL ends with truncated name (no query params follow)
+      if (url.contains('/$badPattern') ||
+          url.contains('/$badPattern?') ||
+          url.endsWith(badPattern)) {
+        final fixed = url.replaceAll('/$badPattern', '/$goodPattern');
+        return fixed.endsWith(badPattern) && fixed != url
+            ? fixed
+            : url.replaceAll(badPattern, goodPattern);
+      }
+
+      // Case 2: Truncated name appears mid-URL (before query params)
+      final qMark = url.indexOf('?');
+      final pathPart = qMark != -1 ? url.substring(0, qMark) : url;
+      if (pathPart.contains(badPattern)) {
+        return url.replaceAll(badPattern, goodPattern);
+      }
+    }
+
+    // Advanced: smart suffix restoration for unknown truncations
+    return _smartRestoreSuffix(url);
+  }
+
+  /// Smart restoration: detects truncated PL/SQL procedure names
+  /// by checking if a procedure prefix matches known suffixes.
+  static String _smartRestoreSuffix(String url) {
+    final qMark = url.indexOf('?');
+    final pathPart = qMark != -1 ? url.substring(0, qMark) : url;
+
+    // Match pattern: gen.gw1pkg.gw1X where X is a single letter
+    final regex = RegExp(r'(gen\.gw1pkg\.gw1[a-zA-Z])');
+    final match = regex.firstMatch(pathPart);
+
+    if (match != null) {
+      final truncated = match.group(0)!;
+      final prefix = truncated.substring(0, truncated.length - 1);
+
+      // Try each known suffix
+      for (final suffix in _procedureSuffixes) {
+        if (suffix.startsWith(truncated.split('.').last)) {
+          final restored = '$prefix$suffix';
+          return url.replaceFirst(truncated, restored);
+        }
+      }
+    }
+
+    // Broader: find any PL/SQL package procedure that might be truncated
+    // Pattern: package_name.procedure_name where procedure is very short
+    final pkgRegex = RegExp(r'(\w+\.\w+\.\w+)(\?|$)');
+    final pkgMatch = pkgRegex.firstMatch(pathPart);
+
+    if (pkgMatch != null) {
+      final procedure = pkgMatch.group(1)!;
+      final parts = procedure.split('.');
+      if (parts.length >= 3) {
+        final procName = parts.last;
+        // If procedure name is suspiciously short (< 5 chars) and
+        // starts with 'gw1' (gateway convention), try to restore it
+        if (procName.startsWith('gw1') && procName.length < 8) {
+          // 'gw1v' -> 'gw1view', 'gw1p' -> 'gw1print', etc.
+          final restored = _restoreGatewayProcedure(procName);
+          if (restored != procName) {
+            final fullProcedure = '${parts[0]}.${parts[1]}.$restored';
+            return url.replaceFirst(procedure, fullProcedure);
+          }
+        }
+      }
+    }
+
+    return url;
+  }
+
+  /// Restores a truncated gateway procedure name to its full form.
+  static String _restoreGatewayProcedure(String truncated) {
+    if (!_knownFixes.containsKey(truncated)) {
+      // Try to match by prefix
+      for (final entry in _knownFixes.entries) {
+        if (entry.key.startsWith(truncated)) {
+          return entry.value;
+        }
+      }
+    }
+    return _knownFixes[truncated] ?? truncated;
+  }
+
+  /// Validates that a URL is properly formed for the ITS portal.
+  static bool isValidItsUrl(String url) {
+    if (!_looksLikeItsUrl(url)) return true; // Not an ITS URL, assume valid
+
+    // Check for known truncation patterns
+    for (final badPattern in _knownFixes.keys) {
+      if (url.contains(badPattern) && !url.contains(_knownFixes[badPattern]!)) {
+        return false;
+      }
+    }
+    return true;
+  }
+}

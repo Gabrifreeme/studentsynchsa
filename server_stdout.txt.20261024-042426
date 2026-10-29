@@ -1,0 +1,155 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 7212
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=04:17:55  661980 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 Incoming message length: 38 chars
+[domain] explicit tool 'weather' -> net (tool domains: ['net'])
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2415 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2415 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in/London?format=3"} out={"url": "https://wttr.in/London?format=3"}
+📧 email watch: primed mailboxes, now polling every 120s
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in/London?format=3"} out={"url": "https://wttr.in/London?format=3"}
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful 123"} out={"command": "echo test successful 123"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2345 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2345 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in/?format=3"} out={"url": "https://wttr.in/?format=3"}
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in/?format=3"} out={"url": "https://wttr.in/?format=3"}
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful 123"} out={"command": "echo test successful 123"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful 123"} out={"command": "echo test successful 123"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+[normalize] run_command in={"command": "echo test successful 123"} out={"command": "echo test successful 123"}
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful 123"} out={"command": "echo test successful 123"}
+🛑 /chat stop: repeated identical batch ('run_command', '{"command": "echo test successful 123"}')
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 9.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 1.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 4 (max_tokens=4096)
+📨 Incoming message length: 38 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2377 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2377 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+📨 Incoming message length: 22 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2363 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2363 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 197580, Requested 2426. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2493 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2493 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 41 chars
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 470 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=470 affordable=106]]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+[normalize] run_command in={"command": "echo \"hello world\" > test.txt"} out={"command": "echo \"hello world\" > test.txt"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+[normalize] run_command in={"command": "echo \"hello world\" > test.txt && cat test.txt"} out={"command": "echo \"hello world\" > test.txt && cat test.txt"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+[normalize] run_command in={"command": "curl -s \"https://wttr.in/London?format=3\""} out={"command": "curl -s \"https://wttr.in/London?format=3\""}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199649, Requested 1352. Please try
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 484 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=484 affordable=106]]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199647, Requested 1688. Please try [retry budget exhausted]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 484 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=484 affordable=106]]
+🪶 reduced schema: 15 -> 2 tools, ~126 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 37 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2390 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2390 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199482, Requested 2459. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2520 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2520 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False

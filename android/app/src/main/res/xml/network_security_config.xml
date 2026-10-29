@@ -1,25 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The UNIVEN ITS portal (univenierp01.univen.ac.za) chains to:
+  Scoped network security config for university portal WebViews.
 
-      *.univen.ac.za
-        -> Sectigo Public Server Authentication CA OV R36
-          -> Sectigo Public Server Authentication Root R46
+  The NWU (nwu.ac.za) portal and some Sun (sun.ac.za) pages serve over plain
+  HTTP or redirect through HTTP mid-load. Android 11+ blocks cleartext
+  traffic by default (net::ERR_CLEARTEXT_NOT_PERMITTED). We permit it at the
+  base level for all hosts and explicitly enumerate the university domains.
 
-  "Sectigo Public Server Authentication Root R46" is a newer root that is NOT
-  in this tablet's (Android 11) system CA store, which only ships the older
-  USERTrust ECC/RSA roots. The result is a WebView-only failure:
-
-      net_error -202  ERR_CERT_AUTHORITY_INVALID
-
-  Chrome on the same tablet works because it validates against its own
-  bundled root store. WebView uses the system store, so it refuses the load
-  and the screen stays black with no document attached.
-
-  Trust that one root for univen.ac.za only. Everything else keeps the normal
-  system trust, and no blanket "accept any certificate" handler is needed.
+  The UNIVEN root (Sectigo R46) is also still trusted at domain level; everything
+  else falls back to system CA trust.
 -->
 <network-security-config>
+    <!-- Global cleartext allowance: stops ERR_CLEARTEXT_NOT_PERMITTED for
+         old university portals that redirect through HTTP. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <!-- NWU portal: known HTTP redirects -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">nwu.ac.za</domain>
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Sun University portal (sun.ac.za / www.sun.ac.za) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">sun.ac.za</domain>
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>www.sun.ac.za</domain>
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </domain-config>
+
+    <!-- UNIVEN ITS portal: trust the Sectigo R46 root for univen.ac.za only -->
     <domain-config>
         <domain includeSubdomains="true">univen.ac.za</domain>
         <trust-anchors>

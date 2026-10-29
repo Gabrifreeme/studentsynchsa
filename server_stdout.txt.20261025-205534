@@ -1,0 +1,243 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 1504
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=11:06:12  663960 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 70 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2511 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2511 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2511 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2511 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2641 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2641 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2641 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2641 affordable=112]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+[ACE-DISPATCH] no models available. per-provider reasons:
+  OpenRouter 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepse
+  OpenRouter 402: Prompt tokens limit exceeded: 2511 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrad
+  OpenRouter 402: Prompt tokens limit exceeded: 2511 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrad
+  Groq 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties:
+  Cerebras 402: Payment required to access this resource. Visit your billing tab.
+  FreeLLM 404: Application not found
+  OpenRouter-fallback 402: Prompt tokens limit exceeded: 2641 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrad
+  OpenRouter-fallback 402: Prompt tokens limit exceeded: 2641 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrad
+📨 Incoming message length: 70 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2514 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2514 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2514 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2514 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"query": "B&Bs near Mabula Lodge South Africa prices"} out={"query": "B&Bs near Mabula Lodge South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2669 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2669 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2669 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2669 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 3.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2799 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2799 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2799 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2799 affordable=112]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 70 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2472 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2472 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2472 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2472 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"query": "bed and breakfast near Mabula Game Lodge Waterberg South Africa prices"} out={"query": "bed and breakfast near Mabula Game Lodge Waterberg South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"query": "bed and breakfast near Mabula Game Lodge Bela Bela South Africa prices"} out={"query": "bed and breakfast near Mabula Game Lodge Bela Bela South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 6.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+[normalize] run_command in={"command": "echo \"run_command test successful\" > test_run.txt"} out={"command": "echo \"run_command test successful\" > test_run.txt"}
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 4421, Requested 4116. Plea [retry budget exhausted]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2970 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2970 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2970 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2970 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 4344, Requested 4116. Plea [retry budget exhausted]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 3100 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=3100 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 3100 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=3100 affordable=112]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 70 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2523 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2523 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2523 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2523 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"query": "B&Bs bed and breakfast near Mabula Game Lodge Waterberg South Africa prices"} out={"query": "B&Bs bed and breakfast near Mabula Game Lodge Waterberg South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2671 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2671 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2671 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2671 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 2.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+[normalize] web_search in={"max_results": 10, "query": "bed and breakfast near Mabula Game Lodge Bela-Bela South Africa prices"} out={"max_results": 10, "query": "bed and breakfast near Mabula Game Lodge Bela-Bela South Africa prices"}
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (10 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 9.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+[normalize] web_search in={"max_results": 10, "query": "B&B \"Mabula\" OR \"Bela-Bela\" OR \"Mokopane\" bed and breakfast price per night"} out={"max_results": 10, "query": "B&B \"Mabula\" OR \"Bela-Bela\" OR \"Mokopane\" bed and breakfast price per night"}
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (10 results)
+🔧 /chat executed web_search ok=True
+[ACE-DISPATCH] 3+ distinct searches; synthesizing from evidence
+✂️ Groq 413 (requested 9729 of 7000): retrying with 0 tools, 17 messages
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 6410, Requested 3680. Plea [retry budget exhausted]
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2505 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2505 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2505 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2505 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"query": "bed and breakfast near Mabula Game Lodge Bela Bela South Africa prices"} out={"query": "bed and breakfast near Mabula Game Lodge Bela Bela South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2657 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2657 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2657 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2657 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 6248, Requested 3566. Plea [daily/period quota exhausted - not retrying]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2787 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2787 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2787 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2787 affordable=112]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2451 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2451 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2451 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2451 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+[normalize] web_search in={"max_results": 8, "query": "B&Bs near Mabula Lodge South Africa prices"} out={"max_results": 8, "query": "B&Bs near Mabula Lodge South Africa prices"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (8 results)
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2659 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2659 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2659 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2659 affordable=112]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 1.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query'] [tool call failed schema validation (null or wrong-typed argument)]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2789 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2789 affordable=106]]
+🪶 reduced schema: 62 -> 22 tools, ~2568 tokens
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2789 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2789 affordable=112]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False

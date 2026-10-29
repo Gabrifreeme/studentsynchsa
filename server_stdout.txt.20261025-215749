@@ -1,0 +1,53 @@
+⚠️ Ollama reachability check failed: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=11434): Max retries exceeded with url: /api/tags (Caused by NewConnectionError
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 17596
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:56:29  724436 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:56:58] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📧 email watch: primed mailboxes, now polling every 120s
+📥 [Groq] HTTP 400 len=552
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query', additionalProperties 'url' not allowed] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=deepseek-v4-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [21:56:58] Sending to OpenCode (deepseek-v4-flash-free) — 4 messages, tools=yes
+📥 [OpenCode] HTTP 400 len=92
+❌ OpenCode (deepseek-v4-flash-free) 400: Upstream request failed: Model is unavailable.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=10 timeout=(10, 90) tools=yes
+📋 [21:56:59] Sending to Cerebras (gpt-oss-120b) — 10 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=10 timeout=(10, 90) tools=yes
+📋 [21:56:59] Sending to FreeLLM (auto) — 10 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode-fallback] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.5-free msgs=4 timeout=(10, 90) tools=yes
+📋 [21:57:00] Sending to OpenCode-fallback (mimo-v2.5-free) — 4 messages, tools=yes
+📥 [OpenCode-fallback] HTTP 410 len=214
+❌ OpenCode-fallback (mimo-v2.5-free) 410: Model mimo-v2.5-free has been deprecated. Use mimo-v2.6-flash-free instead.
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'OpenCode', 'Cerebras', 'FreeLLM'] ollama=False
+📋 [21:57:00] Dispatch complete: 10 messages, model=deepseek/deepseek-v4-flash-0731:free
+[ACE-DISPATCH] no models available. per-provider reasons:
+  Groq 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties:
+  OpenCode 400: Upstream request failed: Model is unavailable.
+  Cerebras 402: Payment required to access this resource. Visit your billing tab.
+  FreeLLM 404: Application not found
+  OpenCode-fallback 410: Model mimo-v2.5-free has been deprecated. Use mimo-v2.6-flash-free instead.

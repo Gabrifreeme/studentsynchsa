@@ -1,0 +1,155 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 15876
+[boot] git HEAD  : 0715dd2  (+1 modified)
+[boot] server.py : mtime=01:48:28  660484 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+📧 email watch: primed mailboxes, now polling every 120s
+❌ Groq (qwen/qwen3.8-27b) 400: Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[normalize] list_files in={"path": "."} out={"path": "."}
+🔧 /chat executed list_files ok=True
+[normalize] run_command in={"command": "find . -type d -name \"*StudentSync*\" 2>/dev/null | head -20"} out={"command": "find . -type d -name \"*StudentSync*\" 2>/dev/null | head -20"}
+🔧 /chat executed run_command ok=True
+[normalize] list_user_files in={"path": "Documents"} out={"path": "Documents"}
+🔧 /chat executed list_user_files ok=True
+[normalize] run_command in={"command": "dir /s /b StudentSyncSA 2>nul"} out={"command": "dir /s /b StudentSyncSA 2>nul"}
+🔧 /chat executed run_command ok=True
+[normalize] list_files in={"path": "C:\\Users\\chris\\StudentSyncSA"} out={"path": "C:\\Users\\chris\\StudentSyncSA"}
+🔧 /chat executed list_files ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && ls -la"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && ls -la"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir android"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir android"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find android/app/src -type f -name \"*.kt\" | head -20"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find android/app/src -type f -name \"*.kt\" | head -20"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find android/app/src -type f -name \"*.kt\" -exec grep -l \"Online Portal\" {} \\;"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find android/app/src -type f -name \"*.kt\" -exec grep -l \"Online Portal\" {} \\;"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir lib"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && dir lib"}
+🔧 /chat executed run_command ok=True
+[normalize] run_command in={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find lib -type f -name \"*.dart\" -exec grep -l \"Online Portal\" {} \\;"} out={"command": "cd /d C:\\Users\\chris\\StudentSyncSA && find lib -type f -name \"*.dart\" -exec grep -l \"Online Portal\" {} \\;"}
+🔧 /chat executed run_command ok=True
+[normalize] grep in={"path": "lib", "pattern": "Online Portal"} out={"path": "lib", "pattern": "Online Portal"}
+🔧 /chat executed grep ok=True
+[normalize] read_file in={"path": "presentation/screens/universities/university_detail_screen.dart"} out={"path": "presentation/screens/universities/university_detail_screen.dart"}
+🔧 /chat executed read_file ok=False
+[normalize] read_file in={"path": "lib/presentation/screens/universities/university_detail_screen.dart"} out={"path": "lib/presentation/screens/universities/university_detail_screen.dart"}
+🔧 /chat executed read_file ok=True
+[normalize] read_file in={"path": "lib/presentation/screens/universities/university_detail_screen.dart"} out={"path": "lib/presentation/screens/universities/university_detail_screen.dart"}
+🔧 /chat executed read_file ok=True
+[normalize] read_file in={"path": "lib/presentation/screens/universities/university_detail_screen.dart"} out={"path": "lib/presentation/screens/universities/university_detail_screen.dart"}
+🔧 /chat executed read_file ok=True
+[normalize] read_file in={"path": "lib/presentation/screens/universities/university_detail_screen.dart"} out={"path": "lib/presentation/screens/universities/university_detail_screen.dart"}
+🛑 /chat stop: repeated identical batch ('read_file', '{"path": "lib/presentation/screens/universities/university_detail_screen.dart"}')
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj)
+⏳ Groq 429: waiting 4.0s before attempt 3 (Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198748, Requested 1633. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[normalize] list_files in={"path": "."} out={"path": "."}
+🔧 /chat executed list_files ok=True
+[normalize] list_files in={"path": "%USERPROFILE%"} out={"path": "%USERPROFILE%"}
+🔧 /chat executed list_files ok=True
+[normalize] run_command in={"command": "where /r %USERPROFILE% pubspec.yaml"} out={"command": "where /r %USERPROFILE% pubspec.yaml"}
+🔧 /chat executed run_command ok=False
+⏰ /chat stop: time budget 240s reached
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+[normalize] cdp_network_requests in={"limit": 20} out={"limit": 20}
+🔧 /chat executed cdp_network_requests ok=True
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+[normalize] cdp_network_requests in={"limit": 50} out={"limit": 50}
+🔧 /chat executed cdp_network_requests ok=True
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199350, Requested 2014. Please try
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199208, Requested 1682. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199061, Requested 1913. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[normalize] list_files in={"path": "."} out={"path": "."}
+⛔ list_files skipped, user aborted
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198912, Requested 2095. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[normalize] git_branch in={} out={}
+🔧 /chat executed git_branch ok=True
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198746, Requested 1790. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198600, Requested 1590. Please try
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+[normalize] run_command in={"command": "echo \"ready\""} out={"command": "echo \"ready\""}
+✅ Groq recovered on attempt 4 (max_tokens=4096)
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199859, Requested 1525. Please try [retry budget exhausted]
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199859, Requested 1525. Please try [retry budget exhausted]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+⚠️ task queue worker: KeyError: 'error'
+🪶 reduced schema: 31 -> 5 tools, ~788 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)

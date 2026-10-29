@@ -651,7 +651,7 @@ class MockUniversityData {
       shortName: 'UCT',
       province: 'Western Cape',
       website: 'https://www.uct.ac.za',
-      applicationUrl: 'https://www.uct.ac.za/apply',
+      applicationUrl: 'https://www.uct.ac.za/main/apply',
       logoUrl: 'https://usaf.ac.za/wp-content/uploads/2023/08/University_of_Cape_Town-logo.webp',
       hasApplicationFee: true,
       applicationFee: 300,

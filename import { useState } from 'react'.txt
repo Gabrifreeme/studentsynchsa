@@ -1,0 +1,1788 @@
+import { useState } from 'react'
+
+export default function App() {
+  const [activeSection, setActiveSection] = useState('overview')
+
+  const sections = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'diagnostic', label: 'Console vs Device' },
+    { id: 'fix-code', label: '🔧 COMPLETE FIX CODE' },
+    { id: 'root-cause', label: 'Root Cause' },
+    { id: 'gv-issue', label: 'gv Truncation Issue' },
+    { id: 'files', label: 'Files Modified' },
+    { id: 'build', label: 'Build & Deploy' },
+    { id: 'verified', label: 'Verified Fixes' },
+    { id: 'residual', label: 'Residual Issues' },
+    { id: 'questions', label: 'Questions for Arena' },
+  ]
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="border-b border-slate-700 bg-slate-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-orange-500">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">404 Error Fix History</h1>
+                <p className="text-xs text-slate-400">ITS Portal Integration Fix</p>
+              </div>
+            </div>
+            <nav className="hidden md:flex gap-1">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    activeSection === section.id
+                      ? 'bg-red-500/20 text-red-400'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar Navigation */}
+          <aside className="lg:col-span-1 space-y-2">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                  activeSection === section.id
+                    ? 'bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50 border border-transparent'
+                }`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </aside>
+
+          {/* Content Area */}
+          <div className="lg:col-span-3 space-y-8">
+            {/* Overview Section */}
+            {activeSection === 'overview' && (
+              <section className="space-y-6">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <h2 className="text-2xl font-bold text-white mb-4">Overview</h2>
+                  <p className="text-slate-300 leading-relaxed">
+                    This document tracks the comprehensive fix for 404 errors in the ITS (Integrated Tertiary Software) portal,
+                    addressing URL construction bugs in the Univen ERP system. The fix involved modifications across multiple
+                    layers: Dart services, JavaScript injection, and Python automation.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+                      <div className="text-3xl font-bold text-green-400">4</div>
+                      <div className="text-sm text-slate-400">Files Modified</div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+                      <div className="text-3xl font-bold text-blue-400">10+</div>
+                      <div className="text-sm text-slate-400">Code Changes Needed</div>
+                    </div>
+                    <div className="bg-red-500/20 rounded-xl p-4 border border-red-500/30">
+                      <div className="text-3xl font-bold text-red-400">63</div>
+                      <div className="text-sm text-red-300">Days Unresolved</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 rounded-2xl p-5 border border-red-500/30">
+                  <h3 className="text-lg font-bold text-white mb-2">What You Need To Do Right Now</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <ol className="text-sm text-slate-300 space-y-2">
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-400 font-bold">1.</span>
+                          <span>Go to <strong className="text-white">🔧 COMPLETE FIX CODE</strong> tab</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-400 font-bold">2.</span>
+                          <span>Copy the code blocks and paste into your 4 files</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-400 font-bold">3.</span>
+                          <span>Rebuild, install, force-stop, test on phone</span>
+                        </li>
+                      </ol>
+                    </div>
+                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                      <p className="text-xs text-slate-400 mb-1">If it still fails, I need just ONE line from the 404 page:</p>
+                      <pre className="text-xs font-mono text-yellow-300">DIAG: Page: https://...</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">System Architecture</h3>
+                  <div className="bg-slate-900/50 rounded-xl p-4 font-mono text-sm">
+                    <pre className="text-green-400">
+{`┌─────────────────────────────────────────────────────────────┐
+│                    ITS Portal Fix Architecture               │
+├─────────────────────────────────────────────────────────────┤
+│  Flutter App (Android)                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Dart Layer  │  │   JS Layer   │  │  Python      │      │
+│  │  Services    │  │  Injection   │  │  Automation  │      │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
+│         │                 │                 │               │
+│         └─────────────────┼─────────────────┘               │
+│                           ▼                                 │
+│              ┌────────────────────────┐                     │
+│              │    WebView Client      │                     │
+│              │  (Navigation Delegate) │                     │
+│              └──────────┬─────────────┘                     │
+│                         ▼                                    │
+│              ┌────────────────────────┐                     │
+│              │   Univen ERP Server    │                     │
+│              │   (univenierp01)       │                     │
+│              └────────────────────────┘                     │
+└─────────────────────────────────────────────────────────────┘`}
+                    </pre>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Console vs Device Diagnostic Section */}
+            {activeSection === 'diagnostic' && (
+              <section className="space-y-6">
+                <div className="bg-orange-500/10 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/20">
+                      <svg className="h-6 w-6 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Console Shows Success, Device Shows 404</h2>
+                  </div>
+
+                  <div className="bg-orange-500/10 rounded-xl p-6 border border-orange-500/30 mb-6">
+                    <h3 className="font-semibold text-orange-400 mb-4">The Discrepancy Explained</h3>
+                    <p className="text-slate-300 mb-4">
+                      You're seeing two different realities because <strong className="text-white">your console and your phone app are looking at different layers of the stack</strong>.
+                    </p>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="h-3 w-3 rounded-full bg-green-400"></div>
+                          <h4 className="font-semibold text-green-400">What Console Shows (Success ✅)</h4>
+                        </div>
+                        <ul className="text-sm text-slate-300 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-400 mt-0.5">•</span>
+                            <span>JS <code className="text-green-300">navfix</code> injection works</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-400 mt-0.5">•</span>
+                            <span>Fetch/XHR wrappers rewrite URLs</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-400 mt-0.5">•</span>
+                            <span>POST body rewrites fire correctly</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-400 mt-0.5">•</span>
+                            <span>Autofill fills 30 fields successfully</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-green-400 mt-0.5">•</span>
+                            <span>Validation XHRs return 200 OK</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/30">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="h-3 w-3 rounded-full bg-red-400"></div>
+                          <h4 className="font-semibold text-red-400">What Phone Shows (404 ❌)</h4>
+                        </div>
+                        <ul className="text-sm text-slate-300 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>Initial page navigation loads truncated URL</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>WebView receives <code className="text-red-300">gen.gw1pkg.gv</code> (404)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>JS navfix never loads (page is 404!)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>Native POST bypasses JS layer entirely</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>Server returns "Not Found" page</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
+                    <h3 className="font-semibold text-white mb-4">Why This Happens - The 6-Layer Problem</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">✓</div>
+                        </div>
+                        <div className="flex-1 bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+                          <h4 className="font-medium text-green-400 text-sm">Layer 1: JS Injection (autofill_script.dart)</h4>
+                          <p className="text-xs text-slate-400 mt-1">Fixes URLs after page loads. Works IF the page loads first.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">✓</div>
+                        </div>
+                        <div className="flex-1 bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+                          <h4 className="font-medium text-green-400 text-sm">Layer 2: Fetch/XHR Wrappers</h4>
+                          <p className="text-xs text-slate-400 mt-1">Intercepts AJAX calls and rewrites POST URLs. Only works for JS-initiated requests.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs font-bold">✓</div>
+                        </div>
+                        <div className="flex-1 bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+                          <h4 className="font-medium text-green-400 text-sm">Layer 3: Dart URL Normalization (its_url_fixer.dart)</h4>
+                          <p className="text-xs text-slate-400 mt-1">Rewrites URLs before navigation. Handles <code className="text-yellow-300">gwa/gwas</code> pattern.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 text-xs font-bold">✗</div>
+                        </div>
+                        <div className="flex-1 bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+                          <h4 className="font-medium text-red-400 text-sm">Layer 4: Dart Navigation Delegate (onNavigationRequest)</h4>
+                          <p className="text-xs text-slate-300 mt-1">Should catch truncated URLs, but <code className="text-red-300">gv</code> pattern is NOT in the detection list!</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 text-xs font-bold">✗</div>
+                        </div>
+                        <div className="flex-1 bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+                          <h4 className="font-medium text-red-400 text-sm">Layer 5: onPageStarted Guard</h4>
+                          <p className="text-xs text-slate-300 mt-1">Checks for <code className="text-red-300">gen.gw1pkg.gw</code> but <code className="text-red-300">gen.gw1pkg.gv</code> might slip through!</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 text-xs font-bold">✗</div>
+                        </div>
+                        <div className="flex-1 bg-red-500/10 rounded-lg p-3 border border-red-500/20">
+                          <h4 className="font-medium text-red-400 text-sm">Layer 6: Native WebView POST Handling</h4>
+                          <p className="text-xs text-slate-300 mt-1">Native Android WebView POST requests bypass ALL JS interception. No MethodChannel exists yet.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 mb-6">
+                    <h3 className="font-semibold text-white mb-4">The Timing Problem</h3>
+                    <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                      <pre className="text-sm font-mono text-slate-300">
+{`Timeline of what happens on your phone:
+
+  0.000s  → User taps "Load ITS Portal"
+  0.001s  → Dart constructs URL: gen.gw1pkg.gw1view
+  0.002s  → URL gets truncated to: gen.gw1pkg.gv
+           (64-char limit truncation)
+  0.003s  → onNavigationRequest fires
+           → Checks: contains 'gv'? NO ← not implemented!
+           → Lets request through unchanged
+  0.005s  → onPageStarted fires
+           → Checks: contains 'gen.gw1pkg.gw'? YES
+           → BUT the URL is already 'gen.gw1pkg.gv'
+           → Pattern match FAILS
+  0.010s  → WebView navigates to: gen.gw1pkg.gv
+  0.015s  → Server returns 404: "Not Found"
+  0.020s  → 404 page loads (no ITS content)
+  0.025s  → JS injection fires
+           → But page is 404, not ITS portal
+           → JS finds nothing to fix
+  0.030s  → Console logs: "Fix injected ✓"
+           (Console doesn't know page is 404!)
+  ──────────────────────────────────────
+  RESULT: Phone shows 404, console shows success`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-500/10 rounded-xl p-6 border border-red-500/30">
+                    <h3 className="font-semibold text-red-400 mb-4">The Fix - What Needs to Change NOW</h3>
+                    
+                    <div className="space-y-4">
+                       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                         <h4 className="font-medium text-red-400 mb-2">PRIORITY 1: Add 'gw1p' AND 'gv' to onNavigationRequest</h4>
+                         <pre className="text-xs font-mono text-slate-300 overflow-x-auto">
+{`// In university_webview_screen.dart
+onNavigationRequest: (request) {
+  final url = request.url;
+  
+  // ⭐ NEW: Catch gw1p truncation (CURRENT on your phone!)
+  if (url.contains('gen.gw1pkg.gw1p') &&
+      !url.contains('gw1view') && !url.contains('gw1proc')) {
+    final fixedUrl = url.replaceFirst('gen.gw1pkg.gw1p', 'gen.gw1pkg.gw1view');
+    debugPrint('🔧 gw1p truncation intercepted: $url → $fixedUrl');
+    return NavigationDecision.prevent;
+  }
+  
+  //  ALSO: Catch gv truncation (previous pattern, keep as fallback)
+  if (url.contains('gen.gw1pkg.gv') &&
+      !url.contains('gw1view') && !url.contains('gw1proc')) {
+    final fixedUrl = url.replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+    debugPrint('🔧 gv truncation intercepted: $url → $fixedUrl');
+    return NavigationDecision.prevent;
+  }
+  // Existing checks...
+}`}
+                         </pre>
+                       </div>
+
+                       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                         <h4 className="font-medium text-red-400 mb-2">PRIORITY 2: Add 'gw1p' AND 'gv' to onPageStarted</h4>
+                         <pre className="text-xs font-mono text-slate-300 overflow-x-auto">
+{`// In university_webview_screen.dart  
+onPageStarted: (url) {
+  //  NEW: Check for gw1p truncation
+  if (url.contains('gen.gw1pkg.gw1p')) {
+    debugPrint('️ gw1p truncation detected in onPageStarted!');
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final fixedUrl = url.replaceFirst('gen.gw1pkg.gw1p', 'gen.gw1pkg.gw1view');
+      controller?.loadUrl(fixedUrl);
+    });
+    return;
+  }
+  
+  // ⚠ ALSO: Check for gv truncation
+  if (url.contains('gen.gw1pkg.gv')) {
+    _recoverTruncatedPage(url);
+  }
+  
+  // Existing checks:
+  if (url.contains('gen.gw1pkg.gw') ||
+      url.contains('gen.gw1pkg.gw1')) {
+    // ...existing logic
+  }
+}`}
+                         </pre>
+                       </div>
+
+                       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                         <h4 className="font-medium text-red-400 mb-2">PRIORITY 3: Add 'gw1p' AND 'gv' to _recoverTruncatedPage()</h4>
+                         <pre className="text-xs font-mono text-slate-300 overflow-x-auto">
+{`// In its_url_fixer.dart
+String? _recoverTruncatedPage(String url) {
+  // Existing patterns:
+  if (url.contains('gwa') || url.contains('gwas')) return 'gw1view';
+  if (url.contains('gwav') || url.contains('gwavs')) return 'gw1view';
+  
+  // ⭐ NEW: gw1p truncation (CURRENT on your phone)
+  if (url.contains('gen.gw1pkg.gw1p')) return 'gw1view';
+  if (url.contains('.gw1p?') || url.contains('.gw1p&')) return 'gw1view';
+  
+  // ⚠ ALSO: gv truncation (previous pattern)
+  if (url.contains('gen.gw1pkg.gv') || 
+      url.contains('.gv1') || 
+      url.contains('.gv')) {
+    return 'gw1view';
+  }
+}`}
+                         </pre>
+                       </div>
+
+                       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                         <h4 className="font-medium text-red-400 mb-2">PRIORITY 4: Add 'gw1p' AND 'gv' to JS navfix</h4>
+                         <pre className="text-xs font-mono text-slate-300 overflow-x-auto">
+{`// In autofill_script.dart (JS injection)
+function fixUrl(url) {
+  // Existing:
+  url = url.replace('univenlerp01', 'univenierp01');
+  url = url.replace('.gwa', '.gw1view');
+  
+  //  NEW: gw1p truncation (CURRENT)
+  url = url.replace('gen.gw1pkg.gw1p', 'gen.gw1pkg.gw1view');
+  url = url.replace('.gw1p?', '.gw1view?');
+  url = url.replace('.gw1p&', '.gw1view&');
+  
+  // ⚠ ALSO: gv truncation (previous, keep as fallback)
+  url = url.replace('.gv1', '.gw1view');
+  url = url.replace('.gv&', '.gw1view&');
+  url = url.replace('.gv?', '.gw1view?');
+  url = url.replace('.gv"', '.gw1view"');
+  
+  // Catches all variants
+  if (url.includes('gen.gw1pkg.gv')) {
+    url = url.replace('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+  }
+  
+  return url;
+}`}
+                         </pre>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* 🔧 COMPLETE FIX CODE SECTION */}
+            {activeSection === 'fix-code' && (
+              <section className="space-y-6">
+                <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-orange-500">
+                      <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">🔧 COMPLETE FIX CODE</h2>
+                      <p className="text-sm text-orange-300">Copy-paste these changes into your files, rebuild, and deploy</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30 mb-6">
+                    <p className="text-sm text-orange-300 font-medium">
+                      ⚡ DO ALL 4 FILES IN ORDER. After completing all 4: rebuild → install → force-stop → test
+                    </p>
+                  </div>
+
+                  {/* MINIMUM INFO BOX */}
+                  <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl p-5 border border-blue-500/40 mb-6">
+                    <h3 className="font-bold text-white text-lg mb-3">📌 The ONE Line I Need (Only If The Fix Doesn't Work)</h3>
+                    <p className="text-sm text-slate-300 mb-3">
+                      On your phone, the 404 page has a line like this:
+                    </p>
+                    <div className="bg-slate-900 rounded-lg p-3 mb-3">
+                      <pre className="text-xs font-mono text-yellow-300">
+{`DIAG: Page: https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1p`}
+                      </pre>
+                    </div>
+                    <p className="text-sm text-white font-medium">
+                      I need that ENTIRE line. Just that one line. Copy the full URL from it.
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Everything after "DIAG: Page: " — that's all I need. It tells me exactly how the URL is being mangled.
+                    </p>
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* FILE 1: its_url_fixer.dart */}
+                  {/* ============================================ */}
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
+                          <span className="text-blue-400 font-bold text-sm">1</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">lib/services/its_url_fixer.dart</h3>
+                          <p className="text-sm text-slate-400">Dart URL normalization</p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-medium">Dart</span>
+                    </div>
+
+                    <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30 mb-4">
+                      <h4 className="font-semibold text-red-400 text-sm mb-2">⚠ CRITICAL ADDITIONS — Add ALL of these:</h4>
+                    </div>
+
+                    {/* Change 1A */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 1A: Add 'gv' AND 'gw1p' to _recoverTruncatedPage()</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find the _recoverTruncatedPage() method and ADD these lines:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE _recoverTruncatedPage(String url) method:
+
+// ===== EXISTING CODE (keep these) =====
+if (url.contains('gwas') || url.contains('gwa/')) {
+  return url.replaceAll('gwas', 'gw1view').replaceAll('gwa/', 'gw1view/');
+}
+if (url.contains('gwav') || url.contains('gwavs')) {
+  return url.replaceAll('gwav', 'gw1view').replaceAll('gwavs', 'gw1view');
+}
+
+// ===== 🔧 ADD THESE NEW LINES =====
+
+// ⭐ NEW: Pattern gw1p (current truncation on your phone)
+// gen.gw1pkg.gw1p → gen.gw1pkg.gw1view
+if (url.contains('gen.gw1pkg.gw1p')) {
+  return url.replaceFirst('gen.gw1pkg.gw1p', 'gen.gw1pkg.gw1view');
+}
+
+// ⭐ NEW: Pattern gw1p with query/fragment separators
+if (url.contains('.gw1p?') || url.contains('.gw1p&') || url.contains('.gw1p"')) {
+  return url.replaceAll('.gw1p?', '.gw1view?')
+            .replaceAll('.gw1p&', '.gw1view&')
+            .replaceAll('.gw1p"', '.gw1view"');
+}
+
+// Pattern: gen.gw1pkg.gv (most aggressive truncation)
+if (url.contains('gen.gw1pkg.gv')) {
+  return url.replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+}
+
+// Pattern: gv followed by query params or end
+if (url.contains('.gv?') || url.contains('.gv&') || url.contains('.gv"')) {
+  return url.replaceAll('.gv?', '.gw1view?')
+            .replaceAll('.gv&', '.gw1view&')
+            .replaceAll('.gv"', '.gw1view"');
+}
+
+// Pattern: gv1 (partial - missing 'ie' or 'iew')
+if (url.contains('.gv1') && !url.contains('.gv1view')) {
+  return url.replaceFirst('.gv1', '.gw1view');
+}
+
+// Pattern: gwa (aggressive truncation, no 's')
+if (url.contains('.gwa?') || url.contains('.gwa&') || url.contains('.gwa"')) {
+  return url.replaceAll('.gwa?', '.gw1view?')
+            .replaceAll('.gwa&', '.gw1view&')
+            .replaceAll('.gwa"', '.gw1view"');
+}
+
+// Pattern: gw1v (partial truncation)
+if (url.contains('.gw1v') && !url.contains('.gw1view') && !url.contains('.gw1proc')) {
+  return url.replaceFirst('.gw1v', '.gw1view');
+}`}
+                      </pre>
+                    </div>
+
+                    {/* Change 1B */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 1B: Add 'gv' to expandProcedure()</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find the expandProcedure() method and ADD these lines:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE expandProcedure() method:
+
+// ===== EXISTING CODE (keep these) =====
+// Full marker: gen.gw1pkg.gw1
+// Short marker: gen.gw1pkg.gw
+
+// ===== 🔧 ADD THIS NEW BLOCK =====
+// Ultra-aggressive truncation: gen.gw1pkg.gv
+String? handleGvTruncation(String url) {
+  // gv → gw1view
+  if (url.contains('gen.gw1pkg.gv')) {
+    // Determine if it should be gw1view or gw1proc
+    // Look at POST body or query params for clues
+    if (url.contains('&_type=post') || url.contains('&_action=submit')) {
+      return url.replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1proc');
+    }
+    return url.replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+  }
+  return null;
+}
+
+// Call it in expandProcedure():
+final gvFix = handleGvTruncation(url);
+if (gvFix != null) return gvFix;`}
+                      </pre>
+                    </div>
+
+                    {/* Change 1C */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 1C: Add 'gv' to normalize()</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find the normalize() method and ADD this line:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE normalize(String url) method:
+
+// ===== EXISTING =====
+url = url.replaceAll('univenlerp01', 'univenierp01');
+
+// ===== 🔧 ADD THIS LINE =====
+// gv truncation fix — must come AFTER domain fix
+url = url.replaceFirst(RegExp(r'gen\.gw1pkg\.gv[&?"\']?'), 'gen.gw1pkg.gw1view');`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* FILE 2: university_webview_screen.dart */}
+                  {/* ============================================ */}
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/20">
+                          <span className="text-green-400 font-bold text-sm">2</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">university_webview_screen.dart</h3>
+                          <p className="text-sm text-slate-400">Dart navigation delegate (THE MOST IMPORTANT FIX)</p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">Dart</span>
+                    </div>
+
+                    <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30 mb-4">
+                      <h4 className="font-semibold text-red-400 text-sm mb-2">⚠ THIS IS THE #1 FIX. The console works because JS runs after page load. The phone fails because the navigation delegate doesn't catch 'gv'.</h4>
+                    </div>
+
+                    {/* Change 2A */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 2A: Add 'gv' to onNavigationRequest (CRITICAL!)</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find onNavigationRequest and ADD this block:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE onNavigationRequest callback:
+
+onNavigationRequest: (NavigationRequest request) {
+  final url = request.url;
+  
+  // ===== 🔧 ADD THIS BLOCK AT THE VERY TOP =====
+  // Catch gv truncation BEFORE it reaches the server
+  if (url.contains('gen.gw1pkg.gv') ||
+      url.contains('gen.gw1pkg.gv1')) {
+    
+    final fixedUrl = url
+        .replaceFirst('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view')
+        .replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+    
+    debugPrint('🔧 gv truncation intercepted:');
+    debugPrint('   FROM: \$url');
+    debugPrint('   TO:   \$fixedUrl');
+    
+    // Prevent the bad navigation
+    return NavigationDecision.prevent;
+  }
+  
+  // Existing gwa/gwas/gwav checks (keep these):
+  if (url.contains('.gwa?') || url.contains('.gwa&') ||
+      url.contains('gwas') || url.contains('gwav')) {
+    final fixedUrl = url
+        .replaceAll('gwas', 'gw1view')
+        .replaceAll('gwav', 'gw1view')
+        .replaceAll('gwa?', 'gw1view?')
+        .replaceAll('gwa&', 'gw1view&');
+    
+    debugPrint('🔧 Truncation intercepted: \$url → \$fixedUrl');
+    return NavigationDecision.prevent;
+  }
+  
+  // ===== EXISTING CODE BELOW =====
+  // ... rest of your onNavigationRequest logic
+}`}
+                      </pre>
+                    </div>
+
+                    {/* Change 2B */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 2B: Add 'gv' to onPageStarted</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find onPageStarted and ADD this check:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE onPageStarted callback:
+
+onPageStarted: (String url) {
+  // ===== 🔧 ADD THIS BLOCK =====
+  // Check for gv truncation on page load
+  if (url.contains('gen.gw1pkg.gv') ||
+      url.contains('gen.gw1pkg.gv1')) {
+    debugPrint('⚠️ onPageStarted: gv truncation detected!');
+    debugPrint('   URL: \$url');
+    // The URL is already loading — it will 404
+    // We need to reload with the fixed URL
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final fixedUrl = url
+          .replaceFirst('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view')
+          .replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+      
+      debugPrint('🔄 Reloading with fixed URL: \$fixedUrl');
+      // Use your webview controller to reload
+      controller?.loadUrl(fixedUrl);
+    });
+    return;
+  }
+  
+  // ===== EXISTING CODE (keep these) =====
+  if (url.contains('gen.gw1pkg.gw') &&
+      !url.contains('gen.gw1pkg.gw1view') &&
+      !url.contains('gen.gw1pkg.gw1proc') &&
+      !url.contains('gen.gw1pkg.gw1startup')) {
+    // ... existing truncation recovery logic
+  }
+}`}
+                      </pre>
+                    </div>
+
+                    {/* Change 2C */}
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 2C: Add gv to _recoverTruncatedPage() in this file</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find _recoverTruncatedPage in this file and ADD:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`// INSIDE _recoverTruncatedPage(String url):
+
+// ===== 🔧 ADD THESE NEW PATTERNS =====
+
+// gv truncation (most aggressive)
+if (url.contains('gen.gw1pkg.gv')) {
+  return url.replaceFirst('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+}
+
+// gv1 truncation (partial)
+if (url.contains('.gv1') && !url.contains('.gv1view')) {
+  return url.replaceFirst('.gv1', '.gw1view');
+}
+
+// gv with query separator
+if (url.contains('.gv?')) return url.replaceFirst('.gv?', '.gw1view?');
+if (url.contains('.gv&')) return url.replaceFirst('.gv&', '.gw1view&');
+
+// ===== EXISTING PATTERNS (keep these) =====
+if (url.contains('gwas')) return url.replaceAll('gwas', 'gw1view');
+if (url.contains('gwav')) return url.replaceAll('gwav', 'gw1view');
+if (url.contains('gwavs')) return url.replaceAll('gwavs', 'gw1view');
+if (url.contains('gwa')) return url.replaceAll('gwa', 'gw1view');
+if (url.contains('gw1v') && !url.contains('gw1view')) {
+  return url.replaceAll('gw1v', 'gw1view');
+}`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* FILE 3: autofill_script.dart */}
+                  {/* ============================================ */}
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/20">
+                          <span className="text-yellow-400 font-bold text-sm">3</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">lib/services/autofill_script.dart</h3>
+                          <p className="text-sm text-slate-400">JS navfix injected at runtime</p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium">JavaScript</span>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 3A: Add 'gv' to fixUrl()</h4>
+                      <p className="text-xs text-slate-500 mb-3">Find the fixUrl() function in the JS string and ADD these lines:</p>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`function fixUrl(url) {
+  // ===== EXISTING =====
+  url = url.replace('univenlerp01', 'univenierp01');
+  
+  // ===== 🔧 ADD THESE LINES =====
+  // gv truncation — MUST be before gwa check
+  url = url.replace('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view');
+  url = url.replace('gen.gw1pkg.gv?', 'gen.gw1pkg.gw1view?');
+  url = url.replace('gen.gw1pkg.gv&', 'gen.gw1pkg.gw1view&');
+  url = url.replace('gen.gw1pkg.gv"', 'gen.gw1pkg.gw1view"');
+  url = url.replace('gen.gw1pkg.gv\\\'', 'gen.gw1pkg.gw1view\\\'');
+  
+  // Fallback: if we see .gv followed by anything, replace it
+  url = url.replace(/\.gv([&?"'])/g, '.gw1view\$1');
+  url = url.replace(/\.gv1([^v])/g, '.gw1view\$1');
+  
+  // Existing gwa/gwas/gwav fixes (keep these):
+  url = url.replace('gwas', 'gw1view');
+  url = url.replace('gwav', 'gw1view');
+  url = url.replace('gwavs', 'gw1view');
+  url = url.replace('gwa?', 'gw1view?');
+  url = url.replace('gwa&', 'gw1view&');
+  
+  return url;
+}`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 3B: Add 'gv' to expandProc()</h4>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`function expandProc(url) {
+  // ===== EXISTING =====
+  if (url.includes('gen.gw1pkg.gw1')) {
+    // Full marker expansion (keep existing logic)
+  }
+  if (url.includes('gen.gw1pkg.gw')) {
+    // Short marker expansion (keep existing logic)
+  }
+  
+  // ===== 🔧 ADD THIS BLOCK =====
+  // Ultra-aggressive truncation: gen.gw1pkg.gv
+  if (url.includes('gen.gw1pkg.gv')) {
+    console.log('🔧 JS: gv truncation detected, fixing...');
+    console.log('   FROM:', url);
+    
+    url = url.replace('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view');
+    url = url.replace('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+    
+    console.log('   TO:  ', url);
+  }
+  
+  return url;
+}`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 3C: Add 'gv' to fixAction() for form submits</h4>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`function fixAction(form) {
+  if (!form || !form.action) return;
+  
+  let action = form.action;
+  
+  // ===== 🔧 ADD THIS BLOCK =====
+  action = action.replace('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view');
+  action = action.replace('gen.gw1pkg.gv?', 'gen.gw1pkg.gw1view?');
+  action = action.replace('gen.gw1pkg.gv&', 'gen.gw1pkg.gw1view&');
+  action = action.replace(/\\.gv([&?"'])/g, '.gw1view\$1');
+  
+  // POST rewrite: gw1view → gw1proc for form submissions
+  if (form.method && form.method.toUpperCase() === 'POST') {
+    if (action.includes('gw1view')) {
+      action = action.replace('gw1view', 'gw1proc');
+    }
+    if (action.includes('.gv')) {
+      action = action.replace('.gv', '.gw1proc');
+    }
+  }
+  
+  form.action = action;
+  
+  // ===== EXISTING CODE (keep) =====
+  // ... rest of fixAction logic
+}`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* FILE 4: server.py */}
+                  {/* ============================================ */}
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/20">
+                          <span className="text-cyan-400 font-bold text-sm">4</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-white text-lg">server.py</h3>
+                          <p className="text-sm text-slate-400">Python automation</p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-xs font-medium">Python</span>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-4">
+                      <h4 className="font-semibold text-green-400 mb-2 text-sm">CHANGE 4A: Add gv fix to _fill_its_page()</h4>
+                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto bg-slate-950 rounded-lg p-3">
+{`# In _fill_its_page() or wherever JS injection happens:
+
+gv_fix_js = '''
+  // 🔧 gv truncation fix
+  (function() {
+    var currentUrl = window.location.href;
+    if (currentUrl.includes('gen.gw1pkg.gv')) {
+      console.log('🔧 Python injected: gv fix detected');
+      var fixedUrl = currentUrl
+        .replace('gen.gw1pkg.gv1', 'gen.gw1pkg.gw1view')
+        .replace('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+      if (currentUrl !== fixedUrl) {
+        window.history.replaceState({}, '', fixedUrl);
+        console.log('   Fixed URL to:', fixedUrl);
+      }
+    }
+  })();
+'''
+
+await page.evaluate(gv_fix_js)
+
+# ===== EXISTING CODE (keep) =====
+# ... rest of _fill_its_page() logic`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* BUILD & DEPLOY INSTRUCTIONS */}
+                  {/* ============================================ */}
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                    <h3 className="font-semibold text-white text-lg mb-4">📱 After making ALL changes:</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/20 flex-shrink-0 mt-0.5">
+                          <span className="text-red-400 font-bold text-xs">1</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-white font-medium">Edit all 4 files with the changes above</p>
+                          <p className="text-xs text-slate-400">Make sure you add ALL the gv-related code blocks</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/20 flex-shrink-0 mt-0.5">
+                          <span className="text-red-400 font-bold text-xs">2</span>
+                        </div>
+                        <div>
+                          <pre className="text-xs font-mono text-green-300">flutter build apk --debug --target-platform android-arm64</pre>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/20 flex-shrink-0 mt-0.5">
+                          <span className="text-red-400 font-bold text-xs">3</span>
+                        </div>
+                        <div>
+                          <pre className="text-xs font-mono text-blue-300">adb -s A6FF6R5527000712 install -r build/app/outputs/flutter-apk/app-debug.apk</pre>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/20 flex-shrink-0 mt-0.5">
+                          <span className="text-red-400 font-bold text-xs">4</span>
+                        </div>
+                        <div>
+                          <pre className="text-xs font-mono text-purple-300">adb shell am force-stop com.studentsyncsa.studentsyncsa</pre>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-500/20 flex-shrink-0 mt-0.5">
+                          <span className="text-green-400 font-bold text-xs">5</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-white font-medium">Open the app on your phone and test</p>
+                          <p className="text-xs text-slate-400">Look for the 🔧 gv truncation intercepted message in logs</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* gv Truncation Issue Section */}
+            {activeSection === 'gv-issue' && (
+              <section className="space-y-6">
+                <div className="bg-red-500/10 backdrop-blur-sm rounded-2xl p-6 border border-red-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/20">
+                      <svg className="h-6 w-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">CRITICAL: gv Truncation Issue</h2>
+                  </div>
+
+                  <div className="bg-red-500/10 rounded-xl p-6 border border-red-500/30 mb-6">
+                    <h3 className="font-semibold text-red-400 mb-4">Error from Phone Testing</h3>
+                    <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700 mb-4">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 flex-shrink-0">
+                          <span className="text-red-400 font-bold text-sm">ERR</span>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-white mb-2">Not Found - 404 Error</h4>
+                          <p className="text-slate-300 text-sm">
+                            The server cannot find the page or resource you are trying to access.
+                          </p>
+                        </div>
+                      </div>
+                      <pre className="text-sm font-mono text-red-300 overflow-x-auto">
+{`The requested URL /pls/prodi41/gen.gw1pkg.gv was not found
+DIAG: Page: https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view`}
+                      </pre>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-red-400 mb-2">Current URL (Broken)</h4>
+                        <code className="block px-3 py-2 bg-red-500/10 text-red-300 rounded font-mono text-sm">
+                          /pls/prodi41/gen.gw1pkg.gv
+                        </code>
+                      </div>
+                      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-green-400 mb-2">Expected URL (Fixed)</h4>
+                        <code className="block px-3 py-2 bg-green-500/10 text-green-300 rounded font-mono text-sm">
+                          /pls/prodi41/gen.gw1pkg.gw1view
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-500/10 rounded-xl p-6 border border-yellow-500/30 mb-6">
+                    <h3 className="font-semibold text-yellow-400 mb-3">Root Cause Analysis</h3>
+                    <p className="text-slate-300 mb-4">
+                      The URL is being truncated more aggressively than previously documented. The procedure name <code className="text-yellow-300">gw1view</code> 
+                      is being cut down to just <code className="text-yellow-300">gv</code> instead of <code className="text-yellow-300">gwa</code> or <code className="text-yellow-300">gwas</code>.
+                    </p>
+                    <div className="bg-slate-900/50 rounded-lg p-4 font-mono text-sm">
+                      <pre className="text-blue-300">
+{`URL Construction Flow:
+  1. Base URL: https://univenierp01.univen.ac.za/pls/prodi41/
+  2. Procedure: gen.gw1pkg.gw1view
+  3. Total length: 64+ characters
+  4. Truncation occurs at: gen.gw1pkg.gv
+  5. Missing: 1view suffix
+
+Why 'gv' instead of 'gwa'?
+  - Different truncation algorithm
+  - Possibly 2-character prefix + 2-character suffix pattern
+  - URL limit hitting at different position`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-500/10 rounded-xl p-6 border border-red-500/30">
+                    <h3 className="font-semibold text-red-400 mb-4">Required Fix - Add 'gv' Pattern Handling</h3>
+                    <p className="text-slate-300 mb-4">
+                      All three layers (Dart, JS, WebView) must be updated to handle the <code className="text-red-300">gv</code> truncation pattern:
+                    </p>
+                    <div className="space-y-3">
+                      <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                        <h4 className="font-medium text-green-400 mb-1">1. its_url_fixer.dart</h4>
+                        <pre className="text-xs font-mono text-slate-300">
+{`// Add to _recoverTruncatedPage()
+if (url.contains('gen.gw1pkg.gv')) {
+  return url.replace('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+}`}
+                        </pre>
+                      </div>
+                      <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                        <h4 className="font-medium text-green-400 mb-1">2. autofill_script.dart (JS)</h4>
+                        <pre className="text-xs font-mono text-slate-300">
+{`// Add to expandProc()
+if (url.includes('gen.gw1pkg.gv')) {
+  url = url.replace('gen.gw1pkg.gv', 'gen.gw1pkg.gw1view');
+}`}
+                        </pre>
+                      </div>
+                      <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                        <h4 className="font-medium text-green-400 mb-1">3. university_webview_screen.dart</h4>
+                        <pre className="text-xs font-mono text-slate-300">
+{`// Add to onPageStarted guard
+if (url.contains('gen.gw1pkg.gv')) {
+  handleTruncation(url, 'gen.gw1pkg.gw1view');
+}`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Root Cause Section */}
+            {activeSection === 'root-cause' && (
+              <section className="space-y-6">
+                <div className="bg-red-500/10 backdrop-blur-sm rounded-2xl p-6 border border-red-500/30">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/20">
+                      <svg className="h-6 w-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Root Cause Identified</h2>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/20">
+                      <h3 className="font-semibold text-red-400 mb-2">1. Domain Typo</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-xs text-slate-500">Incorrect:</span>
+                          <code className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded">univenlerp01</code>
+                        </div>
+                        <div>
+                          <span className="text-xs text-slate-500">Correct:</span>
+                          <code className="ml-2 px-2 py-1 bg-green-500/20 text-green-300 rounded">univenierp01</code>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
+                      <h3 className="font-semibold text-orange-400 mb-2">2. Procedure Truncation (Multiple Patterns)</h3>
+                      <p className="text-slate-300 mb-3">
+                        The 64-character URL limit causes aggressive truncation of procedure names:
+                      </p>
+                      <div className="bg-slate-900/50 rounded-lg p-3 font-mono text-sm overflow-x-auto">
+                        <pre className="text-yellow-300">
+{`Pattern 1 (Handled):
+  gw1view → gwa / gwas
+  gw1proc → gpr / gpro
+
+Pattern 2 (NEW - CRITICAL):
+  gw1view → gv  ← CURRENT ERROR
+  Cause:   Even more aggressive truncation
+
+Error from Phone:
+  /pls/prodi41/gen.gw1pkg.gv → 404
+  Expected: /pls/prodi41/gen.gw1pkg.gw1view`}
+                        </pre>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-500/10 rounded-xl p-4 border border-purple-500/20">
+                      <h3 className="font-semibold text-purple-400 mb-2">3. Marker System Breakdown</h3>
+                      <p className="text-slate-300">
+                        The ITS portal uses internal markers for procedure expansion. When URLs are truncated,
+                        the marker system fails to properly expand:
+                      </p>
+                      <div className="mt-3 bg-slate-900/50 rounded-lg p-4 font-mono text-sm">
+                        <pre className="text-blue-300">
+{`Full marker:   gen.gw1pkg.gw1 → expands to: gw1view / gw1proc
+Short marker:  gen.gw1pkg.gw  → fallback for aggressive truncation
+Truncated:     gwa / gwa → should expand to: gw1view`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Files Modified Section */}
+            {activeSection === 'files' && (
+              <section className="space-y-6">
+                {/* File 1 */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
+                        <svg className="h-5 w-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">lib/services/its_url_fixer.dart</h3>
+                        <p className="text-sm text-slate-400">Dart URL normalization service</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-medium">Dart</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Domain Fix in normalize()</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Before: univenlerp01
+// After:  univenierp01
+url = url.replace('univenlerp01', 'univenierp01')`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Rewritten expandProcedure()</h4>
+                      <pre className="text-sm font-mono text-slate-300 overflow-x-auto">
+{`// Full marker handling
+gen.gw1pkg.gw1 → v/vi/vie/view → view
+               → p/pr/pro/proc → proc
+
+// Short marker fallback
+gen.gw1pkg.gw → 1v/1vi/1vie/1view
+              → 1p/1proc`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Updated _recoverTruncatedPage()</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Catches aggressive truncations
+gw1v, gwa, gwas, gwav, gwavs → gw1view
+gv                             → gw1view  ← NEW
+
+CRITICAL: Need to add 'gv' pattern handling`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File 2 */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/20">
+                        <svg className="h-5 w-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">lib/presentation/screens/.../university_webview_screen.dart</h3>
+                        <p className="text-sm text-slate-400">Dart navigation delegate</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">Dart</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Aggressive Truncation Detection</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`onNavigationRequest:
+  // Detect gw prefix without view/proc
+  if (url contains 'gw' && !contains 'view' && !contains 'proc')
+    return rewriteUrl()
+
+onPageStarted:
+  // Expanded guard check
+  if (url contains 'gen.gw1pkg.gw')
+    handleTruncation()`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Enhanced _recoverTruncatedPage()</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Now catches additional truncations
+gwa  → gw1view
+gwas → gw1view
+gwav → gw1view
+gwavs→ gw1view
+gv   → gw1view  ← NEW - CRITICAL
+
+// All guards check for exclusions
+gw1view, gw1proc, gw1startup excluded from rewriting`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File 3 */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/20">
+                        <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="16 18 22 12 16 6" />
+                          <polyline points="8 6 2 12 8 18" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">lib/services/autofill_script.dart</h3>
+                        <p className="text-sm text-slate-400">JS navfix injected at runtime</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium">JavaScript</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ expandProc() - Dual Marker Support</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Full marker
+gen.gw1pkg.gw1 → expands to view/proc
+
+// Short marker fallback
+gen.gw1pkg.gw → handles aggressive truncation
+
+// Aggressive truncation handling
+gwa/gwas/gwav/gwavs → gw1view
+gv                  → gw1view  ← NEW PATTERN NEEDED`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ fixUrl() - Domain Fix</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`url = url.replace('univenlerp01', 'univenierp01')`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ Fetch & XMLHttpRequest Wrappers</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// POST gw1view → gw1proc rewrite
+fetch: intercept POST to gw1view, rewrite to gw1proc
+XMLHttpRequest: same rewrite logic
+
+// fixAction(): Form submission
+rewrite form action gw1view → gw1proc before submit`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File 4 */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/20">
+                        <svg className="h-5 w-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 20V10" />
+                          <path d="M18 20V4" />
+                          <path d="M6 20v-4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">server.py</h3>
+                        <p className="text-sm text-slate-400">Python automation/autofill</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-xs font-medium">Python</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ _fill_its_page() - Single-Batch CDP Injection</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Inject all 30 fields in single batch
+await page.evaluate('''
+  // CDP injection for all fields
+  fillField1(...); fillField2(...); ... fillField30(...)
+''')`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-green-400 mb-2">✓ _its_field_plan() / _its_fill_batch()</h4>
+                      <pre className="text-sm font-mono text-slate-300">
+{`// Proper field mapping from Hive profile
+field_plan = [
+  'citizenship', 'gender', 'age', ...
+]
+
+// Map profile data to fields
+its_fill_batch(profile, field_plan)
+
+// ui_fill action triggers autofill
+// Uses device Hive profile data`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <h4 className="font-medium text-slate-400 mb-2">ℹ URL Fixes</h4>
+                      <p className="text-sm text-slate-400">
+                        URL fixes are already handled by the JS layer (autofill_script.dart), so no additional changes needed here.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Build & Deploy Section */}
+            {activeSection === 'build' && (
+              <section className="space-y-6">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/20">
+                      <svg className="h-6 w-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Build & Deploy Commands</h2>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Flutter</span>
+                        <span className="text-sm text-slate-400">Build APK</span>
+                      </div>
+                      <pre className="text-sm font-mono text-green-300 overflow-x-auto">
+{`flutter build apk --debug --target-platform android-arm64`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">ADB</span>
+                        <span className="text-sm text-slate-400">Install APK</span>
+                      </div>
+                      <pre className="text-sm font-mono text-blue-300 overflow-x-auto">
+{`adb -s A6FF6R5527000712 install -r build/app/outputs/flutter-apk/app-debug.apk`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">ADB</span>
+                        <span className="text-sm text-slate-400">Force Stop App</span>
+                      </div>
+                      <pre className="text-sm font-mono text-purple-300 overflow-x-auto">
+{`adb shell am force-stop com.studentsyncsa.studentsyncsa`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/30">
+                    <div className="flex items-start gap-3">
+                      <svg className="h-5 w-5 text-cyan-400 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <div>
+                        <h4 className="font-medium text-cyan-400 mb-1">Build Device</h4>
+                        <p className="text-sm text-slate-300">Device ID: <code className="font-mono">A6FF6R5527000712</code></p>
+                        <p className="text-sm text-slate-300">Platform: <code className="font-mono">android-arm64</code></p>
+                        <p className="text-sm text-slate-300">Package: <code className="font-mono">com.studentsyncsa.studentsyncsa</code></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Verified Fixes Section */}
+            {activeSection === 'verified' && (
+              <section className="space-y-6">
+                <div className="bg-green-500/10 backdrop-blur-sm rounded-2xl p-6 border border-green-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
+                      <svg className="h-6 w-6 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">What Works Now (Verified in Console)</h2>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {[
+                      { icon: 'domain', label: 'Domain corrected', detail: 'univenierp01 (was univenlerp01)', status: 'fixed' },
+                      { icon: 'procedure', label: 'gwa/gwas truncation', detail: 'gw1view/gw1proc (partial)', status: 'partial' },
+                      { icon: 'http', label: 'POST to gw1proc', detail: 'HTTP 200 (78464 bytes)', status: 'fixed' },
+                      { icon: 'page', label: 'Page 2 rendering', detail: 'All 30 fields filled', status: 'fixed' },
+                      { icon: 'xhr', label: 'Validation XHRs', detail: 'All 9 fire (CITZ, ID, PASSPORT, GENDER, AGE, CHARTEST, POSTAL, CELL, EMAIL)', status: 'fixed' },
+                      { icon: 'dropdown', label: 'Citizenship dropdown', detail: 'Injected & set to R.S.A', status: 'fixed' },
+                      { icon: 'teacher', label: 'Heard-about-us', detail: 'Set to School Teacher', status: 'fixed' },
+                      { icon: 'gv', label: 'gv truncation', detail: 'NOT FIXED - CRITICAL', status: 'broken' },
+                    ].map((item, index) => {
+                      const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+                        fixed: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/20' },
+                        partial: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/20' },
+                        broken: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/20' },
+                      }
+                      const colors = statusColors[item.status] || statusColors.fixed
+                      return (
+                        <div key={index} className={`bg-slate-900/50 rounded-xl p-4 flex items-start gap-4 ${item.status === 'broken' ? 'border border-red-500/30 bg-red-500/5' : 'border border-green-500/20'}`}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${colors.bg} flex-shrink-0`}>
+                            {item.status === 'broken' ? (
+                              <svg className={`h-4 w-4 ${colors.text}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                              </svg>
+                            ) : (
+                              <svg className={`h-4 w-4 ${colors.text}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-medium mb-1 ${colors.text}`}>{item.label}</h4>
+                            <p className="text-sm text-slate-400">{item.detail}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">Validation XHR Details</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      'CITZ', 'ID', 'PASSPORT', 'GENDER',
+                      'AGE', 'CHARTEST', 'POSTAL', 'CELL', 'EMAIL'
+                    ].map((xhr) => (
+                      <div key={xhr} className="bg-slate-900/50 rounded-lg p-3 border border-slate-700 text-center">
+                        <span className="inline-block px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">
+                          {xhr}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Residual Issues Section */}
+            {activeSection === 'residual' && (
+              <section className="space-y-6">
+                <div className="bg-yellow-500/10 backdrop-blur-sm rounded-2xl p-6 border border-yellow-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-500/20">
+                      <svg className="h-6 w-6 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Residual Issue (Not Fixed)</h2>
+                  </div>
+
+                  <div className="bg-yellow-500/10 rounded-xl p-6 border border-yellow-500/30 mb-6">
+                    <h3 className="font-semibold text-yellow-400 mb-3">Page-2 Citizenship LOV Postback</h3>
+                    <p className="text-slate-300 mb-4">
+                      Approximately 20 seconds after page 2 loads, a POST to gw1view → 404 fires from a citizenship-dependent
+                      LOV (List of Values) refresh. This is a native document-level POST that bypasses the JS navfix.
+                    </p>
+                    <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/20 mb-3">
+                      <p className="text-sm text-red-300 font-medium">
+                        ⚠ BLOCKER: The 'gv' truncation issue must be fixed FIRST before this can be addressed
+                      </p>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-red-400 mb-2">Problem</h4>
+                        <ul className="text-sm text-slate-300 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>Native form submit bypasses JS injection</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>POST gw1view triggers 404 error</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            <span>Occurs from iframe or native form element</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-yellow-400 mb-2">Root Cause</h4>
+                        <ul className="text-sm text-slate-300 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <span className="text-yellow-400 mt-0.5">•</span>
+                            <span>JS injection cannot intercept native POST</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-yellow-400 mt-0.5">•</span>
+                            <span>WebViewClient shouldOverrideUrlLoading not catching POST</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-yellow-400 mt-0.5">•</span>
+                            <span>Missing hidden fields/session tokens in postback</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
+                    <h3 className="font-semibold text-white mb-4">Technical Details</h3>
+                    <pre className="text-sm font-mono text-slate-300 overflow-x-auto">
+{`Timeline:
+  0s    → Page 2 loads
+  ~20s  → Citizenship-dependent LOV refresh triggers
+  ~20s  → POST gw1view → 404 (bypasses JS layer)
+
+Current Layer Coverage:
+  ✓ Dart URL normalization (its_url_fixer.dart)
+  ✓ Dart navigation delegate (university_webview_screen.dart)
+  ✓ JS injection (autofill_script.dart)
+  ✗ Native POST interception (NOT IMPLEMENTED)
+
+Required Fix:
+  Platform channel + WebViewClient.shouldOverrideUrlLoading
+  with POST body access and URL rewriting at native layer.`}
+                    </pre>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Questions Section */}
+            {activeSection === 'questions' && (
+              <section className="space-y-6">
+                <div className="bg-blue-500/10 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/30">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
+                      <svg className="h-6 w-6 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Questions for Arena</h2>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Question 1 */}
+                    <div className="bg-slate-900/50 rounded-xl p-6 border border-blue-500/30">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 flex-shrink-0">
+                          <span className="text-blue-400 font-bold">1</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-white mb-3">Native POST Interception</h3>
+                          <p className="text-slate-300 mb-4">
+                            How to intercept a Document POST navigation in Flutter WebView (Android) that bypasses JS,
+                            and rewrite the URL while preserving the POST body?
+                          </p>
+                          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <h4 className="font-medium text-blue-400 mb-2">Key Requirements:</h4>
+                            <ul className="text-sm text-slate-300 space-y-2">
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Intercept POST requests at WebViewClient level</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Access POST body data from shouldOverrideUrlLoading</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Rewrite gw1view → gw1proc in URL</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Preserve POST body content during redirect</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Question 2 */}
+                    <div className="bg-slate-900/50 rounded-xl p-6 border border-blue-500/30">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 flex-shrink-0">
+                          <span className="text-blue-400 font-bold">2</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-white mb-3">Platform Channel Implementation</h3>
+                          <p className="text-slate-300 mb-4">
+                            Example of MethodChannel + WebViewClient.shouldOverrideUrlLoading with POST body access for Android.
+                          </p>
+                          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <h4 className="font-medium text-blue-400 mb-2">Expected Architecture:</h4>
+                            <pre className="text-xs font-mono text-slate-300 overflow-x-auto">
+{`┌──────────────────────────────────────────┐
+│          Flutter App (Dart)              │
+│  ┌────────────────────────────────────┐  │
+│  │  MethodChannel Registration        │  │
+│  │  PlatformChannel('its_url_fixer')  │  │
+│  └──────────────┬─────────────────────┘  │
+│                 │                        │
+└─────────────────┼────────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────────┐
+│        Android Native Layer              │
+│  ┌────────────────────────────────────┐  │
+│  │  WebViewClient                     │  │
+│  │  ┌──────────────────────────────┐  │  │
+│  │  │ shouldOverrideUrlLoading()   │  │  │
+│  │  │ - Access POST body           │  │  │
+│  │  │ - Rewrite URL                │  │  │
+│  │  │ - Return true (intercept)    │  │  │
+│  │  └──────────────────────────────┘  │  │
+│  └────────────────────────────────────┘  │
+└──────────────────────────────────────────┘`}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Question 3 */}
+                    <div className="bg-slate-900/50 rounded-xl p-6 border border-blue-500/30">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 flex-shrink-0">
+                          <span className="text-blue-400 font-bold">3</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-white mb-3">Session Persistence Issue</h3>
+                          <p className="text-slate-300 mb-4">
+                            Why does POST to gw1proc work on fresh session but fail on page-2 LOV postback?
+                            Are there missing hidden fields or session tokens?
+                          </p>
+                          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <h4 className="font-medium text-blue-400 mb-2">Investigation Points:</h4>
+                            <ul className="text-sm text-slate-300 space-y-2">
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Compare POST body between fresh session vs page-2</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Check for session token expiration</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Verify hidden form fields in LOV refresh</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-blue-400 mt-0.5">•</span>
+                                <span>Inspect CSRF token handling</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/30">
+                    <h4 className="font-medium text-blue-400 mb-2">Priority Order</h4>
+                    <ol className="text-sm text-slate-300 space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-400 font-bold">1.</span>
+                        <span>Platform channel implementation (Question 2)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-400 font-bold">2.</span>
+                        <span>Native POST interception (Question 1)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-400 font-bold">3.</span>
+                        <span>Session persistence analysis (Question 3)</span>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-700 bg-slate-800/50 backdrop-blur-sm mt-12">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-slate-400 text-sm">
+              ITS Portal 404 Error Fix History
+            </div>
+            <div className="flex items-center gap-6 text-sm text-slate-400">
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-400"></span>
+                Fixed
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-yellow-400"></span>
+                Pending
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-400"></span>
+                Critical
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}

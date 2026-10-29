@@ -6,6 +6,10 @@ import android.webkit.WebViewClient
 import android.webkit.WebResourceRequest
 import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import android.content.SharedPreferences
+import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 
@@ -24,9 +28,7 @@ class MainActivity : FlutterActivity() {
         
         // Set up a listener to find and patch WebViews after they're created
         val flutterView = findViewById<android.view.View>(android.R.id.content)
-        if (flutterView != null) {
-            setupWebViewInterception(flutterView)
-        }
+        // WebView interception removed — using native autofill instead
     }
     
     /// Clear cookies for Venda specifically to prevent "Cookie Bloat" / URL length limit
@@ -49,7 +51,7 @@ class MainActivity : FlutterActivity() {
     private fun setupWebViewInterception(view: android.view.View) {
         // Traverse the view hierarchy to find WebViews and set custom WebViewClient
         if (view is android.webkit.WebView) {
-            setupWebViewClient(view)
+            // setupWebViewClient removed — using native autofill
         } else if (view is ViewGroup) {
             for (i in 0 until view.childCount) {
                 setupWebViewInterception(view.getChildAt(i))
@@ -57,46 +59,41 @@ class MainActivity : FlutterActivity() {
         }
     }
     
-    private fun setupWebViewClient(webView: android.webkit.WebView) {
-        val client = object : android.webkit.WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: android.webkit.WebView, request: android.webkit.WebResourceRequest): Boolean {
-                val url = request.url.toString()
-                
-                // Also intercept navigation requests
-                if (isItsHost(url)) {
-                    val fixedUrl = fixItsUrl(url)
-                    if (fixedUrl != url) {
-                        view.loadUrl(fixedUrl)
-                        return true
+    /// MethodChannel to sync profile data from Flutter to Android SharedPreferences
+    private val channel = "lipsync.profile"
+    lateinit var prefs: SharedPreferences
+
+    // MethodChannel disabled — autofill service paused for build
+    /* override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        prefs = getSharedPreferences("autofill_profile", MODE_PRIVATE)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channel).setMethodCallHandler { call, result ->
+            if (call.method == "saveProfile") {
+                val args = call.arguments
+                val map = if (args is Map<*, *>) args else null
+                if (map != null) {
+                    for ((k, v) in map) {
+                        val strV = (v as? String) ?: ""
+                        prefs.edit().putString(k.toString(), strV).apply()
                     }
+                    result.success(true)
+                } else {
+                    result.success(false)
                 }
-                
-                return super.shouldOverrideUrlLoading(view, request)
-            }
-            
-            override fun shouldInterceptRequest(view: android.webkit.WebView, request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
-                val url = request.url.toString()
-                
-                // Only intercept ITS portal URLs
-                if (isItsHost(url)) {
-                    val fixedUrl = fixItsUrl(url)
-                    if (fixedUrl != url) {
-                        // URL was truncated - rewrite and intercept
-                        val fixedUrlObj = android.net.Uri.parse(fixedUrl)
-                        // We can't easily rebuild WebResourceRequest, so we rely on
-                        // shouldOverrideUrlLoading for navigation requests.
-                        // For resource requests, we let them through and rely on
-                        // the navigation fix in shouldOverrideUrlLoading.
-                    }
-                }
-                
-                return super.shouldInterceptRequest(view, request)
+            } else if (call.method == "readProfile") {
+                val json = prefs.all.entries.map { "${it.key}:${it.value}" }.joinToString(",")
+                result.success(json)
+            } else if (call.method == "openAutofillSettings") {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+                startActivity(intent)
+                result.success(true)
+            } else {
+                result.notImplemented()
             }
         }
-        webView.webViewClient = client
-    }
-    
-    private fun isItsHost(url: String): Boolean {
+    } */
+
+        private fun isItsHost(url: String): Boolean {
         return url.contains("univenierp01") ||
             url.contains("univenerp01") ||
             url.contains("univenerip01") ||

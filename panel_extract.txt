@@ -1,0 +1,44 @@
+=== code-panel ===
+v id="resizer1"></div>
+  <div id="code-panel">
+    <div id="spinner-wrap" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; z-index: 10; display: none;">
+      <div id="spinner" style="width: 100%; height: 100%; box-sizing: border-box; border: 8px solid rgba(217, 108, 0, 0.2); border-top: 8px solid #D96C00; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    </div>
+    <div id="code-header">
+      <div class="toolbar-spacer"></div>
+      <div id="code-actions">
+        <input id="searchInput" placeholder="Find in file..." title="Search (Ctrl+F)">
+        <button class="btn btn-icon" onclick="toggleSearch()" title="Search (Ctrl+F)">⌕</button>
+        <button class="btn btn-icon" onclick="clearCode()" title="Clear editor">🗑</button>
+        <button class="btn btn-icon" onclick="copyCode()" title="Copy code">⧉</button>
+        <button class="btn btn-icon" onclick="saveCode()" title="Save code">💾</button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <button class="min-btn" onclick="minPanel('code-panel')" title="Minimize panel">-</button>
+    </div>
+    <div id="code-editor-wrap">
+      <div id="line-numbers">1</div>
+      <
+=== explore-panel ===
+v id="resizer2"></div>
+  <div id="explore-panel">
+    <div id="explore-header"><span class="panel-label">Explorer</span> <span style="display:flex;align-items:center;gap:6px;"><button class="icon-btn" onclick="loadExplorer()" title="Refresh">⟳</button><button class="min-btn" onclick="minPanel('explore-panel')" title="Minimize panel">-</button></span></div>
+    <div id="explorer">Loading...</div>
+  </div>
+</div>
+<div id="status">
+<span class="st-pill" id="stDeviceAgentPill">
+      <span class="st-item">📱 <span id="device-count" class="neon-green">0</span> devices</span>
+      <span class="st-pill-sep">|</span>
+      <span class="st-item">🤖 <span id="agent-count" class="neon-green">0</span> agents</span>
+    </span>
+    <span class="st-dot"></span>
+    <span class="st-item" id="stIndicator" style="display:none;"></span>
+  <div id="min-dock"></div>
+  <span class="st-spacer"></span>
+  <span class="st-model" id="stModelWrap">
+    <button id="stModelBtn" class="st-model-btn" title="Select model">⚡ <b id="stModelName">GPT-OSS 20B</b> ▾</button>
+    <div id="stModelMenu" class="st-model-menu"></div>
+  </span>
+  <span class="st-item" style="margin-left:8px;display:none;" id="stDriveWrap">
+    <button id="stDriveBtn" cla

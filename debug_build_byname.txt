@@ -1,0 +1,30 @@
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']
+  BEFORE drop_cdp: base_schema size=28, run_command in base_schema = False
+  AFTER drop_cdp: base_schema size=28, run_command in base_schema = False
+  by_name created: run_command in by_name = False
+  by_name keys: ['build_apk', 'cdp_get_response_body', 'curl', 'edit_file', 'flutter_analyze', 'flutter_test', 'get_time', 'git_branch', 'git_commit', 'git_log', 'git_merge', 'git_status', 'grep', 'list_files', 'list_user_files', 'note', 'notify', 'open_user_file', 'pub_add', 'pub_remove', 'pub_upgrade', 'read_file', 'read_user_file', 'restart', 'view_user_file', 'weather', 'web_search', 'write_file']

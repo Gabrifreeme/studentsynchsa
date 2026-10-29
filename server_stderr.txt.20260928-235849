@@ -1,0 +1,45 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+127.0.0.1 - - [28/Sep/2026 23:53:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:53:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:53:30] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:53:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:53:31] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:54:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:54:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:54:30] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:54:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:54:31] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:05] "POST /model_chat HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:30] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:55:31] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:56:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:56:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:56:30] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:56:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:56:30] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:30] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:30] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:34] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:34] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:34] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:34] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:57:34] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:30] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:30] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:30] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:32] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:33] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:35] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:35] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:35] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:35] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [28/Sep/2026 23:58:35] "GET /agents HTTP/1.1" 200 -

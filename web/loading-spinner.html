@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+       html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: transparent;
+}
+    </style>
+</head>
+<body>
+    <canvas id="glcanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("glcanvas");
+       const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false });
+
+        if (!gl) {
+            console.error("WebGL not supported");
+        }
+
+        // 1. The function you provided
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                alert("Shader compile error: " + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        // 2. The Vertex Shader (draws a full screen square)
+        const vsSource = `
+            attribute vec4 aVertexPosition;
+            void main() {
+                gl_Position = aVertexPosition;
+            }
+        `;
+
+        // 3. The Fragment Shader (creates a spinning effect)
+        const fsSource = `
+            precision highp float;
+            uniform float u_time;
+            uniform vec2 u_resolution;
+
+            void main() {
+                vec2 uv = (gl_FragCoord.xy / u_resolution.xy) * 2.0 - 1.0;
+                float angle = atan(uv.y, uv.x);
+                float radius = length(uv);
+                
+                // Create a spinning gradient
+                float spin = angle + u_time;
+                float color = sin(spin * 3.0) * 0.5 + 0.5;
+                
+                // Mask to make it look like a ring
+                float ring = smoothstep(0.4, 0.5, radius) - smoothstep(0.6, 0.7, radius);
+                
+                gl_FragColor = vec4(0.85, 0.45, 0.0, ring);
+            }
+        `;
+
+        // 4. Compile the shaders
+        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+        // 5. Create the program
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error("Program link error: " + gl.getProgramInfoLog(program));
+        }
+
+        gl.useProgram(program);
+
+        // 6. Setup the geometry (a square that covers the screen)
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        const positions = [
+            -1.0,  1.0,
+             1.0,  1.0,
+            -1.0, -1.0,
+             1.0, -1.0,
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+        const aVertexPosition = gl.getAttribLocation(program, "aVertexPosition");
+        gl.enableVertexAttribArray(aVertexPosition);
+        gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+
+        // 7. Get the uniform locations
+        const uTime = gl.getUniformLocation(program, "u_time");
+        const uResolution = gl.getUniformLocation(program, "u_resolution");
+
+        // 8. Render loop
+        function render(time) {
+            time *= 0.001; // convert to seconds
+
+            // Resize canvas to match display size
+            if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+
+            gl.clearColor(0.0, 0.0, 0.0, 0.0); // 0.0 alpha means transparent
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.uniform1f(uTime, time);
+            gl.uniform2f(uResolution, canvas.width, canvas.height);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>

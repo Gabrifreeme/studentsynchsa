@@ -1,0 +1,38 @@
+_filter_tools_schema: schema size=21, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: True
+_filter_tools_schema result: 5 tools, run_command in result: True
+_filter_tools_schema: schema size=58, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: False
+_filter_tools_schema result: 28 tools, run_command in result: False
+_filter_tools_schema: schema size=21, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: True
+  schema id: 2283599272832, TOOLS_SCHEMA id: 2283598960320
+_filter_tools_schema result: 5 tools, run_command in result: True
+_filter_tools_schema: schema size=58, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: False
+  schema id: 2283598960320, TOOLS_SCHEMA id: 2283598960320
+_filter_tools_schema result: 28 tools, run_command in result: False
+_filter_tools_schema: schema size=21, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: True
+  schema id: 2021012506368, TOOLS_SCHEMA id: 2021012626752
+_filter_tools_schema result: 5 tools, run_command in result: True
+_filter_tools_schema: schema size=58, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: False
+  schema id: 2021012626752, TOOLS_SCHEMA id: 2021012626752
+_filter_tools_schema result: 28 tools, run_command in result: False
+_filter_tools_schema: schema size=21, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: True
+  schema id: 2857765072768, TOOLS_SCHEMA id: 2857764981312
+_filter_tools_schema result: 5 tools, run_command in result: True
+_filter_tools_schema: schema size=58, allowed_names size=29
+  run_command in allowed_names: True
+  run_command in schema: False
+  schema id: 2857764981312, TOOLS_SCHEMA id: 2857764981312
+_filter_tools_schema result: 28 tools, run_command in result: False
