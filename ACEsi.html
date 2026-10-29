@@ -228,22 +228,6 @@
             <button onclick="triggerPing()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Send Ping</button>
             <button onclick="connectGoogleDrive()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Google Drive</button>
         </div>
-        <!-- Memory Tab -->
-        <div id="settings-tab-memory" style="display:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
-            <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">Memory</div>
-            <textarea id="settings-memory" style="width:100%;height:150px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-family:'Roboto Mono',monospace;font-size:11px;resize:vertical;outline:none;" placeholder="Type memory notes..."></textarea>
-            <div style="margin-top:8px; text-align:center;">
-                <button onclick="saveMemory()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Save Memory</button>
-            </div>
-        </div>
-        <!-- Memory Tab -->
-        <div id="settings-tab-memory" style="display:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
-            <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">Memory</div>
-            <textarea id="settings-memory" style="width:100%;height:150px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-family:'Roboto Mono',monospace;font-size:11px;resize:vertical;outline:none;" placeholder="Type memory notes..."></textarea>
-            <div style="margin-top:8px; text-align:center;">
-                <button onclick="saveMemory()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Save Memory</button>
-            </div>
-        </div>
         
         <div style="text-align:center;margin-top:16px;">
             <button onclick="saveSettings()" style="background:#ff9d00;color:#000;border:none;padding:8px 16px;font-size:11px;font-weight:bold;cursor:pointer;">Save All Settings</button>
@@ -295,17 +279,26 @@
         <!-- Code Editor Panel -->
         <div id="code-panel" class="panel">
             <div class="panel-header">CODE EDITOR
-        <div style="float:right;margin-left:8px;">
-            <button class="btn" title="Save Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="saveCode()">Save</button>
-            <button class="btn" title="Clear Code Editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="clearCodeEditor()">Clear</button>
-            <button class="btn" title="Copy Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;" onclick="copyCode()">Copy</button>
-        </div>
-    </div>
-            <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;">
+            <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;">
+                <button class="btn" title="Save Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="saveCode()">Save</button>
+                <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-code').value='';document.getElementById('autofix-result').innerHTML='';document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
+                <button class="btn" title="Clear Code Editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="clearCodeEditor()">Clear</button>
+                <button class="btn" title="Copy Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;" onclick="copyCode()">Copy</button>
+                <div style="display:flex;align-items:center;gap:4px;font-size:11px;border-left:1px solid #ff9d00;padding-left:8px;">
+                    <span>Logs:</span>
+                    <input type="checkbox" id="log-toggle" style="cursor:pointer;accent-color:#ff9d00;" onclick="toggleLiveLogs()">
+                    <button id="log-pause-btn" onclick="toggleLogPause()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 6px;font-size:10px;cursor:pointer;">Pause</button>
+                </div>
+            </div>
+            </div>
+            <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
               <div id="line-numbers">1</div>
               <textarea id="code-editor" placeholder="Select a file to edit..."></textarea>
+               <div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+
             </div>
         </div>
+
 
         <!-- Explorer Panel -->
         <div id="explorer-panel" class="panel">
@@ -316,6 +309,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     console.log("JS: Explorer script started");
+    window.currentFile = null; // Track the currently opened file
     
     // Use the exact URL that we know is working from the curl command
     fetch('/api/files') 
@@ -325,7 +319,7 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(data => {
             console.log("JS: Data received", data);
-           const explorerDiv = document.getElementById('explorer'); // Make sure this ID matches your HTML container // Make sure this ID matches your HTML container
+            const explorerDiv = document.getElementById('explorer'); // Make sure this ID matches your HTML container // Make sure this ID matches your HTML container
             if (!explorerDiv) {
                 console.error("Could not find the explorer container div!");
                 return;
@@ -344,6 +338,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 // Add click event to load file content later
                 fileDiv.onclick = function() {
                     console.log("Clicked file: " + file);
+                    window.currentFile = file;
                     fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(file))
                         .then(function(res) { return res.text(); })
                         .then(function(fileData) {
@@ -363,6 +358,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
         });
 });
+
 </script>
     <script>
     function runSelected(){ var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked'); if(checks.length===0){ alert('Select a command'); return; } checks.forEach(function(c){ fetch('http://127.0.0.1:5000/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c.value})}).then(r=>r.text()).then(t=>addOutput('▶ '+c.value+': '+t)).catch(e=>addOutput('▶ '+c.value+': '+e.message)); }); document.getElementById('run-panel').style.display='none'; }
@@ -411,17 +407,182 @@ document.addEventListener("DOMContentLoaded", function() {
     <div id="autofix-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:99999;backdrop-filter:blur(5px);">
         <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;padding-top:10px;padding-bottom:10px;font-family:'Roboto Mono',monospace;color:#ff9d00;width:90%;max-width:500px;max-height:80%;overflow:auto;margin:auto;">
             <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
+            <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
             <textarea id="autofix-code" style="width:100%;height:250px;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:vertical;outline:none;overflow:auto;" placeholder="Paste code here to auto-fix..."></textarea>
             <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
-                <button onclick="document.getElementById('autofix-modal').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Cancel</button>
+                <button onclick="document.getElementById('autofix-modal').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Close</button>
                 <button onclick="applyAutoFix()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Fix Code</button>
             </div>
-            <div id="autofix-result" style="margin-top:8px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
         </div>
     </div>
 
     <script>
+    function openSettings() {
+        document.getElementById('settings-panel').style.display = 'block';
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('#settings-panel .tab-content').forEach(function(div) {
+            div.style.display = 'none';
+        });
+        var content = document.getElementById(tabName);
+        if (content) {
+            content.style.display = 'block';
+        }
+        document.querySelectorAll('#settings-panel button[data-tab]').forEach(function(b) {
+            var active = b.getAttribute('data-tab') === tabName;
+            b.style.background = active ? '#ff9d00' : '#111';
+            b.style.color = active ? '#000' : '#ff9d00';
+        });
+    }
+
+    function loadSettings() {
+        fetch('http://127.0.0.1:5000/api/settings')
+            .then(r => r.json())
+            .then(d => {
+                const providerSelect = document.getElementById('settings-provider');
+                if (d.provider) providerSelect.value = d.provider;
+                updateModels(d.provider || 'groq');
+                const modelSelect = document.getElementById('settings-model');
+                if (d.model) modelSelect.value = d.model;
+                document.getElementById('settings-groq-key').value = d.groq_key || '';
+                document.getElementById('settings-openrouter-key').value = d.openrouter_key || '';
+                document.getElementById('settings-prompt').value = d.system_prompt || '';
+                const toolbarToggle = document.getElementById('show-toolbar');
+                if (toolbarToggle) toolbarToggle.checked = d.show_toolbar !== false;
+            })
+            .catch(e => addOutput('❌ Failed to load settings: ' + e.message));
+    }
+
+    function saveSettings() {
+        const provider = document.getElementById('settings-provider').value;
+        const model = document.getElementById('settings-model').value;
+        const groqKey = document.getElementById('settings-groq-key').value;
+        const openrouterKey = document.getElementById('settings-openrouter-key').value;
+        const prompt = document.getElementById('settings-prompt').value;
+
+        fetch('http://127.0.0.1:5000/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: provider,
+                model: model,
+                groq_key: groqKey,
+                openrouter_key: openrouterKey,
+                system_prompt: prompt
+            })
+        })
+        .then(r => r.json())
+        .then(d => {
+            addOutput('✅ Settings saved successfully');
+        })
+        .catch(e => addOutput('❌ Failed to save settings: ' + e.message));
+    }
+
+    function saveSystemPrompt() {
+        saveSettings();
+    }
+
+    function saveMemory() {
+        const memory = document.getElementById('settings-memory').value;
+        fetch('http://127.0.0.1:5000/api/memory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memory: memory })
+        }).then(r => r.json())
+        .then(d => {
+            addOutput('Memory saved: ' + d.memory);
+        })
+        .catch(e => addOutput('Failed to save memory: ' + e.message));
+    }
+
+    function clearChatHistory() {
+        if (confirm('Clear all chat history?')) {
+            document.getElementById('chat-messages').innerHTML = '<div class="msg-bubble msg-left"><b>ACEsi:</b> Hi Chris. I\'m here. Ready to fix your project.</div>';
+            addOutput('💬 Chat history cleared');
+            fetch('http://127.0.0.1:5000/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clear_chat: true })
+            });
+        }
+    }
+
+    function fetchNotifications() {
+        fetch('http://127.0.0.1:5000/api/notifications')
+            .then(r => r.json())
+            .then(d => {
+                const results = d.notifications || [];
+                alert('Fetched ' + results.length + ' notification(s)\n\n' + results.join('\n'));
+            })
+            .catch(e => alert('❌ Failed to fetch notifications: ' + e.message));
+    }
+
+    function triggerPing() {
+        fetch('http://127.0.0.1:5000/api/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ping: true })
+        }).then(r => r.json())
+        .then(d => {
+            alert('📡 ' + (d.status || 'Ping triggered'));
+        })
+        .catch(e => alert('❌ Failed to send ping: ' + e.message));
+    }
+
+    function connectGoogleDrive() {
+        alert('Drive integration coming soon');
+    }
+
+    function saveCode() {
+        const code = document.getElementById('code-editor').value;
+        let filename = window.currentFile;
+        if (!filename) {
+            const explorerFiles = document.querySelectorAll('#explorer div');
+            for (let f of explorerFiles) {
+                if (window.getComputedStyle(f).fontWeight === 'bold') {
+                    filename = f.textContent;
+                    break;
+                }
+            }
+        }
+        if (!filename) {
+            alert('❌ No file selected. Please select a file from the explorer first.');
+            return;
+        }
+        if (!code.trim()) {
+            alert('❌ Nothing to save');
+            return;
+        }
+        const formData = new URLSearchParams();
+        formData.append('filename', filename);
+        formData.append('content', code);
+        fetch('http://127.0.0.1:5000/api/save-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+        }).then(r => {
+            if (!r.ok) throw new Error('Server error ' + r.status);
+            return r.json();
+        }).then(d => {
+            alert('✅ Code saved successfully: ' + filename);
+        }).catch(e => alert('❌ Save failed: ' + e.message));
+    }
+
+    function clearCodeEditor() {
+        document.getElementById('code-editor').value = '';
+        alert('🧹 Editor cleared');
+    }
+
+    function copyCode() {
+        const code = document.getElementById('code-editor').value;
+        navigator.clipboard.writeText(code).then(() => {
+            alert('📋 Code copied to clipboard');
+        }).catch(e => alert('❌ Copy failed: ' + e.message));
+    }
+
     function applyAutoFix() {
+        console.log("FIX BUTTON CLICKED");
         const code = document.getElementById('autofix-code').value;
         if (!code.trim()) {
             document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">No code provided.</span>';
@@ -432,20 +593,74 @@ document.addEventListener("DOMContentLoaded", function() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code: code })
-        }).then(r => r.json()).then(d => {
+        }).then(r => {
+            if (!r.ok) throw new Error('Server error ' + r.status);
+            return r.json();
+        }).then(d => {
             if (d.ok && d.fixed_code) {
                 const newCode = d.fixed_code;
-                document.getElementById('code-editor').value = newCode;
-                updateLineNumbers();
-                document.getElementById('autofix-modal').style.display = 'none';
-                addOutput('✅ Auto-fix applied from server');
-                alert('Auto Fix applied.');
+                const editor = document.getElementById('code-editor');
+                if (editor) editor.value = newCode;
+                document.getElementById('autofix-result').innerHTML = '<div style="color: #00ff00; margin-bottom: 10px;">✅ Code Fixed Successfully!</div>' + '<pre style="color: #ff9d00; white-space: pre-wrap; text-align: left; background: #111; padding: 5px; border: 1px solid #ff9d00;">' + newCode + '</pre>';
+                setTimeout(() => {
+                    document.getElementById('autofix-modal').style.display = 'none';
+                }, 1500);
             } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">❌ Error: ' + (d.error || 'unknown error') + '</span>';
+                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Error: ' + (d.error || 'unknown error') + '</span>';
             }
         }).catch(e => {
-            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">❌ Server error: ' + e.message + '</span>';
+            console.error("AutoFix Error:", e);
+            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Server error: ' + e.message + '</span>';
         });
+    }
+
+    let logSource = null;
+    let logPaused = false;
+    function toggleLiveLogs() {
+        const isChecked = document.getElementById('log-toggle').checked;
+        const logOverlay = document.getElementById('logs-overlay');
+        const editor = document.getElementById('code-editor');
+        const lineNumbers = document.getElementById('line-numbers');
+
+        if (isChecked) {
+            logOverlay.style.display = 'block';
+            editor.style.visibility = 'hidden';
+            if (lineNumbers) lineNumbers.style.visibility = 'hidden';
+            
+            if (!logSource) {
+                logSource = new EventSource('http://127.0.0.1:5000/api/logs');
+                logSource.onmessage = function(e) {
+                    if (logPaused) return;
+                    const line = document.createElement('div');
+                    line.textContent = e.data;
+                    logOverlay.appendChild(line);
+                    logOverlay.scrollTop = logOverlay.scrollHeight;
+                };
+                logSource.onerror = function() {
+                    console.error("SSE Log Connection Error");
+                    logSource.close();
+                    logSource = null;
+                };
+            }
+        } else {
+            logOverlay.style.display = 'none';
+            editor.style.visibility = 'visible';
+            if (lineNumbers) lineNumbers.style.visibility = 'visible';
+            
+            if (logSource) {
+                logSource.close();
+                logSource = null;
+            }
+        }
+    }
+
+        }
+    }
+
+    function toggleLogPause() {
+        logPaused = !logPaused;
+        const btn = document.getElementById('log-pause-btn');
+        btn.textContent = logPaused ? 'Resume' : 'Pause';
     }
     </script>
 </body>
