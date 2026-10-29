@@ -1,0 +1,101 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 10868
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=00:35:21  701866 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 5  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_get_response_body, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=False. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 /model_chat incoming: 29 chars
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🔧 /chat executed cdp_connect ok=True
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Groq (openai/gpt-oss-20b) 400: Tool call validation failed: tool call validation failed: attempted to call tool 'cdp_evaluate' which was not in request.tools
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🔧 /chat executed cdp_dom_state ok=True
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Groq (openai/gpt-oss-20b) 429: Rate limit reached for model `openai/gpt-oss-20b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6584, Requested 2188. Please tr [retry budget exhausted]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Groq (openai/gpt-oss-20b) 429: Rate limit reached for model `openai/gpt-oss-20b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6537, Requested 1732. Please tr [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🔧 /chat executed cdp_dom_state ok=True
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🔧 /chat executed ui_connect ok=False
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 14 tools, ~1495 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 14 tools, ~1495 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Groq (openai/gpt-oss-20b) 429: Rate limit reached for model `openai/gpt-oss-20b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 5797, Requested 5109. Please tr [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 13 tools, ~1384 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 13 tools, ~1384 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+🪶 reduced schema: 58 -> 13 tools, ~1384 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 13 tools, ~1384 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Groq (openai/gpt-oss-20b) 429: Rate limit reached for model `openai/gpt-oss-20b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 7940, Requested 5156. Please tr [retry budget exhausted]
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 58 -> 12 tools, ~1150 tokens
+❌ FreeLLM (auto) 429: All models rate-limited after 1 attempt. Soonest cooldown reset ~10m. Attempt trail: groq/openai/gpt-oss-20b key1: daily_quota_exhausted. Last error: Groq API error 429: Rate limit reached for model ` [daily/period quota exhausted - not retrying]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2459 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2459 affordable=106]]
+🪶 reduced schema: 58 -> 15 tools, ~1553 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False

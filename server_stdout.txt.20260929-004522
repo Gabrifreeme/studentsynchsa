@@ -1,0 +1,315 @@
+🛑 E-STOP armed at boot; ACE_AUTO_AGENTS=False
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 8692
+[boot] git HEAD  : 0715dd2  (+2 modified)
+[boot] server.py : mtime=23:58:07  710736 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=True. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🔴 E-STOP PERSISTED ON BOOT (reason=armed at boot: autonomous agents are off by default, source=boot) — ACEsi is silent until the un-kill word arrives.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 /model_chat incoming: 68 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🟢 E-STOP CLEARED
+📨 /model_chat incoming: 68 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'No' resolved from dump -> 552,852
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+🟢 E-STOP CLEARED
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198340, Requested 3499. Please 
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198339, Requested 3650. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+📨 /model_chat incoming: 68 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+⏰ /chat stop: time budget 240s reached
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199595, Requested 1725. Please 
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199596, Requested 1488. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+📨 /model_chat incoming: 68 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199376, Requested 1649. Please 
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199376, Requested 1703. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199240, Requested 2859. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+  ui_tap '--- Please select ---' resolved from dump -> 534,966
+[cdp] carried 1 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+[cdp] carried 1 request(s) across a reconnect
+  ui_tap 'No' resolved from dump -> 535,895
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+  ui_tap '--- Please select ---' resolved from dump -> 534,1044
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+⏰ /chat stop: time budget 240s reached
+📨 /model_chat incoming: 74 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+📨 /model_chat incoming: 201 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198563, Requested 1580. Please 
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198518, Requested 1638. Please 
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_swipe ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_swipe ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp] carried 2 request(s) across a reconnect
+  ui_tap 'No' resolved from dump -> 534,966
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ FreeLLM (auto) 429: All models rate-limited after 2 attempts. Soonest cooldown reset ~9m. Attempt trail: openrouter/liquid/lfm-2.5-2.6b:free key1: daily_quota_exhausted; openrouter/nvidia/nemotron-3.5-lightning:free key1 [daily/period quota exhausted - not retrying]
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 198368, Requested 4509. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ FreeLLM (auto) 429: All models exhausted: 17 routes checked (9 rate-limited or on cooldown, 8 model lacks tool-calling). Add more API keys or wait for rate limits to reset. Soonest reset ~9m. 295 models skipped: no key c [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter-fallback 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2589 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2589 affordable=151]]
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter-fallback 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2589 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2589 affordable=160]]
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'Cerebras', 'OpenRouter', 'FreeLLM'] ollama=False
+📨 /model_chat incoming: 285 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 20.0s before attempt 4 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 4 (max_tokens=4096)
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199958, Requested 1997. Please  [retry budget exhausted]
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199957, Requested 1969. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+  ui_tap '--- Please select ---' resolved from dump -> 534,966
+[cdp] carried 2 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+[cdp] carried 2 request(s) across a reconnect
+  ui_tap 'No' resolved from dump -> 535,895
+[cdp] carried 3 request(s) across a reconnect
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+[cdp] carried 3 request(s) across a reconnect
+[cdp] carried 3 request(s) across a reconnect
+[cdp] carried 3 request(s) across a reconnect
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+  ui_tap 'No' resolved from dump -> 1158,317
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199606, Requested 2849. Please  [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1134 tokens
+❌ FreeLLM (auto) 429: All models exhausted: 17 routes checked (9 rate-limited or on cooldown, 8 model lacks tool-calling). Add more API keys or wait for rate limits to reset. Soonest reset ~4m. 295 models skipped: no key c [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter-fallback 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2642 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2642 affordable=151]]
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter-fallback 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 2642 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2642 affordable=160]]
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'Cerebras', 'OpenRouter', 'FreeLLM'] ollama=False

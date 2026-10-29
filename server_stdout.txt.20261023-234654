@@ -1,0 +1,43 @@
+🛑 E-STOP armed at boot; ACE_AUTO_AGENTS=False
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 3632
+[boot] git HEAD  : 0715dd2  (+12 modified)
+[boot] server.py : mtime=23:44:49  703426 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 7  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=True. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🔴 E-STOP PERSISTED ON BOOT (reason=armed at boot: autonomous agents are off by default, source=boot) — ACEsi is silent until the un-kill word arrives.
+ * Serving Flask app 'server'
+ * Debug mode: off
+🟢 E-STOP CLEARED
+📨 Incoming message length: 57 chars
+🪶 reduced schema: 10 -> 2 tools, ~166 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 10 -> 2 tools, ~166 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 745 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=745 affordable=106]]
+🪶 reduced schema: 10 -> 2 tools, ~166 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 10 -> 2 tools, ~166 tokens
+🔧 /chat executed cdp_network_requests ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+⏳ Groq 429: waiting 5.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 30 -> 4 tools, ~491 tokens
+⏳ Groq 429: waiting 14.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)

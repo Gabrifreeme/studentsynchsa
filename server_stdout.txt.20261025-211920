@@ -1,0 +1,221 @@
+✅ Ollama reachable — 3 model(s) loaded: ['qwen2.5-coder:1.5b', 'qwen2.5:14b', 'qwen2.5-coder:7b']
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 648
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:13:35  722992 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=10 timeout=(30, 240) tools=yes
+📋 [21:14:15] Sending to Ollama (qwen2.5-coder:1.5b) — 10 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:14:29] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:51048-\u003e127.0.0.1:50938: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:51048->127.0.0.1:50938: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=4 timeout=(10, 90) tools=yes
+📋 [21:14:29] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:14:30] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=665
+[normalize] cdp_status in={} out={}
+📋 [21:14:31] Tool: cdp_status({}) ok=True
+🔧 /chat executed cdp_status ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=12 timeout=(30, 240) tools=yes
+📋 [21:14:31] Sending to Ollama (qwen2.5-coder:1.5b) — 12 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:14:45] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:51230-\u003e127.0.0.1:51110: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:51230->127.0.0.1:51110: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=5 timeout=(10, 90) tools=yes
+📋 [21:14:45] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:14:45] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=667
+[normalize] cdp_connect in={} out={}
+📋 [21:14:51] Tool: cdp_connect({}) ok=True
+🔧 /chat executed cdp_connect ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=14 timeout=(30, 240) tools=yes
+📋 [21:14:51] Sending to Ollama (qwen2.5-coder:1.5b) — 14 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:15:07] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:51475-\u003e127.0.0.1:51360: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:51475->127.0.0.1:51360: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=6 timeout=(10, 90) tools=yes
+📋 [21:15:07] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:15:07] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=668
+[normalize] cdp_dom_state in={} out={}
+📋 [21:15:08] Tool: cdp_dom_state({}) ok=True
+🔧 /chat executed cdp_dom_state ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=16 timeout=(30, 240) tools=yes
+📋 [21:15:08] Sending to Ollama (qwen2.5-coder:1.5b) — 16 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:15:26] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:51686-\u003e127.0.0.1:51567: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:51686->127.0.0.1:51567: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=7 timeout=(10, 90) tools=yes
+📋 [21:15:26] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:15:26] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=742
+[normalize] cdp_navigate in={"url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"} out={"url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"}
+📋 [21:15:43] Tool: cdp_navigate({"url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"}) ok=False
+🔧 /chat executed cdp_navigate ok=False
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=18 timeout=(30, 240) tools=yes
+📋 [21:15:43] Sending to Ollama (qwen2.5-coder:1.5b) — 18 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:15:58] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:52023-\u003e127.0.0.1:51891: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:52023->127.0.0.1:51891: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=8 timeout=(10, 90) tools=yes
+📋 [21:15:58] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:15:59] Sending to Groq (qwen/qwen3.8-27b) — 8 messages, tools=yes
+📥 [Groq] HTTP 200 len=666
+[normalize] cdp_status in={} out={}
+📋 [21:15:59] Tool: cdp_status({}) ok=True
+🔧 /chat executed cdp_status ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=20 timeout=(30, 240) tools=yes
+📋 [21:15:59] Sending to Ollama (qwen2.5-coder:1.5b) — 20 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:16:16] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:52271-\u003e127.0.0.1:52080: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:52271->127.0.0.1:52080: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=9 timeout=(10, 90) tools=yes
+📋 [21:16:16] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:16:17] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 200 len=668
+[normalize] cdp_dom_state in={} out={}
+[cdp] carried 1 request(s) across a reconnect
+📋 [21:16:57] Tool: cdp_dom_state({}) ok=False
+🔧 /chat executed cdp_dom_state ok=False
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=22 timeout=(30, 240) tools=yes
+📋 [21:16:57] Sending to Ollama (qwen2.5-coder:1.5b) — 22 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:17:11] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:52800-\u003e127.0.0.1:52680: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:52800->127.0.0.1:52680: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=10 timeout=(10, 90) tools=yes
+📋 [21:17:11] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=10 timeout=(10, 90) tools=yes
+📋 [21:17:11] Sending to Groq (qwen/qwen3.8-27b) — 10 messages, tools=yes
+📥 [Groq] HTTP 200 len=666
+[normalize] cdp_status in={} out={}
+📋 [21:17:12] Tool: cdp_status({}) ok=True
+🔧 /chat executed cdp_status ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=24 timeout=(30, 240) tools=yes
+📋 [21:17:12] Sending to Ollama (qwen2.5-coder:1.5b) — 24 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:17:29] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:53020-\u003e127.0.0.1:52863: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:53020->127.0.0.1:52863: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=11 timeout=(10, 90) tools=yes
+📋 [21:17:29] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=11 timeout=(10, 90) tools=yes
+📋 [21:17:29] Sending to Groq (qwen/qwen3.8-27b) — 11 messages, tools=yes
+📥 [Groq] HTTP 200 len=665
+[normalize] cdp_status in={} out={}
+📋 [21:17:29] Tool: cdp_status({}) ok=True
+🔧 /chat executed cdp_status ok=True
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=26 timeout=(30, 240) tools=yes
+📋 [21:17:29] Sending to Ollama (qwen2.5-coder:1.5b) — 26 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:17:47] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:53230-\u003e127.0.0.1:53094: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:53230->127.0.0.1:53094: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=12 timeout=(10, 90) tools=yes
+📋 [21:17:47] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=12 timeout=(10, 90) tools=yes
+📋 [21:17:47] Sending to Groq (qwen/qwen3.8-27b) — 12 messages, tools=yes
+📥 [Groq] HTTP 200 len=757
+[normalize] cdp_navigate in={"timeout": 30, "url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"} out={"timeout": 30, "url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"}
+[cdp] carried 1 request(s) across a reconnect
+📋 [21:18:04] Tool: cdp_navigate({"timeout": 30, "url": "http://10.0.2.2:8080", "wait": true, "wait_for": "network_idle"}) ok=False
+🔧 /chat executed cdp_navigate ok=False
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=28 timeout=(30, 240) tools=yes
+📋 [21:18:04] Sending to Ollama (qwen2.5-coder:1.5b) — 28 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:18:19] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:53584-\u003e127.0.0.1:53437: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:53584->127.0.0.1:53437: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=13 timeout=(10, 90) tools=yes
+📋 [21:18:19] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:18:19] Sending to Groq (qwen/qwen3.8-27b) — 13 messages, tools=yes
+📥 [Groq] HTTP 200 len=664
+[normalize] cdp_status in={} out={}
+📋 [21:18:20] Tool: cdp_status({}) ok=True
+🔧 /chat executed cdp_status ok=True
+⏰ /chat stop: time budget 240s reached
+📋 [21:18:20] Dispatch complete: 30 messages, model=qwen2.5-coder:1.5b

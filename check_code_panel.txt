@@ -1,0 +1,29 @@
+Found at 36278
+id="code-panel">
+    <div id="spinner-wrap" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; z-index: 10; display: none;">
+      <div id="spinner" style="width: 100%; height: 100%; box-sizing: border-box; border: 8px solid rgba(217, 108, 0, 0.2); border-top: 8px solid #D96C00; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    </div>
+    <div id="code-header">
+      <div class="toolbar-spacer"></div>
+      <div id="code-actions">
+        <input id="searchInput" placeholder="Find in file..." title="Search (Ctrl+F)">
+        <button class="btn btn-icon" onclick="toggleSearch()" title="Search (Ctrl+F)">⌕</button>
+        <button class="btn btn-icon" onclick="clearCode()" title="Clear editor">🗑</button>
+        <button class="btn btn-icon" onclick="copyCode()" title="Copy code">⧉</button>
+        <button class="btn btn-icon" onclick="saveCode()" title="Save code">💾</button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <button class="min-btn" onclick="minPanel('code-panel')" title="Minimize panel">-</button>
+    </div>
+    <div id="code-editor-wrap">
+      <div id="line-numbers">1</div>
+      <div id="code-editor" contenteditable="true"></div>
+    </div>
+  </div>
+  <div id="resizer2"></div>
+  <div id="explore-panel">
+    <div id="explore-header"><span class="panel-label">Bursaries & Announcements</span> <span style="display:flex;align-items:center;gap:6px;"><button class="min-btn" onclick="minPanel('explore-panel')" title="Minimize panel">-</button></span></div>
+    <div id="explorer" style="padding: 14px; color: var(--text); font-family: var(--sans); font-size: 13px;">
+      <div style="background: #0a0a0a; border: 1px solid #ff9d00; border-radius: 6px; padding: 14px; margin-bottom: 10px;">
+        <h3 style="font-size: 14px; font-weight: 700; color: #ff9d00; margin-bottom: 6px;">NSFAS applications open soon</h3>
+        <p style="font-size: 12px; color: rgba(255,157,0,0.8);">P

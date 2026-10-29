@@ -52,6 +52,16 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
+# System prompt — loaded from system_prompt.txt so you can edit it without
+# touching code.  Falls back to empty string if the file is missing, which is
+# fine if the prompt is sent directly from the UI or another source.
+_PROMPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "system_prompt.txt")
+try:
+    with open(_PROMPT_PATH, "r", encoding="utf-8") as _f:
+        _SYSTEM_PROMPT = _f.read()
+except Exception:
+    _SYSTEM_PROMPT = ""
+
 # ── Context system (ACEsi is general-purpose now) ───────────────────────────
 try:
     import ace_context
@@ -81,7 +91,13 @@ except Exception:
     pass
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 CORS(app, resources={r"/*": {"origins": "*"}})
+from autofix_route import register_autofix
+
+register_autofix(app)
+from file_routes import register_file_routes
+register_file_routes(app)
 
 
 # Load provider keys from a gitignored .env without requiring python-dotenv.
@@ -172,14 +188,34 @@ OLLAMA_CHAT_MODEL = "qwen2.5-coder:1.5b"
 # Ollama Tools Schema - minimal set for web search to avoid wsarecv crash on 7b model.
 # Only web_search and webfetch are included; the 1.5b model handles this fine.
 OLLAMA_TOOLS_SCHEMA = [
-    {"type": "function", "function": {"name": "web_search",
-        "description": "Search the web and return top results WITH content snippets; answer directly from those. Args: query, max_results optional.",
-        "parameters": {"type": "object", "additionalProperties": False, "properties": {
-            "query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "webfetch",
-        "description": "Fetch full page content from a URL. Args: url (REQUIRED), format (optional). USE after web_search to read actual page content.",
-        "parameters": {"type": "object", "properties": {
-            "url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web and return top results WITH content snippets; answer directly from those. Args: query, max_results optional.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "webfetch",
+            "description": "Fetch full page content from a URL. Args: url (REQUIRED), format (optional). USE after web_search to read actual page content.",
+            "parameters": {
+                "type": "object",
+                "properties": {"url": {"type": "string"}, "format": {"type": "string"}},
+                "required": ["url"],
+            },
+        },
+    },
 ]
 
 # Ollama on this hardware crashes with any prompt over ~500 chars (2GB VRAM,
@@ -1325,11 +1361,16 @@ def load_json(filename, default):
 
 
 def save_json(filename, data):
-    path = os.path.join(DATA_DIR, filename)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, path)
+    try:
+        path = os.path.join(DATA_DIR, filename)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, path)
+    except Exception as e:
+        # Fail silently so reminder watch errors don't crash the server
+        print("[save_json silent]", filename, e)
+        pass
 
 
 # ===== Playbook memory ("what worked") + audit log =====
@@ -2968,7 +3009,9 @@ def _chat_providers(domain=""):
         ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
     ]
     if OLLAMA_ENABLED:
-        providers.append(("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact"))
+        providers.append(
+            ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
+        )
     return providers
 
 
@@ -3166,6 +3209,7 @@ def _chat_one(
     # OpenCode Zen requires a session header for free-tier models
     if name == "OpenCode" or name == "OpenCode-fallback":
         import uuid
+
         headers["x-opencode-session"] = str(uuid.uuid4())
     # Use a compact schema for Ollama: on this 2012-CPU box prefill is ~10 tok/s,
     # and the full 30-tool schema (~2.7k tokens) alone blows the round timeout.
@@ -4371,8 +4415,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         _budget = (
                             GROQ_REDUCED_BUDGET
                             if _pname == "Groq"
-                            else OPENCODE_REDUCED_BUDGET if _pname == "OpenCode"
-                            else OPENROUTER_REDUCED_BUDGET
+                            else (
+                                OPENCODE_REDUCED_BUDGET
+                                if _pname == "OpenCode"
+                                else OPENROUTER_REDUCED_BUDGET
+                            )
                         )
                         _base = _reduced_tool_pool(
                             active_domain, net_domain_schema or full_domain_schema
@@ -4539,8 +4586,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         _budget = (
                             GROQ_REDUCED_BUDGET
                             if active[0] == "Groq"
-                            else OPENCODE_REDUCED_BUDGET if active[0] == "OpenCode"
-                            else OPENROUTER_REDUCED_BUDGET
+                            else (
+                                OPENCODE_REDUCED_BUDGET
+                                if active[0] == "OpenCode"
+                                else OPENROUTER_REDUCED_BUDGET
+                            )
                         )
                         fwd_msgs = reduced_messages(
                             llm_messages, active_domain, ctx_overlay
@@ -5370,6 +5420,7 @@ def api_live_logs():
     limit = int(request.args.get("limit", 200))
     return jsonify({"logs": _LIVE_LOGS[-limit:]})
 
+
 @app.route("/api/live_logs/clear", methods=["POST"])
 def api_live_logs_clear():
     """Clear the live action log buffer."""
@@ -5792,6 +5843,8 @@ def chat():
             + "\n\n"
             + WEB_SEARCH_RULES_TEXT
             + _mood_softener_line()
+            + ("Memory note: " + open(_SETTINGS_PATH.replace("config.json", "memory.txt"), "r", encoding="utf-8", errors="replace").read().strip() if os.path.exists(_SETTINGS_PATH.replace("config.json", "memory.txt")) else "")
+            + "\n\n"
             + build_context_block()
             + _prefs_text
             + "\n\n"
@@ -5990,16 +6043,6 @@ def _resolve_run_device(command):
     else:
         command = command.rstrip() + " -d " + device_id
     return command
-
-
-@app.route("/files", methods=["GET"])
-def list_files():
-    try:
-        files = os.listdir("C:\\Users\\chris\\StudentSyncSA")
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
 
 def strip_code_fences(code):
     """Remove a leading ```<lang> ... trailing ``` wrapper if the model added one."""
@@ -10656,22 +10699,34 @@ TOOLS_SCHEMA = [
 
 
 _SUBTASK_PROBES = [
-    ("web search",   ("web_search",),            r"\bsearch\b|\bfind out\b|\bagenc"),
-    ("fetch pages",  ("webfetch", "curl"),       r"\bfetch\b|\btop \d+\b"),
-    ("save file",    ("write_file", "open_in_vscode"), r"\bsave\b|\bwrite .*file\b"),
-    ("weather",      ("weather",),               r"\bweather\b"),
-    ("current time", ("get_time",),              r"\bcurrent time\b|\bwhat time\b"),
-    ("open/view user file", ("view_user_file", "open_user_file", "read_user_file"),
-    r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b"),
+    ("web search", ("web_search",), r"\bsearch\b|\bfind out\b|\bagenc"),
+    ("fetch pages", ("webfetch", "curl"), r"\bfetch\b|\btop \d+\b"),
+    ("save file", ("write_file", "open_in_vscode"), r"\bsave\b|\bwrite .*file\b"),
+    ("weather", ("weather",), r"\bweather\b"),
+    ("current time", ("get_time",), r"\bcurrent time\b|\bwhat time\b"),
+    (
+        "open/view user file",
+        ("view_user_file", "open_user_file", "read_user_file"),
+        r"\b(?:open|view|show|display)\b.*\b(?:file|median|picture|photo|image|\.(?:png|jpe?g|gif|pdf|txt|md))\b",
+    ),
     # Broad question-type probes. These match almost any question, so they are
     # only enforced on genuinely multi-step requests (see _BROAD_PROBES).
-    ("answer question", ("web_search", "webfetch", "curl"),
-    r"\b(?:what|who|when|where|which|whom|whose)\b\s+[\w'\- ]{2,40}\b(?:is|was|were|are|does|did|do)\b"
-    r"|\boldest\b|\blargest\b|\bsmallest\b|\bhighest\b|\binvented\b|\bfounded\b"),
-    ("price lookup", ("web_search",),
-    r"\b(?:price|closing price|close[ds]? at|index|stock|share price|exchange rate|rate of)\b"),
-    ("compare values", ("web_search",),
-    r"\bcompare[ds]?\b|\bversus\b|\bvs\.?\b|\bcompared to\b|\byear ago\b|\bthan last\b|\bchange in\b"),
+    (
+        "answer question",
+        ("web_search", "webfetch", "curl"),
+        r"\b(?:what|who|when|where|which|whom|whose)\b\s+[\w'\- ]{2,40}\b(?:is|was|were|are|does|did|do)\b"
+        r"|\boldest\b|\blargest\b|\bsmallest\b|\bhighest\b|\binvented\b|\bfounded\b",
+    ),
+    (
+        "price lookup",
+        ("web_search",),
+        r"\b(?:price|closing price|close[ds]? at|index|stock|share price|exchange rate|rate of)\b",
+    ),
+    (
+        "compare values",
+        ("web_search",),
+        r"\bcompare[ds]?\b|\bversus\b|\bvs\.?\b|\bcompared to\b|\byear ago\b|\bthan last\b|\bchange in\b",
+    ),
 ]
 
 # Probes too generic to enforce on their own: "who was Nelson Mandela?" must not
@@ -10848,63 +10903,224 @@ for _t in TOOLS_SCHEMA:
     # read_file/write_file are included so web-research tasks that ALSO save findings to a
     # notes/*.md file can persist results; they're filtered out for pure net domain calls.
     NET_TOOLS_SCHEMA = [
-        {"type": "function", "function": {"name": "curl",
-            "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
-            "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "timeout": {"type": "number"}}, "required": ["url"]}}},
-        {"type": "function", "function": {"name": "web_search",
-            "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
-            "parameters": {"type": "object", "additionalProperties": False, "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
-        {"type": "function", "function": {"name": "webfetch",
-            "description": "Fetch full page content. Args: url, format.",
-            "parameters": {"type": "object", "properties": {"url": {"type": "string"}, "format": {"type": "string"}}, "required": ["url"]}}},
-        {"type": "function", "function": {"name": "check_email",
-            "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
-            "parameters": {"type": "object", "properties": {"force_all": {"type": "boolean"}}, "required": []}}},
-        {"type": "function", "function": {"name": "view_web_image",
-            "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
-            "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-        {"type": "function", "function": {"name": "weather",
-            "description": "Current weather for a city. Args: city.",
-            "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
-        {"type": "function", "function": {"name": "read_file",
-            "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
-            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-        {"type": "function", "function": {"name": "write_file",
-            "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
-            "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-        {"type": "function", "function": {"name": "open_in_vscode",
-            "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
-            "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
-        {"type": "function", "function": {"name": "note",
-            "description": "Save a note to notes.json. Args: text.",
-            "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
-        {"type": "function", "function": {"name": "todo_add",
-            "description": "Add a to-do task. Args: text (REQUIRED), priority (optional), category (optional).",
-            "parameters": {"type": "object", "properties": {
-                "text": {"type": "string", "title": "text", "description": "REQUIRED. Task description."},
-                "priority": {"type": "string"}, "category": {"type": "string"}},
-            "required": ["text"]}}},
-        {"type": "function", "function": {"name": "todo_list",
-            "description": "List to-do items. Args: category (optional), done (optional bool).",
-            "parameters": {"type": "object", "properties": {
-                "category": {"type": "string"}, "done": {"type": "boolean"}},
-            "required": []}}},
-        {"type": "function", "function": {"name": "todo_done",
-            "description": "Mark a to-do item done. Args: task_id (REQUIRED, integer).",
-            "parameters": {"type": "object", "properties": {
-                "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-        {"type": "function", "function": {"name": "todo_remove",
-            "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
-            "parameters": {"type": "object", "properties": {
-                "task_id": {"type": "integer"}},
-            "required": ["task_id"]}}},
-        {"type": "function", "function": {"name": "get_time",
-            "description": "Current local date/time and weekday.",
-            "parameters": {"type": "object", "properties": {}, "required": []}}},
-        {"type": "function", "function": {"name": "notify",
-            "description": "Send push notification via ntfy. Args: message, title.",
-            "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+        {
+            "type": "function",
+            "function": {
+                "name": "curl",
+                "description": "Hit a URL, return status + body snippet. Args: url, timeout.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "timeout": {"type": "number"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
+                "parameters": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "query": {"type": "string"},
+                        "max_results": {"type": "integer"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "webfetch",
+                "description": "Fetch full page content. Args: url, format.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "format": {"type": "string"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "check_email",
+                "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"force_all": {"type": "boolean"}},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "view_web_image",
+                "description": "Download an image from a URL and DISPLAY it inline in the ACEsi chat window as a popup — use when the user wants to actually SEE a picture from the internet. The URL must point directly at an image file (png/jpg/jpeg/gif/webp/bmp). Args: url.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "weather",
+                "description": "Current weather for a city. Args: city.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "read_file",
+                "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "write_file",
+                "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"},
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "open_in_vscode",
+                "description": "Open content in the user's code editor (VS Code/VSCodium) as a review DRAFT — does NOT write the final file. Chris reviews it in the editor and decides whether to save. Use whenever the user asked to research/save/find + save to a file: compose the findings, call this with path (intended final location) and content, then tell Chris to review. Chris will then say 'save it' to commit. Args: path, content.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"},
+                    },
+                    "required": ["path", "content"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "note",
+                "description": "Save a note to notes.json. Args: text.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "todo_add",
+                "description": "Add a to-do task. Args: text (REQUIRED), priority (optional), category (optional).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "title": "text",
+                            "description": "REQUIRED. Task description.",
+                        },
+                        "priority": {"type": "string"},
+                        "category": {"type": "string"},
+                    },
+                    "required": ["text"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "todo_list",
+                "description": "List to-do items. Args: category (optional), done (optional bool).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {"type": "string"},
+                        "done": {"type": "boolean"},
+                    },
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "todo_done",
+                "description": "Mark a to-do item done. Args: task_id (REQUIRED, integer).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"task_id": {"type": "integer"}},
+                    "required": ["task_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "todo_remove",
+                "description": "Remove a to-do item. Args: task_id (REQUIRED, integer).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"task_id": {"type": "integer"}},
+                    "required": ["task_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_time",
+                "description": "Current local date/time and weekday.",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "notify",
+                "description": "Send push notification via ntfy. Args: message, title.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "message": {"type": "string"},
+                    },
+                    "required": ["message"],
+                },
+            },
+        },
     ]
     # Old commented version with CDP tools:
     # NET_TOOLS_SCHEMA = [
@@ -13199,107 +13415,11 @@ def _nav_gate(user_message, names):
     return None
 
 
-CODE_AGENT_PROMPT = """You are ACEsi, an autonomous coding agent for the StudentSyncSA Flutter project.
-You are on Windows; the project root is C:\\Users\\chris\\StudentSyncSA and `flutter`,
-`dart`, `git` are on PATH. You plan, use tools, and VERIFY your own work — read first,
-then act, then run a check (flutter test / flutter analyze / a script) and read the
-result. Never invent facts about the code; look before you leap.
-
-Per turn, emit lines using exactly one of these tags:
-  THOUGHT: <1-2 sentence reasoning>
-  CALL: <tool_name> <json-arg-object>     (you may emit several CALL lines per turn)
-  FINAL: <your answer to Chris>          (ends the turn)
-
-STYLE — CRITICAL: THOUGHT must be at most ONE short sentence. Never narrate
-what a tool returned, never recap the whole plan in prose, never explain your
-reasoning out loud. Between CALL lines output ONLY the CALL lines — no extra
-commentary. When you finish, the FINAL is a short, plain report (3-5 lines max)
-like a text message: what you did and the key result. No paragraphs, no
-"First I ... then I ..." recaps.
-
-A tool call may also be written as a single-line JSON object on its own line,
-either form is accepted:
-  CALL: read_file {"path": "lib/..."}
-  {"command": "read_file", "args": {"path": "lib/..."}}
-
-IMPORTANT: one tool call is executed per turn. Emit ONE call, see its result,
-then emit the NEXT call. Do not batch independent edits in one turn — file
-state changes after each edit, so a later edit may not match if you guessed
-its old_string before seeing earlier results. If you need to re-read a file,
-that's fine, but do not re-call the exact same tool with the same arguments
-after a success — make forward progress instead.
-
-{TOOLS}
-Safety: run_command blocks rm/git push/checkout/flake.clean/pub get/build, adb
-uninstall and scrcpy. Use the dedicated git_* tools for commits/branches/merges
-(they do NOT push; git_merge rolls back on conflict). build_apk/pub_*/flutter_*
-run via dedicated tools. ui_* tools drive the connected Android device. Edits
-are surgical (exact-match, single occurrence) and sandboxed to the project.
-Treat every step as needing verification. ALWAYS run flutter_analyze or
-flutter_test after edits before committing; only git_commit when tests pass.
-You cannot see screenshots — verify screen state with ui_dump, not ui_screenshot.
-
-DISPATCH RULE — when the instruction is about the app/device (open the app,
-tap, swipe, type, press a key, screenshot, check the UI): use the ui_* tools
-(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot).
-read_file is ONLY for reading source/config files on disk — never feed a UI
-instruction into read_file, and never use a user instruction as a file path.
-
-UI NAVIGATION PROTOCOL (device/app tasks) — follow EVERY step:
-  1. ui_app_open {}                   launch the app
-  2. ui_dump {}                       see what is ACTUALLY on screen now
-  3. ui_tap / ui_swipe / ui_type / ui_key   take ONE action toward the target
-  4. ui_dump {} again                 VERIFY the screen changed as expected
-  5. Repeat 3-4 until ui_dump confirms the target is visible.
-  6. ui_screenshot {"name": "...", "save": true}    ONLY AFTER ui_dump proves the target screen.
-Screenshots are NOT saved to disk by default — they are shown to Chris in a popup. Only set
-save=true when Chris explicitly asked to keep the file. In your FINAL, cite the REAL page
-titles/buttons from the last ui_dump and the actual screenshot behavior — never invent a file
-path or claim to have opened Chrome/CDP when you did not.
-HTTPS/HSTS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT /
-HSTS interstitial for the ITS portal (expired cert is expected), call
-ui_type {"text": "thisisunsafe"} to bypass it, then ui_dump to confirm the portal loaded.
-The server may already auto-type it — follow the fresh ui_dump in that case.
-Never emit FINAL merely after opening the app + taking one screenshot — that is
-NOT navigation and the user will see a screenshot of the wrong screen. In your
-FINAL, report what the LAST ui_dump showed (the visible titles/buttons), proving
-you reached the target. If a tap did not change the screen, scroll (ui_swipe) or
-try a different control; never give up after one attempt.
-
-KNOWN APP STRUCTURE (StudentSyncSA): Landing → login → the bottom navigation bar
-has tabs like Home / Universities. The ITS portal is reached via: Universities tab
-→ tap a university card (e.g. "University of Venda", ITS host univenierp01) → its
-detail screen → tap the "↗ Online Portal" button → the ITS portal opens in an
-in-app WebView. Once the WebView is open, ui_dump shows only the app chrome — read
-the portal itself with the cdp_* tools (cdp_connect, then cdp_dom_state /
-cdp_evaluate to confirm the URL/title), then ui_screenshot.
-
-To move a connected CDP page somewhere, use cdp_navigate(url) — it performs a
-real browser navigation and waits for load, so cdp_dom_state and
-cdp_network_requests then describe the new page. Do NOT fake navigation with
-evaluate_js("location.href=...") when you intend to inspect the Network panel,
-because a JS-driven redirect does not produce a proper Document request.
-
-CRITICAL — you MUST use at least one tool before emitting FINAL. You are not
-allowed to announce a fix you have not actually applied. If tool outputs show
-the tests still fail, fix the cause and re-test. Never fabricate a result.
-
-Example of a correct turn:
-  THOUGHT: First I'll read the file to see the existing rules.
-  CALL: read_file {"path": "lib/services/its_url_fixer.dart"}
-  CALL: grep {"pattern": "univenerip01", "path": "lib/services/its_url_fixer.dart"}
-  THOUGHT: The rule is absent — adding it next via edit_file, then I'll test.
-  CALL: edit_file {"path": "lib/services/its_url_fixer.dart", "old": "        url.contains('unlvenierp01') ||", "new": "        url.contains('unlvenierp01') ||\n        url.contains('univenerip01') ||"}
-  CALL: run_command {"command": "flutter test test/its_url_fixer_test.dart"}
-  FINAL: Added the univenerip01 rule to isItsHost and normalize; tests now pass.
-
-AUTO-TRACK: When Chris gives you 2 or more separate instructions
-(e.g. "do X, do Y, and do Z"), automatically break them into tracked
-tasks. Use todo_add for each one, todo_done when finished, and
-todo_list to check remaining. Always end your FINAL with:
-"Progress: X/Y tasks done" (e.g. "Progress: 3/3 tasks done" or
-"Progress: 2/3 tasks done — 1 pending").
-"""
+try:
+    with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+        CODE_AGENT_PROMPT = f.read()
+except FileNotFoundError:
+    CODE_AGENT_PROMPT = "You are ACESi, a helpful assistant."
 
 
 def _unwrap_typed(o):
@@ -15496,9 +15616,7 @@ def llm_reply(
             if res is not None:
                 return res
         for model in OPENCODE_FALLBACKS:
-            res = one(
-                "OpenCode-fallback", OPENCODE_ENDPOINT, OPENCODE_API_KEY, model
-            )
+            res = one("OpenCode-fallback", OPENCODE_ENDPOINT, OPENCODE_API_KEY, model)
             if res is not None:
                 return res
     # Last resort: local Ollama — uses requests.Session() with trust_env=False,
@@ -17598,6 +17716,132 @@ def _boot_banner():
         _sys.stdout.flush()
     except Exception:
         pass
+
+
+# ===== Explorer file routes =====
+@app.route("/api/files", methods=["GET"])
+@app.route("/api/files", methods=["GET"])
+def api_files():
+    import os
+    files = []
+    lib_dir = os.path.abspath("lib")
+    print("Explorer: reading lib dir:", lib_dir, "exists?", os.path.isdir(lib_dir))
+    if os.path.isdir(lib_dir):
+        for root, dirs, filenames in os.walk(lib_dir):
+            for filename in filenames:
+                if filename.endswith(".dart"):
+                    full = os.path.join(root, filename)
+                    rel = os.path.relpath(full, lib_dir)
+                    rel = rel.replace("\\", "/")
+                    # Return paths relative to lib, prefixed with lib/
+                    files.append("lib/" + rel)
+    print("Explorer files found:", sorted(files)[:5], "... total:", len(files))
+    return jsonify(sorted(files))
+
+@app.route("/api/file-content", methods=["GET"])
+def api_file_content():
+    path = (request.args.get("path") or "").strip()
+    if not path or ".." in path:
+        return jsonify({"ok": False, "error": "bad path"}), 400
+    full = path if path.startswith("lib/") else os.path.join("lib", path)
+    try:
+        with open(full, "r", encoding="utf-8") as fh:
+            return Response(fh.read(), mimetype="text/plain")
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 404
+
+@app.route("/api/save-file", methods=["POST"])
+def api_save_file():
+    data = request.get_json(silent=True) or {}
+    path = (data.get("path") or "").strip()
+    content = data.get("content", "")
+    if not path or ".." in path:
+        return jsonify({"ok": False, "error": "bad path"}), 400
+    full = path if path.startswith("lib/") else os.path.join("lib", path)
+    try:
+        with open(full, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        return jsonify({"ok": True, "saved": path})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ── ACEsi System Settings ──────────────────────────────────────────────
+import json as _json
+import os as _os
+
+_SETTINGS_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "config.json")
+_PROMPT_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "system_prompt.txt")
+
+def _load_settings():
+    try:
+        with open(_SETTINGS_PATH, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {"provider": "Groq", "model": "qwen2.5-coder:7b", "system_prompt": "", "show_toolbar": True, "chat_history": [], "groq_key": "", "openrouter_key": ""}
+
+_save_lock = _threading_lock = __import__("_thread").allocate_lock()
+
+def _save_settings(v):
+    with _save_lock:
+        try:
+            with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
+                _json.dump(v, f, indent=2)
+        except Exception as e:
+            print(f"[settings] save failed: {e}")
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_get():
+    s = _load_settings()
+    # Read system prompt
+    try:
+        with open(_PROMPT_PATH, "r", encoding="utf-8") as f:
+            s["system_prompt"] = f.read()
+    except Exception:
+        s["system_prompt"] = ""
+    return jsonify(s)
+
+@app.route("/api/settings", methods=["POST"])
+def api_settings_post():
+    data = request.get_json(silent=True) or {}
+    s = _load_settings()
+    if "provider" in data:
+        s["provider"] = data["provider"]
+    if "model" in data:
+        s["model"] = data["model"]
+    if "system_prompt" in data:
+        try:
+            with open(_PROMPT_PATH, "w", encoding="utf-8") as f:
+                f.write(data["system_prompt"])
+        except Exception as e:
+            print(f"[settings] save prompt failed: {e}")
+    if "groq_key" in data:
+        s["groq_key"] = data["groq_key"]
+    if "openrouter_key" in data:
+        s["openrouter_key"] = data["openrouter_key"]
+    if data.get("clear_chat") == True:
+        s["chat_history"] = []
+    _save_settings(s)
+    return jsonify(s)
+
+
+@app.route("/api/reminders", methods=["POST"])
+def api_reminders():
+    data = request.get_json(silent=True) or {}
+    # TODO: Implement reminder creation logic
+    print("📌 Reminder requested: %s" % data.get("text", "no text"))
+    return jsonify({"status": "requested", "reminder": data.get("text", "")})
+
+@app.route("/api/notifications", methods=["GET"])
+def api_notifications():
+    # TODO: Implement notification log retrieval
+    print("📢 Fetching notifications log")
+    return jsonify({"notifications": []})
+
+@app.route("/api/ping", methods=["POST"])
+def api_ping():
+    # TODO: Trigger notify tool / send test ping
+    print("📡 Send Ping triggered")
+    return jsonify({"status": "ping sent"})
 
 
 if __name__ == "__main__":

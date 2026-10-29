@@ -1,0 +1,134 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 12640
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=01:37:16  710541 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 5  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_get_response_body, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=False. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📨 /model_chat incoming: 67 chars
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+🔧 /chat executed write_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool write_file did not match schema: errors: [missing properties: 'path'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+📨 /model_chat incoming: 66 chars
+[domain] explicit tool 'edit_file' -> code (tool domains: ['code'])
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+🔧 /chat executed edit_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+📨 /model_chat incoming: 35 chars
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+🔧 /chat executed list_files ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+🔧 /chat executed list_files ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed list_files ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 18.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🛑 /chat stop: repeated identical batch ('list_files', '{"path": "."}')
+⏳ Groq 429: waiting 12.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+📨 /model_chat incoming: 22 chars
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 6.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+⏳ Groq 429: waiting 4.0s before attempt 3 (Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj)
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+🔧 /chat executed read_user_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 6.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed read_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed read_user_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool list_user_files did not match schema: errors: [missing properties: 'path'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed list_user_files ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 6857, Requested 1833. Plea [retry budget exhausted]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Groq (qwen/qwen3.8-27b) 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Used 6826, Requested 1833. Plea [retry budget exhausted]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1301 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1301 affordable=106]]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'Cerebras', 'OpenRouter', 'FreeLLM'] ollama=False
+📨 /model_chat incoming: 29 chars
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+🔧 /chat executed view_user_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 7.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed view_user_file ok=True
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool list_files did not match schema: errors: [missing properties: 'path'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool view_user_file did not match schema: errors: [missing properties: 'path'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 971 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=971 affordable=106]]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'Cerebras', 'OpenRouter', 'FreeLLM'] ollama=False
+📨 /model_chat incoming: 38 chars
+🪶 reduced schema: 28 -> 11 tools, ~965 tokens
+⏳ Groq 429: waiting 6.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+📨 Incoming message length: 323 chars
+🧠 ui_script bail: prompt is 323 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1124 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1124 affordable=106]]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+⚠️ /chat auto-open fallback: no file matches hint 'Please create a new text file in the current directory named local_test.txt'
+📨 /model_chat incoming: 321 chars
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool write_file did not match schema: errors: [missing properties: 'path'] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1021 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1021 affordable=106]]
+🪶 reduced schema: 14 -> 10 tools, ~789 tokens
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'Cerebras', 'OpenRouter', 'FreeLLM'] ollama=False
+⚠️ /chat auto-open fallback: no file matches hint 'Please create a new text file in the current directory named local_test.txt'

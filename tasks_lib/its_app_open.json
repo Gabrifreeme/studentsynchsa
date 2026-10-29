@@ -1,0 +1,10 @@
+{
+  "name": "its_app_open",
+  "description": "Open StudentSyncSA app, read the screen, and confirm the landing page",
+  "auto_dump": true,
+  "steps": [
+    {"tool": "ui_app_open", "args": {}},
+    {"tool": "ui_dump", "args": {}},
+    {"tool": "ui_assert_text", "args": {"text": "login", "present": true}}
+  ]
+}

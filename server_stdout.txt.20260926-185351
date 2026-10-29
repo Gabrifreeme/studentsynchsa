@@ -1,0 +1,41 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 396 chars
+[domain] explicit tool 'cdp_network_requests' -> ui (tool domains: ['net', 'ui'])
+🧠 ui_script bail: URL/DevTools/CDP task - deferring to the model-driven loop
+❌ OpenRouter 404: {"error":{"message":"This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731","code":404}
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 75. To increase, visit https:/
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 30. To increase, visit https:/
+❌ Groq 413: {"error":{"message":"Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens pe
+❌ Cerebras 402: {"message":"Payment required to access this resource. Visit your billing tab.","type":"payment_required_error","param":"quota","code":"payment_required"}
+❌ OpenRouter 404: {"error":{"message":"This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731","code":404}
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 75. To increase, visit https:/
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 30. To increase, visit https:/
+❌ Groq 413: {"error":{"message":"Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens pe
+❌ Cerebras 402: {"message":"Payment required to access this resource. Visit your billing tab.","type":"payment_required_error","param":"quota","code":"payment_required"}
+🔧 /chat executed cdp_connect ok=True
+🔧 /chat executed cdp_navigate ok=False
+🔧 /chat executed cdp_status ok=True
+🔧 /chat executed cdp_dom_state ok=False
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_network_requests ok=True
+🔧 /chat executed cdp_navigate ok=True
+🔧 /chat executed cdp_dom_state ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_evaluate ok=True
+🔧 /chat executed cdp_network_requests ok=True
+🔧 /chat executed cdp_get_response_body ok=False
+🔧 /chat executed cdp_get_response_body ok=False
+🔧 /chat executed cdp_network_requests ok=True
+📨 Incoming message length: 396 chars
+[domain] explicit tool 'cdp_network_requests' -> ui (tool domains: ['net', 'ui'])
+🧠 ui_script bail: URL/DevTools/CDP task - deferring to the model-driven loop

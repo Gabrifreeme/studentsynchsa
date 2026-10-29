@@ -1,0 +1,9 @@
+{
+  "provider": "groq",
+  "model": "qwen2.5-coder:7b",
+  "system_prompt": "",
+  "show_toolbar": true,
+  "chat_history": [],
+  "groq_key": "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",
+  "openrouter_key": "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"
+}

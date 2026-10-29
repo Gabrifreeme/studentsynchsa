@@ -1,0 +1,92 @@
+⚠️ Ollama reachability check failed: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=11434): Max retries exceeded with url: /api/tags (Caused by NewConnectionError
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 18188
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:42:02  723952 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:42:37] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=701
+[normalize] run_command in={"command": "echo \"hello\""} out={"command": "echo \"hello\""}
+📋 [21:42:38] Tool: run_command({"command": "echo \"hello\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:42:38] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=694
+[normalize] curl in={"url": "https://www.google.com"} out={"url": "https://www.google.com"}
+📋 [21:42:39] Tool: curl({"url": "https://www.google.com"}) ok=True
+🔧 /chat executed curl ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:42:39] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=699
+[normalize] run_command in={"command": "echo \"hello\""} out={"command": "echo \"hello\""}
+📋 [21:42:39] Tool: run_command({"command": "echo \"hello\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:42:39] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=733
+[normalize] web_search in={"query": "StudentSyncSA ITS portal login university South Africa"} out={"query": "StudentSyncSA ITS portal login university South Africa"}
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+📋 [21:42:44] Tool: web_search({"query": "StudentSyncSA ITS portal login university South Africa"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:42:44] Sending to Groq (qwen/qwen3.8-27b) — 8 messages, tools=yes
+📥 [Groq] HTTP 200 len=715
+[normalize] web_search in={"query": "UNIZULU ITS student portal login url"} out={"query": "UNIZULU ITS student portal login url"}
+[web_search] Enhanced query: 'UNIZULU ITS student portal login url' → 'UNIZULU ITS student portal login url South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+📋 [21:42:47] Tool: web_search({"query": "UNIZULU ITS student portal login url"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+❌ OpenCode (opencode/zen) nokey: no API key configured for this provider
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:42:47] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+⏳ Groq 429: waiting 4.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:42:51] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 200 len=725
+[normalize] web_search in={"query": "Unizulu ITS iEnabler portal login URL student"} out={"query": "Unizulu ITS iEnabler portal login URL student"}
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+[web_search] Enhanced query: 'Unizulu ITS iEnabler portal login URL student' → 'Unizulu ITS iEnabler portal login URL student South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+📋 [21:42:55] Tool: web_search({"query": "Unizulu ITS iEnabler portal login URL student"}) ok=True
+🔧 /chat executed web_search ok=True
+💥 Exception in /chat: NameError: name '_SUBTASK_PROBES' is not defined

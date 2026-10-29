@@ -1,0 +1,22 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+127.0.0.1 - - [24/Oct/2026 02:05:37] "POST /model_chat HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:22] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:22] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:22] "GET /notifications/pending?after=1789843026984 HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:22] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:23] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /screenshot/latest HTTP/1.1" 404 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /assets/web/loading-spinner.html HTTP/1.1" 404 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /history HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /kill/status HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /conversations?limit=60 HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /devices HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /agents HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:24] "GET /files HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:25] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:26] "GET /opencode/status HTTP/1.1" 200 -
+127.0.0.1 - - [24/Oct/2026 02:06:27] "GET /opencode/status HTTP/1.1" 200 -

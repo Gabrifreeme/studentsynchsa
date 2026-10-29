@@ -1,0 +1,200 @@
+⚠️ Ollama reachability check failed: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=11434): Max retries exceeded with url: /api/tags (Caused by NewConnectionError
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 15392
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=22:15:05  729965 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [22:24:04] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=908
+[normalize] run_command in={"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b066-9fa0226c927b/scratchpad/ 2>/dev/null; echo \"---\"; ls /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b066-9fa0226c927b/scratchpad/*.txt 2>/dev/null"} out={"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b066-9fa0226c927b/scratchpad/ 2>/dev/null; echo \"---\"; ls /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b066-9fa0226c927b/scratchpad/*.txt 2>/dev/null"}
+📋 [22:24:05] Tool: run_command({"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b066-9fa0226c927b/scratchpad/ 2>/dev/null; echo \"--) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:05] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=687
+[normalize] run_command in={"command": "echo ok"} out={"command": "echo ok"}
+📋 [22:24:05] Tool: run_command({"command": "echo ok"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [22:24:05] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=715
+[normalize] run_command in={"command": "echo \"checking environment\""} out={"command": "echo \"checking environment\""}
+📋 [22:24:06] Tool: run_command({"command": "echo \"checking environment\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [22:24:06] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=545
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [22:24:06] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=824
+📋 [22:24:07] Dispatch complete: 17 messages, model=deepseek/deepseek-v4-flash-0731:free
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [22:24:16] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=750
+[normalize] web_search in={"max_results": 5, "query": "Mabula Game Lodge Bela-Bela location GPS coordinates"} out={"max_results": 5, "query": "Mabula Game Lodge Bela-Bela location GPS coordinates"}
+[web_search] Trying Tavily...
+📨 Incoming message length: 2 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [22:24:19] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=847
+[normalize] run_command in={"command": "curl -s https://ipinfo.io/json"} out={"command": "curl -s https://ipinfo.io/json"}
+📋 [22:24:20] Tool: run_command({"command": "curl -s https://ipinfo.io/json"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:20] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+⏳ Groq 429: waiting 10.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+[web_search] SUCCESS via Tavily (5 results)
+📋 [22:24:21] Tool: web_search({"max_results": 5, "query": "Mabula Game Lodge Bela-Bela location GPS coordinates"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:21] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 429 len=389
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:31] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 400 len=502
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query', additionalProperties 'q' not allowed] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:31] Sending to OpenCode (mimo-v2.6-flash-free) — 5 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+⏳ OpenCode 429: waiting 20.0s before attempt 2 (Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:32] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 429 len=389
+⏳ Groq 429: waiting 11.0s before attempt 3 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:44] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=741
+[normalize] web_search in={"query": "Mabula Game Lodge Bela Bela GPS coordinates latitude longitude"} out={"query": "Mabula Game Lodge Bela Bela GPS coordinates latitude longitude"}
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (6 results)
+📋 [22:24:47] Tool: web_search({"query": "Mabula Game Lodge Bela Bela GPS coordinates latitude longitude"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [22:24:47] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 429 len=381
+⏳ Groq 429: waiting 13.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=5 timeout=(10, 90) tools=yes
+📋 [22:24:52] Sending to OpenCode (mimo-v2.6-flash-free) — 5 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+⏳ OpenCode 429: waiting 20.0s before attempt 3 (Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [22:25:00] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=921
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+📋 [22:25:00] Dispatch complete: 14 messages, model=deepseek/deepseek-v4-flash-0731:free
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=5 timeout=(10, 90) tools=yes
+📋 [22:25:13] Sending to OpenCode (mimo-v2.6-flash-free) — 5 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+❌ OpenCode (mimo-v2.6-flash-free) 429: Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go [retry budget exhausted]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=12 timeout=(10, 90) tools=yes
+📋 [22:25:14] Sending to Cerebras (gpt-oss-120b) — 12 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=12 timeout=(10, 90) tools=yes
+📋 [22:25:14] Sending to FreeLLM (auto) — 12 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode-fallback] POST https://opencode.ai/zen/v1/chat/completions model=deepseek-v4-flash-free msgs=5 timeout=(10, 90) tools=yes
+📋 [22:25:15] Sending to OpenCode-fallback (deepseek-v4-flash-free) — 5 messages, tools=yes
+📥 [OpenCode-fallback] HTTP 400 len=92
+❌ OpenCode-fallback (deepseek-v4-flash-free) 400: Upstream request failed: Model is unavailable.
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'OpenCode', 'Cerebras', 'FreeLLM'] ollama=False
+📋 [22:25:16] Dispatch complete: 12 messages, model=deepseek/deepseek-v4-flash-0731:free
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+📨 Incoming message length: 121 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [22:25:41] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 400 len=615
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query', additionalProperties 'url' not allowed] [tool call failed schema validation (null or wrong-typed argument)]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [22:25:42] Sending to OpenCode (mimo-v2.6-flash-free) — 4 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+⏳ OpenCode 429: waiting 20.0s before attempt 2 (Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [22:26:03] Sending to OpenCode (mimo-v2.6-flash-free) — 4 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+⏳ OpenCode 429: waiting 20.0s before attempt 3 (Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [22:26:24] Sending to OpenCode (mimo-v2.6-flash-free) — 4 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+⏳ OpenCode 429: waiting 20.0s before attempt 4 (Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode] POST https://opencode.ai/zen/v1/chat/completions model=mimo-v2.6-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [22:26:44] Sending to OpenCode (mimo-v2.6-flash-free) — 4 messages, tools=yes
+📥 [OpenCode] HTTP 429 len=208
+❌ OpenCode (mimo-v2.6-flash-free) 429: Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=10 timeout=(10, 90) tools=yes
+📋 [22:26:45] Sending to Cerebras (gpt-oss-120b) — 10 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=10 timeout=(10, 90) tools=yes
+📋 [22:26:46] Sending to FreeLLM (auto) — 10 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenCode-fallback] POST https://opencode.ai/zen/v1/chat/completions model=deepseek-v4-flash-free msgs=4 timeout=(10, 90) tools=yes
+📋 [22:26:46] Sending to OpenCode-fallback (deepseek-v4-flash-free) — 4 messages, tools=yes
+📥 [OpenCode-fallback] HTTP 400 len=92
+❌ OpenCode-fallback (deepseek-v4-flash-free) 400: Upstream request failed: Model is unavailable.
+[ACE-DISPATCH] All providers exhausted. tried=['Groq', 'OpenCode', 'Cerebras', 'FreeLLM'] ollama=False
+📋 [22:26:47] Dispatch complete: 10 messages, model=deepseek/deepseek-v4-flash-0731:free
+⚠️ email watch: yahoo mailbox failed (attempt 1) — [UNAVAILABLE] LOGIN Server error - Please try again later
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.

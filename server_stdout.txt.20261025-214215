@@ -1,0 +1,654 @@
+✅ Ollama reachable — 3 model(s) loaded: ['qwen2.5-coder:1.5b', 'qwen2.5:14b', 'qwen2.5-coder:7b']
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 12916
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:19:01  723329 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:39] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:39] Sending to OpenRouter (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:42] Sending to OpenRouter (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1053 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1053 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:42] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:42] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=884
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1053 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1053 affordable=112]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:19:42] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=739
+[normalize] run_command in={"command": "curl -s -m 5 http://10.0.2.2:8080 || echo \"FAILED\""} out={"command": "curl -s -m 5 http://10.0.2.2:8080 || echo \"FAILED\""}
+📋 [21:19:48] Tool: run_command({"command": "curl -s -m 5 http://10.0.2.2:8080 || echo \"FAILED\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:48] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:48] Sending to OpenRouter (poolside/laguna-s-2.1) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:50] Sending to OpenRouter (poolside/laguna-s-2.1) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 906 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=906 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:50] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:50] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=883
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 906 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=906 affordable=112]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:19:50] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=738
+[normalize] web_search in={"max_results": 5, "query": "StudentSyncSA ITS portal login credentials"} out={"max_results": 5, "query": "StudentSyncSA ITS portal login credentials"}
+[web_search] Enhanced query: 'StudentSyncSA ITS portal login credentials' → 'StudentSyncSA ITS portal login credentials South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] SUCCESS via Tavily (5 results)
+📋 [21:19:55] Tool: web_search({"max_results": 5, "query": "StudentSyncSA ITS portal login credentials"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to OpenRouter (poolside/laguna-s-2.1) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to OpenRouter (poolside/laguna-s-2.1) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1180 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1180 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=884
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1180 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1180 affordable=112]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:19:55] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=723
+[normalize] web_search in={"query": "NSFAS student accommodation portal login URL"} out={"query": "NSFAS student accommodation portal login URL"}
+[web_search] Enhanced query: 'NSFAS student accommodation portal login URL' → 'NSFAS student accommodation portal login URL South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] REJECTED garbage result: 'How to Apply for NSFAS Private Accommodation: The Portal, Step by Step | DigsCon'
+[web_search] SUCCESS via Tavily (5 results)
+📋 [21:19:59] Tool: web_search({"query": "NSFAS student accommodation portal login URL"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to OpenRouter (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to OpenRouter (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1426 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1426 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 23 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=884
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1426 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1426 affordable=112]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:19:59] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 400 len=555
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query', additionalProperties 'url' not allowed] [tool call failed schema validation (null or wrong-typed argument)]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=16 timeout=(10, 90) tools=yes
+📋 [21:20:00] Sending to Cerebras (gpt-oss-120b) — 16 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=16 timeout=(10, 90) tools=yes
+📋 [21:20:00] Sending to FreeLLM (auto) — 16 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(30, 240) tools=yes
+📋 [21:20:01] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:20:15] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:54577-\u003e127.0.0.1:54485: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:54577->127.0.0.1:54485: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:20:15] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=486
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:20:15] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=415
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1426 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1426 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:20:15] Sending to OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=957
+💳 OpenRouter-fallback 402: balance affords only 23 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:20:15] Sending to OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=884
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1426 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1426 affordable=112]]
+[Fallback] Cloud API rate limited. Switching to local Ollama.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=1 timeout=(15, 300) tools=yes
+📋 [21:20:16] Sending to Ollama (qwen2.5-coder:1.5b) — 1 messages, tools=yes
+📨 Incoming message length: 0 chars
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:12] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:13] Sending to OpenRouter (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:13] Sending to OpenRouter (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 902 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=902 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:13] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:13] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 4 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 902 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=902 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:23:13] Sending to Groq (qwen/qwen3.8-27b) — 4 messages, tools=yes
+📥 [Groq] HTTP 200 len=815
+[normalize] run_command in={"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b068-8e4561b451a2/scratchpad/ 2>/dev/null || echo \"no scratchpad\""} out={"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b068-8e4561b451a2/scratchpad/ 2>/dev/null || echo \"no scratchpad\""}
+📋 [21:23:14] Tool: run_command({"command": "ls -la /tmp/claude-1000/-home-admin/2182ee5e-ec42-99d4-b068-8e4561b451a2/scratchpad/ 2>/dev/null || echo \") ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to OpenRouter (poolside/laguna-s-2.1) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to OpenRouter (poolside/laguna-s-2.1) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 919 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=919 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 5 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 919 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=919 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=5 timeout=(10, 90) tools=yes
+📋 [21:23:14] Sending to Groq (qwen/qwen3.8-27b) — 5 messages, tools=yes
+📥 [Groq] HTTP 200 len=852
+[normalize] run_command in={"command": "ls -la ~ 2>/dev/null; echo \"---\"; ls -la /tmp 2>/dev/null | head; echo \"---\"; find / -maxdepth 3 -name \"scratchpad*\" 2>/dev/null | head"} out={"command": "ls -la ~ 2>/dev/null; echo \"---\"; ls -la /tmp 2>/dev/null | head; echo \"---\"; find / -maxdepth 3 -name \"scratchpad*\" 2>/dev/null | head"}
+📋 [21:23:15] Tool: run_command({"command": "ls -la ~ 2>/dev/null; echo \"---\"; ls -la /tmp 2>/dev/null | head; echo \"---\"; find / -maxdepth 3 -name ) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:15] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:15] Sending to OpenRouter (poolside/laguna-s-2.1) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:15] Sending to OpenRouter (poolside/laguna-s-2.1) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 933 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=933 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:15] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:16] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 6 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 933 > 112. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=933 affordable=112]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=6 timeout=(10, 90) tools=yes
+📋 [21:23:16] Sending to Groq (qwen/qwen3.8-27b) — 6 messages, tools=yes
+📥 [Groq] HTTP 200 len=822
+[normalize] run_command in={"command": "dir /s /b C:\\Users\\*scratchpad* 2>nul & dir /s /b C:\\*scratchpad* 2>nul & echo --- & dir C:\\Users"} out={"command": "dir /s /b C:\\Users\\*scratchpad* 2>nul & dir /s /b C:\\*scratchpad* 2>nul & echo --- & dir C:\\Users"}
+📥 [Ollama] HTTP 200 len=437
+📋 [21:24:20] Ollama responded OK (437 bytes)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(15, 300) tools=yes
+📋 [21:24:20] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:24:25] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:56631-\u003e127.0.0.1:54635: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:56631->127.0.0.1:54635: wsarecv: An existing connection was forcibly closed by the remote host.
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM', 'Ollama'] ollama=True
+📋 [21:24:25] Dispatch complete: 16 messages, model=deepseek/deepseek-v4-flash-0731:free
+📋 [21:25:16] Tool: run_command({"command": "dir /s /b C:\\Users\\*scratchpad* 2>nul & dir /s /b C:\\*scratchpad* 2>nul & echo --- & dir C:\\Users"}) ok=False
+🔧 /chat executed run_command ok=False
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:16] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to OpenRouter (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to OpenRouter (poolside/laguna-s-2.1) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 939 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=939 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 7 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 939 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=939 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=7 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to Groq (qwen/qwen3.8-27b) — 7 messages, tools=yes
+📥 [Groq] HTTP 200 len=700
+[normalize] run_command in={"command": "echo \"test\""} out={"command": "echo \"test\""}
+📋 [21:25:17] Tool: run_command({"command": "echo \"test\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:17] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to OpenRouter (poolside/laguna-s-2.1) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to OpenRouter (poolside/laguna-s-2.1) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 943 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=943 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 8 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 943 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=943 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=8 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to Groq (qwen/qwen3.8-27b) — 8 messages, tools=yes
+📥 [Groq] HTTP 200 len=689
+[normalize] run_command in={"command": "echo ok"} out={"command": "echo ok"}
+📋 [21:25:18] Tool: run_command({"command": "echo ok"}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:18] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (poolside/laguna-s-2.1) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (poolside/laguna-s-2.1) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 946 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=946 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 9 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 946 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=946 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=9 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to Groq (qwen/qwen3.8-27b) — 9 messages, tools=yes
+📥 [Groq] HTTP 200 len=700
+[normalize] run_command in={"command": "echo \"test\""} out={"command": "echo \"test\""}
+📋 [21:25:19] Tool: run_command({"command": "echo \"test\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:19] Sending to OpenRouter (poolside/laguna-s-2.1) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:20] Sending to OpenRouter (poolside/laguna-s-2.1) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=414
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 950 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=950 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:20] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:20] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 10 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=812
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 950 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=950 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=10 timeout=(10, 90) tools=yes
+📋 [21:25:20] Sending to Groq (qwen/qwen3.8-27b) — 10 messages, tools=yes
+📥 [Groq] HTTP 200 len=728
+[normalize] web_search in={"query": "StudentSyncSA ITS portal university online portal"} out={"query": "StudentSyncSA ITS portal university online portal"}
+[web_search] Enhanced query: 'StudentSyncSA ITS portal university online portal' → 'StudentSyncSA ITS portal university online portal South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] REJECTED garbage result: 'Portal - An Immersive Spatial Audio App For Focus, Sleep & Relaxation'
+[web_search] REJECTED garbage result: 'Portal Oakland — Preview V3'
+[web_search] REJECTED garbage result: 'Meta Portal - Video Calling Devices with Smart Assistant Integration | Meta Stor'
+[web_search] SUCCESS via Tavily (3 results)
+📋 [21:25:23] Tool: web_search({"query": "StudentSyncSA ITS portal university online portal"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to OpenRouter (poolside/laguna-s-2.1) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to OpenRouter (poolside/laguna-s-2.1) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1124 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1124 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 11 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=814
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1124 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1124 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=11 timeout=(10, 90) tools=yes
+📋 [21:25:23] Sending to Groq (qwen/qwen3.8-27b) — 11 messages, tools=yes
+📥 [Groq] HTTP 200 len=699
+[normalize] run_command in={"command": "echo \"test\""} out={"command": "echo \"test\""}
+📋 [21:25:24] Tool: run_command({"command": "echo \"test\""}) ok=True
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to OpenRouter (poolside/laguna-s-2.1) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to OpenRouter (poolside/laguna-s-2.1) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1129 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1129 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 12 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=814
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1129 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1129 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:24] Sending to Groq (qwen/qwen3.8-27b) — 12 messages, tools=yes
+📥 [Groq] HTTP 429 len=388
+⏳ Groq 429: waiting 2.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=12 timeout=(10, 90) tools=yes
+📋 [21:25:27] Sending to Groq (qwen/qwen3.8-27b) — 12 messages, tools=yes
+📥 [Groq] HTTP 200 len=738
+[normalize] web_search in={"query": "Portal video game Aperture Science first person puzzle game"} out={"query": "Portal video game Aperture Science first person puzzle game"}
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+[web_search] Enhanced query: 'Portal video game Aperture Science first person puzzle game' → 'Portal video game Aperture Science first person puzzle game South Africa bed and breakfast'
+[web_search] Trying Tavily...
+[web_search] REJECTED garbage result: 'Portal Maze 2 game 3D aperture – Apps on Google Play'
+[web_search] SUCCESS via Tavily (5 results)
+📋 [21:25:29] Tool: web_search({"query": "Portal video game Aperture Science first person puzzle game"}) ok=True
+🔧 /chat executed web_search ok=True
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=deepseek/deepseek-v4-flash-0731:free msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:29] Sending to OpenRouter (deepseek/deepseek-v4-flash-0731:free) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 404 len=206
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:29] Sending to OpenRouter (poolside/laguna-s-2.1) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=486
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:30] Sending to OpenRouter (poolside/laguna-s-2.1) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=415
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1432 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1432 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:30] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=957
+💳 OpenRouter 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:30] Sending to OpenRouter (nvidia/nemotron-3-super-120b-a12b) — 13 messages, tools=yes
+📥 [OpenRouter] HTTP 402 len=814
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1432 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1432 affordable=119]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:30] Sending to Groq (qwen/qwen3.8-27b) — 13 messages, tools=yes
+📥 [Groq] HTTP 429 len=389
+⏳ Groq 429: waiting 11.0s before attempt 2 (Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49ska)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Groq] POST https://api.groq.com/openai/v1/chat/completions model=qwen/qwen3.8-27b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:41] Sending to Groq (qwen/qwen3.8-27b) — 13 messages, tools=yes
+📥 [Groq] HTTP 400 len=545
+❌ Groq (qwen/qwen3.8-27b) 400: tool call validation failed: parameters for tool web_search did not match schema: errors: [missing properties: 'query', additionalProperties 'url' not allowed] [tool call failed schema validation (null or wrong-typed argument)]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Cerebras] POST https://api.cerebras.ai/v1/chat/completions model=gpt-oss-120b msgs=28 timeout=(10, 90) tools=yes
+📋 [21:25:41] Sending to Cerebras (gpt-oss-120b) — 28 messages, tools=yes
+📥 [Cerebras] HTTP 402 len=153
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [FreeLLM] POST https://freellmapi-production-1394.up.railway.app/v1/chat/completions model=auto msgs=28 timeout=(10, 90) tools=yes
+📋 [21:25:42] Sending to FreeLLM (auto) — 28 messages, tools=yes
+📥 [FreeLLM] HTTP 404 len=101
+❌ FreeLLM (auto) 404: Application not found [model slug not found or retired at this provider]
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(30, 240) tools=yes
+📋 [21:25:42] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:25:57] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:57632-\u003e127.0.0.1:57527: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:57632->127.0.0.1:57527: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:57] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 13 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=486
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:57] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 13 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=415
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1432 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1432 affordable=106]]
+🪶 reduced schema: 40 -> 5 tools, ~592 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:57] Sending to OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) — 13 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=957
+💳 OpenRouter-fallback 402: balance affords only 21 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=13 timeout=(10, 90) tools=yes
+📋 [21:25:58] Sending to OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) — 13 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=814
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1432 > 119. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1432 affordable=119]]
+[Fallback] Cloud API rate limited. Switching to local Ollama.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=1 timeout=(15, 300) tools=yes
+📋 [21:25:58] Sending to Ollama (qwen2.5-coder:1.5b) — 1 messages, tools=yes
+📥 [Ollama] HTTP 200 len=437
+📋 [21:30:03] Ollama responded OK (437 bytes)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(15, 300) tools=yes
+📋 [21:30:03] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:30:08] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:59799-\u003e127.0.0.1:57685: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:59799->127.0.0.1:57685: wsarecv: An existing connection was forcibly closed by the remote host.
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM', 'Ollama'] ollama=True
+📋 [21:30:08] Dispatch complete: 28 messages, model=deepseek/deepseek-v4-flash-0731:free
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+🔥 Uncaught exception: NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.

@@ -5,6 +5,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:lipsyncstudent/services/autofill_script.dart' as star;
 import 'package:lipsyncstudent/services/its_url_fixer.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lipsyncstudent/presentation/screens/profile/quick_copy_screen.dart';
 
 /// Shows a university's web portal.
 ///
@@ -41,10 +42,12 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
       'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view';
 
   late WebViewController _controller;
+  late WebViewController _acesiController;
   bool _loading = true;
   String? _currentUrl;
   String? _profileJson;
   bool _wizardBootstrapped = false;
+  bool showAcesi = false;
 
   @override
   void initState() {
@@ -91,8 +94,16 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
           if (url.contains('gw1startup')) {
             await _continueToWizardIfNeeded();
           }
-
-          await _injectPageScripts();
+          try {
+            await _controller.runJavaScript(
+              "var style=document.createElement('style');"
+              "style.innerHTML='body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;font-family:'Roboto Mono',monospace!important;}"
+              "input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}"
+              "a{color:#ff9d00!important;text-decoration:none!important;}"
+              "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';"
+              "document.head.appendChild(style);"
+            );
+          } catch (_) {}
         },
         onHttpError: (error) {
           debugPrint(
@@ -108,6 +119,28 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     );
 
     _controller.loadRequest(Uri.parse(initialUrl));
+
+    // ACESi assistant WebView (black/amber theme, localhost:5000)
+    _acesiController = WebViewController();
+    _acesiController.setJavaScriptMode(JavaScriptMode.unrestricted);
+
+    _acesiController.setNavigationDelegate(
+      NavigationDelegate(
+        onPageFinished: (url) async {
+          try {
+            await _acesiController.runJavaScript(
+              "var style=document.createElement('style');"
+              "style.innerHTML='body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;font-family:'Roboto Mono',monospace!important;}'"
+              "input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}"
+              "a{color:#ff9d00!important;text-decoration:none!important;}"
+              "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';"
+              "document.head.appendChild(style);"
+            );
+          } catch (_) {}
+        },
+      ),
+    );
+    _acesiController.loadRequest(Uri.parse('http://127.0.0.1:5000'));
   }
 
   @override
@@ -119,7 +152,6 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     // will not fire again for the page already on screen, so inject now or the
     // star button never appears. Re-injection is safe: both scripts de-dup.
     _profileJson = widget.profileJson;
-    if (!_loading) _injectPageScripts();
   }
 
   /// True when this screen is showing UNIVEN's Oracle ITS wizard.
@@ -226,6 +258,20 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     }
   }
 
+  Future<List<String>> _listLibFiles() async {
+    final dir = Directory('lib');
+    if (!await dir.exists()) return [];
+    try {
+      final entities = await dir.list(recursive: true).toList();
+      final files = entities.whereType<File>().map((f) => f.path.replaceFirst('lib\\', '').replaceFirst('lib/', '')).toList()..sort();
+      return files;
+    } catch (_) { return []; }
+  }
+
+  void _openFileInCodeEditor(String relativePath) {
+    try { Process.run('code', [relativePath]); } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -233,10 +279,63 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
         title: Text(widget.universityName),
         backgroundColor: Colors.blue,
         actions: [
+          // Magic wand: manual autofill trigger for testing.
+          IconButton(
+            icon: const Icon(Icons.auto_fix_high),
+            tooltip: 'Test Autofill',
+            onPressed: () async {
+              final json = _profileJson;
+              if (json == null || json.isEmpty) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No profile loaded'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+                return;
+              }
+              try {
+                await _controller.runJavaScript(
+                  star.buildAutofillScript(json),
+                );
+                await _controller.runJavaScript(
+                  'if (typeof window.requestFlutterAutofill === "function") '
+                  'window.requestFlutterAutofill();',
+                );
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Autofill triggered'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } catch (e) {
+                debugPrint('Test autofill error: $e');
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Autofill failed: $e'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),
             tooltip: 'Open in Chrome',
             onPressed: _openInExternalBrowser,
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_all),
+            tooltip: 'Quick Copy Profile',
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => QuickCopyScreen(profileJson: _profileJson, portalUrl: widget.url)));
+            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -251,15 +350,77 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
               _controller.loadRequest(Uri.parse(_resolveInitialUrl()));
             },
           ),
+          IconButton(
+            tooltip: 'Toggle ACESi',
+            onPressed: () {
+              setState(() => showAcesi = !showAcesi);
+            },
+            icon: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('ACE', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
+                Text('si', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
+                Text('‿', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 14)),
+              ],
+            ),
+          ),
         ],
       ),
-      body: Stack(
+      body: IndexedStack(
+        index: showAcesi ? 1 : 0,
         children: [
-          WebViewWidget(controller: _controller),
-          if (_loading)
-            const LinearProgressIndicator(
-              backgroundColor: Colors.transparent,
-            ),
+          Stack(
+            children: [
+              WebViewWidget(controller: _controller),
+              if (_loading)
+                const LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                ),
+            ],
+          ),
+          Row(
+            children: [
+              Container(
+                width: 260,
+                decoration: BoxDecoration(
+                  color: Color(0xFF0a0a0a),
+                  border: Border(right: BorderSide(color: Color(0xFFFF9D00), width: 1.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Explorer — lib/', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                    Expanded(
+                      child: FutureBuilder<List<String>>(
+                        future: _listLibFiles(),
+                        builder: (context, snap) {
+                          if (!snap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                          final files = snap.data ?? [];
+                          if (files.isEmpty) return const Padding(padding: EdgeInsets.all(12), child: Text('No lib/ files', style: TextStyle(color: Colors.grey)));
+                          return ListView.builder(
+                            itemCount: files.length,
+                            itemBuilder: (context, i) {
+                              final f = files[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(f, style: TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace')),
+                                onTap: () => _openFileInCodeEditor(f),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: WebViewWidget(controller: _acesiController)),
+            ],
+          ),
         ],
       ),
     );
