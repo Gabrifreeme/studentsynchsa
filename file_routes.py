@@ -36,17 +36,29 @@ def register_file_routes(app):
 
     @app.route('/api/save-file', methods=['POST'])
     def save_file_content():
-        data = request.json
-        path = data.get('path')
-        code = data.get('code')
-        if not path or code is None:
-            return jsonify({"error": "Missing path or code"}), 400
-        full_path = os.path.join(os.path.dirname(__file__), path)
-        if not full_path.startswith(LIB_DIR):
-            return jsonify({"error": "Invalid path"}), 403
+        # ACEsi.html sends data as application/x-www-form-urlencoded
+        if request.content_type == 'application/x-www-form-urlencoded':
+            filename = request.form.get('filename')
+            code = request.form.get('content')
+        else:
+            data = request.json or {}
+            filename = data.get('path')
+            code = data.get('code')
+
+        if not filename or code is None:
+            return jsonify({"error": "Missing filename or content"}), 400
+        
+        # Resolve path relative to the app directory
+        full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
+        
         try:
-            with open(full_path, 'w', encoding='utf-8') as f:
+            # Use a temporary file and replace to handle Windows file locks more robustly
+            tmp_path = full_path + ".tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 f.write(code)
-            return jsonify({"success": True}), 200
+            os.replace(tmp_path, full_path)
+            return jsonify({"ok": True, "message": f"Successfully saved {filename}"}), 200
+        except PermissionError as e:
+            return jsonify({"error": f"Permission denied/File locked: {str(e)}"}), 500
         except Exception as e:
             return jsonify({"error": str(e)}), 500

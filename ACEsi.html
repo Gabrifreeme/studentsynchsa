@@ -280,10 +280,10 @@
         <div id="code-panel" class="panel">
             <div class="panel-header">CODE EDITOR
             <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;">
-                <button class="btn" title="Save Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="saveCode()">Save</button>
+                <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
                 <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-code').value='';document.getElementById('autofix-result').innerHTML='';document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
-                <button class="btn" title="Clear Code Editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="clearCodeEditor()">Clear</button>
-                <button class="btn" title="Copy Code" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;" onclick="copyCode()">Copy</button>
+                <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+                <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
                 <div style="display:flex;align-items:center;gap:4px;font-size:11px;border-left:1px solid #ff9d00;padding-left:8px;">
                     <span>Logs:</span>
                     <input type="checkbox" id="log-toggle" style="cursor:pointer;accent-color:#ff9d00;" onclick="toggleLiveLogs()">
@@ -294,7 +294,9 @@
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
               <div id="line-numbers">1</div>
               <textarea id="code-editor" placeholder="Select a file to edit..."></textarea>
-               <div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+                <div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+                <div id="logs-overlay-inner" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1001; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+
 
             </div>
         </div>
@@ -535,6 +537,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function saveCode() {
+        console.log("Save button clicked!");
         const code = document.getElementById('code-editor').value;
         let filename = window.currentFile;
         if (!filename) {
@@ -557,7 +560,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const formData = new URLSearchParams();
         formData.append('filename', filename);
         formData.append('content', code);
-        fetch('http://127.0.0.1:5000/api/save-file', {
+        fetch('/api/save-file', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
@@ -565,19 +568,19 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!r.ok) throw new Error('Server error ' + r.status);
             return r.json();
         }).then(d => {
-            alert('✅ Code saved successfully: ' + filename);
+            alert('✅ Saved successfully!');
         }).catch(e => alert('❌ Save failed: ' + e.message));
     }
-
     function clearCodeEditor() {
+        console.log("Clear button clicked!");
         document.getElementById('code-editor').value = '';
-        alert('🧹 Editor cleared');
+        alert('🗑️ Editor Cleared!');
     }
-
     function copyCode() {
+        console.log("Copy button clicked!");
         const code = document.getElementById('code-editor').value;
         navigator.clipboard.writeText(code).then(() => {
-            alert('📋 Code copied to clipboard');
+            alert('📋 Code Copied!');
         }).catch(e => alert('❌ Copy failed: ' + e.message));
     }
 
@@ -654,14 +657,22 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-        }
-    }
 
     function toggleLogPause() {
         logPaused = !logPaused;
         const btn = document.getElementById('log-pause-btn');
         btn.textContent = logPaused ? 'Resume' : 'Pause';
     }
+    // --- BUTTON EVENT LISTENERS ---
+    document.getElementById('save-btn').addEventListener('click', function() {
+        saveCode();
+    });
+    document.getElementById('clear-btn').addEventListener('click', function() {
+        clearCodeEditor();
+    });
+    document.getElementById('copy-btn').addEventListener('click', function() {
+        copyCode();
+    });
     </script>
 </body>
 </html>
