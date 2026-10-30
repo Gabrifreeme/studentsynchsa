@@ -1,8 +1,5 @@
-The Live Logs are still not working. I checked the HTML and there is NO element with the id `logs-overlay`. The AI forgot to create the HTML container for the logs.
-
-Please review @ACESi.html and fix this:
-1. Find the `<textarea id="code-editor">` or the main code editor container.
-2. Right below it, create the missing HTML container: `<div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap;"></div>`
-3. Ensure the JavaScript `toggleLiveLogs()` function properly finds this new div and shows/hides it when the checkbox is clicked.
-
+Fix the Save, Clear, and Copy buttons in ACESi.html. Add a JavaScript event listener at the bottom of the script that:
+1. Save: Grabs the text from `code-editor` and the bold filename from the Explorer, sends a POST to `/api/save-file` using `URLSearchParams`, and alerts "✅ File Saved!" on success.
+2. Clear: Clears the `code-editor` and alerts "🗑️ Editor Cleared!".
+3. Copy: Copies the `code-editor` text to the clipboard and alerts "📋 Code Copied!".
 Show me the diff.
