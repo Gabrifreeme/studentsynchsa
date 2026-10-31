@@ -629,13 +629,12 @@ document.addEventListener("DOMContentLoaded", function() {
             logOverlay.style.display = 'block';
             editor.style.visibility = 'hidden';
             if (lineNumbers) lineNumbers.style.visibility = 'hidden';
-            
             if (!logSource) {
-                logSource = new EventSource('http://127.0.0.1:5000/api/logs');
-                logSource.onmessage = function(e) {
+                logSource = new EventSource('/api/logs');
+                logSource.onmessage = function(event) {
                     if (logPaused) return;
                     const line = document.createElement('div');
-                    line.textContent = e.data;
+                    line.textContent = event.data;
                     logOverlay.appendChild(line);
                     logOverlay.scrollTop = logOverlay.scrollHeight;
                 };
