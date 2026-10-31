@@ -1,5 +1,26 @@
-Fix the Save, Clear, and Copy buttons in ACESi.html. Add a JavaScript event listener at the bottom of the script that:
-1. Save: Grabs the text from `code-editor` and the bold filename from the Explorer, sends a POST to `/api/save-file` using `URLSearchParams`, and alerts "✅ File Saved!" on success.
-2. Clear: Clears the `code-editor` and alerts "🗑️ Editor Cleared!".
-3. Copy: Copies the `code-editor` text to the clipboard and alerts "📋 Code Copied!".
+The terminal is printing live logs perfectly. However, ACESi is getting a 404 error when trying to save settings: "OPTIONS /api/settings HTTP/1.1" 404 -.
+
+The `/api/settings` route is missing from server.py.
+
+Please review @server.py and add the settings route back right above `if __name__ == '__main__':`:
+
+@app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
+def api_settings():
+    from flask import request, jsonify
+    if request.method == 'OPTIONS':
+        return '', 200
+    if request.method == 'POST':
+        data = request.get_json()
+        import json
+        with open('config.json', 'w') as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"ok": True, "message": "Settings saved"})
+    if request.method == 'GET':
+        import json
+        try:
+            with open('config.json', 'r') as f:
+                return jsonify(json.load(f))
+        except:
+            return jsonify({})
+
 Show me the diff.
