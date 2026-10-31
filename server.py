@@ -1,3 +1,4 @@
+import logging
 # -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
@@ -13,7 +14,7 @@ import subprocess
 import time
 import tempfile
 import threading
-import logging
+import queue
 import sys
 
 # Windows registry/environment proxy variables force Python to route
@@ -298,37 +299,27 @@ _live_handler.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(_live_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
-# Also capture every print() statement by wrapping sys.stdout
-import sys as _sys
+# Queue-based stdout redirect for live ACESi logs
+_LOG_QUEUE = queue.Queue()
 
-
-class _LiveLogStream:
-    """Wraps sys.stdout/sys.stderr so every print() is also appended to _LIVE_LOGS."""
-
+class QueueStdout:
     def __init__(self, original):
         self._orig = original
-
     def write(self, text):
         self._orig.write(text)
-        # Only capture non-empty, non-whitespace lines
         stripped = text.strip()
         if stripped:
-            _LIVE_LOGS.append(stripped)
-            if len(_LIVE_LOGS) > _LIVE_LOG_MAX:
-                del _LIVE_LOGS[: len(_LIVE_LOGS) - _LIVE_LOG_MAX]
-
+            _LOG_QUEUE.put(stripped)
     def flush(self):
         self._orig.flush()
-
     def isatty(self):
         return self._orig.isatty()
-
     def fileno(self):
         return self._orig.fileno()
 
-
-_sys.stdout = _LiveLogStream(_sys.stdout)
-_sys.stderr = _LiveLogStream(_sys.stderr)
+sys.stdout = QueueStdout(sys.stdout)
+sys.stderr = QueueStdout(sys.stderr)
+print("Server started - logs streaming to ACESi")
 
 
 def _live_log(msg: str):
@@ -17972,14 +17963,19 @@ def api_ping():
 
 @app.route('/api/logs')
 def api_logs():
-    import time
     from flask import Response
+    import queue
     def generate():
+        yield "data: Connected to live server logs...\n\n"
         while True:
-            yield f"data: Server heartbeat... {time.strftime('%H:%M:%S')}\n\n"
-            time.sleep(2)
-    return Response(generate(), mimetype='text/event-stream')
-
+            try:
+                msg = _LOG_QUEUE.get(timeout=5)
+                formatted_msg = msg.replace("\n", " | ")
+                yield f"data: {formatted_msg}\n\n"
+            except queue.Empty:
+                yield ": keep-alive\n\n"
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
 @app.route('/favicon.ico')
 def ignore_favicon_crash():
     return '', 204
@@ -18006,6 +18002,17 @@ def save_file_route():
         return jsonify({"ok": True, "message": "Saved!"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+    import threading
+import time
+import threading
+import time
+from datetime import datetime
+
+# Start the heartbeat in the background
+import threading
+import time
+from datetime import datetime
+
 if __name__ == "__main__":
     _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
@@ -18021,5 +18028,22 @@ if __name__ == "__main__":
     # 5000 with any old server still running, silently leaving the PHONE on
     # stale code (seen: qwen going off to Google because the deterministic
     # executor wasn't loaded). Reloads are handled by the ace_host watchdog
-    # via its restart flag instead.
-    app.run(host="127.0.0.1", port=5000, debug=False)
+# Queue-based logging for Flask HTTP requests + stdout
+class QueueLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stripped = msg.strip()
+            if stripped:
+                _LOG_QUEUE.put(stripped)
+        except Exception:
+            pass
+
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.handlers.clear()
+werkzeug_logger.addHandler(QueueLogHandler())
+werkzeug_logger.setLevel(logging.INFO)
+
+# Debug=False to avoid reloader conflicts with ace_host watchdog.
+# Reloads are handled externally; this keeps the port 5000 stable.
+app.run(host="127.0.0.1", port=5000, debug=False)
