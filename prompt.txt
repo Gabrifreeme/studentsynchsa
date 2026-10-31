@@ -1,26 +1,11 @@
-The terminal is printing live logs perfectly. However, ACESi is getting a 404 error when trying to save settings: "OPTIONS /api/settings HTTP/1.1" 404 -.
+I want to add status icons (emojis) to the terminal log output and the ACESi live log viewer.
 
-The `/api/settings` route is missing from server.py.
+Please review @server.py and do the following:
 
-Please review @server.py and add the settings route back right above `if __name__ == '__main__':`:
-
-@app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
-def api_settings():
-    from flask import request, jsonify
-    if request.method == 'OPTIONS':
-        return '', 200
-    if request.method == 'POST':
-        data = request.get_json()
-        import json
-        with open('config.json', 'w') as f:
-            json.dump(data, f, indent=2)
-        return jsonify({"ok": True, "message": "Settings saved"})
-    if request.method == 'GET':
-        import json
-        try:
-            with open('config.json', 'r') as f:
-                return jsonify(json.load(f))
-        except:
-            return jsonify({})
+1. Find the `SimpleLogger` class (where `sys.stdout` is intercepted).
+2. In the `write` method, use a regex to check if the message contains an HTTP status code (e.g., `"GET /api/files HTTP/1.1" 200`).
+3. If the status code is `200` or `204`, append ` 😊` to the end of the message before putting it in the queue.
+4. If the status code starts with `4` or `5` (like `404` or `500`), append ` ❌` to the end of the message.
+5. Also, find the `* Running on http://127.0.0.1:5000` startup line and append ` ✅` to it.
 
 Show me the diff.
