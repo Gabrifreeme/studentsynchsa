@@ -59,6 +59,20 @@ except Exception:
     pass
 
 app = Flask(__name__)
+
+import logging
+import sys
+
+# Force werkzeug to log to the terminal
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.INFO)
+werkzeug_logger.handlers.clear()
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter('%(message)s'))
+werkzeug_logger.addHandler(handler)
+werkzeug_logger.propagate = False
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Load provider keys from a gitignored .env without requiring python-dotenv.
@@ -2491,10 +2505,12 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
             if _normalize_tool_messages(msgs):
                 body["messages"] = msgs
                 print(f"🧹 {name}: rewrote null tool args to match the schema")
+            _live_log("%s -> %s (%d msgs)" % (name, model, len(msgs)))
             r = requests.post(f"{endpoint}/chat/completions",
                 headers=headers,
                 json=body,
                 timeout=timeout)
+            _live_log("%s <- HTTP %d" % (name, r.status_code))
         except requests.exceptions.Timeout:
             _prov_record(name, model, "timeout", "no response in time",
                          "timeout=%s" % (timeout,))
@@ -3791,6 +3807,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                     "raised %s: %s" % (type(e).__name__, e))
                         print("💥 tool %s raised %s: %s"
                               % (run_name, type(e).__name__, e), flush=True)
+                _live_log("tool %s -> %s" % (run_name, "ok" if ok else "fail"))
                 if ok and run_name == "ui_dump":
                     # An explicit ui_dump's result is fed straight back to the
                     # model, so it now has real screen state to tap from.
@@ -3978,12 +3995,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # deterministically so the popup appears (no LLM required).
     if not names and not (last_text and last_text.strip()):
         _auto_picked = _auto_open_user_file()
-        msg = _AGENT["last_reply"]
-        if not (msg and msg.strip()):
+        if _auto_picked:
             with _AGENT_LOCK:
-                _AGENT["last_reply"] = (("Opened the file you asked for.")
-                                        if _auto_picked else (last_text or ""))
-        return _AGENT["last_reply"]
+                _AGENT["last_reply"] = "Opened the file you asked for."
+            return _AGENT["last_reply"]
+        # The model produced no text and no tool ran: every provider failed.
+        # Do NOT replay a reply from an earlier turn (that is how each message
+        # echoed the previous answer, e.g. "Good afternoon. I'm here."). Return
+        # None so /chat reports the real per-provider failure instead.
+        with _AGENT_LOCK:
+            _AGENT["last_reply"] = ""
+        return None
 
     # Auto-capture a screenshot if the user asked for one but the model didn't.
     if names:
@@ -4241,6 +4263,25 @@ def chat():
             return jsonify({"reply": f"❌ Could not read file: {e}"})
 
     # Greeting check — time-aware
+    # Deterministic clock: the server knows the time, so don't let a model that
+    # ignored the [Current time] context answer "I don't have a clock".
+    if re.match(
+        r"(?i)^\s*(?:hey[,\s]+|hi[,\s]+)?"
+        r"(?:(?:what(?:'s|s|\s+is)?|tell\s+me|give\s+me|show\s+me)\s+(?:the\s+)?(?:current\s+)?"
+        r"|(?:the\s+)?current\s+)"
+        r"(?:date(?:\s*(?:and|&)\s*time)?|time(?:\s*(?:and|&)\s*date)?|day)"
+        r"(?:\s+(?:is\s+it|now|today))?"
+        r"\s*(?:please)?\s*[?.!]*$",
+        user_message,
+    ):
+        _now = datetime.now()
+        reply = "It's %s, %s." % (
+            _now.strftime("%A, %d %B %Y"),
+            _now.strftime("%I:%M %p").lstrip("0"),
+        )
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
     if user_message.lower().strip() in ["hello", "hi"]:
         hour = datetime.now().hour
         if hour < 5:
@@ -4367,6 +4408,8 @@ def chat():
             "Never invent personal history, memories, or references to past events that are not in the context below. "
             "Use the facts and journal entries below naturally when they are relevant — not every message. "
             "Keep replies short unless Chris asks for more.\n\n"
+            "TIME: The [Current time: ...] line in the context below is the real current date and time. "
+            "Use it for any date or time question; never say you don't have a clock.\n\n"
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
             "[Facts I know about Chris], [Shared history — recent journal entries], and the recent "
             "conversation turns at the end of this prompt. They are loaded from your database on every "
@@ -4467,6 +4510,8 @@ def chat():
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
         reply = _chat_dispatch(llm_messages, user_message=user_message, preferred_model=model)
+        _live_log("dispatch done: %d msgs, %s"
+                  % (len(llm_messages), "reply" if reply else "no reply"))
         if reply:
             # Playbook memory: record which tools proved useful on this task.
             with _AGENT_LOCK:
@@ -4583,6 +4628,70 @@ def list_files():
         return jsonify({'files': files})
     except Exception as e:
         return jsonify({'error': str(e)})
+
+# ===== IDE Explorer routes (ACEsi.html calls these) =====
+# The reverted server only had /files, which returns {files: [...]} for a
+# different directory. ACEsi.html expects a plain array of "lib/..." paths from
+# /api/files, plain text from /api/file-content, and form-encoded input on
+# /api/save-file. Without these the Explorer sits on "Loading..." forever.
+_IDE_ROOT = os.path.dirname(os.path.abspath(__file__))
+_IDE_LIB = os.path.join(_IDE_ROOT, 'lib')
+
+
+def _ide_path(rel):
+    """Resolve an Explorer path inside the project root, or None if it escapes."""
+    rel = (rel or '').strip().replace('\\', '/')
+    if not rel or rel.startswith('/') or '..' in rel.split('/'):
+        return None
+    full = os.path.realpath(os.path.join(_IDE_ROOT, rel))
+    root = os.path.realpath(_IDE_ROOT)
+    if full != root and not full.startswith(root + os.sep):
+        return None
+    return full
+
+
+@app.route('/api/files', methods=['GET'])
+def api_files():
+    files = []
+    if os.path.isdir(_IDE_LIB):
+        for root, _dirs, names in os.walk(_IDE_LIB):
+            for name in names:
+                if name.endswith('.dart'):
+                    rel = os.path.relpath(os.path.join(root, name), _IDE_ROOT)
+                    files.append(rel.replace('\\', '/'))
+    return jsonify(sorted(files))
+
+
+@app.route('/api/file-content', methods=['GET'])
+def api_file_content():
+    full = _ide_path(request.args.get('path'))
+    if not full or not os.path.isfile(full):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    try:
+        with open(full, 'r', encoding='utf-8', errors='replace') as f:
+            return Response(f.read(), mimetype='text/plain')
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/save-file', methods=['POST'])
+def api_save_file():
+    # ACEsi.html posts form-encoded data; accept JSON too for other clients.
+    data = request.get_json(silent=True) or {}
+    filename = request.form.get('filename') or data.get('filename')
+    content = request.form.get('content')
+    if content is None:
+        content = data.get('content')
+    full = _ide_path(filename)
+    if not full or content is None:
+        return jsonify({'ok': False, 'error': 'Missing filename or content'}), 400
+    try:
+        with open(full, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print("💾 Explorer: saved %s (%d chars)" % (filename, len(content)))
+        return jsonify({'ok': True, 'message': 'Saved!'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 def strip_code_fences(code):
     """Remove a leading ```<lang> ... trailing ``` wrapper if the model added one."""
@@ -11414,6 +11523,7 @@ def run_agent(user_message):
                         ok = False
                     else:
                         ok, result = _call_tool(name, args)
+                    _live_log("tool %s -> %s" % (name, "ok" if ok else "fail"))
                     executed_any = True
                     calls_history.append(name)
                     with _AGENT_LOCK:
@@ -13510,6 +13620,118 @@ def _boot_banner():
     except Exception:
         pass
 
+
+import collections
+import threading
+
+class _LogBuffer:
+    """Bounded live-log ring shared by every /api/logs viewer.
+
+    Each viewer keeps its own cursor, so a line reaches ALL connected viewers
+    instead of being consumed by whichever one reads first. The ring drops the
+    oldest lines once full, so an idle server cannot grow without bound.
+    """
+    def __init__(self, maxlen=500):
+        self._lines = collections.deque(maxlen=maxlen)
+        self._next_seq = 0
+        self._cond = threading.Condition()
+
+    def put(self, message):
+        line = message.replace("\n", " | ")
+        with self._cond:
+            self._lines.append((self._next_seq, line))
+            self._next_seq += 1
+            self._cond.notify_all()
+
+    def follow(self):
+        with self._cond:
+            # Start at the oldest retained line so a newly opened viewer shows
+            # recent history, capped by the ring size rather than by uptime.
+            cursor = self._next_seq - len(self._lines)
+        while True:
+            with self._cond:
+                if cursor >= self._next_seq:
+                    self._cond.wait(5)
+                oldest = self._next_seq - len(self._lines)
+                if cursor < oldest:
+                    cursor = oldest  # viewer fell behind; skip dropped lines
+                if cursor < self._next_seq:
+                    line = self._lines[cursor - oldest][1]
+                    cursor += 1
+                else:
+                    line = None
+            yield line
+
+
+_LOG_QUEUE = _LogBuffer()
+
+# Mirror Python logging (all loggers, DEBUG and up) into the live stream. The
+# server already prints plenty, but background services (ntfy polling every
+# 30s, provider HTTP calls) only log; without this the panel looks dead between
+# user-visible events even though the backend is working.
+class _LiveLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            _LOG_QUEUE.put(msg)
+            # Echo to the real console as well, so the PowerShell window shows
+            # the same background activity as the panel. sys.__stdout__ is the
+            # original stream, not the SimpleLogger wrapper, so the line is not
+            # queued twice.
+            out = sys.__stdout__
+            if out is not None:
+                out.write(msg + "\n")
+                out.flush()
+        except Exception:
+            pass
+
+_live_handler = _LiveLogHandler()
+_live_handler.setLevel(logging.DEBUG)
+_live_handler.setFormatter(logging.Formatter('%(message)s'))
+logging.getLogger().addHandler(_live_handler)
+logging.getLogger().setLevel(logging.DEBUG)
+
+
+def _live_log(msg):
+    """Timestamped action line; shows in the panel and the PowerShell window."""
+    logging.getLogger("acesi.actions").info(
+        "[%s] %s", time.strftime("%H:%M:%S"), msg)
+
+
+@app.route('/api/logs')
+def api_logs():
+    from flask import Response
+    def generate():
+        yield "data: Connected to live server logs...\n\n"
+        for line in _LOG_QUEUE.follow():
+            if line is None:
+                yield ": keep-alive\n\n"
+            else:
+                yield f"data: {line}\n\n"
+    return Response(generate(), mimetype='text/event-stream', headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
+
+import sys
+class SimpleLogger:
+    def __init__(self, original):
+        self.original = original
+    def write(self, message):
+        self.original.write(message)
+        self.original.flush()
+        if message.strip():
+            _LOG_QUEUE.put(message)
+    def flush(self):
+        self.original.flush()
+
+sys.stdout = SimpleLogger(sys.stdout)
+sys.stderr = SimpleLogger(sys.stderr)
+
+# The werkzeug handler was built from the ORIGINAL sys.stdout, before the
+# wrapper above existed, so it wrote straight to the terminal and the viewer
+# never saw request lines. Point it at the wrapper; SimpleLogger still passes
+# everything through to the terminal, so nothing is lost.
+for _h in logging.getLogger('werkzeug').handlers:
+    if isinstance(_h, logging.StreamHandler):
+        _h.stream = sys.stdout
 
 if __name__ == '__main__':
     _boot_banner()
