@@ -13758,7 +13758,22 @@ class SimpleLogger:
 
     def write(self, message):
         try:
-            self.original.write(message)
+            # Add status icons to HTTP logs and startup line
+            import re
+            msg_text = message
+            if "* Running on http://127.0.0.1:5000" in msg_text:
+                msg_text = msg_text.rstrip() + " ✅\n"
+            else:
+                # Regex for HTTP status code: "METHOD /path HTTP/1.1" CODE
+                match = re.search(r'"\s*(\d{3})\s*(-|-)', msg_text)
+                if match:
+                    status = match.group(1)
+                    if status in ('200', '204'):
+                        msg_text = msg_text.rstrip() + " 😊\n"
+                    elif status.startswith(('4', '5')):
+                        msg_text = msg_text.rstrip() + " ❌\n"
+            
+            self.original.write(msg_text)
         except RecursionError:
             pass
         if message.strip() and hasattr(self, 'queue'):
