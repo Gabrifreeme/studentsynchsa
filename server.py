@@ -2510,7 +2510,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                 headers=headers,
                 json=body,
                 timeout=timeout)
-            _live_log("%s <- HTTP %d" % (name, r.status_code))
+            _live_log("%s <- HTTP %d %s" % (name, r.status_code, 
+    "😊" if r.status_code in (200, 204) else "❌"))
         except requests.exceptions.Timeout:
             _prov_record(name, model, "timeout", "no response in time",
                          "timeout=%s" % (timeout,))
@@ -4552,7 +4553,47 @@ def chat():
             _AGENT["last_reply"] = f"Error: {type(e).__name__}: {e}"
         return jsonify({"reply": f"Error: {str(e)}"})
 
-@app.route('/history', methods=['GET'])
+@app.route('/api/autofix', methods=['POST'])
+def autofix():
+    """Fix code using AI model. Posts {code: "..."} → {ok: True, fixed_code: "..."}."""
+    print("AUTOFIX REQUEST RECEIVED")
+    data = request.json or {}
+    code = data.get('code', '')
+    if not code.strip():
+        return jsonify({"ok": False, "error": "No code provided"})
+    # Use _chat_one with tool_choice="none": no tools advertised → model must write text
+    try:
+        msgs = [{"role": "user", "content": f"You are a code repair assistant. The user will provide broken code. Do NOT run any terminal commands. Do NOT return exit codes. Do NOT add any explanations or markdown formatting. Just the raw, fixed code.\n\nCode to fix:\n{code}"}]
+        # _chat_one returns (text, tool_calls, finish_reason). With tool_choice="none"
+        # and no tools_schema, the model has no calls to make and must reply with text.
+        reply, _, _ = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, "qwen/qwen3.8-27b", msgs, tool_choice="none")
+        fixed = (reply or "").strip()
+        # Additional post-processing: remove any exit codes or command artifacts
+        import re
+        lines = fixed.split('\\n')
+        filtered = []
+        for line in lines:
+            # Skip exit code lines
+            if re.match(r'^\\s*exit\\s*=\\s*\\d+', line, re.IGNORECASE):
+                continue
+            # Skip separator lines
+            if re.match(r'^\\s*--+\\s*$', line):
+                continue
+            # Skip system error lines
+            if "The system cannot" in line or "is not recognized" in line:
+                continue
+            # Skip bare command names
+            if re.match(r'^\\s*\\w+\\s*$', line) and len(line.strip()) > 2:
+                continue
+            filtered.append(line)
+        fixed = '\\n'.join(filtered).strip()
+        if fixed:
+            return jsonify({"ok": True, "fixed_code": fixed})
+        else:
+            return jsonify({"ok": False, "error": "AI could not fix the code"})
+    except Exception as e:
+        print(f"💥 AutoFix error: {type(e).__name__}: {e}")
+        return jsonify({"ok": False, "error": str(e)})@app.route('/history', methods=['GET'])
 def history():
     limit = min(int(request.args.get('limit', 100)), 500)
     conn = sqlite3.connect('ace_memory.db')
@@ -13714,16 +13755,23 @@ import sys
 class SimpleLogger:
     def __init__(self, original):
         self.original = original
-    def write(self, message):
-        self.original.write(message)
-        self.original.flush()
-        if message.strip():
-            _LOG_QUEUE.put(message)
-    def flush(self):
-        self.original.flush()
 
+    def write(self, message):
+        try:
+            self.original.write(message)
+        except RecursionError:
+            pass
+        if message.strip() and hasattr(self, 'queue'):
+            self.queue.put(message)
+
+    def flush(self):
+        try:
+            self.original.flush()
+        except RecursionError:
+            pass
 sys.stdout = SimpleLogger(sys.stdout)
 sys.stderr = SimpleLogger(sys.stderr)
+
 
 # The werkzeug handler was built from the ORIGINAL sys.stdout, before the
 # wrapper above existed, so it wrote straight to the terminal and the viewer
@@ -13732,6 +13780,25 @@ sys.stderr = SimpleLogger(sys.stderr)
 for _h in logging.getLogger('werkzeug').handlers:
     if isinstance(_h, logging.StreamHandler):
         _h.stream = sys.stdout
+
+@app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
+def api_settings():
+    from flask import request, jsonify
+    if request.method == 'OPTIONS':
+        return '', 200
+    if request.method == 'POST':
+        data = request.get_json()
+        import json
+        with open('config.json', 'w') as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"ok": True, "message": "Settings saved"})
+    if request.method == 'GET':
+        import json
+        try:
+            with open('config.json', 'r') as f:
+                return jsonify(json.load(f))
+        except:
+            return jsonify({})
 
 if __name__ == '__main__':
     _boot_banner()
@@ -13747,4 +13814,21 @@ if __name__ == '__main__':
     # stale code (seen: qwen going off to Google because the deterministic
     # executor wasn't loaded). Reloads are handled by the ace_host watchdog
     # via its restart flag instead.
+    import threading, time as _t
+    def _hb_func():
+        """Animated ASCII ECG heartbeat: cycles through wave characters every 5s,
+        using \r to overwrite in-place so it doesn't interfere with print() output."""
+        # Waveform frames: flat, rising, peak, falling, flat
+        frames = ['_', '/', '|', '\\', '_']
+        idx = 0
+        while True:
+            _t.sleep(5)  # Full heartbeat interval
+            # Animate 10 frames within the 5s interval for smooth wave
+            for _ in range(10):
+                idx = (idx + 1) % len(frames)
+                sys.stdout.write('\r' + frames[idx])
+                sys.stdout.flush()
+                _t.sleep(0.5)  # 0.1s would be 50 frames, 0.5s is 10 frames for simplicity
+    _hb = threading.Thread(target=_hb_func, daemon=True)
+    _hb.start()
     app.run(host='127.0.0.1', port=5000, debug=False)

@@ -1,9 +1,7 @@
 {
   "provider": "groq",
-  "model": "llama-3.1-8b-instant",
-  "system_prompt": "",
-  "show_toolbar": true,
-  "chat_history": [],
-  "groq_key": "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",
-  "openrouter_key": "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"
+  "model": "qwen2.5-coder:7b",
+  "groq_key": "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",
+  "openrouter_key": "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",
+  "system_prompt": ""
 }
