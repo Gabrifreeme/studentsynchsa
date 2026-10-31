@@ -94,20 +94,103 @@
         
         .btn { background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 10px; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 11px; margin-right: 4px; }
         .btn:hover { background: #ff9d00; color: #000; }
-        #line-numbers { width: 42px; padding: 10px 6px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 1.5; color: #ff9d00; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
-        #code-editor {
-            flex: 1;
-            width: 100%;
-            background: #000;
-            color: #ff9d00;
-            border: none;
+        #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
+        #editor-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        #highlight-layer {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            margin: 0;
             padding: 10px;
             font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 21px;
             white-space: pre;
+            tab-size: 4;
+            overflow: hidden;
+            color: #ff9d00;
+            background: transparent;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #search-marks {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+        }
+        #search-marks-inner { position: absolute; top: 0; left: 0; }
+        .search-mark { position: absolute; background: rgba(255, 200, 0, 0.40); border-radius: 2px; }
+        .search-mark.current { background: rgba(255, 200, 0, 0.60); box-shadow: inset 0 0 0 1px #ff9d00; }
+        #code-editor {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            color: transparent;
+            border: none;
+            padding: 10px;
+            margin: 0;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 21px;
+            white-space: pre;
+            tab-size: 4;
             overflow: auto;
             outline: none;
             resize: none;
+            z-index: 3;
         }
+        #code-editor::selection { background: rgba(255, 157, 0, 0.35); }
+        #code-editor::placeholder { color: #7a5a1a; }
+        .hl-com { color: #6b7280; font-style: italic; }
+        .hl-str { color: #7ec699; }
+        .hl-num { color: #d19a66; }
+        .hl-kw { color: #ffb84d; font-weight: bold; }
+        .hl-fn { color: #61afef; }
+        .hl-op { color: #c8c8c8; }
+        .hl-tag { color: #e06c75; }
+        .hl-attr { color: #d19a66; }
+        .hl-at { color: #c678dd; }
+        .hl-prop { color: #61afef; }
+        .hl-sel { color: #e5c07b; }
+        #editor-search {
+            display: none;
+            position: absolute;
+            top: 6px;
+            right: 14px;
+            z-index: 999;
+            align-items: center;
+            gap: 4px;
+            background: #111;
+            border: 1px solid #ff9d00;
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        #search-input {
+            width: 150px;
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 3px 5px;
+            font-family: inherit;
+            font-size: 11px;
+            outline: none;
+        }
+        #search-count { min-width: 48px; text-align: center; color: #888; }
+        #editor-search button {
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 2px 6px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        #editor-search button:hover { background: #ff9d00; color: #000; }
         
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #000; }
@@ -279,7 +362,8 @@
         <!-- Code Editor Panel -->
         <div id="code-panel" class="panel">
             <div class="panel-header">CODE EDITOR
-            <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;">
+            <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <button id="search-btn" class="btn" title="Find text or line (Ctrl+F)" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="editorSearchOpen()">Search</button>
                 <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
                 <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-code').value='';document.getElementById('autofix-result').innerHTML='';document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
                 <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
@@ -293,7 +377,18 @@
             </div>
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
               <div id="line-numbers">1</div>
-              <textarea id="code-editor" placeholder="Select a file to edit..."></textarea>
+              <div id="editor-area">
+                <pre id="highlight-layer" aria-hidden="true"></pre>
+                <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
+                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..."></textarea>
+                <div id="editor-search">
+                    <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
+                    <span id="search-count"></span>
+                    <button type="button" title="Previous match (Shift+Enter)" onclick="editorSearchPrev()">&#8593;</button>
+                    <button type="button" title="Next match (Enter)" onclick="editorSearchNext()">&#8595;</button>
+                    <button type="button" title="Close (Esc)" onclick="editorSearchClose()">&#215;</button>
+                </div>
+              </div>
                 <div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
                 <div id="logs-overlay-inner" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1001; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
 
@@ -345,6 +440,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         .then(function(res) { return res.text(); })
                         .then(function(fileData) {
                             document.getElementById('code-editor').value = fileData;
+                            if (window.aceEditorRefresh) window.aceEditorRefresh();
                         })
                         .catch(function(err) {
                             alert("Failed to load file: " + err.message);
@@ -650,6 +746,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function clearCodeEditor() {
         console.log("Clear button clicked!");
         document.getElementById('code-editor').value = '';
+        if (window.aceEditorRefresh) window.aceEditorRefresh();
         alert('🗑️ Editor Cleared!');
     }
     function copyCode() {
@@ -659,6 +756,322 @@ document.addEventListener("DOMContentLoaded", function() {
             alert('📋 Code Copied!');
         }).catch(e => alert('❌ Copy failed: ' + e.message));
     }
+
+    // ===== Code editor: line numbers, syntax colouring, find =====
+    (function () {
+        const ed = document.getElementById('code-editor');
+        const ln = document.getElementById('line-numbers');
+        const hl = document.getElementById('highlight-layer');
+        if (!ed || !ln || !hl) return;
+
+        const LINE_HEIGHT = 21;
+        const MAX_HIGHLIGHT_CHARS = 150000;
+        let hlTimer = null;
+        let lastCount = -1;
+
+        const KEYWORDS = {
+            py: 'False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case self',
+            js: 'async await break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new null of return set static super switch this throw true false try typeof undefined var void while with yield',
+            ts: 'abstract any as async await boolean break case catch class const constructor continue declare default delete do else enum export extends false finally for from function get if implements import in instanceof interface let module namespace new null number of private protected public readonly return set static string super switch this throw true try type typeof undefined var void while with yield',
+            dart: 'abstract as assert async await break case catch class const continue covariant default deferred do dynamic else enum export extends extension external factory false final finally for Function get hide if implements import in interface is late library mixin new null on operator part required rethrow return set show static super switch sync this throw true try typedef var void while with yield',
+            json: 'true false null',
+            java: 'abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for if implements import instanceof int interface long new null package private protected public return short static strictfp super switch synchronized this throw throws transient true false try void volatile while',
+            sh: 'case do done elif else esac fi for function if in local return then until while echo export cd',
+            sql: 'select from where and or not null insert into values update set delete create table drop alter join left right inner outer on group by order having limit offset as distinct union all',
+            yml: 'true false null',
+        };
+        const KW_BY_EXT = {
+            py: 'py', pyw: 'py',
+            js: 'js', jsx: 'js', mjs: 'js', cjs: 'js', ts: 'ts', tsx: 'ts',
+            json: 'json', dart: 'dart', java: 'java', kt: 'java', kts: 'java',
+            sh: 'sh', bash: 'sh', zsh: 'sh', sql: 'sql',
+            yml: 'yml', yaml: 'yml',
+        };
+
+        function escapeHtml(s) {
+            return s.replace(/[&<>]/g, function (c) {
+                return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+            });
+        }
+
+        function classOf(m) {
+            const g = m.groups || {};
+            if (g.com) return 'hl-com';
+            if (g.str) return 'hl-str';
+            if (g.num) return 'hl-num';
+            if (g.kw) return 'hl-kw';
+            if (g.fn) return 'hl-fn';
+            if (g.op) return 'hl-op';
+            if (g.tag) return 'hl-tag';
+            if (g.attr) return 'hl-attr';
+            if (g.at) return 'hl-at';
+            if (g.prop) return 'hl-prop';
+            if (g.sel) return 'hl-sel';
+            return '';
+        }
+
+        function tokensToHtml(src, re) {
+            let out = '', last = 0, m;
+            re.lastIndex = 0;
+            while ((m = re.exec(src)) !== null) {
+                if (m.index > last) out += escapeHtml(src.slice(last, m.index));
+                const cls = classOf(m);
+                out += cls ? '<span class="' + cls + '">' + escapeHtml(m[0]) + '</span>'
+                           : escapeHtml(m[0]);
+                last = m.index + m[0].length;
+                if (m[0].length === 0) re.lastIndex++;
+            }
+            out += escapeHtml(src.slice(last));
+            return out;
+        }
+
+        const genericCache = {};
+        function genericRe(ext) {
+            if (genericCache[ext]) return genericCache[ext];
+            const kwKey = KW_BY_EXT[ext] || '';
+            const kw = KEYWORDS[kwKey] || '';
+            const hashComment = (kwKey === 'py' || kwKey === 'sh' || kwKey === 'yml');
+            const lineComment = hashComment ? '#[^\\n]*' : '\\/\\/[^\\n]*';
+            const parts = [];
+            parts.push('(?<com>\\/\\*[\\s\\S]*?\\*\\/|' + lineComment + ')');
+            if (kwKey === 'py') {
+                parts.push('(?<str>"""[\\s\\S]*?"""|\'\'\'[\\s\\S]*?\'\'\'|"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\')');
+            } else {
+                parts.push('(?<str>"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\'|`(?:\\\\.|[^`\\\\])*`)');
+            }
+            parts.push('(?<num>\\b(?:0[xX][0-9a-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b)');
+            if (kw) parts.push('(?<kw>\\b(?:' + kw.split(/\s+/).join('|') + ')\\b)');
+            parts.push('(?<fn>\\b[A-Za-z_$][\\w$]*(?=\\s*\\())');
+            parts.push('(?<op>[+\\-*\\/%=<>!&|^~?:]+)');
+            genericCache[ext] = new RegExp(parts.join('|'), 'gm');
+            return genericCache[ext];
+        }
+
+        const markupRe = /(?<com><!--[\s\S]*?-->)|(?<str>"[^"]*"|'[^']*')|(?<tag><\/?[A-Za-z][\w:-]*)|(?<attr>\b[A-Za-z_:][-\w:.]*(?==))|(?<op>\/?>)/g;
+        const cssRe = /(?<com>\/\*[\s\S]*?\*\/)|(?<str>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(?<at>@[\w-]+)|(?<sel>[.#][A-Za-z_][\w-]*)|(?<num>#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg)?\b)|(?<prop>\b[-A-Za-z]+(?=\s*:))|(?<fn>\b[-A-Za-z]+(?=\())/g;
+
+        function fileExt() {
+            const m = /\.([A-Za-z0-9]+)$/.exec(window.currentFile || '');
+            return m ? m[1].toLowerCase() : '';
+        }
+
+        function highlightCode(src) {
+            if (!src) return '';
+            if (src.length > MAX_HIGHLIGHT_CHARS) return escapeHtml(src);
+            const ext = fileExt();
+            if (ext === 'html' || ext === 'htm' || ext === 'xml' || ext === 'svg' || ext === 'vue') {
+                return tokensToHtml(src, markupRe);
+            }
+            if (ext === 'css' || ext === 'scss' || ext === 'less') {
+                return tokensToHtml(src, cssRe);
+            }
+            if (KW_BY_EXT[ext]) return tokensToHtml(src, genericRe(ext));
+            return escapeHtml(src);
+        }
+
+        function updateLineNumbers() {
+            const count = ed.value ? ed.value.split('\n').length : 1;
+            if (count !== lastCount) {
+                const buf = new Array(count);
+                for (let i = 0; i < count; i++) buf[i] = i + 1;
+                ln.textContent = buf.join('\n');
+                lastCount = count;
+            }
+            ln.style.width = Math.max(48, String(count).length * 9 + 22) + 'px';
+            ln.scrollTop = ed.scrollTop;
+        }
+
+        function syncScroll() {
+            hl.scrollTop = ed.scrollTop;
+            hl.scrollLeft = ed.scrollLeft;
+            ln.scrollTop = ed.scrollTop;
+        }
+
+        function refresh() {
+            hl.innerHTML = highlightCode(ed.value);
+            updateLineNumbers();
+            syncScroll();
+        }
+
+        function scheduleRefresh() {
+            clearTimeout(hlTimer);
+            hlTimer = setTimeout(refresh, 40);
+        }
+
+        ed.addEventListener('input', scheduleRefresh);
+        ed.addEventListener('scroll', function () {
+            syncScroll();
+            renderMarks();
+        });
+        ed.addEventListener('click', syncScroll);
+
+        // --- Find: text, or :42 / "line 42" ---
+        let matches = [];
+        let matchIndex = -1;
+        let currentQuery = '';
+        const searchBar = document.getElementById('editor-search');
+        const searchInput = document.getElementById('search-input');
+        const searchCount = document.getElementById('search-count');
+        const marksInner = document.getElementById('search-marks-inner');
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = '14px "Roboto Mono", monospace';
+        const CHAR_W = measureCtx.measureText('MMMMMMMMMM').width / 10;
+
+        function setCount(text) { if (searchCount) searchCount.textContent = text; }
+
+        function lineStartsOf(src) {
+            const starts = [0];
+            for (let i = 0; i < src.length; i++) {
+                if (src.charCodeAt(i) === 10) starts.push(i + 1);
+            }
+            return starts;
+        }
+
+        function lineIndexAt(starts, pos) {
+            let lo = 0, hi = starts.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi + 1) >> 1;
+                if (starts[mid] <= pos) lo = mid; else hi = mid - 1;
+            }
+            return lo;
+        }
+
+        function clearMarks() {
+            if (marksInner) marksInner.innerHTML = '';
+        }
+
+        // Draw the found ranges under the text (the textarea itself is
+        // transparent, so a plain selection is invisible when focus is in
+        // the find box). The current match gets a stronger fill + outline.
+        function renderMarks() {
+            clearMarks();
+            if (!marksInner || !matches.length || !searchInput.value) return;
+            const src = ed.value;
+            const qlen = searchInput.value.length;
+            const starts = lineStartsOf(src);
+            const limit = Math.min(matches.length, 1000);
+            const frag = document.createDocumentFragment();
+            const pad = 10;
+            for (let i = 0; i < limit; i++) {
+                const start = matches[i];
+                const end = Math.min(start + qlen, src.length);
+                let seg = start;
+                while (seg < end) {
+                    const li = lineIndexAt(starts, seg);
+                    const lineStart = starts[li];
+                    const lineEnd = (li + 1 < starts.length) ? starts[li + 1] - 1 : src.length;
+                    const s = Math.max(seg, lineStart);
+                    const e = Math.min(end, lineEnd);
+                    if (e > s) {
+                        const d = document.createElement('div');
+                        d.className = 'search-mark' + (i === matchIndex ? ' current' : '');
+                        // Position relative to editor content, adjusted for scroll
+                        d.style.top = (pad + li * LINE_HEIGHT - ed.scrollTop) + 'px';
+                        d.style.left = (pad + (s - lineStart) * CHAR_W - ed.scrollLeft) + 'px';
+                        d.style.width = ((e - s) * CHAR_W) + 'px';
+                        d.style.height = LINE_HEIGHT + 'px';
+                        frag.appendChild(d);
+                    }
+                    seg = lineEnd + 1;
+                }
+            }
+            marksInner.appendChild(frag);
+        }
+
+        function selectMatch() {
+            if (matchIndex < 0 || !matches.length) return;
+            renderMarks();
+            const q = searchInput.value;
+            const idx = matches[matchIndex];
+            const before = ed.value.slice(0, idx);
+            const line = before.split('\n').length - 1;
+            const col = idx - (before.lastIndexOf('\n') + 1);
+            ed.focus({ preventScroll: true });
+            ed.setSelectionRange(idx, idx + q.length);
+            ed.scrollTop = Math.max(0, line * LINE_HEIGHT - ed.clientHeight / 3);
+            ed.scrollLeft = Math.max(0, col * 8.4 - ed.clientWidth / 3);
+            syncScroll();
+            searchInput.focus({ preventScroll: true });
+            setCount((matchIndex + 1) + '/' + matches.length);
+        }
+
+        function runSearch(reset) {
+            const q = searchInput.value;
+            if (reset) { matches = []; matchIndex = -1; currentQuery = ''; }
+            if (!q) { setCount(''); return; }
+            const lineMatch = /^\s*(?::|line\s+)(\d+)\s*$/i.exec(q);
+            if (lineMatch) { jumpToLine(parseInt(lineMatch[1], 10)); return; }
+            if (q === currentQuery) return;
+            currentQuery = q;
+            matches = [];
+            const hay = ed.value.toLowerCase();
+            const needle = q.toLowerCase();
+            let i = 0;
+            while (matches.length < 5000) {
+                i = hay.indexOf(needle, i);
+                if (i === -1) break;
+                matches.push(i);
+                i += Math.max(1, needle.length);
+            }
+            matchIndex = matches.length ? 0 : -1;
+            if (matchIndex >= 0) selectMatch();
+            else setCount('0/0');
+        }
+
+        function jumpToLine(n) {
+            const lines = ed.value.split('\n');
+            n = Math.max(1, Math.min(n, lines.length));
+            let pos = 0;
+            for (let i = 0; i < n - 1; i++) pos += lines[i].length + 1;
+            ed.focus({ preventScroll: true });
+            ed.setSelectionRange(pos, pos + lines[n - 1].length);
+            ed.scrollTop = Math.max(0, (n - 1) * LINE_HEIGHT - ed.clientHeight / 3);
+            ed.scrollLeft = 0;
+            syncScroll();
+            searchInput.focus({ preventScroll: true });
+            setCount('line ' + n);
+        }
+
+        window.editorSearchOpen = function () {
+            searchBar.style.display = 'flex';
+            searchInput.focus();
+            searchInput.select();
+            if (searchInput.value) runSearch(true);
+        };
+        window.editorSearchClose = function () {
+            searchBar.style.display = 'none';
+            matches = [];
+            matchIndex = -1;
+            currentQuery = '';
+            setCount('');
+            ed.focus({ preventScroll: true });
+        };
+        window.editorSearch = runSearch;
+        window.editorSearchNext = function () {
+            if (!matches.length) { runSearch(true); return; }
+            matchIndex = (matchIndex + 1) % matches.length;
+            selectMatch();
+        };
+        window.editorSearchPrev = function () {
+            if (!matches.length) { runSearch(true); return; }
+            matchIndex = (matchIndex - 1 + matches.length) % matches.length;
+            selectMatch();
+        };
+        window.aceEditorRefresh = refresh;
+
+        document.addEventListener('keydown', function (e) {
+            const key = (e.key || '').toLowerCase();
+            if ((e.ctrlKey || e.metaKey) && key === 'f') {
+                e.preventDefault();
+                window.editorSearchOpen();
+            } else if (e.key === 'F3') {
+                e.preventDefault();
+                if (searchBar.style.display === 'flex') window.editorSearchNext();
+            }
+        });
+
+        refresh();
+    })();
 
     function applyAutoFix() {
         console.log("FIX BUTTON CLICKED");
@@ -680,6 +1093,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const newCode = d.fixed_code;
                 const editor = document.getElementById('code-editor');
                 if (editor) editor.value = newCode;
+                if (window.aceEditorRefresh) window.aceEditorRefresh();
                 document.getElementById('autofix-result').innerHTML = '<div style="color: #00ff00; margin-bottom: 10px;">✅ Code Fixed Successfully!</div>' + '<pre style="color: #ff9d00; white-space: pre-wrap; text-align: left; background: #111; padding: 5px; border: 1px solid #ff9d00;">' + newCode + '</pre>';
                 setTimeout(() => {
                     document.getElementById('autofix-modal').style.display = 'none';
