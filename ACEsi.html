@@ -857,7 +857,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return genericCache[ext];
         }
 
-        const markupRe = /(?<com><!--[\s\S]*?-->)|(?<str>"[^"]*"|'[^']*')|(?<tag><\/?[A-Za-z][\w:-]*)|(?<attr>\b[A-Za-z_:][-\w:.]*(?==))|(?<op>\/?>)/g;
+        //const markupRe = /(?<com><!--[\s\S]*?-->)|(?<str>"[^"]*"|'[^']*')|(?<tag><\/?[A-Za-z][\w:-]*)|(?<attr>\b[A-Za-z_:][-\w:.]*(?==))|(?<op>\/?>)/g;
         const cssRe = /(?<com>\/\*[\s\S]*?\*\/)|(?<str>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(?<at>@[\w-]+)|(?<sel>[.#][A-Za-z_][\w-]*)|(?<num>#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|s|ms|deg)?\b)|(?<prop>\b[-A-Za-z]+(?=\s*:))|(?<fn>\b[-A-Za-z]+(?=\())/g;
 
         function fileExt() {
