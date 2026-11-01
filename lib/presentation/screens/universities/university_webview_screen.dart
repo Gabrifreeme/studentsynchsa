@@ -58,8 +58,15 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     _currentUrl = initialUrl;
 
     _controller = WebViewController();
-    _controller.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    _controller.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    // Single UA, set once. The UA does not affect UFS markup (the portal
+    // returns the same HTML for desktop and mobile agents), so this only
+    // exists to avoid the "unsupported browser" path some other portals take.
+    // Note the engine is whatever Android System WebView ships, which may be
+    // older than the version advertised here.
+    _controller.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    );
 
     // Android specific settings (cookies & media).
     if (Platform.isAndroid) {
@@ -73,10 +80,6 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
       cookieManager.setAcceptThirdPartyCookies(androidController, true);
     }
 
-    // The User-Agent is deliberately left at the WebView default: Chrome on
-    // this same tablet reaches the wizard with its normal mobile UA, so
-    // spoofing a desktop UA is both unnecessary and unlike the known-good
-    // control.
     _controller.setJavaScriptMode(JavaScriptMode.unrestricted);
 
     _controller.setNavigationDelegate(
@@ -92,6 +95,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
         onPageFinished: (url) async {
           _currentUrl = url;
           if (mounted) setState(() => _loading = false);
+          debugPrint('PAGE finished: $url');
 
           // gw1startup sets `sessid` from inline JS and then redirects itself
           // to gw1view. If that redirect did not happen, finish the handshake
@@ -101,41 +105,23 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
             await _continueToWizardIfNeeded();
           }
           
-                       try {
-          await _controller.runJavaScript("""
-            var style = document.createElement('style');
-            style.innerHTML = `
-              body { background-color: #000000 !important; color: #e0e0e0 !important; }
-              h1, h2, h3, h4, h5, h6 { color: #ff9d00 !important; }
-              p, span, div, li { color: #e0e0e0 !important; }
-              a { color: #ff9d00 !important; text-decoration: underline !important; }
-              input, select, textarea { 
-                background-color: #111111 !important; 
-                color: #ff9d00 !important; 
-                border: 1px solid #ff9d00 !important; 
-                border-radius: 4px !important; 
-                padding: 6px !important; 
-              }
-              button, input[type="submit"] { 
-                background-color: #000000 !important; 
-                color: #ff9d00 !important; 
-                border: 1px solid #ff9d00 !important; 
-                border-radius: 6px !important; 
-                padding: 8px 16px !important; 
-                font-weight: bold !important; 
-                cursor: pointer !important;
-              }
-              /* Fix the navigation bar */
-              nav, .navbar, header { background-color: #111111 !important; border-bottom: 1px solid #ff9d00 !important; }
-              /* Fix tables */
-              table, th, td { border-color: #333 !important; }
-              th { background-color: #111111 !important; color: #ff9d00 !important; }
-            `;
-            document.head.appendChild(style);
-          """);
-        } catch (e) {
-          debugPrint('CSS Injection Error: $e');
-        }
+          // The grey sheet is not a modal, not a loading mask, and not an
+          // element you can query for. It is a pseudo-element from the SB
+          // Admin Pro theme shipped as /lib/sbpro/css/styles.css:
+          //
+          //   .sidenav-toggled #layoutSidenav #layoutSidenav_content:before {
+          //     content: ""; position: absolute; top: 0; left: 0;
+          //     width: 100%; height: 100%; background: #000;
+          //     z-index: 1037; opacity: 0.5;
+          //   }
+          //
+          // The portal hard-codes class="nav-fixed sidenav-toggled" on <body>.
+          // SB Admin Pro hides that overlay for widths >= 992px only, so on a
+          // phone it paints a 50% black sheet over the entire page - the text
+          // shows through, nothing is clickable. Because it is a ::before there
+          // is no matching DOM node, which is why every class-based CSS rule
+          // and every "full screen overlay" sweep missed it.
+          await _fixSidenavVeil();
         },
         onHttpError: (error) {
           debugPrint(
@@ -144,11 +130,15 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
         },
                onWebResourceError: (error) async {
           debugPrint('WebView error: ${error.description} (${error.errorCode})');
-          if (error.errorCode == -202 || error.isForMainFrame == true) {
-                        final url = Uri.parse(_currentUrl!);
-            if (await canLaunchUrl(url)) {
-              await launchUrl(url, mode: LaunchMode.externalApplication);
-            }
+          // Sub-resource failures (images, scripts, XHR) are not fatal and
+          // must NOT bounce the user into Chrome. Only a main-frame failure
+          // is worth escaping to an external browser.
+          if (error.isForMainFrame != true) return;
+          final current = _currentUrl;
+          if (current == null) return;
+          final url = Uri.parse(current);
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
           }
         },
       ),
@@ -243,6 +233,150 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
 
     if (!mounted) return;
     await _controller.loadRequest(Uri.parse(_itsWizardUrl));
+  }
+
+  /// Reports what is actually painted on top of the portal page.
+  ///
+  /// A `::before` pseudo-element never appears in `querySelectorAll`, so the
+  /// only reliable evidence is (a) the computed style of the pseudo-element on
+  /// its host, and (b) `elementsFromPoint`, which shows whether the topmost
+  /// hit at screen centre is the host itself (pseudo-element on top) or one of
+  /// its children (no veil).
+  static const String _veilProbeJs = r'''
+    (function () {
+      function info(el) {
+        if (!el) return null;
+        var c = getComputedStyle(el), r = el.getBoundingClientRect();
+        return { t: el.tagName, id: el.id || '',
+                 c: String(el.className || '').slice(0, 70),
+                 p: c.position, z: c.zIndex, bg: c.backgroundColor,
+                 op: c.opacity, pe: c.pointerEvents,
+                 box: [r.left | 0, r.top | 0, r.width | 0, r.height | 0] };
+      }
+      var host = document.getElementById('layoutSidenav_content');
+      var before = null;
+      if (host) {
+        var b = getComputedStyle(host, '::before');
+        before = { content: b.content, display: b.display,
+                   bg: b.backgroundColor, op: b.opacity, z: b.zIndex,
+                   pos: b.position, w: b.width, h: b.height };
+      }
+      var out = {
+        url: location.href,
+        iw: window.innerWidth, ih: window.innerHeight,
+        cw: document.documentElement.clientWidth,
+        dpr: window.devicePixelRatio,
+        ready: document.readyState,
+        bodyClass: document.body ? document.body.className : null,
+        hostFound: !!host,
+        before: before,
+        nav: info(document.getElementById('layoutSidenav_nav')),
+        injected: !!document.getElementById('ufs-veil-fix'),
+        stack: []
+      };
+      try {
+        out.stack = (document.elementsFromPoint(
+          (window.innerWidth / 2) | 0,
+          (window.innerHeight / 2) | 0) || []).slice(0, 5).map(info);
+      } catch (e) {}
+      return JSON.stringify(out);
+    })();
+  ''';
+
+  static const String _veilFixJs = r'''
+    (function () {
+      var result = { style: 'present', rulesDeleted: 0 };
+
+      // 1. Override the dimmer via CSS.
+      //
+      // The width check lives INSIDE the stylesheet as a media query, on
+      // purpose: `window.innerWidth` is not a usable proxy for one. This
+      // tablet reports innerWidth 1096 (Chrome zoomed the page out) while the
+      // layout viewport the theme's media query sees is 800 - so a JS
+      // `innerWidth < 992` test silently skips exactly the case that needs
+      // fixing. The browser evaluates both queries the same way, so let CSS
+      // decide.
+      if (!document.getElementById('ufs-veil-fix')) {
+        var s = document.createElement('style');
+        s.id = 'ufs-veil-fix';
+        s.textContent =
+          '.sidenav-toggled #layoutSidenav #layoutSidenav_content::before' +
+          '{content:none!important;display:none!important;opacity:0!important;' +
+          'background:transparent!important;}' +
+          '@media (max-width: 991.98px){' +
+          '.sidenav-toggled #layoutSidenav #layoutSidenav_nav' +
+          '{transform:translateX(-15rem)!important;pointer-events:none!important;}' +
+          '.sidenav-toggled #layoutSidenav #layoutSidenav_content' +
+          '{margin-left:-15rem!important;}' +
+          '}';
+        (document.head || document.documentElement).appendChild(s);
+        result.style = 'added';
+      }
+
+      // 2. Delete the offending rule from the stylesheet. Overriding is enough
+      //    in theory; deleting cannot be beaten by a later sheet. Rules are
+      //    indexed per sheet and @media blocks contain their own child rules,
+      //    so compare per leaf rule - matching a media rule's cssText would
+      //    wipe the entire breakpoint.
+      function matches(rule) {
+        var t = rule.cssText || '';
+        return t.indexOf('layoutSidenav_content') !== -1 &&
+               t.indexOf('before') !== -1;
+      }
+      for (var i = 0; i < document.styleSheets.length; i++) {
+        var rules = null;
+        try { rules = document.styleSheets[i].cssRules; } catch (e) { continue; }
+        if (!rules) continue;
+        for (var j = rules.length - 1; j >= 0; j--) {
+          var r = rules[j];
+          if (r.cssRules) {
+            // @media / @supports / @layer wrapper: look inside only.
+            for (var k = r.cssRules.length - 1; k >= 0; k--) {
+              if (matches(r.cssRules[k])) {
+                try { r.deleteRule(k); result.rulesDeleted++; } catch (e) {}
+              }
+            }
+          } else if (matches(r)) {
+            try { document.styleSheets[i].deleteRule(j); result.rulesDeleted++; }
+            catch (e) {}
+          }
+        }
+      }
+
+      return JSON.stringify(result);
+    })();
+  ''';
+
+  /// Removes SB Admin Pro's off-canvas dimmer on phone-width screens.
+  ///
+  /// The portal renders `<body class="nav-fixed sidenav-toggled">`, and the
+  /// theme paints `#layoutSidenav_content::before` as a 50%-black, full-page
+  /// sheet while that class is present. The theme only disables it at
+  /// >= 992px (`@media (min-width: 992px) { ... :before { display: none } }`),
+  /// so the desktop layout is clean while a phone gets an unclickable grey
+  /// page. Cancelling the dimmer below that breakpoint restores the layout the
+  /// theme intended for a phone: nav parked off-canvas, content full width,
+  /// nothing intercepting taps.
+  ///
+  /// The width test lives inside the injected stylesheet as a media query, not
+  /// in Dart/JS: on this tablet `window.innerWidth` reports 1096 while the
+  /// layout viewport the theme's own query sees is 800, so a JS width check
+  /// skips exactly the case that needs fixing.
+  Future<void> _fixSidenavVeil() async {
+    try {
+      final fix = await _controller.runJavaScriptReturningResult(_veilFixJs);
+      final after = await _controller.runJavaScriptReturningResult(_veilProbeJs);
+
+      // One line on success; dump the full state only if the dimmer survived,
+      // which is the one case worth reading in detail.
+      if (after.toString().contains('"display":"block"')) {
+        debugPrint('VEIL STILL DIMMED\n  fix: $fix\n  after: $after');
+      } else {
+        debugPrint('VEIL clear ($fix)');
+      }
+    } catch (e) {
+      debugPrint('VEIL error: $e');
+    }
   }
 
   Future<void> _injectPageScripts() async {
