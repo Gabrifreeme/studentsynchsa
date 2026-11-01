@@ -294,12 +294,15 @@ class _UniversityCardState extends State<_UniversityCard> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: widget.logoColor.withValues(alpha: 0.2),
-                        image: uni.logoUrl.isNotEmpty
-                            ? DecorationImage(
-                                image: NetworkImage(uni.logoUrl),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
+                                                    image: uni.logoUrl.isNotEmpty && !uni.logoUrl.contains('University_of_Zululand-logo.webp')
+                                ? DecorationImage(
+                                    image: NetworkImage(uni.logoUrl),
+                                    fit: BoxFit.cover,
+                                    onError: (exception, stackTrace) {
+                                      debugPrint('Failed to load logo: ${uni.logoUrl}');
+                                    },
+                                  )
+                                : null,
                       ),
                       child: uni.logoUrl.isEmpty
                           ? Icon(
