@@ -1189,7 +1189,19 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById('copy-btn').addEventListener('click', function() {
         copyCode();
     });
-    </script>
+    
+    function toggleDeveloperToolbar() {
+        const isChecked = document.getElementById('show-toolbar').checked;
+        const toolbarPanel = document.getElementById('dev-toolbar');
+        
+        if (toolbarPanel) {
+            toolbarPanel.style.display = isChecked ? 'flex' : 'none';
+        }
+    }
+
+</script>
 </body>
 </html>
+
+
 
