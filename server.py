@@ -13741,30 +13741,36 @@ def _live_log(msg):
 
 @app.route('/api/logs')
 def api_logs():
-    from flask import Response
     def generate():
         yield "data: Connected to live server logs...\n\n"
         for line in _LOG_QUEUE.follow():
             if line is None:
-                yield ": keep-alive\n\n"
+                yield "data: : keep-alive\n\n"
             else:
-                yield f"data: {line}\n\n"
-    return Response(generate(), mimetype='text/event-stream', headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
+                import json
+                # Force JSON encoding to protect the emojis
+                yield f"data: {json.dumps({'log': line})}\n\n"
+                
+    return Response(generate(), mimetype='text/event-stream; charset=utf-8', headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
 
 import sys
+import re
+import queue
+
 class SimpleLogger:
-    def __init__(self, original):
+    def __init__(self, original, log_queue):
         self.original = original
+        self.queue = log_queue
 
     def write(self, message):
         try:
-            # Add status icons to HTTP logs and startup line
-            import re
             msg_text = message
+            
+            # Add status icons to HTTP logs and startup line
             if "* Running on http://127.0.0.1:5000" in msg_text:
                 msg_text = msg_text.rstrip() + " ✅\n"
             else:
-                # Regex for HTTP status code: "METHOD /path HTTP/1.1" CODE
+                # Regex for HTTP status code
                 match = re.search(r'"\s*(\d{3})\s*(-|-)', msg_text)
                 if match:
                     status = match.group(1)
@@ -13773,19 +13779,25 @@ class SimpleLogger:
                     elif status.startswith(('4', '5')):
                         msg_text = msg_text.rstrip() + " ❌\n"
             
+            # 1. Print to the terminal
             self.original.write(msg_text)
+            
+            # 2. Send the EMOJI version to the web UI queue
+            if message.strip() and hasattr(self, 'queue') and self.queue:
+                self.queue.put(msg_text) 
+                
         except RecursionError:
             pass
-        if message.strip() and hasattr(self, 'queue'):
-            self.queue.put(message)
 
     def flush(self):
+        if hasattr(self, 'original'):
+            self.original.flush()
         try:
             self.original.flush()
         except RecursionError:
             pass
-sys.stdout = SimpleLogger(sys.stdout)
-sys.stderr = SimpleLogger(sys.stderr)
+sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
+sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 
 
 # The werkzeug handler was built from the ORIGINAL sys.stdout, before the
