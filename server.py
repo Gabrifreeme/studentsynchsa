@@ -13774,8 +13774,8 @@ class SimpleLogger:
                 msg_text = msg_text.rstrip() + " ✅\n"
             else:
                 # Regex for HTTP status code
-                match = re.search(r'"\s*(\d{3})\s*(-|-)', msg_text)
-                if match:
+                                match = re.search(r'\s(\d{3})\s', msg_text)
+            if match:
                     status = match.group(1)
                     if status in ('200', '204'):
                         msg_text = msg_text.rstrip() + " 😊\n"
