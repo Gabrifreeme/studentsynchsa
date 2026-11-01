@@ -495,7 +495,7 @@ document.addEventListener("DOMContentLoaded", function() {
     </script>
     <div id="bottom-status" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#000;border-top:1px solid #ff9d00;font-family:'Roboto Mono',monospace;font-size:12px;color:#ff9d00;flex-shrink:0;">
         <span style="font-weight:bold;">ACEsi</span> <span>|</span>
-        <span>Agent: <b>1</b> | Devices: <b>0</b> connected</span>
+        <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
         <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B –¾</button>
@@ -1198,6 +1198,29 @@ document.addEventListener("DOMContentLoaded", function() {
             toolbarPanel.style.display = isChecked ? 'flex' : 'none';
         }
     }
+
+
+    // Fetch connected Android devices from the server
+    async function updateDeviceCount() {
+        try {
+            const res = await fetch('/devices');
+            const data = await res.json();
+            const count = data.devices ? data.devices.length : 0;
+            const el = document.getElementById('device-count');
+            if (el) {
+                el.textContent = count;
+                el.style.color = count > 0 ? '#00ff00' : '#ff0000'; // Green if connected, red if zero
+            }
+        } catch (e) {
+            console.error('Failed to fetch devices:', e);
+        }
+    }
+
+    // Run on load, and then every 5 seconds
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDeviceCount();
+        setInterval(updateDeviceCount, 5000);
+    });
 
 </script>
 </body>
