@@ -1,7 +1,7 @@
 {
   "provider": "groq",
   "model": "qwen2.5-coder:7b",
-  "groq_key": "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",
-  "openrouter_key": "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",
+  "groq_key": "",
+  "openrouter_key": "",
   "system_prompt": ""
 }
