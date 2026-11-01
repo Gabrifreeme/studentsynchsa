@@ -13768,37 +13768,30 @@ class SimpleLogger:
     def write(self, message):
         try:
             msg_text = message
-            
-            # Add status icons to HTTP logs and startup line
-            if "* Running on http://127.0.0.1:5000" in msg_text:
-                msg_text = msg_text.rstrip() + " ✅\n"
+            if '* Running on http://127.0.0.1:5000' in msg_text:
+                msg_text = msg_text.rstrip() + ' ✅\n'
+            elif 'ntfy.sh' in msg_text:
+                msg_text = msg_text.rstrip() + ' ⭐\n'
             else:
-                # Regex for HTTP status code
-                                match = re.search(r'\s(\d{3})\s', msg_text)
-            if match:
+                import re
+                match = re.search(r'\s(\d{3})\s', msg_text)
+                if match:
                     status = match.group(1)
-                    if status in ('200', '204'):
-                        msg_text = msg_text.rstrip() + " 😊\n"
+                    if status in ('200', '201', '202', '204'):
+                        msg_text = msg_text.rstrip() + ' 😊\n'
                     elif status.startswith(('4', '5')):
-                        msg_text = msg_text.rstrip() + " ❌\n"
-            
-            # 1. Print to the terminal
+                        msg_text = msg_text.rstrip() + ' ❌\n'
+
             self.original.write(msg_text)
-            
-            # 2. Send the EMOJI version to the web UI queue
-            if message.strip() and hasattr(self, 'queue') and self.queue:
-                self.queue.put(msg_text) 
-                
-        except RecursionError:
+            if hasattr(self, 'queue') and self.queue:
+                self.queue.put(msg_text)
+        except Exception:
             pass
 
     def flush(self):
         if hasattr(self, 'original'):
             self.original.flush()
-        try:
-            self.original.flush()
-        except RecursionError:
-            pass
+
 sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 
