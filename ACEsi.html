@@ -1120,20 +1120,37 @@ document.addEventListener("DOMContentLoaded", function() {
             editor.style.visibility = 'hidden';
             if (lineNumbers) lineNumbers.style.visibility = 'hidden';
             if (!logSource) {
-                logSource = new EventSource('/api/logs');
-                logSource.onmessage = function(event) {
-                    if (logPaused) return;
-                    const line = document.createElement('div');
-                    line.textContent = event.data;
-                    logOverlay.appendChild(line);
-                    logOverlay.scrollTop = logOverlay.scrollHeight;
-                };
-                logSource.onerror = function() {
-                    console.error("SSE Log Connection Error");
-                    logSource.close();
-                    logSource = null;
-                };
+    const logSource = new EventSource('/api/logs');
+    logSource.onmessage = function(event) {
+        if (logPaused) return;
+        
+        // 1. Ignore the keep-alive pings
+        if (event.data.startsWith(':')) return;
+
+        let logText = event.data;
+        
+        // 2. Parse the JSON from the backend
+        try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.log) {
+                logText = parsed.log;
             }
+        } catch (e) {
+            // If it fails to parse, it's just raw text, so we fall back to event.data
+        }
+
+        // 3. Append to the UI
+        const line = document.createElement('div');
+        line.textContent = logText; // textContent handles emojis natively
+        logOverlay.appendChild(line);
+        logOverlay.scrollTop = logOverlay.scrollHeight;
+    };
+    logSource.onerror = function() {
+        console.error("SSE Log Connection Error");
+        logSource.close();
+        logSource = null;
+    };
+}
         } else {
             logOverlay.style.display = 'none';
             editor.style.visibility = 'visible';
