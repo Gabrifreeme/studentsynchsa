@@ -4042,6 +4042,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
 def chat():
     data = request.json
     user_message = data.get('message', '')
+    requested_model = data.get('model', '')
+    requested_provider = data.get('provider', '')
     # E-STOP: kill mode = total silence. No conversation saved, no model touched.
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
@@ -4510,6 +4512,7 @@ def chat():
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
+        model = requested_model if requested_model else model
         reply = _chat_dispatch(llm_messages, user_message=user_message, preferred_model=model)
         _live_log("dispatch done: %d msgs, %s"
                   % (len(llm_messages), "reply" if reply else "no reply"))
@@ -11798,12 +11801,17 @@ def run_agent(user_message):
 # Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
 # Passes the native tools= schema to the provider so the model can emit
 # structured tool_calls instead of free-form prose (the stall fix).
+
 def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
-              allowed_names=None):
+              allowed_names=None, requested_model=None, requested_provider=None):
     # Free-tier providers cap input tokens per minute (Groq ITPM = 7000). Sending
     # the full 54-tool schema (~8.9k tok) with the agent prompt trips a 413, which
     # made every /opencode task look like "all providers are down". Restrict to the
     # task's domain tools first, then trim further if still over budget.
+    # ── FORCE LOCAL OLLAMA IF SELECTED ──
+    if requested_provider == 'ollama' or (requested_model and 'qwen2.5' in requested_model):
+        print(f"🦙 Forcing Local Ollama model: {requested_model}")
+
     tools_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names) if allowed_names else TOOLS_SCHEMA
     tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
 
@@ -12147,11 +12155,17 @@ def auto_fix_stream():
             {"role": "user", "content": content}
         ]
         fixed_code = None
-        for name, endpoint, api_key, model in (
-            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-            ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-            ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-        ):
+        # If a local model was requested, skip the cloud providers completely
+        if requested_model and 'qwen' in requested_model:
+            providers = []
+        else:
+            providers = [
+                ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+                ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)
+            ]
+        
+        for name, endpoint, api_key, model in providers:
             if not api_key:
                 continue
             try:

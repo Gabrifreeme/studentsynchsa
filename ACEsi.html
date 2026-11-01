@@ -569,7 +569,11 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text })
+            body: JSON.stringify({ 
+                message: text,
+                model: document.getElementById('settings-model') ? document.getElementById('settings-model').value : '',
+                provider: document.getElementById('settings-provider') ? document.getElementById('settings-provider').value : ''
+            })
         })
         .then(function (r) {
             return r.text().then(function (raw) {
