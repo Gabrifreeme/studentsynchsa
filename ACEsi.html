@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -237,7 +237,7 @@
 
     <div id="inspect-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
         <div style="font-weight:bold;margin-bottom:8px;">Inspect Tools</div>
-        <button onclick="addOutput('🔍 DOM: '+document.documentElement.outerHTML.substring(0,80)+'...')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">View DOM</button>
+        <button onclick="addOutput('ðŸ” DOM: '+document.documentElement.outerHTML.substring(0,80)+'...')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">View DOM</button>
         <button onclick="alert('Styles loaded')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Check CSS</button>
         <button onclick="console.log('ACEsi inspect')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Console</button>
         <button onclick="document.getElementById('inspect-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
@@ -245,9 +245,9 @@
 
     <div id="messily-panel" style="display:none;position:fixed;top:60px;right:20px;background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
         <div style="font-weight:bold;margin-bottom:8px;">Messily Tool</div>
-        <button onclick="addOutput('🧹 Clear log');var cm=document.getElementById('chat-messages');if(cm){cm.querySelectorAll('.tool-output').forEach(function(x){x.remove();});}" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Clear Log</button>
-        <button onclick="addOutput('📋 Copy buffer')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Copy</button>
-        <button onclick="addOutput('🧪 Test ping')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Test Ping</button>
+        <button onclick="addOutput('ðŸ§¹ Clear log');var cm=document.getElementById('chat-messages');if(cm){cm.querySelectorAll('.tool-output').forEach(function(x){x.remove();});}" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Clear Log</button>
+        <button onclick="addOutput('ðŸ“‹ Copy buffer')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Copy</button>
+        <button onclick="addOutput('ðŸ§ª Test ping')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Test Ping</button>
         <button onclick="document.getElementById('messily-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
     </div>
 
@@ -319,7 +319,7 @@
     </div>
 
     <div id="dev-toolbar" style="display:flex;justify-content:center;gap:10px;padding:10px;border-bottom:1px solid #ff9d00;background:#000;flex-wrap:wrap;align-items:center;">
-        <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run ▾</button>
+        <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run â–¾</button>
         <button class="btn" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;" onclick="openSettings()">Settings</button>
         <button class="btn" title="Restart App" onclick="location.reload()">Restart</button>
         <button class="btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
@@ -341,7 +341,7 @@
         <div id="chat-panel" class="panel" style="width:33%;">
             <div class="panel-header">CONVERSATION</div>
             <div id="chat-messages" style="flex:1;overflow-y:auto;padding:10px;"><div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> Hi Chris. I'm here. Ready to fix your project.</div></div>
-            <div id="response-timer" style="text-align:center;font-size:10px;color:#888;margin-bottom:4px;height:12px;"></div>
+            <div id="response-timer" style="text-align:center;font-size:12px;color:#e0e0e0;margin-bottom:4px;height:16px;font-weight:bold;"></div>
             <div style="display:flex;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
                 <input id="chat-input" type="text" placeholder="Ask ACEsi..." style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
                 <button onclick="sendMessage()" title="Send" style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;" onmousedown="console.log('Send clicked')">Send</button>
@@ -350,9 +350,9 @@
     <div id="spinner-left" class="spinner" style="width:20px;"></div>
     
     <div style="display:flex; gap:6px; flex:1; justify-content:center;">
-        <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🎤</button>
-        <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🔊</button>
-        <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">➕</button>
+        <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">ðŸŽ¤</button>
+        <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">ðŸ”Š</button>
+        <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">âž•</button>
     </div>
 
     <div id="spinner-right" class="spinner" style="width:20px;"></div>
@@ -459,7 +459,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
     <script>
-    function runSelected(){ var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked'); if(checks.length===0){ alert('Select a command'); return; } checks.forEach(function(c){ fetch('http://127.0.0.1:5000/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c.value})}).then(r=>r.text()).then(t=>addOutput('▶ '+c.value+': '+t)).catch(e=>addOutput('▶ '+c.value+': '+e.message)); }); document.getElementById('run-panel').style.display='none'; }
+    function runSelected(){ var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked'); if(checks.length===0){ alert('Select a command'); return; } checks.forEach(function(c){ fetch('http://127.0.0.1:5000/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c.value})}).then(r=>r.text()).then(t=>addOutput('â–¶ '+c.value+': '+t)).catch(e=>addOutput('â–¶ '+c.value+': '+e.message)); }); document.getElementById('run-panel').style.display='none'; }
     function toggleModelPicker(e){
         var btn = document.getElementById('modelBtn');
         var existing = document.getElementById('model-dropdown');
@@ -477,7 +477,7 @@ document.addEventListener("DOMContentLoaded", function() {
             d.onmouseout = function(){ d.style.background='#000'; d.style.color='#ff9d00'; };
             d.onclick = function(ev){
                 ev.stopPropagation();
-                document.getElementById('modelBtn').textContent = mm + ' ▾';
+                document.getElementById('modelBtn').textContent = mm + ' â–¾';
                 document.getElementById('modelBtn').style.display='inline-block';
                 m.remove();
                 alert('Model switched to: ' + mm);
@@ -498,7 +498,7 @@ document.addEventListener("DOMContentLoaded", function() {
         <span>Agent: <b>1</b> | Devices: <b>0</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
-        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B ▾</button>
+        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B â–¾</button>
     </div>
 
     <!-- Auto Fix Modal -->
@@ -549,7 +549,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    function sendMessage() {
+        function sendMessage() {
         const input = document.getElementById('chat-input');
         const timer = document.getElementById('response-timer');
         const text = (input ? input.value : '').trim();
@@ -557,30 +557,40 @@ document.addEventListener("DOMContentLoaded", function() {
         addBubble('You', text, 'msg-right');
         input.value = '';
         setChatBusy(true);
-        if (timer) timer.textContent = 'thinking...';
+        
         const t0 = Date.now();
+        if (timer) {
+            timer.textContent = 'thinking... 0.0s';
+            window.tickInterval = setInterval(() => {
+                timer.textContent = 'thinking... ' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
+            }, 100);
+        }
+        
         fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text })
         })
-            .then(function (r) {
-                return r.text().then(function (raw) {
-                    let d = null;
-                    try { d = JSON.parse(raw); } catch (e) { /* not JSON */ }
-                    if (!r.ok) {
-                        throw new Error((d && d.error) || ('HTTP ' + r.status + ': ' + raw.slice(0, 200)));
-                    }
-                    if (!d) throw new Error('Bad response: ' + raw.slice(0, 200));
-                    return d;
-                });
-            })
+        .then(function (r) {
+            return r.text().then(function (raw) {
+                let d = null;
+                try { d = JSON.parse(raw); } catch (e) { /* not JSON */ }
+                if (!r.ok) {
+                    throw new Error((d && d.error) || ('HTTP ' + r.status + ': ' + raw.slice(0, 200)));
+                }
+                if (!d) throw new Error('Bad response: ' + raw.slice(0, 200));
+                return d;
+            });
+        })
             .then(function (d) {
                 addBubble('ACEsi', d.reply || '(no reply)', 'msg-left');
-                if (timer) timer.textContent = ((Date.now() - t0) / 1000).toFixed(1) + 's';
+                if (tickInterval) clearInterval(tickInterval);
+                           if (window.tickInterval) clearInterval(window.tickInterval);
+            if (timer) timer.textContent = 'Done in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
             })
             .catch(function (e) {
-                addBubble('ACEsi', 'Error: ' + e.message, 'msg-left');
+                           if (window.tickInterval) clearInterval(window.tickInterval);
+            if (timer) timer.textContent = 'Error';
                 if (timer) timer.textContent = '';
             })
             .finally(function () {
@@ -625,7 +635,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const toolbarToggle = document.getElementById('show-toolbar');
                 if (toolbarToggle) toolbarToggle.checked = d.show_toolbar !== false;
             })
-            .catch(e => addOutput('❌ Failed to load settings: ' + e.message));
+            .catch(e => addOutput('âŒ Failed to load settings: ' + e.message));
     }
 
     function saveSettings() {
@@ -648,9 +658,9 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(r => r.json())
         .then(d => {
-            addOutput('✅ Settings saved successfully');
+            addOutput('âœ… Settings saved successfully');
         })
-        .catch(e => addOutput('❌ Failed to save settings: ' + e.message));
+        .catch(e => addOutput('âŒ Failed to save settings: ' + e.message));
     }
 
     function saveSystemPrompt() {
@@ -673,7 +683,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function clearChatHistory() {
         if (confirm('Clear all chat history?')) {
             document.getElementById('chat-messages').innerHTML = '<div class="msg-bubble msg-left"><b>ACEsi:</b> Hi Chris. I\'m here. Ready to fix your project.</div>';
-            addOutput('💬 Chat history cleared');
+            addOutput('ðŸ’¬ Chat history cleared');
             fetch('http://127.0.0.1:5000/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -689,7 +699,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const results = d.notifications || [];
                 alert('Fetched ' + results.length + ' notification(s)\n\n' + results.join('\n'));
             })
-            .catch(e => alert('❌ Failed to fetch notifications: ' + e.message));
+            .catch(e => alert('âŒ Failed to fetch notifications: ' + e.message));
     }
 
     function triggerPing() {
@@ -699,9 +709,9 @@ document.addEventListener("DOMContentLoaded", function() {
             body: JSON.stringify({ ping: true })
         }).then(r => r.json())
         .then(d => {
-            alert('📡 ' + (d.status || 'Ping triggered'));
+            alert('ðŸ“¡ ' + (d.status || 'Ping triggered'));
         })
-        .catch(e => alert('❌ Failed to send ping: ' + e.message));
+        .catch(e => alert('âŒ Failed to send ping: ' + e.message));
     }
 
     function connectGoogleDrive() {
@@ -722,11 +732,11 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         if (!filename) {
-            alert('❌ No file selected. Please select a file from the explorer first.');
+            alert('âŒ No file selected. Please select a file from the explorer first.');
             return;
         }
         if (!code.trim()) {
-            alert('❌ Nothing to save');
+            alert('âŒ Nothing to save');
             return;
         }
         const formData = new URLSearchParams();
@@ -740,21 +750,21 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!r.ok) throw new Error('Server error ' + r.status);
             return r.json();
         }).then(d => {
-            alert('✅ Saved successfully!');
-        }).catch(e => alert('❌ Save failed: ' + e.message));
+            alert('âœ… Saved successfully!');
+        }).catch(e => alert('âŒ Save failed: ' + e.message));
     }
     function clearCodeEditor() {
         console.log("Clear button clicked!");
         document.getElementById('code-editor').value = '';
         if (window.aceEditorRefresh) window.aceEditorRefresh();
-        alert('🗑️ Editor Cleared!');
+        alert('ðŸ—‘ï¸ Editor Cleared!');
     }
     function copyCode() {
         console.log("Copy button clicked!");
         const code = document.getElementById('code-editor').value;
         navigator.clipboard.writeText(code).then(() => {
-            alert('📋 Code Copied!');
-        }).catch(e => alert('❌ Copy failed: ' + e.message));
+            alert('ðŸ“‹ Code Copied!');
+        }).catch(e => alert('âŒ Copy failed: ' + e.message));
     }
 
     // ===== Code editor: line numbers, syntax colouring, find =====
@@ -1094,16 +1104,16 @@ document.addEventListener("DOMContentLoaded", function() {
                 const editor = document.getElementById('code-editor');
                 if (editor) editor.value = newCode;
                 if (window.aceEditorRefresh) window.aceEditorRefresh();
-                document.getElementById('autofix-result').innerHTML = '<div style="color: #00ff00; margin-bottom: 10px;">✅ Code Fixed Successfully!</div>' + '<pre style="color: #ff9d00; white-space: pre-wrap; text-align: left; background: #111; padding: 5px; border: 1px solid #ff9d00;">' + newCode + '</pre>';
+                document.getElementById('autofix-result').innerHTML = '<div style="color: #00ff00; margin-bottom: 10px;">âœ… Code Fixed Successfully!</div>' + '<pre style="color: #ff9d00; white-space: pre-wrap; text-align: left; background: #111; padding: 5px; border: 1px solid #ff9d00;">' + newCode + '</pre>';
                 setTimeout(() => {
                     document.getElementById('autofix-modal').style.display = 'none';
                 }, 1500);
             } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Error: ' + (d.error || 'unknown error') + '</span>';
+                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">âŒ Error: ' + (d.error || 'unknown error') + '</span>';
             }
         }).catch(e => {
             console.error("AutoFix Error:", e);
-            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Server error: ' + e.message + '</span>';
+            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">âŒ Server error: ' + e.message + '</span>';
         });
     }
 

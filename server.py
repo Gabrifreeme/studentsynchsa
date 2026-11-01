@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
 import requests
@@ -7650,6 +7650,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "read_user_file",
         "description": "Read a file's content from anywhere on Chris's PC (any folder: Documents, Pictures, Desktop, Downloads, etc). Accepts a full path or a bare filename. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+        {"type": "function", "function": {"name": "web_search",
+        "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
+        "parameters": {"type": "object", "additionalProperties": False, "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "view_user_file",
         "description": "VIEW a file from Chris's PC inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Accepts a full path or a bare filename. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
