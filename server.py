@@ -4563,47 +4563,76 @@ def chat():
             _AGENT["last_reply"] = f"Error: {type(e).__name__}: {e}"
         return jsonify({"reply": f"Error: {str(e)}"})
 
+def _strip_code_fences(text):
+    """Return model output as raw code.
+
+    The prompt asks for no markdown, but models wrap the answer in a fence
+    often enough that stripping it is cheaper than a retry. The longest fenced
+    block is the one that holds the code; the surrounding prose is discarded.
+    """
+    text = (text or "").strip()
+    if "```" in text:
+        blocks = re.findall(r"```[^\n]*\n(.*?)```", text, re.S)
+        text = max(blocks, key=len).strip() if blocks else text.replace("```", "").strip()
+    return text
+
+
 @app.route('/api/autofix', methods=['POST'])
 def autofix():
-    """Fix code using AI model. Posts {code: "..."} → {ok: True, fixed_code: "..."}."""
+    """Fix syntax errors in pasted code. Posts {code} -> {ok, fixed_code|error}.
+
+    Uses the same provider chain as /chat rather than one hardcoded provider:
+    pinning this endpoint to a single provider made it fail outright whenever
+    that provider's key was unset, even with another provider fully working.
+
+    Always answers 200 with an `ok` flag: ACEsi.html throws on a non-2xx and
+    replaces the body with "Server error 500", hiding the actual reason.
+    """
     print("AUTOFIX REQUEST RECEIVED")
     data = request.json or {}
     code = data.get('code', '')
     if not code.strip():
         return jsonify({"ok": False, "error": "No code provided"})
-    # Use _chat_one with tool_choice="none": no tools advertised → model must write text
-    try:
-        msgs = [{"role": "user", "content": f"You are a code repair assistant. The user will provide broken code. Do NOT run any terminal commands. Do NOT return exit codes. Do NOT add any explanations or markdown formatting. Just the raw, fixed code.\n\nCode to fix:\n{code}"}]
-        # _chat_one returns (text, tool_calls, finish_reason). With tool_choice="none"
-        # and no tools_schema, the model has no calls to make and must reply with text.
-        reply, _, _ = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, "qwen/qwen3.8-27b", msgs, tool_choice="none")
-        fixed = (reply or "").strip()
-        # Additional post-processing: remove any exit codes or command artifacts
-        import re
-        lines = fixed.split('\\n')
-        filtered = []
-        for line in lines:
-            # Skip exit code lines
-            if re.match(r'^\\s*exit\\s*=\\s*\\d+', line, re.IGNORECASE):
-                continue
-            # Skip separator lines
-            if re.match(r'^\\s*--+\\s*$', line):
-                continue
-            # Skip system error lines
-            if "The system cannot" in line or "is not recognized" in line:
-                continue
-            # Skip bare command names
-            if re.match(r'^\\s*\\w+\\s*$', line) and len(line.strip()) > 2:
-                continue
-            filtered.append(line)
-        fixed = '\\n'.join(filtered).strip()
+    if len(code) > 12000:
+        code = code[:12000] + "\n# ... trimmed to 12000 characters"
+
+    msgs = [{
+        "role": "user",
+        "content": (
+            "You are a code repair assistant. Fix the syntax errors in the "
+            "code below. Return ONLY the complete corrected code, with no "
+            "explanations, no markdown fences and no shell commands.\n\n"
+            "CODE:\n" + code
+        ),
+    }]
+
+    tried = []
+    providers = list(_chat_providers())
+    if OLLAMA_ENABLED:
+        providers.append(("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL))
+    for name, endpoint, api_key, model in providers:
+        if not api_key:
+            tried.append("%s: no API key" % name)
+            continue
+        try:
+            # tool_choice="none" sends no tool schema, so the model has nothing
+            # to call and must answer with the code itself.
+            reply, _, _ = _chat_one(name, endpoint, api_key, model, msgs,
+                                    tool_choice="none")
+        except Exception as e:
+            tried.append("%s: %s: %s" % (name, type(e).__name__, e))
+            continue
+        fixed = _strip_code_fences(reply)
         if fixed:
-            return jsonify({"ok": True, "fixed_code": fixed})
-        else:
-            return jsonify({"ok": False, "error": "AI could not fix the code"})
-    except Exception as e:
-        print(f"💥 AutoFix error: {type(e).__name__}: {e}")
-        return jsonify({"ok": False, "error": str(e)})@app.route('/history', methods=['GET'])
+            return jsonify({"ok": True, "fixed_code": fixed, "provider": name})
+        tried.append("%s: no code in reply" % name)
+
+    detail = "; ".join(tried) or "no provider configured"
+    print(f"💥 AutoFix: no provider returned code ({detail})")
+    return jsonify({"ok": False, "error": "No model returned a fix. Tried: " + detail})
+
+
+@app.route('/history', methods=['GET'])
 def history():
     limit = min(int(request.args.get('limit', 100)), 500)
     conn = sqlite3.connect('ace_memory.db')

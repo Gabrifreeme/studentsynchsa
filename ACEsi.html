@@ -639,7 +639,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const toolbarToggle = document.getElementById('show-toolbar');
                 if (toolbarToggle) toolbarToggle.checked = d.show_toolbar !== false;
             })
-            .catch(e => addOutput('Œ Failed to load settings: ' + e.message));
+            .catch(e => addOutput('❌ Failed to load settings: ' + e.message));
     }
 
     function saveSettings() {
@@ -664,7 +664,7 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(d => {
             addOutput('✅ Settings saved successfully');
         })
-        .catch(e => addOutput('Œ Failed to save settings: ' + e.message));
+        .catch(e => addOutput('❌ Failed to save settings: ' + e.message));
     }
 
     function saveSystemPrompt() {
@@ -703,7 +703,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const results = d.notifications || [];
                 alert('Fetched ' + results.length + ' notification(s)\n\n' + results.join('\n'));
             })
-            .catch(e => alert('Œ Failed to fetch notifications: ' + e.message));
+            .catch(e => alert('❌ Failed to fetch notifications: ' + e.message));
     }
 
     function triggerPing() {
@@ -715,7 +715,7 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(d => {
             alert('ðŸ“¡ ' + (d.status || 'Ping triggered'));
         })
-        .catch(e => alert('Œ Failed to send ping: ' + e.message));
+        .catch(e => alert('❌ Failed to send ping: ' + e.message));
     }
 
     function connectGoogleDrive() {
@@ -736,11 +736,11 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         if (!filename) {
-            alert('Œ No file selected. Please select a file from the explorer first.');
+            alert('❌ No file selected. Please select a file from the explorer first.');
             return;
         }
         if (!code.trim()) {
-            alert('Œ Nothing to save');
+            alert('❌ Nothing to save');
             return;
         }
         const formData = new URLSearchParams();
@@ -755,7 +755,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return r.json();
         }).then(d => {
             alert('✅ Saved successfully!');
-        }).catch(e => alert('Œ Save failed: ' + e.message));
+        }).catch(e => alert('❌ Save failed: ' + e.message));
     }
     function clearCodeEditor() {
         console.log("Clear button clicked!");
@@ -768,7 +768,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const code = document.getElementById('code-editor').value;
         navigator.clipboard.writeText(code).then(() => {
             alert('ðŸ“‹ Code Copied!');
-        }).catch(e => alert('Œ Copy failed: ' + e.message));
+        }).catch(e => alert('❌ Copy failed: ' + e.message));
     }
 
     // ===== Code editor: line numbers, syntax colouring, find =====
@@ -1113,11 +1113,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     document.getElementById('autofix-modal').style.display = 'none';
                 }, 1500);
             } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">Œ Error: ' + (d.error || 'unknown error') + '</span>';
+                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Error: ' + (d.error || 'unknown error') + '</span>';
             }
         }).catch(e => {
             console.error("AutoFix Error:", e);
-            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">Œ Server error: ' + e.message + '</span>';
+            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Server error: ' + e.message + '</span>';
         });
     }
 
