@@ -54,10 +54,11 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     super.initState();
     _profileJson = widget.profileJson;
 
-    final initialUrl = _resolveInitialUrl();
+        final initialUrl = 'https://apply.ufs.ac.za/Application/Start';
     _currentUrl = initialUrl;
 
     _controller = WebViewController();
+    _controller.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
     // Android specific settings (cookies & media).
     if (Platform.isAndroid) {
@@ -79,6 +80,10 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
 
     _controller.setNavigationDelegate(
       NavigationDelegate(
+                onSslAuthError: (SslAuthError error) async {
+          debugPrint('SSL override: $error');
+          await error.proceed();
+        },
         onPageStarted: (url) {
           _currentUrl = url;
           if (mounted) setState(() => _loading = true);
@@ -94,26 +99,33 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
           if (url.contains('gw1startup')) {
             await _continueToWizardIfNeeded();
           }
-          try {
-            await _controller.runJavaScript(
-              "var style=document.createElement('style');"
-              "style.innerHTML='body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;font-family:'Roboto Mono',monospace!important;}"
-              "input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}"
-              "a{color:#ff9d00!important;text-decoration:none!important;}"
-              "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';"
-              "document.head.appendChild(style);"
-            );
-          } catch (_) {}
+          
+                  try {
+          await _controller.runJavaScript("""
+            var style = document.createElement('style');
+            style.innerHTML = 'body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;}'
+              + 'input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}'
+              + 'a{color:#ff9d00!important;text-decoration:none!important;}'
+              + 'button,input[type="submit"]{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';
+            document.head.appendChild(style);
+          """);
+        } catch (e) {
+          debugPrint('CSS Injection Error: $e');
+        }catch (_) {}
         },
         onHttpError: (error) {
           debugPrint(
             'WebView HTTP ${error.response?.statusCode} ${error.request?.uri}',
           );
         },
-        onWebResourceError: (error) {
-          debugPrint(
-            'WebView error: ${error.description} (${error.errorCode})',
-          );
+               onWebResourceError: (error) async {
+          debugPrint('WebView error: ${error.description} (${error.errorCode})');
+          if (error.errorCode == -202 || error.isForMainFrame == true) {
+                        final url = Uri.parse(_currentUrl!);
+            if (await canLaunchUrl(url)) {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+            }
+          }
         },
       ),
     );
@@ -127,16 +139,19 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     _acesiController.setNavigationDelegate(
       NavigationDelegate(
         onPageFinished: (url) async {
-          try {
-            await _acesiController.runJavaScript(
-              "var style=document.createElement('style');"
-              "style.innerHTML='body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;font-family:'Roboto Mono',monospace!important;}'"
-              "input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}"
-              "a{color:#ff9d00!important;text-decoration:none!important;}"
-              "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';"
-              "document.head.appendChild(style);"
-            );
-          } catch (_) {}
+                          try {
+          String css = "body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;font-family:monospace!important;}"
+                       "input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}"
+                       "a{color:#ff9d00!important;text-decoration:none!important;}"
+                       "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}";
+          
+          // Using backticks to safely wrap the CSS string for JavaScript
+          String js = "var style=document.createElement('style'); style.innerHTML=\`" + css + "\`; document.head.appendChild(style);";
+          
+          await _acesiController.runJavaScript(js);
+        } catch (e) {
+          debugPrint('CSS Injection Error: $e');
+        } 
         },
       ),
     );

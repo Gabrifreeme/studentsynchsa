@@ -1,52 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Scoped network security config for university portal WebViews.
-
-  The NWU (nwu.ac.za) portal and some Sun (sun.ac.za) pages serve over plain
-  HTTP or redirect through HTTP mid-load. Android 11+ blocks cleartext
-  traffic by default (net::ERR_CLEARTEXT_NOT_PERMITTED). We permit it at the
-  base level for all hosts and explicitly enumerate the university domains.
-
-  The UNIVEN root (Sectigo R46) is also still trusted at domain level; everything
-  else falls back to system CA trust.
--->
 <network-security-config>
-    <!-- Global cleartext allowance: stops ERR_CLEARTEXT_NOT_PERMITTED for
-         old university portals that redirect through HTTP. -->
+    <!-- Allow cleartext (HTTP) traffic for ALL domains -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
-            <certificates src="system"/>
+            <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
-
-    <!-- NWU portal: known HTTP redirects -->
+    
+    <!-- Specifically allow the UFS and UNIVEN domains to use bad certs -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">nwu.ac.za</domain>
-        <trust-anchors>
-            <certificates src="system"/>
-        </trust-anchors>
-    </domain-config>
-
-    <!-- Sun University portal (sun.ac.za / www.sun.ac.za) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">sun.ac.za</domain>
-        <trust-anchors>
-            <certificates src="system"/>
-        </trust-anchors>
-    </domain-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain>www.sun.ac.za</domain>
-        <trust-anchors>
-            <certificates src="system"/>
-        </trust-anchors>
-    </domain-config>
-
-    <!-- UNIVEN ITS portal: trust the Sectigo R46 root for univen.ac.za only -->
-    <domain-config>
+        <domain includeSubdomains="true">ufs.ac.za</domain>
         <domain includeSubdomains="true">univen.ac.za</domain>
+        <domain includeSubdomains="true">univenierp01.univen.ac.za</domain>
         <trust-anchors>
-            <certificates src="@raw/univen_sectigo_root_r46"/>
-            <certificates src="system"/>
+            <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </domain-config>
 </network-security-config>
