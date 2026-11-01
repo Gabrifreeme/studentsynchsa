@@ -2302,7 +2302,7 @@ def _find_provider_for_model(preferred_model):
     rather than silently falling back to the cloud."""
     if not preferred_model:
         return None
-    if preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL):
+    if preferred_model and (preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL) or 'qwen' in preferred_model or 'llama' in preferred_model):
         if OLLAMA_ENABLED:
             return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
         return None
@@ -3273,10 +3273,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         for m in OPENROUTER_FALLBACKS:
                             if m != preferred_model:
                                 providers.append(("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, m))
-                # Then try the standard providers.
-                for p in _chat_providers(active_domain):
-                    if p not in providers:
-                        providers.append(p)
+                # If a preferred model is selected, DO NOT add cloud fallbacks.
+                # This forces the app to use the local model if requested.
+                if not preferred_model:
+                    for p in _chat_providers(active_domain):
+                        if p not in providers:
+                            providers.append(p)
+                elif not providers:
+                    # If the preferred model was unknown, fall back to standard
+                    for p in _chat_providers(active_domain):
+                        if p not in providers:
+                            providers.append(p)
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
