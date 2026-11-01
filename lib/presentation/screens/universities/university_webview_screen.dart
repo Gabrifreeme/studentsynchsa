@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -58,6 +58,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     _currentUrl = initialUrl;
 
     _controller = WebViewController();
+    _controller.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     _controller.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
     // Android specific settings (cookies & media).
@@ -100,18 +101,41 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
             await _continueToWizardIfNeeded();
           }
           
-                  try {
+                       try {
           await _controller.runJavaScript("""
             var style = document.createElement('style');
-            style.innerHTML = 'body,html,div,table,td,tr{background-color:#000000!important;color:#ff9d00!important;}'
-              + 'input,select,textarea{background-color:#111111!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:4px!important;padding:4px!important;}'
-              + 'a{color:#ff9d00!important;text-decoration:none!important;}'
-              + 'button,input[type="submit"]{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}';
+            style.innerHTML = `
+              body { background-color: #000000 !important; color: #e0e0e0 !important; }
+              h1, h2, h3, h4, h5, h6 { color: #ff9d00 !important; }
+              p, span, div, li { color: #e0e0e0 !important; }
+              a { color: #ff9d00 !important; text-decoration: underline !important; }
+              input, select, textarea { 
+                background-color: #111111 !important; 
+                color: #ff9d00 !important; 
+                border: 1px solid #ff9d00 !important; 
+                border-radius: 4px !important; 
+                padding: 6px !important; 
+              }
+              button, input[type="submit"] { 
+                background-color: #000000 !important; 
+                color: #ff9d00 !important; 
+                border: 1px solid #ff9d00 !important; 
+                border-radius: 6px !important; 
+                padding: 8px 16px !important; 
+                font-weight: bold !important; 
+                cursor: pointer !important;
+              }
+              /* Fix the navigation bar */
+              nav, .navbar, header { background-color: #111111 !important; border-bottom: 1px solid #ff9d00 !important; }
+              /* Fix tables */
+              table, th, td { border-color: #333 !important; }
+              th { background-color: #111111 !important; color: #ff9d00 !important; }
+            `;
             document.head.appendChild(style);
           """);
         } catch (e) {
           debugPrint('CSS Injection Error: $e');
-        }catch (_) {}
+        }
         },
         onHttpError: (error) {
           debugPrint(
@@ -376,7 +400,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
               children: [
                 Text('ACE', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
                 Text('si', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
-                Text('‿', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 14)),
+                Text('â€¿', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 14)),
               ],
             ),
           ),
@@ -407,7 +431,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
                   children: [
                     Padding(
                       padding: EdgeInsets.all(12),
-                      child: Text('Explorer — lib/', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, fontSize: 14)),
+                      child: Text('Explorer â€” lib/', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, fontSize: 14)),
                     ),
                     Expanded(
                       child: FutureBuilder<List<String>>(
@@ -441,3 +465,4 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     );
   }
 }
+
