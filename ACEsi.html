@@ -319,7 +319,7 @@
     </div>
 
     <div id="dev-toolbar" style="display:flex;justify-content:center;gap:10px;padding:10px;border-bottom:1px solid #ff9d00;background:#000;flex-wrap:wrap;align-items:center;">
-        <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run â–¾</button>
+        <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run Run ▶</button>
         <button class="btn" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;" onclick="openSettings()">Settings</button>
         <button class="btn" title="Restart App" onclick="location.reload()">Restart</button>
         <button class="btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
@@ -459,7 +459,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
     <script>
-    function runSelected(){ var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked'); if(checks.length===0){ alert('Select a command'); return; } checks.forEach(function(c){ fetch('http://127.0.0.1:5000/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c.value})}).then(r=>r.text()).then(t=>addOutput('â–¶ '+c.value+': '+t)).catch(e=>addOutput('â–¶ '+c.value+': '+e.message)); }); document.getElementById('run-panel').style.display='none'; }
+    function runSelected(){ var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked'); if(checks.length===0){ alert('Select a command'); return; } checks.forEach(function(c){ fetch('http://127.0.0.1:5000/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c.value})}).then(r=>r.text()).then(t=>addOutput('–¶ '+c.value+': '+t)).catch(e=>addOutput('–¶ '+c.value+': '+e.message)); }); document.getElementById('run-panel').style.display='none'; }
     function toggleModelPicker(e){
         var btn = document.getElementById('modelBtn');
         var existing = document.getElementById('model-dropdown');
@@ -477,7 +477,7 @@ document.addEventListener("DOMContentLoaded", function() {
             d.onmouseout = function(){ d.style.background='#000'; d.style.color='#ff9d00'; };
             d.onclick = function(ev){
                 ev.stopPropagation();
-                document.getElementById('modelBtn').textContent = mm + ' â–¾';
+                document.getElementById('modelBtn').textContent = mm + ' –¾';
                 document.getElementById('modelBtn').style.display='inline-block';
                 m.remove();
                 alert('Model switched to: ' + mm);
@@ -498,7 +498,7 @@ document.addEventListener("DOMContentLoaded", function() {
         <span>Agent: <b>1</b> | Devices: <b>0</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
-        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B â–¾</button>
+        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B –¾</button>
     </div>
 
     <!-- Auto Fix Modal -->
@@ -635,7 +635,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const toolbarToggle = document.getElementById('show-toolbar');
                 if (toolbarToggle) toolbarToggle.checked = d.show_toolbar !== false;
             })
-            .catch(e => addOutput('âŒ Failed to load settings: ' + e.message));
+            .catch(e => addOutput('Œ Failed to load settings: ' + e.message));
     }
 
     function saveSettings() {
@@ -660,7 +660,7 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(d => {
             addOutput('✅ Settings saved successfully');
         })
-        .catch(e => addOutput('âŒ Failed to save settings: ' + e.message));
+        .catch(e => addOutput('Œ Failed to save settings: ' + e.message));
     }
 
     function saveSystemPrompt() {
@@ -699,7 +699,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const results = d.notifications || [];
                 alert('Fetched ' + results.length + ' notification(s)\n\n' + results.join('\n'));
             })
-            .catch(e => alert('âŒ Failed to fetch notifications: ' + e.message));
+            .catch(e => alert('Œ Failed to fetch notifications: ' + e.message));
     }
 
     function triggerPing() {
@@ -711,7 +711,7 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(d => {
             alert('ðŸ“¡ ' + (d.status || 'Ping triggered'));
         })
-        .catch(e => alert('âŒ Failed to send ping: ' + e.message));
+        .catch(e => alert('Œ Failed to send ping: ' + e.message));
     }
 
     function connectGoogleDrive() {
@@ -732,11 +732,11 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         if (!filename) {
-            alert('âŒ No file selected. Please select a file from the explorer first.');
+            alert('Œ No file selected. Please select a file from the explorer first.');
             return;
         }
         if (!code.trim()) {
-            alert('âŒ Nothing to save');
+            alert('Œ Nothing to save');
             return;
         }
         const formData = new URLSearchParams();
@@ -751,7 +751,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return r.json();
         }).then(d => {
             alert('✅ Saved successfully!');
-        }).catch(e => alert('âŒ Save failed: ' + e.message));
+        }).catch(e => alert('Œ Save failed: ' + e.message));
     }
     function clearCodeEditor() {
         console.log("Clear button clicked!");
@@ -764,7 +764,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const code = document.getElementById('code-editor').value;
         navigator.clipboard.writeText(code).then(() => {
             alert('ðŸ“‹ Code Copied!');
-        }).catch(e => alert('âŒ Copy failed: ' + e.message));
+        }).catch(e => alert('Œ Copy failed: ' + e.message));
     }
 
     // ===== Code editor: line numbers, syntax colouring, find =====
@@ -1109,11 +1109,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     document.getElementById('autofix-modal').style.display = 'none';
                 }, 1500);
             } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">âŒ Error: ' + (d.error || 'unknown error') + '</span>';
+                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">Œ Error: ' + (d.error || 'unknown error') + '</span>';
             }
         }).catch(e => {
             console.error("AutoFix Error:", e);
-            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">âŒ Server error: ' + e.message + '</span>';
+            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">Œ Server error: ' + e.message + '</span>';
         });
     }
 
