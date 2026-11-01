@@ -4,4 +4,4 @@ echo [ACEsi Server Auto-Start]
 cd /d C:\Users\chris\LipSyncStudent
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
-start /min python server.py
+wt -w 0 nt cmd /c "python server.py"
