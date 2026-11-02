@@ -12165,7 +12165,7 @@ def auto_fix_stream():
         ]
         fixed_code = None
         # If a local model was requested, skip the cloud providers completely
-            providers = [
+        providers = [
                 ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
                 ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)

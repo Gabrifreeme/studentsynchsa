@@ -327,6 +327,7 @@
 
     <div id="dev-toolbar" style="display:flex;justify-content:center;gap:10px;padding:10px;border-bottom:1px solid #ff9d00;background:#000;flex-wrap:wrap;align-items:center;">
         <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run Run ▶</button>
+        <button class="btn" title="Open Terminal" onclick="document.getElementById('terminal-panel').style.display='flex'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Terminal</button>
         <button class="btn" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;" onclick="openSettings()">Settings</button>
         <button class="btn" title="Restart App" onclick="location.reload()">Restart</button>
         <button class="btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
@@ -375,11 +376,6 @@
                 <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-code').value='';document.getElementById('autofix-result').innerHTML='';document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
                 <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
                 <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
-                <div style="display:flex;align-items:center;gap:4px;font-size:11px;border-left:1px solid #ff9d00;padding-left:8px;">
-                    <span>Logs:</span>
-                    <input type="checkbox" id="log-toggle" style="cursor:pointer;accent-color:#ff9d00;" onclick="toggleLiveLogs()">
-                    <button id="log-pause-btn" onclick="toggleLogPause()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 6px;font-size:10px;cursor:pointer;">Pause</button>
-                </div>
             </div>
             </div>
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
@@ -463,6 +459,38 @@ document.addEventListener("DOMContentLoaded", function() {
             if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
         });
 });
+
+
+       async function runTerminalCommand() {
+        const input = document.getElementById('terminal-input');
+        const output = document.getElementById('terminal-output');
+        const cmd = input.value.trim();
+        
+        if (!cmd) return;
+        
+        // Print the command being run
+        output.innerHTML += "\n<span style='color:#ff9d00;'> > " + cmd + "</span>\n";
+        output.scrollTop = output.scrollHeight;
+        input.value = '';
+        
+        try {
+            const res = await fetch('/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd })
+            });
+            const data = await res.json();
+            
+            if (data.output) {
+                output.innerHTML += "<span style='color:#e0e0e0;'>" + data.output + "</span>\n";
+            } else if (data.error) {
+                output.innerHTML += "<span style='color:#ff0000;'>" + data.error + "</span>\n";
+            }
+        } catch (e) {
+            output.innerHTML += "<span style='color:#ff0000;'>Failed to run command: " + e.message + "</span>\n";
+        }
+        output.scrollTop = output.scrollHeight;
+    }
 
 </script>
     <script>
@@ -1234,6 +1262,19 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
 </script>
+
+    <!-- TERMINAL PANEL -->
+    <div id="terminal-panel" style="display:none; position:fixed; bottom:0; left:0; right:0; width:100%; height:350px; background:#000; border-top: 2px solid #ff9d00; z-index:10000; flex-direction:column; padding:0;">
+        <div style="display:flex; justify-content:space-between; padding: 10px; background: #111; border-bottom: 1px solid #333;">
+            <span style="color:#ff9d00; font-weight:bold; font-family:'Roboto Mono', monospace;">ACESi Terminal</span>
+            <button onclick="document.getElementById('terminal-panel').style.display='none'" style="background:transparent;color:#ff9d00;border:none;cursor:pointer;font-weight:bold;">✕ Close</button>
+        </div>
+        <div id="terminal-output" style="flex:1; overflow-y:auto; color:#e0e0e0; font-family:'Roboto Mono', monospace; font-size:12px; white-space:pre-wrap; padding:10px; background:#000;"></div>
+        <div style="display:flex; padding: 10px; background: #111; border-top: 1px solid #333;">
+            <input type="text" id="terminal-input" placeholder="Type a command..." style="flex:1; background:#000; color:#e0e0e0; border:none; outline:none; padding:4px; font-family:'Roboto Mono', monospace; font-size:14px;" onkeydown="if(event.key === 'Enter') runTerminalCommand()">
+        </div>
+    </div>
+
 </body>
 </html>
 
