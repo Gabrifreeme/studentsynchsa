@@ -297,59 +297,6 @@ def save_conversation(role, content):
     c.execute("INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)", (datetime.now().isoformat(), role, content))
     conn.commit()
     conn.close()
-# ===== Context awareness (currently open file in the Explorer) =====
-import threading as _ctx_threading
-_CURRENT_CONTEXT = {'path': None, 'content': None, 'timestamp': None}
-_CURRENT_CONTEXT_LOCK = _ctx_threading.Lock()
-
-@app.route('/api/context/file', methods=['POST'])
-def api_context_file_set():
-    data = request.get_json(silent=True) or {}
-    path = data.get('path')
-    content = data.get('content')
-    append_to_chat = bool(data.get('append_to_chat', False))
-    if not path or not isinstance(path, str):
-        return jsonify({'ok': False, 'error': 'path required'}), 400
-    safe = _ide_path(path)
-    if not safe or not os.path.isfile(safe):
-        return jsonify({'ok': False, 'error': 'bad path'}), 400
-    if content is None:
-        try:
-            with open(safe, 'r', encoding='utf-8', errors='replace') as f:
-                content = f.read()
-        except Exception as e:
-            return jsonify({'ok': False, 'error': str(e)}), 500
-    snippet = content if len(content) <= 8000 else content[:8000] + '\n... [truncated]'
-    ts = datetime.now().isoformat()
-    with _CURRENT_CONTEXT_LOCK:
-        _CURRENT_CONTEXT['path'] = path
-        _CURRENT_CONTEXT['content'] = snippet
-        _CURRENT_CONTEXT['timestamp'] = ts
-    if append_to_chat:
-        try:
-            save_conversation('system', f"[context] currently open file: {path}")
-        except Exception:
-            pass
-    return jsonify({'ok': True, 'path': path, 'timestamp': ts, 'length': len(content)})
-
-@app.route('/api/context/file', methods=['GET'])
-def api_context_file_get():
-    with _CURRENT_CONTEXT_LOCK:
-        snapshot = dict(_CURRENT_CONTEXT)
-    return jsonify({'ok': True, 'context': snapshot})
-
-@app.route('/api/context/prompt', methods=['GET'])
-def api_context_prompt():
-    with _CURRENT_CONTEXT_LOCK:
-        snapshot = dict(_CURRENT_CONTEXT)
-    if not snapshot.get('path'):
-        return jsonify({'ok': True, 'prompt': ''})
-    prompt = (
-        f"Currently open file: {snapshot['path']}\n"
-        f"```\n{snapshot['content']}\n```\n"
-    )
-    return jsonify({'ok': True, 'prompt': prompt, 'path': snapshot['path']})
-
 # ===== Memory (facts I hold about Chris) =====
 def get_memories():
     conn = sqlite3.connect('ace_memory.db')
@@ -4079,6 +4026,9 @@ def chat():
     user_message = data.get('message', '')
     requested_model = data.get('model', '')
     requested_provider = data.get('provider', '')
+        # Inject the currently open file from context awareness
+    if _CURRENT_CONTEXT.get('path'):
+        user_message = f"System Context: I am currently looking at the file '{_CURRENT_CONTEXT['path']}'. Here is its content:\n```\n{_CURRENT_CONTEXT['content']}\n```\n\nMy message: {user_message}"
     # E-STOP: kill mode = total silence. No conversation saved, no model touched.
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
