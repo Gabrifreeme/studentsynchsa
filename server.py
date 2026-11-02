@@ -11821,9 +11821,6 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
     # made every /opencode task look like "all providers are down". Restrict to the
     # task's domain tools first, then trim further if still over budget.
     # ── FORCE LOCAL OLLAMA IF SELECTED ──
-    if requested_provider == 'ollama' or (requested_model and 'qwen2.5' in requested_model):
-        print(f"🦙 Forcing Local Ollama model: {requested_model}")
-
     tools_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names) if allowed_names else TOOLS_SCHEMA
     tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
 
@@ -12168,9 +12165,6 @@ def auto_fix_stream():
         ]
         fixed_code = None
         # If a local model was requested, skip the cloud providers completely
-        if requested_model and 'qwen' in requested_model:
-            providers = []
-        else:
             providers = [
                 ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
