@@ -437,20 +437,33 @@ document.addEventListener("DOMContentLoaded", function() {
                 fileDiv.style.color = "#ff9d00";
                 
                 // Add click event to load file content later
-                fileDiv.onclick = function() {
+                                fileDiv.onclick = function() {
                     console.log("Clicked file: " + file);
                     window.currentFile = file;
+                    
+                    // 1. Load the file content into the editor
                     fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(file))
                         .then(function(res) { return res.text(); })
                         .then(function(fileData) {
-                            document.getElementById('code-editor').value = fileData;                            fetch('http://127.0.0.1:5000/api/context/file', {
+                            document.getElementById('code-editor').value = fileData;
+                            if (window.aceEditorRefresh) window.aceEditorRefresh();
+                            
+                            // 2. Send context. If Shift is held, PIN it. Otherwise, replace context.
+                            fetch('http://127.0.0.1:5000/api/context/file', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ path: file, content: fileData, append_to_chat: false })
+                                body: JSON.stringify({ 
+                                    path: file, 
+                                    content: fileData, 
+                                    pin: window.event ? window.event.shiftKey : false 
+                                })
+                            }).then(res => res.json()).then(data => {
+                                if (data.pinned_count > 1) {
+                                    console.log('Pinned files:', data.pinned_count);
+                                }
                             }).catch(function(err) {
                                 console.warn('Context POST failed (non-fatal):', err);
                             });
-                            if (window.aceEditorRefresh) window.aceEditorRefresh();
                         })
                         .catch(function(err) {
                             alert("Failed to load file: " + err.message);

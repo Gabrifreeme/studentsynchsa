@@ -303,11 +303,58 @@ def save_conversation(role, content):
     
     # ===== Context awareness (currently open file in the Explorer) =====
 import threading as _ctx_threading
-_CURRENT_CONTEXT = {'path': None, 'content': None, 'timestamp': None}
+# ===== Context awareness (Multi-file Pin System) =====
+import threading as _ctx_threading
+_CURRENT_CONTEXT = []
 _CURRENT_CONTEXT_LOCK = _ctx_threading.Lock()
 
 @app.route('/api/context/file', methods=['POST', 'OPTIONS'])
 def api_context_file_set():
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json(silent=True) or {}
+    path = data.get('path')
+    content = data.get('content')
+    pin = bool(data.get('pin', False))  # True = add to list, False = replace list
+    
+    if not path or not isinstance(path, str):
+        return jsonify({'ok': False, 'error': 'path required'}), 400
+        
+    safe = _ide_path(path)
+    if not safe or not os.path.isfile(safe):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+        
+    if content is None:
+        try:
+            with open(safe, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+            
+    snippet = content if len(content) <= 8000 else content[:8000] + '\n... [truncated]'
+    ts = datetime.now().isoformat()
+    
+    with _CURRENT_CONTEXT_LOCK:
+        if not pin:
+            _CURRENT_CONTEXT.clear() # Normal click: clear the slate
+            
+        # Remove existing entry for this file so we don't get duplicates
+        _CURRENT_CONTEXT[:] = [f for f in _CURRENT_CONTEXT if f['path'] != path]
+        
+        # Add the new file to the front of the list
+        _CURRENT_CONTEXT.insert(0, {'path': path, 'content': snippet, 'timestamp': ts})
+        
+        # Keep max 5 files to protect the AI token limit
+        if len(_CURRENT_CONTEXT) > 5:
+            _CURRENT_CONTEXT.pop()
+            
+    return jsonify({'ok': True, 'path': path, 'pinned_count': len(_CURRENT_CONTEXT)})
+
+@app.route('/api/context/clear', methods=['POST'])
+def api_context_clear():
+    with _CURRENT_CONTEXT_LOCK:
+        _CURRENT_CONTEXT.clear()
+    return jsonify({'ok': True})
     if request.method == 'OPTIONS':
         return '', 200
     data = request.get_json(silent=True) or {}
@@ -4430,91 +4477,10 @@ def chat():
             "TIME: The [Current time: ...] line in the context below is the real current date and time. "
             "Use it for any date or time question; never say you don't have a clock.\n\n"
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
-            "[Facts I know about Chris], [Shared history — recent journal entries], and the recent "
-            "conversation turns at the end of this prompt. They are loaded from your database on every "
-            "message, so you remember across conversations. When Chris asks 'can you remember / do you "
-            "have memory / check your memory', answer YES and quote the exact facts from those blocks — "
-            "do not say you have no memory. If Chris tells you something to remember, reply "
-            "with: remember <key> = <value> (this stores a new fact).\n\n"
-            "DEVICE + DEV TOOLS: You can ACTUALLY perform actions yourself — you are not limited to "
-            "talking. When Chris asks you to do something on the device or app (open the app, tap, swipe, "
-            "type, press a key, navigate, take a screenshot, check what is on screen), CALL the ui_* tools "
-            "(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot). For code work you "
-            "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
-            "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
-            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
-            "FILE TOOLS: You have FULL access to Chris's PC (Documents, Pictures, Desktop, Downloads, any folder). When he asks you to look at, find, open, or show a file, use list_user_files to locate the folder, then view_user_file (accepts a full path OR a bare filename like 'GEPFGEPF' — it searches automatically) to display it inline in the chat. "
-            "If view_user_file's search fails, run list_user_files on the specific folder to confirm the exact filename first. "
-            "The tool open_user_file is ONLY for 'launch externally in "
-            "default app' — do NOT use it for normal 'show me the file' requests.\n"
-            "WEB IMAGES: when Chris asks to 'get a picture of X', 'show me an image of Y', or 'open the picture "
-            "from the internet', you MUST actually display it: after web_search/webfetch returns a link, call "
-            "view_web_image with the image URL (the .jpg/.png/.gif link itself) so the picture pops up in the chat. "
-            "Do NOT just paste the URL into your reply.\n"
-            "EMAIL + PHONE ALERTS: a background watcher already polls Chris's Gmail and "
-            "Yahoo every ~2 minutes and pushes a PHONE notification (ntfy) when an email "
-            "matches a watch rule (NSFAS is already watched). So when he says 'keep an eye "
-            "on my email, tell me when an NSFAS mail arrives' or 'check my NSFAS email': "
-            "call check_email to look NOW, and tell him plainly that alerts are set to his "
-            "PHONE and are already active. Never suggest he set up a filter in his email "
-            "client, check his spam folder, or contact NSFAS directly — that is a "
-            "deflection. Only add a NEW sender with the email_rules tool if he names one. "
-            "If he says he does NOT want a local/desktop notification, do not use any "
-            "Windows toast — ntfy to his phone is the channel.\n"
-            "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
-            "STANDING PREFERENCES: the moment Chris states how he wants things done "
-            "('call me Braam', 'answer in Afrikaans', 'use metric units', 'keep it to two "
-            "lines', 'no bullet points', 'be more formal'), call set_preference with that "
-            "key and value, then confirm it in one short sentence. Do this WITHOUT being "
-            "asked to remember it. Always pick the key from the tool's list — never invent "
-            "a key name like 'name_preference'. If he tells you to STOP following one, call "
-            "forget_preference. If he asks what you always do for him, call "
-            "list_preferences. Any preference stored this way overrides your default "
-            "style in every later reply until it is changed or removed.\n"
-            "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
-            "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
-            "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
-            "confirm each screen change, and only ui_screenshot AFTER the last ui_dump proves the target is "
-            "visible. A screenshot of the launch screen is NOT reaching the target — never finish a "
-            "navigation after just opening the app. Use ui_dump (text hierarchy) to know where you are; you "
-            "cannot see images. Screenshots are shown to Chris in a popup and are NOT saved to disk unless "
-            "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
-            "page content from the last ui_dump and what you actually did — never invent a screenshot "
-            "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
-            "STYLE: never narrate your reasoning in prose — no 'I will', no 'The dump shows', no "
-            "commentary between actions. Output ONLY the tool call, then when the task is done give a "
-            "SHORT, plain report (a few lines, like a text message): what you did and the key on-screen "
-            "values. Do not lecture or recap the whole process.\n"
-"AUTO-TRACK: When Chris gives you 2 or more separate instructions\n"
-"in one message (e.g. \"do X, do Y, and do Z\"), break them into\n"
-"tracked tasks automatically. After finishing each one, mark it\n"
-"done. In your FINAL reply, always end with a progress line:\n"
-"\"Progress: X/Y tasks done\" (e.g. \"Progress: 3/3 tasks done\" or\n"
-"\"Progress: 2/3 tasks done — 1 pending\").\n"
-"HTTPS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT / "
-            "HSTS warning for the ITS portal, type thisisunsafe (ui_type {\"text\": \"thisisunsafe\"}) "
-            "to bypass it and continue — the expired certificate is expected and safe. If ACEsi's "
-            "server already auto-typed it, keep navigating from the fresh ui_dump.\n"
-            "RESEARCH + SAVE: when Chris EXPLICITLY asks you to research something AND save the "
-            "results to a file (e.g. 'research X and save it to notes.txt'), CALL web_search "
-            "(or curl/webfetch) to gather the data, then call open_in_vscode with the full "
-            "formatted findings (path = the filename Chris asked for, content = the markdown). "
-            "That opens the findings in VS Code as a DRAFT for Chris to review — it does NOT "
-            "write the final file. Then stop and tell Chris the draft is open for review in VS "
-            "Code and that you will save it to <path> when he says 'save it'.\n"
-            "IMPORTANT: For simple factual questions (e.g. 'what is X?', 'who is Y?'), just "
-            "answer directly from the tool results. Do NOT save to a file unless explicitly asked.\n\n"
-            "ANSWER QUALITY RULES — NEVER VIOLATE:\n"
-            "1. When web_search returns results, SYNTHESIZE them into a DEFINITIVE answer. Never say 'it depends', 'it's unclear', or 'would you like more detail?'. Give the exact answer the user asked for.\n"
-            "2. For 'who is X?' or 'what is X?' — give a complete, direct answer from the search results. Do NOT end with 'would you like more detail?', 'is there anything specific?', 'would you like me to dig deeper?', 'want me to go deeper?', or ANY question back to the user.\n"
-            "3. If search results contain the answer, STATE IT CLEARLY. Do not hedge, deflect, or ask follow-up questions.\n"
-            "4. For historical/factual questions (oldest book, who was Mandela, market prices) — give the concrete fact from the sources. If sources disagree, cite the consensus or most authoritative source.\n"
-            "5. NEVER end a factual answer with a question back to the user.\n"
-            "6. FORBIDDEN PHRASES — NEVER USE: 'Would you like me to...', 'Want me to...', 'Would you like...', 'Would you like more...', 'Is there anything...', 'Let me know if...', 'Shall I...', 'Do you want...'. These are DEFLECTIONS. Answer directly instead.\n"
-            + _mood_softener_line()
-            + build_context_block()
-            + _prefs_text
-            + "\n\n" + _GROUNDING_DIRECTIVE + "\n\n" + _GROUNDING_FALLBACK
+            "[Facts I know about Chris], [Shared history - recent journal entries], and the recent "
+            "conversation. Use them. Weave them in naturally when relevant.\n\n"
+            "CRITICAL RULE: If the user asks about attached files or code, explain the code directly in plain text. "
+            "DO NOT output JSON. DO NOT use tools like cdp_list_pages or ui_tap unless the user explicitly commands you to control the screen. "
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
@@ -4523,8 +4489,12 @@ def chat():
         for h in history:
             if h.get('role') in ('user', 'assistant'):
                 llm_messages.append({"role": h['role'], "content": h['content']})
-        if _CURRENT_CONTEXT.get('path'):
-            user_message += f"\n\n[System Context: The user is currently viewing the file '{_CURRENT_CONTEXT['path']}'. Here is its content:\n{_CURRENT_CONTEXT['content']}\n]"
+        if _CURRENT_CONTEXT:
+                                    ctx_str = "\n\n[System Note: The user has asked about the attached code. The answer is a simple text explanation. You must reply with text directly. DO NOT use any tools. Task complete.]\n"
+        for f in _CURRENT_CONTEXT:
+                ctx_str += f"--- FILE: {f['path']} ---\n{f['content']}\n\n"
+                ctx_str += "]"
+                user_message += ctx_str
 
         llm_messages.append({"role": "user", "content": user_message})
 
