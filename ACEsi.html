@@ -198,6 +198,13 @@
         .spinner { display: none; width: 16px; height: 16px; border: 2px solid #ff9d00; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+
+    <style>
+        select, select option {
+            font-family: Arial, sans-serif !important;
+        }
+    </style>
+
 </head>
 <body>
 
@@ -273,7 +280,7 @@
                 <div style="flex:1;">
                     <label style="display:block;margin-bottom:4px;font-size:11px;">Model</label>
                     <select id="settings-model" style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
-                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+                        
                         <option value="gpt-oss-20b">gpt-oss-20b</option>
                     </select>
                 </div>
@@ -468,7 +475,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var m = document.createElement('div');
         m.id = 'model-dropdown';
         m.style.cssText = 'position:absolute;bottom:40px;right:12px;background:#000;border:1px solid #ff9d00;padding:4px;z-index:9999;font-family:Roboto Mono,monospace;color:#ff9d00;';
-        var models = ['qwen2.5-coder:7b','gpt-oss-20b','llama-3.1-8b','deepseek-coder-v2','phi-3-mini','mistral-instruct'];
+        var models = ['>qwen2.5-coder:7b<','gpt-oss-20b','llama-3.1-8b','deepseek-coder-v2','phi-3-mini','mistral-instruct'];
         models.forEach(function(mm){
             var d = document.createElement('div');
             d.textContent = mm;

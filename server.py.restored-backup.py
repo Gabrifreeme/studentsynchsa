@@ -28,7 +28,7 @@ except Exception:
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "openai/gpt-oss-20b:free"
 OPENROUTER_FALLBACKS = [
