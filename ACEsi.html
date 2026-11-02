@@ -461,36 +461,51 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 
-       async function runTerminalCommand() {
+           async function runTerminalCommand() {
         const input = document.getElementById('terminal-input');
         const output = document.getElementById('terminal-output');
         const cmd = input.value.trim();
         
         if (!cmd) return;
         
-        // Print the command being run
-        output.innerHTML += "\n<span style='color:#ff9d00;'> > " + cmd + "</span>\n";
+        output.innerHTML += "<div><span style='color:#ff9d00;'>$ " + cmd + "</span></div>";
         output.scrollTop = output.scrollHeight;
         input.value = '';
         
-        try {
-            const res = await fetch('/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: cmd })
-            });
-            const data = await res.json();
-            
-            if (data.output) {
-                output.innerHTML += "<span style='color:#e0e0e0;'>" + data.output + "</span>\n";
-            } else if (data.error) {
-                output.innerHTML += "<span style='color:#ff0000;'>" + data.error + "</span>\n";
-            }
-        } catch (e) {
-            output.innerHTML += "<span style='color:#ff0000;'>Failed to run command: " + e.message + "</span>\n";
-        }
+        const runId = 'run-' + Date.now();
+        output.innerHTML += "<div id='" + runId + "' style='color:#888;'>Running...</div>";
         output.scrollTop = output.scrollHeight;
+
+        try {
+            const eventSource = new EventSource('/run_stream?cmd=' + encodeURIComponent(cmd));
+            
+            eventSource.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                
+                if (data.line) {
+                    output.innerHTML += "<div style='color:#e0e0e0; margin:0; font-family:monospace;'>" + data.line + "</div>";
+                } else if (data.done) {
+                    const indicator = document.getElementById(runId);
+                    if (indicator) indicator.innerHTML = "<span style='color:#00ff00; font-weight:bold;'>Done ❤️</span>";
+                    eventSource.close();
+                } else if (data.error) {
+                    output.innerHTML += "<div style='color:#ff0000;'>" + data.error + "</div>";
+                    eventSource.close();
+                }
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            eventSource.onerror = function() {
+                const indicator = document.getElementById(runId);
+                if (indicator) indicator.innerHTML = "<span style='color:#ff0000;'>Disconnected.</span>";
+                eventSource.close();
+            };
+            
+        } catch (e) {
+            output.innerHTML += "<span style='color:#ff0000;'>Failed to run command: " + e.message + "</span>";
+        }
     }
+
 
 </script>
     <script>
