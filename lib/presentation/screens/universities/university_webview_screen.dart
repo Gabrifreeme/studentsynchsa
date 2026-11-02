@@ -523,21 +523,6 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
               _controller.loadRequest(Uri.parse(_resolveInitialUrl()));
             },
           ),
-          IconButton(
-            tooltip: 'Toggle ACESi',
-            onPressed: () {
-              setState(() => showAcesi = !showAcesi);
-            },
-            icon: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('ACE', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
-                Text('si', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 10)),
-                Text('â€¿', style: TextStyle(color: Color(0xFFFF9D00), fontWeight: FontWeight.bold, height: 1.0, fontSize: 14)),
-              ],
-            ),
-          ),
         ],
       ),
       body: IndexedStack(
