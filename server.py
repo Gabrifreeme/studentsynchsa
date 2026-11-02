@@ -1,6 +1,9 @@
-﻿# -*- coding: utf-8 -*-
+﻿
+
+# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
+_CURRENT_CONTEXT = {}
 import requests
 import json
 import base64
@@ -297,6 +300,37 @@ def save_conversation(role, content):
     c.execute("INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)", (datetime.now().isoformat(), role, content))
     conn.commit()
     conn.close()
+    
+    # ===== Context awareness (currently open file in the Explorer) =====
+import threading as _ctx_threading
+_CURRENT_CONTEXT = {'path': None, 'content': None, 'timestamp': None}
+_CURRENT_CONTEXT_LOCK = _ctx_threading.Lock()
+
+@app.route('/api/context/file', methods=['POST', 'OPTIONS'])
+def api_context_file_set():
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json(silent=True) or {}
+    path = data.get('path')
+    content = data.get('content')
+    if not path or not isinstance(path, str):
+        return jsonify({'ok': False, 'error': 'path required'}), 400
+    safe = _ide_path(path)
+    if not safe or not os.path.isfile(safe):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    if content is None:
+        try:
+            with open(safe, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+    snippet = content if len(content) <= 8000 else content[:8000] + '\n... [truncated]'
+    ts = datetime.now().isoformat()
+    with _CURRENT_CONTEXT_LOCK:
+        _CURRENT_CONTEXT['path'] = path
+        _CURRENT_CONTEXT['content'] = snippet
+        _CURRENT_CONTEXT['timestamp'] = ts
+    return jsonify({'ok': True, 'path': path, 'timestamp': ts, 'length': len(content)})
 # ===== Memory (facts I hold about Chris) =====
 def get_memories():
     conn = sqlite3.connect('ace_memory.db')
@@ -4026,10 +4060,7 @@ def chat():
     user_message = data.get('message', '')
     requested_model = data.get('model', '')
     requested_provider = data.get('provider', '')
-        # Inject the currently open file from context awareness
-    if _CURRENT_CONTEXT.get('path'):
-        user_message = f"System Context: I am currently looking at the file '{_CURRENT_CONTEXT['path']}'. Here is its content:\n```\n{_CURRENT_CONTEXT['content']}\n```\n\nMy message: {user_message}"
-    # E-STOP: kill mode = total silence. No conversation saved, no model touched.
+  
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
     save_conversation("user", user_message)
@@ -4492,6 +4523,9 @@ def chat():
         for h in history:
             if h.get('role') in ('user', 'assistant'):
                 llm_messages.append({"role": h['role'], "content": h['content']})
+        if _CURRENT_CONTEXT.get('path'):
+            user_message += f"\n\n[System Context: The user is currently viewing the file '{_CURRENT_CONTEXT['path']}'. Here is its content:\n{_CURRENT_CONTEXT['content']}\n]"
+
         llm_messages.append({"role": "user", "content": user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
