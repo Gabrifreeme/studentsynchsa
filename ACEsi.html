@@ -461,21 +461,18 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 
-           async function runTerminalCommand() {
+                  async function runTerminalCommand() {
         const input = document.getElementById('terminal-input');
         const output = document.getElementById('terminal-output');
         const cmd = input.value.trim();
         
         if (!cmd) return;
         
-        output.innerHTML += "<div><span style='color:#ff9d00;'>$ " + cmd + "</span></div>";
+        // Print the command with a smiley
+        output.innerHTML += "<div><span style='color:#ff9d00;'>😊 " + cmd + "</span></div>";
         output.scrollTop = output.scrollHeight;
         input.value = '';
         
-        const runId = 'run-' + Date.now();
-        output.innerHTML += "<div id='" + runId + "' style='color:#888;'>Running...</div>";
-        output.scrollTop = output.scrollHeight;
-
         try {
             const eventSource = new EventSource('/run_stream?cmd=' + encodeURIComponent(cmd));
             
@@ -485,8 +482,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data.line) {
                     output.innerHTML += "<div style='color:#e0e0e0; margin:0; font-family:monospace;'>" + data.line + "</div>";
                 } else if (data.done) {
-                    const indicator = document.getElementById(runId);
-                    if (indicator) indicator.innerHTML = "<span style='color:#00ff00; font-weight:bold;'>Done ❤️</span>";
+                    output.innerHTML += "<div style='color:#00ff00; font-weight:bold;'>Done ❤️</div>";
                     eventSource.close();
                 } else if (data.error) {
                     output.innerHTML += "<div style='color:#ff0000;'>" + data.error + "</div>";
@@ -496,8 +492,8 @@ document.addEventListener("DOMContentLoaded", function() {
             };
             
             eventSource.onerror = function() {
-                const indicator = document.getElementById(runId);
-                if (indicator) indicator.innerHTML = "<span style='color:#ff0000;'>Disconnected.</span>";
+                // If the connection drops, show the heart anyway!
+                output.innerHTML += "<div style='color:#00ff00; font-weight:bold;'>Done ❤️</div>";
                 eventSource.close();
             };
             
