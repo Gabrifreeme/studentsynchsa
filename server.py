@@ -13900,4 +13900,11 @@ def run_stream():
     return Response(generate(), mimetype='text/event-stream')
 
 
+
+@app.route('/restart', methods=['POST'])
+def restart_server():
+    import subprocess
+    subprocess.Popen("restart_server.bat", shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+    return jsonify({"status": "restarting"})
+
 app.run(host='127.0.0.1', port=5000, debug=False)
