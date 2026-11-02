@@ -443,7 +443,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(file))
                         .then(function(res) { return res.text(); })
                         .then(function(fileData) {
-                            document.getElementById('code-editor').value = fileData;
+                            document.getElementById('code-editor').value = fileData;                            fetch('http://127.0.0.1:5000/api/context/file', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: file, content: fileData, append_to_chat: false })
+                            }).catch(function(err) {
+                                console.warn('Context POST failed (non-fatal):', err);
+                            });
                             if (window.aceEditorRefresh) window.aceEditorRefresh();
                         })
                         .catch(function(err) {
