@@ -959,18 +959,16 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   ${addFloatingStar ? '''
   // Floating star button injected into the page
-  (function() {
-    if (document.getElementById('ssa-star')) return;
-    var star = document.createElement('div');
-    star.id = 'ssa-star';
-    star.innerHTML = '⭐';
-    star.title = 'Star Auto-Fill';
-    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
-      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
-      + 'color:#FFD700;font-size:32px;user-select:none;';
-    star.onclick = doAutofill;
+     // Floating star button injected into the page (DISABLED)
+    /*
+    (function() {
+      if (document.getElementById('ssa-star')) return;
+      var star = document.createElement('div');
+      star.id = 'ssa-star';
+      star.innerHTML = '⭐';
+      // ... (the rest of the block)
+      }
+    */
     function tryAppend() {
       if (document.body) document.body.appendChild(star);
       else setTimeout(tryAppend, 300);
