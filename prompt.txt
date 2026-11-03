@@ -1,5 +1,14 @@
-"The AutoFix modal is perfect. I need one last feature: I want to be able to easily paste code into the left panel (#autofix-panel-original).
+"The modal layout and colors are perfect. But when I paste code into the left panel and click 'Fix Code', it says 'No code provided'.
 
-Please add a 'Paste' button right above the left panel (or inside the modal header). When clicked, it should use the Clipboard API (navigator.clipboard.readText()) to read the user's clipboard and put the text directly into the left panel.
+The issue is that the applyAutoFix() function is not reading the code from the visible left panel.
 
-Also, ensure that the left panel is a standard <textarea> (or has contenteditable="true") so I can also paste using Ctrl+V if I want to. Make it look clean and match the dark theme."
+Please fix the JavaScript in ACEsi.html:
+
+Update applyAutoFix() so it grabs the code directly from the visible left panel element.
+
+Ensure the 'Paste' button actually pastes clipboard text into that same visible left panel.
+
+Ensure the highlightDiff() function puts the fixed code into the right panel correctly.
+
+Do not change the layout or the colors, just fix the data flow so the button reads the code and the AI fixes it."**
+

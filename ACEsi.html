@@ -1272,8 +1272,9 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function applyAutoFix() {
-        // Grab from the main editor
-        const code = document.getElementById('code-editor').value;
+        // Grab from the visible left panel
+        const leftPanel = document.getElementById('autofix-panel-original');
+        const code = leftPanel ? leftPanel.innerText.replace(/^Original\n?/, '').trim() : '';
         
         if (!code.trim()) {
             document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">No code provided.</span>';
