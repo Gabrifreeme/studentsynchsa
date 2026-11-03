@@ -654,12 +654,12 @@ document.addEventListener("DOMContentLoaded", function() {
         <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;padding-top:10px;padding-bottom:10px;font-family:'Roboto Mono',monospace;color:#ff9d00;width:90%;max-width:500px;max-height:80%;overflow:auto;margin:auto;">
             <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors <button onclick="pasteToLeftPanel()" style="margin-left:8px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:10px;font-family:monospace;cursor:pointer;">Paste</button></div>
             <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
-            <div id="autofix-diff" style="display: flex; gap: 10px; margin-top: 10px;">
-                <div id="autofix-panel-original" contenteditable="true" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #ff8080;">
+            <div id="autofix-diff" style="display: flex; gap: 10px; margin-top: 10px; width: 100%;">
+                <div id="autofix-panel-original" contenteditable="true" style="flex: 1; width: 50%; height: 500px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 14px; white-space: pre; box-sizing: border-box; color: #ff8080; text-align: left;">
                     <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Original</div>
                     <span id="autofix-original-code" style="color: #4a0000;"></span>
                 </div>
-                <div id="autofix-panel-fixed" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #00ff00;">
+                <div id="autofix-panel-fixed" style="flex: 1; width: 50%; height: 500px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 14px; white-space: pre; box-sizing: border-box; color: #00ff00; text-align: left;">
                     <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Fixed</div>
                    <span id="autofix-fixed-code" style="color: #00ff00;"></span>
                 </div>

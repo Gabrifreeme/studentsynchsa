@@ -1,14 +1,12 @@
-"The modal layout and colors are perfect. But when I paste code into the left panel and click 'Fix Code', it says 'No code provided'.
+"The AutoFix modal is working perfectly now. However, the code panels are too small and squished in the middle.
 
-The issue is that the applyAutoFix() function is not reading the code from the visible left panel.
+Please adjust the CSS in ACEsi.html so that the side-by-side code panels fill the entire width of the modal.
 
-Please fix the JavaScript in ACEsi.html:
+Make sure the container holding the two panels (#autofix-diff or the grid container) has width: 100% and display: flex (or grid with 1fr 1fr).
 
-Update applyAutoFix() so it grabs the code directly from the visible left panel element.
+Make sure the panels themselves have flex: 1 and width: 50%.
 
-Ensure the 'Paste' button actually pastes clipboard text into that same visible left panel.
+Increase the height of the panels from 300px to 400px or 500px so there is more room to read the code.
 
-Ensure the highlightDiff() function puts the fixed code into the right panel correctly.
-
-Do not change the layout or the colors, just fix the data flow so the button reads the code and the AI fixes it."**
+Ensure the font size is slightly larger (e.g., 14px) and the text is left-aligned, not centered."**
 
