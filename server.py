@@ -4479,8 +4479,10 @@ def chat():
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
             "[Facts I know about Chris], [Shared history - recent journal entries], and the recent "
             "conversation. Use them. Weave them in naturally when relevant.\n\n"
-            "CRITICAL RULE: If the user asks about attached files or code, explain the code directly in plain text. "
-            "DO NOT output JSON. DO NOT use tools like cdp_list_pages or ui_tap unless the user explicitly commands you to control the screen. "
+                        "If the user asks you to EXPLAIN code, answer in plain text. "
+            "If the user asks you to FIX or EDIT code, you MUST output the ENTIRE corrected file inside a standard markdown block. "
+            "DO NOT use any tools. DO NOT output JSON."
+                        "If I ask you to fix or edit code, output the ENTIRE corrected file inside a standard markdown block like this: ```dart\n<code here>\n```. Do NOT use any tools. Do NOT output JSON."
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
