@@ -1,11 +1,16 @@
-"The layout is perfect, but the code is not showing up in the panels, and I can't type into them. I suspect you made the #autofix-panel-original and #autofix-panel-fixed elements into <textarea> tags instead of <div> tags.
+"I need to fix the text brightness in the AutoFix modal inside ACEsi.html.
 
-Please fix this by:
+Currently, when the AutoFix modal opens, the code in both the left panel (#autofix-panel-original) and the right panel (#autofix-panel-fixed) is very dark and hard to read against the black background. The right panel is using a dark green (#003300) and the left is using a dark red.
 
-Changing the HTML for #autofix-panel-original and #autofix-panel-fixed to be <div> elements instead of <textarea>.
+Please make these specific changes to ACEsi.html:
 
-Updating the highlightDiff() JavaScript function so it uses innerHTML or textContent to put the code into those divs, and correctly applies the #4a0000 (red) and #003300 (green) background colors to the changed lines.
+HTML (Left Panel): Find the <textarea> or <div> with id="autofix-panel-original". Ensure its CSS color is set to #ffffff (bright white).
 
-Ensuring the panels still have height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace;.
+HTML (Right Panel): Find the element with id="autofix-panel-fixed". Change its CSS color to #00ff00 (bright neon green).
 
-Also, make sure the applyAutoFix() function is actually calling highlightDiff(code, d.fixed_code) so the text appears."**
+JavaScript (highlightDiff function): When the function injects the lines into the right panel, make sure it applies color: #00ff00 to the text, and only uses background: #003300 (dark green) for the highlight of the changed lines. The text itself must be bright.
+
+JavaScript (highlightDiff function): When injecting lines into the left panel, make sure the text color is #ff9d00 (bright ACESi orange) or #ffffff, and only use background: #4a0000 (dark red) for the highlight.
+
+The goal is: Bright text on dark highlights, not dark text everywhere. Please give me the exact replacement lines."
+

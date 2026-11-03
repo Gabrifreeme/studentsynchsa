@@ -381,8 +381,9 @@
             <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <button id="search-btn" class="btn" title="Find text or line (Ctrl+F)" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="editorSearchOpen()">Search</button>
                 <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
-                <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-code').value='';document.getElementById('autofix-result').innerHTML='';document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
-                <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+                            <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
+            <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+            <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
                 <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
             </div>
             </div>
@@ -654,13 +655,13 @@ document.addEventListener("DOMContentLoaded", function() {
             <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
             <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
             <div id="autofix-diff" style="display: flex; gap: 10px; margin-top: 10px;">
-                <div id="autofix-panel-original" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #4a0000;">
+                <div id="autofix-panel-original" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #ffffff;">
                     <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Original</div>
                     <span id="autofix-original-code" style="color: #4a0000;"></span>
                 </div>
-                <div id="autofix-panel-fixed" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #003300;">
+                <div id="autofix-panel-fixed" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #00ff00;">
                     <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Fixed</div>
-                    <span id="autofix-fixed-code" style="color: #003300;"></span>
+                   <span id="autofix-fixed-code" style="color: #00ff00;"></span>
                 </div>
             </div>
             <div id="autofix-code-container" style="margin-top: 10px; display: none;">
@@ -1327,18 +1328,18 @@ document.addEventListener("DOMContentLoaded", function() {
             // Left side (Original)
             const leftDiv = document.createElement('div');
             leftDiv.textContent = oLine || ' ';
+            leftDiv.style.color = '#ff9d00'; // Bright orange for all left lines
             if (oLine !== fLine) {
-                leftDiv.style.background = '#4a0000'; // Dark Red
-                leftDiv.style.color = '#ff8080';
+                leftDiv.style.background = '#4a0000'; // Dark red background only for changed lines
             }
             leftPanel.appendChild(leftDiv);
 
             // Right side (Fixed)
             const rightDiv = document.createElement('div');
             rightDiv.textContent = fLine || ' ';
+            rightDiv.style.color = '#00ff00'; // Bright green for all right lines
             if (oLine !== fLine) {
-                rightDiv.style.background = '#003300'; // Dark Green
-                rightDiv.style.color = '#80ff80';
+                rightDiv.style.background = '#003300'; // Dark green background only for changed lines
             }
             rightPanel.appendChild(rightDiv);
         }
