@@ -4583,9 +4583,9 @@ def autofix():
     msgs = [{
         "role": "user",
         "content": (
-            "You are a code repair assistant. Fix the syntax errors in the "
-            "code below. Return ONLY the complete corrected code, with no "
-            "explanations, no markdown fences and no shell commands.\n\n"
+                        "You are an expert developer. I will provide you with a file. Fix any bugs, improve the code, or apply the request if one is present. "
+            "CRITICAL: You must return the ENTIRE, complete file including all original imports, comments, and structure. "
+            "Do not delete any existing imports or classes. Return ONLY the code, no markdown fences, no explanations.\n\n"
             "CODE:\n" + code
         ),
     }]
@@ -4608,6 +4608,22 @@ def autofix():
             continue
         fixed = _strip_code_fences(reply)
         if fixed:
+            filename = data.get('filename')
+            if filename:
+                try:
+                    full_path = _ide_path(filename)
+                    if full_path:
+                        with open(full_path, 'w', encoding='utf-8') as f:
+                            f.write(fixed)
+                        print(f"💾 Auto Fix saved to {filename}")
+                except Exception as e:
+                    print(f"Failed to save autofix: {e}")
+
+            return jsonify({"ok": True, "fixed_code": fixed, "provider": name})
+            
+        tried.append("%s: no code in reply" % name)
+        if fixed:
+            
             return jsonify({"ok": True, "fixed_code": fixed, "provider": name})
         tried.append("%s: no code in reply" % name)
 
