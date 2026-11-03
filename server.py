@@ -4583,9 +4583,9 @@ def autofix():
     msgs = [{
         "role": "user",
         "content": (
-                        "You are an expert developer. I will provide you with a file. Fix any bugs, improve the code, or apply the request if one is present. "
-            "CRITICAL: You must return the ENTIRE, complete file including all original imports, comments, and structure. "
-            "Do not delete any existing imports or classes. Return ONLY the code, no markdown fences, no explanations.\n\n"
+                                    "You are a strict code formatter. You MUST output the ENTIRE file from the first line (imports) to the last line. "
+            "Do NOT truncate. Do NOT omit imports. If you omit any part of the file, the system will crash. "
+            "Fix the syntax errors, but return the complete 100% original file with your fix applied. Return ONLY the code.\n\n"
             "CODE:\n" + code
         ),
     }]
