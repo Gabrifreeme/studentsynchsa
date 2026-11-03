@@ -655,7 +655,7 @@ document.addEventListener("DOMContentLoaded", function() {
             <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
             <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
             <div id="autofix-diff" style="display: flex; gap: 10px; margin-top: 10px;">
-                <div id="autofix-panel-original" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #ffffff;">
+                <div id="autofix-panel-original" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #ff8080;">
                     <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Original</div>
                     <span id="autofix-original-code" style="color: #4a0000;"></span>
                 </div>
@@ -1328,7 +1328,7 @@ document.addEventListener("DOMContentLoaded", function() {
             // Left side (Original)
             const leftDiv = document.createElement('div');
             leftDiv.textContent = oLine || ' ';
-            leftDiv.style.color = '#ff9d00'; // Bright orange for all left lines
+            leftDiv.style.color = '#ff8080'; // Bright red for all left lines
             if (oLine !== fLine) {
                 leftDiv.style.background = '#4a0000'; // Dark red background only for changed lines
             }
