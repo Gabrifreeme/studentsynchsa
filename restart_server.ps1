@@ -56,6 +56,19 @@ function Stop-Listener {
 Write-Host "==> stopping any listener on port $Port"
 $old = Stop-Listener
 
+# Stop-Process is deliberately quiet, so a refused stop (the server runs
+# elevated and this shell does not) would otherwise look like success. Rotating
+# logs here would then fail too, because the surviving process still holds them
+# open - so say what actually happened and leave the working server alone.
+$still = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+if ($still) {
+  $owner = ($still | Select-Object -First 1).OwningProcess
+  Write-Host "!! port $Port is still held by pid $owner - the stop was refused." -ForegroundColor Red
+  Write-Host "   That process is running elevated. End python.exe from Task Manager" -ForegroundColor Red
+  Write-Host "   (Run as administrator), then start the server from a normal terminal." -ForegroundColor Red
+  exit 1
+}
+
 if (-not $NoRotate) {
   # Append-only logs grow without bound (the access log alone hit 69 KB in
   # minutes), and a fresh file makes "is the banner there?" unambiguous.
@@ -76,22 +89,41 @@ Write-Host "    stderr -> $err  (Werkzeug access log; app errors appear here too
 # here too so anything it shells out to inherits it.
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
+$runStart = Get-Date
 Start-Process -FilePath $Python -ArgumentList 'server.py' `
   -WorkingDirectory $Root `
   -RedirectStandardOutput $out `
   -RedirectStandardError $err `
   -WindowStyle Hidden | Out-Null
 
+# Only accept a NEW process. A listener that survived Stop-Listener (because it
+# runs elevated and this shell cannot stop it) must not be reported as "UP":
+# that is exactly how a failed restart looked successful.
 $new = $null
+$blocker = $null
 for ($i = 0; $i -lt 120; $i++) {
   $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-  if ($c) { $new = $c[0].OwningProcess; break }
+  if ($c) {
+    $cand = $c[0].OwningProcess
+    $candStart = (Get-Process -Id $cand -ErrorAction SilentlyContinue).StartTime
+    if ($old -notcontains $cand -and $candStart -and $candStart -ge $runStart) {
+      $new = $cand
+      break
+    }
+    $blocker = $cand
+  }
   Start-Sleep -Milliseconds 500
 }
 
 if (-not $new) {
-  Write-Host "!! FAILED to bind port $Port within 60s. Last 20 stderr lines:" -ForegroundColor Red
-  if (Test-Path $err) { Get-Content $err -Tail 20 | ForEach-Object { "   $_" } }
+  if ($blocker) {
+    Write-Host "!! port $Port is still held by pid $blocker, which survived the stop." -ForegroundColor Red
+    Write-Host "   It is probably running elevated; stop it from an elevated shell or Task Manager," -ForegroundColor Red
+    Write-Host "   then start the server again from a normal (non-admin) terminal." -ForegroundColor Red
+  } else {
+    Write-Host "!! FAILED to bind port $Port within 60s. Last 20 stderr lines:" -ForegroundColor Red
+    if (Test-Path $err) { Get-Content $err -Tail 20 | ForEach-Object { "   $_" } }
+  }
   exit 1
 }
 

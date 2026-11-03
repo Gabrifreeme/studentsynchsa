@@ -234,6 +234,7 @@
             <div style="font-size:10px;color:#ff9d00;margin-bottom:4px;">System & Maintenance</div>
             <label style="display:block;margin:4px 0;"><input type="checkbox" value="adb devices"> adb devices</label>
             <label style="display:block;margin:4px 0;"><input type="checkbox" value="git status"> git status</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="git commit"> git commit</label>
             <label style="display:block;margin:4px 0;"><input type="checkbox" value="explorer ."> Open Project Folder</label>
             
         </div>
@@ -349,7 +350,7 @@
         <!-- Chat Panel -->
         <div id="chat-panel" class="panel" style="width:33%;">
             <div class="panel-header">CONVERSATION</div>
-            <div id="chat-messages" style="flex:1;overflow-y:auto;padding:10px;"><div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> Hi Chris. I'm here. Ready to fix your project.</div></div>
+            <div id="chat-messages" style="flex:1;overflow-y:auto;padding:10px;"><div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> <span id="ace-greeting">Chris, I'm here. Active and ready.</span><span id="ace-session" style="display:block;color:#9a9a9a;font-size:12px;margin-top:4px;white-space:pre-line;"></span></div></div>
             <div id="response-timer" style="text-align:center;font-size:12px;color:#ff9d00;margin-bottom:4px;height:16px;font-weight:bold;"></div>
             <div style="display:flex;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
                 <input id="chat-input" type="text" placeholder="Ask ACEsi..." style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
@@ -1374,8 +1375,69 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
     </div>
 
-</body>
-</html>
+    <script>
+    // Opening line: name the last real change in this project instead of a canned
+    // "Ready and waiting". The text comes from /api/last_edit, which reads git (the
+    // last commit, or newer uncommitted edits). If the endpoint is unreachable the
+    // static sentence already in the markup stays, so the panel is never blank.
+    (function () {
+        var FALLBACK = "Chris, I'm here. Ready and waiting.";
+
+        function greetingText() {
+            var e = window.__lastEdit;
+            if (!e || !e.ok || !e.phrase) return FALLBACK;
+            var s = 'Chris, our last change was ' + e.phrase + '.';
+            // Say whether the server is actually running that change. Without this
+            // the line is only a description of the disk, not of what is live.
+            if (e.runtime_note) s += ' ' + e.runtime_note + '.';
+            // And what the current stretch of work has been, rebuilt from commits,
+            // chat and saves - so a long session is not invisible.
+            if (e.session_note) s += ' ' + e.session_note + '.';
+            return s;
+        }
+
+        // Second line: what this stretch of work has been, and the last long one.
+        // Rebuilt server-side from commits + chat + saves, not from memory.
+        function sessionText() {
+            var e = window.__lastEdit;
+            if (!e || !e.ok) return '';
+            var parts = [];
+            if (e.session_note) parts.push(e.session_note);
+            if (e.prior_note) parts.push(e.prior_note);
+            return parts.join('\n');
+        }
+
+        function renderGreeting() {
+            var els = document.querySelectorAll('#ace-greeting');
+            for (var i = 0; i < els.length; i++) {
+                els[i].textContent = greetingText();
+                var box = els[i].parentNode;
+                var sess = box ? box.querySelector('#ace-session') : null;
+                if (sess) sess.textContent = sessionText();
+                if (window.__lastEdit && window.__lastEdit.detail) {
+                    els[i].title = window.__lastEdit.detail;
+                    if (sess) sess.title = window.__lastEdit.detail;
+                }
+            }
+        }
+
+        window.aceGreetingText = greetingText;
+        window.aceGreetingHtml = function () {
+            return '<span id="ace-greeting">' + escapeHtml(greetingText()) + '</span>' +
+                '<span id="ace-session" style="display:block;color:#9a9a9a;font-size:12px;' +
+                'margin-top:4px;white-space:pre-line;">' + escapeHtml(sessionText()) + '</span>';
+        };
+        window.aceLoadLastEdit = function () {
+            fetch('/api/last_edit', { cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { window.__lastEdit = d; renderGreeting(); })
+                .catch(function () { /* keep the static line */ });
+        };
+
+        window.aceLoadLastEdit();
+        document.addEventListener('DOMContentLoaded', window.aceLoadLastEdit);
+    })();
+    </script>
 
 
 

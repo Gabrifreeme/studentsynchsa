@@ -76,6 +76,8 @@ emails.json
 email_notify_rules.local.json
 server_stdout.txt
 server_stderr.txt
+server_stdout.txt.*
+server_stderr.txt.*
 
 ace_memory.json
 
