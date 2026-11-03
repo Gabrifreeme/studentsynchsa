@@ -213,6 +213,10 @@ def init_db():
     c.execute('CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)')
+    # One row per file save: the raw material for "what did we work on last
+    # night?". Git knows the current diff, but only this table knows *when*
+    # each individual save happened.
+    c.execute('CREATE TABLE IF NOT EXISTS change_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, path TEXT, line INTEGER, added INTEGER, removed INTEGER, source TEXT, note TEXT)')
     conn.commit()
     conn.close()
 
@@ -2267,6 +2271,708 @@ def build_context_block(light=False):
     return _ctx_text
 
 LAST_FILE_PATH = None
+
+
+# ===== "What did we last do?" for the opening greeting =====
+# The chat greeted every session with the same canned "I'm here. Ready and
+# waiting." That is stale the moment work happens. Instead the greeting asks
+# the repo: the last commit when the tree is clean, or the uncommitted edits
+# when they are newer than that commit. Cached briefly, because the UI asks on
+# every page load and again after "Clear history".
+_LAST_EDIT_CACHE = {"at": 0.0, "value": None}
+_LAST_EDIT_TTL_S = 10.0
+
+# Runtime logs are rewritten on every restart. They are not edits, and letting
+# them win "newest" would greet every session with a log rotation.
+_LOG_PATH_RE = re.compile(r"^server_(stdout|stderr)\.txt(\.|$)")
+
+# This process's own identity. A greeting must not call a change "live" when
+# the file was written after this process started: that code is on disk, not in
+# memory. Comparing mtimes to this timestamp is how we know the difference.
+_SERVER_START_TS = time.time()
+_SERVER_PID = os.getpid()
+
+
+def _git_out(args, timeout=10):
+    """Run git in the project root; return stdout, or '' on any failure.
+
+    Only trailing newlines are trimmed: `git status --porcelain` starts each
+    line with a space for unstaged entries, and `.strip()` would eat the status
+    column of the first line, shifting every path by one character.
+    """
+    try:
+        r = subprocess.run(["git"] + args, cwd=PROJECT_ROOT,
+                           capture_output=True, text=True, timeout=timeout,
+                           encoding="utf-8", errors="replace")
+        return (r.stdout or "").rstrip("\r\n") if r.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def _rel_time(seconds):
+    """'8 minutes ago' / '2 days ago' - readable, never a raw timestamp."""
+    seconds = max(0, int(seconds))
+    if seconds < 90:
+        return "just now"
+    if seconds < 3600:
+        n = seconds // 60
+        return "%d minute%s ago" % (n, "" if n == 1 else "s")
+    if seconds < 86400:
+        n = seconds // 3600
+        return "%d hour%s ago" % (n, "" if n == 1 else "s")
+    n = seconds // 86400
+    return "%d day%s ago" % (n, "" if n == 1 else "s")
+
+
+def _numstat_path(path):
+    """Resolve the new name from git's `old => new` / `dir/{a => b}/f` forms."""
+    path = path.strip()
+    if " => " not in path:
+        return path
+    if "{" in path and "}" in path:
+        pre, rest = path.split("{", 1)
+        mid, post = rest.split("}", 1)
+        if " => " in mid:
+            return pre + mid.split(" => ", 1)[1] + post
+    return path.split(" => ", 1)[1]
+
+
+def _parse_numstat(text):
+    """Parse `--numstat` output into {new_path: (added, removed)}.
+
+    Binary files have '-' where the counts belong; they map to (None, None).
+    """
+    stats = {}
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        added, removed, path = parts
+        stats[_numstat_path(path)] = (
+            int(added) if added.isdigit() else None,
+            int(removed) if removed.isdigit() else None,
+        )
+    return stats
+
+
+def _first_changed_lines(diff_text):
+    """Map new-file path -> first changed line number, from a unified diff."""
+    lines = {}
+    current = None
+    for raw in diff_text.splitlines():
+        if raw.startswith("+++ "):
+            target = raw[4:].strip()
+            if target.startswith('"') and target.endswith('"'):
+                target = target[1:-1]
+            if target.startswith("b/"):
+                target = target[2:]
+            current = None if target == "/dev/null" else target
+        elif raw.startswith("@@") and current:
+            m = re.search(r"\+(\d+)", raw)
+            if m and current not in lines:
+                lines[current] = int(m.group(1))
+    return lines
+
+
+def _count_lines(path):
+    """Line count for an untracked file, or None when it is binary/missing."""
+    try:
+        with open(os.path.join(PROJECT_ROOT, path), "rb") as fh:
+            data = fh.read(2_000_000)
+    except OSError:
+        return None
+    if b"\x00" in data:
+        return None
+    if not data:
+        return 0
+    return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
+
+
+def _size_text(added, removed):
+    """'(+4/-2 lines)' - the shape of a change, never a bare file name."""
+    if added is None or removed is None:
+        return "binary file"
+    bits = []
+    if added:
+        bits.append("+%d" % added)
+    if removed:
+        bits.append("-%d" % removed)
+    if not bits:
+        return "no line changes"
+    total = (added or 0) + (removed or 0)
+    return "%s line%s" % ("/".join(bits), "" if total == 1 else "s")
+
+
+def _uptime_text(seconds):
+    """'5 minutes' / '2 hours' - an age, not a point in time ('ago' is wrong)."""
+    seconds = max(0, int(seconds))
+    if seconds < 90:
+        return "less than a minute"
+    if seconds < 3600:
+        n = seconds // 60
+        return "%d minute%s" % (n, "" if n == 1 else "s")
+    if seconds < 86400:
+        n = seconds // 3600
+        return "%d hour%s" % (n, "" if n == 1 else "s")
+    n = seconds // 86400
+    return "%d day%s" % (n, "" if n == 1 else "s")
+
+
+def _is_elevated():
+    """True when this server holds administrator rights (Windows)."""
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def _server_runtime():
+    """Facts about the process answering this request."""
+    up = max(0, time.time() - _SERVER_START_TS)
+    return {
+        "pid": _SERVER_PID,
+        "uptime_seconds": int(up),
+        "uptime": _uptime_text(up),
+        "elevated": _is_elevated(),
+    }
+
+
+def _server_loads(path):
+    """Whether the running server loaded this file at boot."""
+    base = os.path.basename(path)
+    return path.lower().endswith((".py", ".pyw", ".pyd")) or base in (
+        "ace_config.yaml", "ace_config.yml")
+
+
+def _needs_restart(path, mtime):
+    """Whether this change is in a file the running server loaded at boot."""
+    return _server_loads(path) and mtime > _SERVER_START_TS
+
+
+def _runtime_note(newest_path, pending, runtime):
+    """One sentence on whether the running server actually has this change.
+
+    Always names the process, so the sentence is evidence of a live server
+    rather than a description of the disk.
+    """
+    who = "This server (pid %d, up %s)" % (runtime["pid"], runtime["uptime"])
+    if pending:
+        names = ", ".join(pending[:3])
+        if len(pending) > 3:
+            names += " (+%d more)" % (len(pending) - 3)
+        return "Restart ACEsi to apply it - %s changed after %s started" % (names, who.lower())
+    low = newest_path.lower()
+    if low.endswith((".html", ".htm", ".js", ".css")):
+        return "%s serves it from disk, so a page refresh is enough" % who
+    if low.endswith(".dart"):
+        return "%s does not run it - the app needs a rebuild" % who
+    if low.endswith((".ps1", ".bat", ".cmd")):
+        return "%s reads it from disk when it runs it, so nothing needs restarting" % who
+    if _server_loads(newest_path):
+        return "%s has it loaded" % who
+    return "%s does not load it" % who
+
+
+def _runtime_detail(runtime, pending):
+    """Tooltip line: which process is answering, and what it is missing."""
+    line = "Running: pid %d, up %s%s" % (
+        runtime["pid"], runtime["uptime"],
+        ", elevated (admin rights)" if runtime["elevated"] else "")
+    if pending:
+        line += " - not loaded yet: " + ", ".join(pending[:6])
+        if len(pending) > 6:
+            line += " (+%d more)" % (len(pending) - 6)
+    return line
+
+
+# ---------------------------------------------------------------------------
+# Work sessions
+#
+# A greeting that only knows the newest diff cannot answer "we worked 7 hours
+# on context awareness last night". Nothing was recording that: git stores
+# commits, the conversations table stores chat, and the editor never recorded
+# its own saves. This section adds the missing save log and groups all three
+# sources into continuous sessions, so the answer is reconstructed from
+# events rather than guessed.
+# ---------------------------------------------------------------------------
+
+# ===== Work session data path =====
+# PROJECT_ROOT is defined lower down (line 5626); resolve the db path lazily
+# so that module-level code doesn't run before the constant exists.
+def _memory_db_path():
+    return os.path.join(PROJECT_ROOT, 'ace_memory.db')
+_SESSION_GAP_S = 60 * 60          # this much silence ends a session
+_SESSION_CACHE = {"at": 0.0, "value": None}
+_SESSION_TTL_S = 30.0
+
+_TOPIC_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "into", "your",
+    "have", "feat", "fix", "chore", "refactor", "wip", "final", "fully",
+    "completed", "complete", "working", "works", "added", "add", "now",
+    "can", "all", "new", "file", "files", "part", "bug", "state", "clean",
+    "checkpoint", "some", "more", "only", "also", "when", "then", "them",
+}
+
+
+def _change_log_connect():
+    """Open ace_memory.db, creating the save log if this is an older install."""
+    conn = sqlite3.connect(_memory_db_path(), timeout=10)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS change_log ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, path TEXT, "
+        "line INTEGER, added INTEGER, removed INTEGER, source TEXT, note TEXT)")
+    return conn
+
+
+def _diff_span(old, new):
+    """(first changed line, added, removed) for a single save.
+
+    Scans from both ends instead of running a full diff: an editor save is
+    almost always one contiguous hunk, which keeps this fast even on a
+    14,000-line file where difflib would take seconds.
+    """
+    a = (old or "").splitlines()
+    b = (new or "").splitlines()
+    start = 0
+    limit = min(len(a), len(b))
+    while start < limit and a[start] == b[start]:
+        start += 1
+    end_a, end_b = len(a), len(b)
+    while end_a > start and end_b > start and a[end_a - 1] == b[end_b - 1]:
+        end_a -= 1
+        end_b -= 1
+    return start + 1, end_b - start, end_a - start
+
+
+def _log_change(path, old_text, new_text, source='editor'):
+    """Record one save (file, line, +/-) so sessions can be rebuilt later."""
+    try:
+        rel = os.path.relpath(os.path.abspath(path), PROJECT_ROOT).replace('\\', '/')
+    except Exception:
+        rel = str(path)
+    try:
+        line, added, removed = _diff_span(old_text, new_text)
+    except Exception:
+        line, added, removed = None, None, None
+    try:
+        conn = _change_log_connect()
+        with conn:
+            conn.execute(
+                "INSERT INTO change_log (ts, path, line, added, removed, source) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (datetime.now().isoformat(timespec='seconds'),
+                 rel, line, added, removed, source))
+        conn.close()
+    except Exception as e:
+        print("change_log: could not record %s: %s" % (rel, e))
+
+
+def _change_log_events(days):
+    since = (datetime.now() - timedelta(days=days)).isoformat(timespec='seconds')
+    events = []
+    try:
+        conn = _change_log_connect()
+        rows = conn.execute(
+            "SELECT ts, path, line, added, removed FROM change_log "
+            "WHERE ts >= ? ORDER BY ts", (since,)).fetchall()
+        conn.close()
+    except Exception:
+        return events
+    for ts, path, line, added, removed in rows:
+        try:
+            at = datetime.fromisoformat(ts).timestamp()
+        except Exception:
+            continue
+        events.append({"at": at, "kind": "save", "path": path,
+                       "line": line, "added": added, "removed": removed})
+    return events
+
+
+def _commit_events(days):
+    """Commits from the last few days, as activity timestamps + subjects."""
+    out = _git_out(["log", "--since=%d days ago" % days,
+                    "--pretty=%ct%x09%cI%x09%s"], timeout=20)
+    events = []
+    for raw in out.splitlines():
+        parts = raw.split("\t", 2)
+        if len(parts) != 3:
+            continue
+        try:
+            at = float(parts[0])
+        except ValueError:
+            continue
+        events.append({"at": at, "kind": "commit", "iso": parts[1],
+                       "subject": parts[2]})
+    return events
+
+
+def _message_events(days):
+    """Chat messages, which keep a session alive between commits and saves."""
+    since = (datetime.now() - timedelta(days=days)).isoformat(timespec='seconds')
+    events = []
+    try:
+        conn = sqlite3.connect(_memory_db_path(), timeout=10)
+        rows = conn.execute(
+            "SELECT timestamp, role FROM conversations "
+            "WHERE timestamp >= ? ORDER BY timestamp", (since,)).fetchall()
+        conn.close()
+    except Exception:
+        return events
+    for ts, role in rows:
+        try:
+            at = datetime.fromisoformat(ts).timestamp()
+        except Exception:
+            continue
+        events.append({"at": at, "kind": "message", "role": role})
+    return events
+
+
+def _group_sessions(events, gap_s=_SESSION_GAP_S):
+    """Split a time-ordered event stream wherever the silence exceeds gap_s."""
+    sessions = []
+    for ev in sorted(events, key=lambda e: e["at"]):
+        if sessions and ev["at"] - sessions[-1]["last"] <= gap_s:
+            sessions[-1]["last"] = ev["at"]
+            sessions[-1]["events"].append(ev)
+        else:
+            sessions.append({"first": ev["at"], "last": ev["at"],
+                             "events": [ev]})
+    return sessions
+
+
+def _session_topic(subjects):
+    """The phrase that recurs in a session's commit subjects, if there is one.
+
+    "context awareness" or "real-time terminal" is what a person would call
+    the session. A one-off phrase is not a label, so it must appear twice.
+    Ties go to the phrase used most recently: a long night usually ends on
+    the thing that became the session's name.
+    """
+    from collections import Counter
+    counts = Counter()
+    last_seen = {}
+    for idx, subject in enumerate(subjects):
+        words = [w.lower().strip('.:,;()[]') for w in
+                 re.findall(r"[A-Za-z][A-Za-z0-9+#._-]*", subject or "")]
+        words = [w for w in words if len(w) > 2 and w not in _TOPIC_STOPWORDS]
+        for a, b in zip(words, words[1:]):
+            key = a + " " + b
+            counts[key] += 1
+            last_seen[key] = idx
+    repeated = [(n, last_seen[p], p) for p, n in counts.items() if n >= 2]
+    if repeated:
+        repeated.sort(reverse=True)
+        return repeated[0][2]
+    return ""
+
+
+def _duration_text(seconds):
+    """'7h 31m' - a length of time, never a time of day."""
+    minutes = max(1, int(seconds) // 60)
+    hours, mins = divmod(minutes, 60)
+    if hours and mins:
+        return "%dh %dm" % (hours, mins)
+    if hours:
+        return "%dh" % hours
+    return "%dm" % mins
+
+
+def _session_note(s, label=None):
+    """One sentence: how long, when, how much work, and what it was about."""
+    if label is None:
+        label = "This session" if s["ongoing"] else "Last session"
+    bits = ["%s: %s" % (label, s["duration"])]
+    bits.append(s["when"])
+    if s["commits"]:
+        bits.append("%d commit%s" % (s["commits"],
+                                     "" if s["commits"] == 1 else "s"))
+    if s["messages"]:
+        bits.append("%d message%s" % (s["messages"],
+                                      "" if s["messages"] == 1 else "s"))
+    if s["saves"]:
+        bits.append("%d save%s" % (s["saves"],
+                                   "" if s["saves"] == 1 else "s"))
+    note = ", ".join(bits)
+    if s["topic"]:
+        note += ' - mostly "%s"' % s["topic"]
+    elif s["last_subject"]:
+        note += ' - last commit "%s"' % s["last_subject"]
+    return note
+
+
+def _summarize_session(s, now):
+    """Turn one grouped stretch of activity into a reportable record."""
+    first, last = s["first"], s["last"]
+    commits = [e for e in s["events"] if e["kind"] == "commit"]
+    messages = [e for e in s["events"] if e["kind"] == "message"]
+    saves = [e for e in s["events"] if e["kind"] == "save"]
+    files = []
+    for e in saves:
+        if e["path"] not in files:
+            files.append(e["path"])
+    start_dt = datetime.fromtimestamp(first)
+    end_dt = datetime.fromtimestamp(last)
+    if start_dt.date() == end_dt.date():
+        when = "%s to %s" % (start_dt.strftime("%Y-%m-%d %H:%M"),
+                             end_dt.strftime("%H:%M"))
+    else:
+        when = "%s to %s" % (start_dt.strftime("%Y-%m-%d %H:%M"),
+                             end_dt.strftime("%Y-%m-%d %H:%M"))
+    value = {
+        "ok": True,
+        "start": first,
+        "end": last,
+        "duration_seconds": int(last - first),
+        "duration": _duration_text(last - first),
+        "ongoing": (now - last) < _SESSION_GAP_S,
+        "commits": len(commits),
+        "messages": len(messages),
+        "saves": len(saves),
+        "files": files[:8],
+        "topic": _session_topic([c["subject"] for c in commits]),
+        "last_subject": commits[-1]["subject"] if commits else "",
+        "when": when,
+    }
+    value["note"] = _session_note(value)
+    return value
+
+
+def _recent_session(days=10):
+    """Rebuild the most recent work session from commits, chat and saves.
+
+    There is no start/stop button to consult, so a session is defined as
+    activity with no gap longer than _SESSION_GAP_S. The events already
+    existed; they had simply never been grouped.
+
+    The most recent session is the headline. When it is still short, the last
+    long session is carried along as "Before that", because that is what a
+    person means by "we worked 7 hours on it last night".
+    """
+    now = time.time()
+    cached = _SESSION_CACHE
+    if cached["value"] and now - cached["at"] < _SESSION_TTL_S:
+        return cached["value"]
+
+    events = (_commit_events(days) + _message_events(days)
+              + _change_log_events(days))
+    # A single commit or a two-minute burst is not a "session".
+    qualifying = [g for g in _group_sessions(events)
+                  if g["last"] - g["first"] >= 20 * 60]
+    value = {"ok": False}
+    if qualifying:
+        value = _summarize_session(qualifying[-1], now)
+        if value["duration_seconds"] < 2 * 3600:
+            for g in reversed(qualifying[:-1]):
+                if g["last"] - g["first"] >= 2 * 3600:
+                    prior = _summarize_session(g, now)
+                    prior["note"] = _session_note(prior, label="Before that")
+                    value["prior"] = prior
+                    value["prior_note"] = prior["note"]
+                    break
+    cached.update({"at": now, "value": value})
+    return value
+
+
+def _last_edit_info():
+    """Describe the last real change to this project, in detail.
+
+    Uncommitted edits win when they are newer than HEAD: that is the edit the
+    user just watched happen, and reporting an older commit instead would be
+    the same staleness this replaced. For each file we report the first changed
+    line and how many lines moved, because "5 files changed" is not an answer
+    to "what did we just do?".
+
+    Semantic wording ("a syntax error fix") can only come from a commit
+    subject. An uncommitted edit has no description attached, so it is
+    described factually - file, line, size - rather than guessed at.
+    """
+    now = time.time()
+    cached = _LAST_EDIT_CACHE
+    if cached["value"] and now - cached["at"] < _LAST_EDIT_TTL_S:
+        return cached["value"]
+
+    runtime = _server_runtime()
+
+    commit_hash = _git_out(["log", "-1", "--format=%h"])
+    commit_msg = _git_out(["log", "-1", "--format=%s"])
+    commit_iso = _git_out(["log", "-1", "--format=%cI"])
+    commit_ts = 0.0
+    if commit_iso:
+        try:
+            commit_ts = datetime.fromisoformat(commit_iso).timestamp()
+        except Exception:
+            commit_ts = 0.0
+
+    # core.quotepath=false keeps non-ASCII paths readable instead of "\\303\\251".
+    changed = []
+    status = _git_out(["-c", "core.quotepath=false", "status", "--porcelain"])
+    for line in status.splitlines():
+        if len(line) < 4:
+            continue
+        state = line[:2]
+        path = line[3:].strip()
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+        if " -> " in path:          # rename: report the new name
+            path = path.split(" -> ", 1)[1]
+        if _LOG_PATH_RE.match(os.path.basename(path)):
+            continue                # rotated stdout/stderr, not a code edit
+        try:
+            full = os.path.join(PROJECT_ROOT, path)
+            if os.path.isfile(full):
+                mtime = os.path.getmtime(full)
+            elif "D" in state:
+                # The file is gone; the parent directory's mtime is the closest
+                # honest signal of when the deletion happened.
+                mtime = os.path.getmtime(os.path.dirname(full))
+            else:
+                continue            # submodule/gitlink: not an edit to this tree
+        except OSError:
+            continue
+        changed.append({"path": path, "at": mtime,
+                        "untracked": state == "??", "deleted": "D" in state})
+    changed.sort(key=lambda c: c["at"], reverse=True)
+    newest = changed[0] if changed else None
+
+    def describe(entry):
+        """(phrase fragment, tooltip line) for one changed file."""
+        path = entry["path"]
+        if entry.get("deleted"):
+            size = _size_text(*stats.get(path, (None, None)))
+            return ("a deletion of %s (%s)" % (path, size),
+                    "%s - deleted (%s)" % (path, size))
+        if entry["untracked"]:
+            n = _count_lines(path)
+            if n is None:
+                return ("a new binary file %s" % path,
+                        "%s - new file (binary, untracked)" % path)
+            return ("a new file %s (%d line%s)" % (path, n, "" if n == 1 else "s"),
+                    "%s - new file, %d lines (untracked)" % (path, n))
+        added, removed = stats.get(path, (None, None))
+        line = hunks.get(path)
+        where = " at line %d" % line if line else ""
+        size = _size_text(added, removed)
+        return ("an edit in %s%s (%s)" % (path, where, size),
+                "%s%s (%s)" % (path, where, size))
+
+    stats, hunks = {}, {}
+    if any(not c["untracked"] for c in changed):
+        # One diff covers staged and unstaged tracked edits at once.
+        stats = _parse_numstat(_git_out(
+            ["-c", "core.quotepath=false", "diff", "HEAD", "--numstat"]))
+        hunks = _first_changed_lines(_git_out(
+            ["-c", "core.quotepath=false", "diff", "HEAD", "-U0"]))
+
+    if newest and newest["at"] > commit_ts:
+        phrase_body, newest_detail = describe(newest)
+        rel = _rel_time(now - newest["at"])
+        extras = len(changed) - 1
+        suffix = ""
+        if extras > 0:
+            suffix = " (plus %d other file%s)" % (extras, "" if extras == 1 else "s")
+        lines = [describe(c)[1] for c in changed[:8]]
+        if len(changed) > 8:
+            lines.append("... and %d more" % (len(changed) - 8))
+        pending = [c["path"] for c in changed
+                   if _needs_restart(c["path"], c["at"])]
+        value = {
+            "ok": True,
+            "source": "working-tree",
+            "phrase": "%s, saved %s, not committed yet%s" % (phrase_body, rel, suffix),
+            "runtime_note": _runtime_note(newest["path"], pending, runtime),
+            "detail": "Not committed yet - newest saved %s:\n%s\n%s" % (
+                rel, "\n".join(lines), _runtime_detail(runtime, pending)),
+            "file": newest["path"],
+            "files": [c["path"] for c in changed],
+            "runtime": dict(runtime, pending_restart=pending),
+        }
+    elif status.strip():
+        # The tree is dirty but nothing could be stated (e.g. only a mode bit or
+        # an unreadable path). Better a vague truth than an older commit.
+        value = {
+            "ok": True,
+            "source": "working-tree",
+            "phrase": "uncommitted changes in the working tree, not committed yet",
+            "detail": "Uncommitted:\n" + status.strip() + "\n" + _runtime_detail(runtime, []),
+            "files": [],
+            "runtime": dict(runtime, pending_restart=[]),
+        }
+    elif commit_hash:
+        subject = commit_msg if len(commit_msg) <= 70 else commit_msg[:67] + "..."
+        commit_stats = _parse_numstat(_git_out(
+            ["-c", "core.quotepath=false", "show", "--format=", "--numstat", commit_hash]))
+        commit_hunks = _first_changed_lines(_git_out(
+            ["-c", "core.quotepath=false", "show", "--format=", "-U0", commit_hash]))
+        rel = _rel_time(now - commit_ts)
+        phrase = 'commit %s "%s"' % (commit_hash, subject)
+        detail_lines = []
+        # Prefer the file the commit subject names ("fix syntax error in
+        # ACEsi.html") over whichever file merely had the most lines churn:
+        # the subject is what the human remembers doing.
+        subject_lower = commit_msg.lower()
+        named = [p for p in commit_stats
+                 if os.path.basename(p) and os.path.basename(p).lower() in subject_lower]
+        ranked = sorted(commit_stats,
+                        key=lambda p: (commit_stats[p][0] or 0) + (commit_stats[p][1] or 0),
+                        reverse=True)
+        biggest = (named[0] if named else ranked[0]) if ranked else None
+        if biggest:
+            added, removed = commit_stats[biggest]
+            line = commit_hunks.get(biggest)
+            where = " at line %d" % line if line else ""
+            phrase += " - %s%s (%s)" % (biggest, where, _size_text(added, removed))
+            for p in ranked:
+                a, r = commit_stats[p]
+                ln = commit_hunks.get(p)
+                detail_lines.append("  %s%s (%s)" % (
+                    p, " at line %d" % ln if ln else "", _size_text(a, r)))
+        phrase += ", committed %s" % rel
+        pending = []
+        for p in commit_stats:
+            try:
+                mtime = os.path.getmtime(os.path.join(PROJECT_ROOT, p))
+            except OSError:
+                continue
+            if _needs_restart(p, mtime):
+                pending.append(p)
+        value = {
+            "ok": True,
+            "source": "commit",
+            "phrase": phrase,
+            "runtime_note": _runtime_note(biggest or "", pending, runtime),
+            "detail": '%s "%s" committed %s:\n%s\n%s' % (
+                commit_hash, commit_msg, rel, "\n".join(detail_lines),
+                _runtime_detail(runtime, pending)),
+            "commit": commit_hash,
+            "files": list(commit_stats),
+            "runtime": dict(runtime, pending_restart=pending),
+        }
+    else:
+        value = {"ok": False, "reason": "no git history available"}
+
+    # What the current stretch of work has been, not just the newest diff.
+    if value.get("ok"):
+        session = _recent_session()
+        if session.get("ok"):
+            value["session"] = session
+            value["session_note"] = session.get("note", "")
+            extra = [session["note"]]
+            if session.get("prior_note"):
+                value["prior_session_note"] = session["prior_note"]
+                extra.append(session["prior_note"])
+            value["detail"] = (value.get("detail", "") + "\n" +
+                               "\n".join(extra)).strip()
+
+    _LAST_EDIT_CACHE.update({"at": now, "value": value})
+    return value
+
+
+@app.route('/api/last_edit')
+def last_edit():
+    """What the last real change to this project was - feeds the greeting."""
+    return jsonify(_last_edit_info())
+
 
 @app.route('/')
 def index():
@@ -4766,8 +5472,15 @@ def api_save_file():
     if not full or content is None:
         return jsonify({'ok': False, 'error': 'Missing filename or content'}), 400
     try:
+        old = ''
+        try:
+            with open(full, 'r', encoding='utf-8', errors='replace') as f:
+                old = f.read()
+        except OSError:
+            old = ''            # new file: the save creates it
         with open(full, 'w', encoding='utf-8') as f:
             f.write(content)
+        _log_change(full, old, content, source='explorer')
         print("💾 Explorer: saved %s (%d chars)" % (filename, len(content)))
         return jsonify({'ok': True, 'message': 'Saved!'})
     except Exception as e:
@@ -4808,8 +5521,15 @@ def write_file():
     path = data.get('path', '')
     content = data.get('content', '')
     try:
+        old = ''
+        try:
+            with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                old = f.read()
+        except OSError:
+            old = ''
         with open(path, 'w') as f:
             f.write(content)
+        _log_change(path, old, content, source='write')
         return jsonify({'status': 'saved'})
     except Exception as e:
         return jsonify({'error': str(e)})
@@ -13927,8 +14647,39 @@ def run_stream():
 
 @app.route('/restart', methods=['POST'])
 def restart_server():
+    """Restart from the UI without killing unrelated Python programs.
+
+    This used to launch restart_server.bat, whose `taskkill /F /IM python.exe`
+    terminates every Python process on the machine - other tools included - and
+    then starts the server with no logs and no verification. restart_server.ps1
+    stops only the process holding port 5000, keeps stdout/stderr on disk and
+    prints a stale-code verdict.
+
+    The two-second delay lets this HTTP response reach the browser before the
+    script stops the process that is serving it. The batch file stays as a
+    fallback for machines where the script is missing.
+    """
     import subprocess
-    subprocess.Popen("restart_server.bat", shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
-    return jsonify({"status": "restarting"})
+    root = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(root, "restart_server.ps1")
+    if os.path.isfile(script):
+        safe = script.replace("'", "''")
+        cmd = [
+            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+            "-WindowStyle", "Hidden", "-Command",
+            "Start-Sleep -Seconds 2; & '%s'" % safe,
+        ]
+        try:
+            subprocess.Popen(cmd, cwd=root,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
+            return jsonify({"status": "restarting", "via": "restart_server.ps1"})
+        except Exception as e:
+            print("[restart] ps1 failed (%s), falling back to .bat" % e)
+    try:
+        subprocess.Popen("restart_server.bat", shell=True,
+                         creationflags=subprocess.CREATE_NEW_CONSOLE)
+        return jsonify({"status": "restarting", "via": "restart_server.bat"})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 app.run(host='127.0.0.1', port=5000, debug=False)
