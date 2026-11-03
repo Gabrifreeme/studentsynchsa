@@ -1,11 +1,26 @@
-I want to add status icons (emojis) to the terminal log output and the ACESi live log viewer.
+Context: I am working on ACEsi.html for my custom IDE. The backend /api/autofix works perfectly. The frontend applyAutoFix() function is working, but the side-by-side modal layout is broken.
 
-Please review @server.py and do the following:
+The Problem:
+When the user clicks "Fix Code", a modal shows up. There are two original <textarea> elements inside it (id="autofix-original" and id="autofix-code"). We try to hide them and replace them with <div> panels to show a diff (red for original, green for fixed).
 
-1. Find the `SimpleLogger` class (where `sys.stdout` is intercepted).
-2. In the `write` method, use a regex to check if the message contains an HTTP status code (e.g., `"GET /api/files HTTP/1.1" 200`).
-3. If the status code is `200` or `204`, append ` 😊` to the end of the message before putting it in the queue.
-4. If the status code starts with `4` or `5` (like `404` or `500`), append ` ❌` to the end of the message.
-5. Also, find the `* Running on http://127.0.0.1:5000` startup line and append ` ✅` to it.
+However, when we hide the textareas, they still take up space in the flexbox/grid layout, leaving a massive ugly black gap on the left, and squishing the new div panels to the right.
 
-Show me the diff.
+The Task:
+Please review the applyAutoFix() and highlightDiff() functions in ACEsi.html and fix the layout. I need you to:
+
+Completely remove the original textareas from the DOM layout (use display: none on the parent, or remove them entirely).
+
+Create a single container <div> that holds the diff side-by-side.
+
+Use display: flex; gap: 10px; on the container.
+
+The left panel should show the original code with changed lines highlighted in dark red.
+
+The right panel should show the fixed code with changed lines highlighted in dark green.
+
+The panels must have height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace;.
+
+Ensure the "Close", "Fix Code" (hidden), and "Save to File" buttons remain at the bottom and are not covered by the new layout.
+
+
+

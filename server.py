@@ -780,7 +780,7 @@ def summarize_session(messages, max_length=800):
     # Format conversation
     conv_text = "\n".join([f"{m['role']}: {m['content'][:500]}" for m in messages])
     prompt = _SESSION_SUMMARY_PROMPT.format(conversation=conv_text)
-    msgs = [{"role": "user", "content": prompt}]
+      
     try:
         reply = _chat_dispatch(msgs, user_message=prompt, preferred_model=None)
         if reply:
@@ -5267,77 +5267,47 @@ def _strip_code_fences(text):
     return text
 
 
-@app.route('/api/autofix', methods=['POST'])
+
+@app.route('/api/autofix', methods=['POST', 'OPTIONS'])
 def autofix():
-    """Fix syntax errors in pasted code. Posts {code} -> {ok, fixed_code|error}.
-
-    Uses the same provider chain as /chat rather than one hardcoded provider:
-    pinning this endpoint to a single provider made it fail outright whenever
-    that provider's key was unset, even with another provider fully working.
-
-    Always answers 200 with an `ok` flag: ACEsi.html throws on a non-2xx and
-    replaces the body with "Server error 500", hiding the actual reason.
-    """
-    print("AUTOFIX REQUEST RECEIVED")
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
     data = request.json or {}
     code = data.get('code', '')
     if not code.strip():
         return jsonify({"ok": False, "error": "No code provided"})
-    if len(code) > 12000:
-        code = code[:12000] + "\n# ... trimmed to 12000 characters"
 
-    msgs = [{
-        "role": "user",
-        "content": (
-                                    "You are a strict code formatter. You MUST output the ENTIRE file from the first line (imports) to the last line. "
-            "Do NOT truncate. Do NOT omit imports. If you omit any part of the file, the system will crash. "
-            "Fix the syntax errors, but return the complete 100% original file with your fix applied. Return ONLY the code.\n\n"
-            "CODE:\n" + code
-        ),
-    }]
+    msgs = [
+        {
+            "role": "system",
+            "content": "You are an expert Dart code fixer. Fix the syntax errors in the code provided. Return ONLY the raw fixed code. No markdown, no explanations, no backticks."
+        },
+        {
+            "role": "user",
+            "content": code
+        }
+    ]
 
-    tried = []
-    providers = list(_chat_providers())
-    if OLLAMA_ENABLED:
-        providers.append(("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL))
-    for name, endpoint, api_key, model in providers:
-        if not api_key:
-            tried.append("%s: no API key" % name)
-            continue
-        try:
-            # tool_choice="none" sends no tool schema, so the model has nothing
-            # to call and must answer with the code itself.
-            reply, _, _ = _chat_one(name, endpoint, api_key, model, msgs,
-                                    tool_choice="none")
-        except Exception as e:
-            tried.append("%s: %s: %s" % (name, type(e).__name__, e))
-            continue
-        fixed = _strip_code_fences(reply)
-        if fixed:
-            filename = data.get('filename')
-            if filename:
-                try:
-                    full_path = _ide_path(filename)
-                    if full_path:
-                        with open(full_path, 'w', encoding='utf-8') as f:
-                            f.write(fixed)
-                        print(f"💾 Auto Fix saved to {filename}")
-                except Exception as e:
-                    print(f"Failed to save autofix: {e}")
-
-            return jsonify({"ok": True, "fixed_code": fixed, "provider": name})
+    try:
+        # Force Groq directly
+        if GROQ_API_KEY:
+            reply, _, _ = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs, tool_choice="none")
+            if reply:
+                return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": "Groq"})
+        
+        # Fallback to the first provider that works
+        for name, endpoint, api_key, model in _chat_providers():
+            if not api_key: continue
+            try:
+                reply, _, _ = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
+                if reply:
+                    return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": name})
+            except: pass
             
-        tried.append("%s: no code in reply" % name)
-        if fixed:
-            
-            return jsonify({"ok": True, "fixed_code": fixed, "provider": name})
-        tried.append("%s: no code in reply" % name)
-
-    detail = "; ".join(tried) or "no provider configured"
-    print(f"💥 AutoFix: no provider returned code ({detail})")
-    return jsonify({"ok": False, "error": "No model returned a fix. Tried: " + detail})
-
-
+        return jsonify({"ok": False, "error": "All providers failed or returned empty."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 @app.route('/history', methods=['GET'])
 def history():
     limit = min(int(request.args.get('limit', 100)), 500)
