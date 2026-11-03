@@ -1185,6 +1185,29 @@ document.addEventListener("DOMContentLoaded", function() {
 
         refresh();
     })();
+        function saveToFile() {
+        const code = document.getElementById('autofix-code').value;
+        if (!code.trim()) {
+            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">No code to save.</span>';
+            return;
+        }
+        if (!window.currentFile) {
+            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">No file selected in Explorer.</span>';
+            return;
+        }
+        fetch('http://127.0.0.1:5000/api/save-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: window.currentFile, content: code })
+        }).then(r => r.json()).then(d => {
+            if (d.ok) {
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Saved to disk!</span>';
+                document.getElementById('code-editor').value = code;
+            } else {
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error saving.</span>';
+            }
+        });
+    }
 
     function applyAutoFix() {
         console.log("FIX BUTTON CLICKED");
