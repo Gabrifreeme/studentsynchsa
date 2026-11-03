@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -14,7 +14,7 @@ class RerankService {
       final response = await http.post(
         Uri.parse(baseUrl),
         headers: {
-          'Authorization': 'Bearer ',
+          'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://studentsyncsa.co.za',
         },
@@ -36,7 +36,7 @@ class RerankService {
       }
       return null;
     } catch (e) {
-      debugPrint('Rerank error: ');
+      debugPrint('Rerank error: $e');
       return null;
     }
   }
