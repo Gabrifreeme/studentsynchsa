@@ -205,6 +205,12 @@
         }
     </style>
 
+    <style>
+        .diff-del { color: #4a0000; }      /* dark red */
+        .diff-add { color: #003300; }      /* dark green */
+        .diff-unchanged { color: #888; }
+    </style>
+
 </head>
 <body>
 
@@ -647,10 +653,23 @@ document.addEventListener("DOMContentLoaded", function() {
         <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;padding-top:10px;padding-bottom:10px;font-family:'Roboto Mono',monospace;color:#ff9d00;width:90%;max-width:500px;max-height:80%;overflow:auto;margin:auto;">
             <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
             <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
-            <textarea id="autofix-code" style="width:100%;height:250px;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:vertical;outline:none;overflow:auto;" placeholder="Paste code here to auto-fix..."></textarea>
+            <div id="autofix-diff" style="display: flex; gap: 10px; margin-top: 10px;">
+                <div id="autofix-panel-original" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #4a0000;">
+                    <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Original</div>
+                    <span id="autofix-original-code" style="color: #4a0000;"></span>
+                </div>
+                <div id="autofix-panel-fixed" style="flex: 1; height: 300px; overflow: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; white-space: pre; box-sizing: border-box; color: #003300;">
+                    <div style="font-weight:bold; margin-bottom: 8px; color: #ff9d00;">Fixed</div>
+                    <span id="autofix-fixed-code" style="color: #003300;"></span>
+                </div>
+            </div>
+            <div id="autofix-code-container" style="margin-top: 10px; display: none;">
+                <textarea id="autofix-code" style="width:100%;height:250px;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:vertical;outline:none;overflow:auto;" placeholder="Paste code here to auto-fix..."></textarea>
+            </div>
             <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
                 <button onclick="document.getElementById('autofix-modal').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Close</button>
-                <button onclick="applyAutoFix()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Fix Code</button>
+                <button id="autofix-fix-btn" onclick="applyAutoFix()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Fix Code</button>
+                <button id="autofix-save-btn" onclick="saveToFile()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;display:none;">Save to File</button>
             </div>
         </div>
     </div>
@@ -1252,49 +1271,77 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function applyAutoFix() {
-        console.log("FIX BUTTON CLICKED");
-        const code = document.getElementById('autofix-code').value;
+        // Grab from the main editor
+        const code = document.getElementById('code-editor').value;
+        
         if (!code.trim()) {
             document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">No code provided.</span>';
             return;
         }
+
         document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
-        fetch('http://127.0.0.1:5000/api/autofix', {
+
+        fetch('/api/autofix', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code: code })
-        }).then(r => {
-            if (!r.ok) throw new Error('Server error ' + r.status);
-            return r.json();
-        }).then(d => {
+        }).then(r => r.json()).then(d => {
             if (d.ok && d.fixed_code) {
-                const newCode = d.fixed_code;
-                const editor = document.getElementById('code-editor');
-                if (editor) editor.value = newCode;
-                                // Save directly to disk!
-                if (window.currentFile) {
-                    fetch('http://127.0.0.1:5000/api/save-file', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ filename: window.currentFile, content: newCode })
-                    }).then(res => res.json()).then(saveRes => {
-                        if (saveRes.ok) {
-                            document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Fixed & Saved!</span>';
-                        }
-                    }).catch(e => console.log("Save failed:", e));
-                }
-                if (window.aceEditorRefresh) window.aceEditorRefresh();
-                document.getElementById('autofix-result').innerHTML = '<div style="color: #00ff00; margin-bottom: 10px;">✅ Code Fixed Successfully!</div>' + '<pre style="color: #ff9d00; white-space: pre-wrap; text-align: left; background: #111; padding: 5px; border: 1px solid #ff9d00;">' + newCode + '</pre>';
-                setTimeout(() => {
-                    document.getElementById('autofix-modal').style.display = 'none';
-                }, 1500);
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
+                
+                // 1. Call the diff function
+                highlightDiff(code, d.fixed_code);
+
+                // 2. Toggle buttons
+                document.getElementById('autofix-fix-btn').style.display = 'none';
+                document.getElementById('autofix-save-btn').style.display = 'inline-block';
             } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Error: ' + (d.error || 'unknown error') + '</span>';
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + (d.error || JSON.stringify(d)) + '</span>';
             }
         }).catch(e => {
-            console.error("AutoFix Error:", e);
-            document.getElementById('autofix-result').innerHTML = '<span style="color: #ff0000;">❌ Server error: ' + e.message + '</span>';
+            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Server error: ' + e.message + '</span>';
         });
+    }
+
+    function highlightDiff(original, fixed) {
+        // Target the panels OpenCode just created
+        const leftPanel = document.getElementById('autofix-panel-original');
+        const rightPanel = document.getElementById('autofix-panel-fixed');
+        
+        if (!leftPanel || !rightPanel) return;
+
+        // Clear them
+        leftPanel.innerHTML = '';
+        rightPanel.innerHTML = '';
+
+        // Split into lines
+        const origLines = original.split('\n');
+        const fixLines = fixed.split('\n');
+        const maxLines = Math.max(origLines.length, fixLines.length);
+
+        // Loop through and create the rows
+        for (let i = 0; i < maxLines; i++) {
+            const oLine = origLines[i] !== undefined ? origLines[i] : '';
+            const fLine = fixLines[i] !== undefined ? fixLines[i] : '';
+
+            // Left side (Original)
+            const leftDiv = document.createElement('div');
+            leftDiv.textContent = oLine || ' ';
+            if (oLine !== fLine) {
+                leftDiv.style.background = '#4a0000'; // Dark Red
+                leftDiv.style.color = '#ff8080';
+            }
+            leftPanel.appendChild(leftDiv);
+
+            // Right side (Fixed)
+            const rightDiv = document.createElement('div');
+            rightDiv.textContent = fLine || ' ';
+            if (oLine !== fLine) {
+                rightDiv.style.background = '#003300'; // Dark Green
+                rightDiv.style.color = '#80ff80';
+            }
+            rightPanel.appendChild(rightDiv);
+        }
     }
 
     let logSource = null;
