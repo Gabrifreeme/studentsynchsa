@@ -429,50 +429,91 @@ document.addEventListener("DOMContentLoaded", function() {
             
             explorerDiv.innerHTML = ""; // Clear "Loading..."
             
-            // Because the server returns an array directly: ["file1", "file2"]
-            data.forEach(file => {
-                const fileDiv = document.createElement("div");
-                fileDiv.textContent = file;
-                fileDiv.style.cursor = "pointer";
-                fileDiv.style.padding = "4px";
-                fileDiv.style.color = "#ff9d00";
-                
-                // Add click event to load file content later
-                                fileDiv.onclick = function() {
-                    console.log("Clicked file: " + file);
-                    window.currentFile = file;
-                    
-                    // 1. Load the file content into the editor
-                    fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(file))
-                        .then(function(res) { return res.text(); })
-                        .then(function(fileData) {
-                            document.getElementById('code-editor').value = fileData;
-                            if (window.aceEditorRefresh) window.aceEditorRefresh();
-                            
-                            // 2. Send context. If Shift is held, PIN it. Otherwise, replace context.
-                            fetch('http://127.0.0.1:5000/api/context/file', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    path: file, 
-                                    content: fileData, 
-                                    pin: window.event ? window.event.shiftKey : false 
-                                })
-                            }).then(res => res.json()).then(data => {
-                                if (data.pinned_count > 1) {
-                                    console.log('Pinned files:', data.pinned_count);
-                                }
-                            }).catch(function(err) {
-                                console.warn('Context POST failed (non-fatal):', err);
-                            });
-                        })
-                        .catch(function(err) {
-                            alert("Failed to load file: " + err.message);
-                        });
-                };
-                
-                explorerDiv.appendChild(fileDiv);
+                        // Build a nested tree from the flat paths
+            const tree = {};
+            data.forEach(path => {
+                const parts = path.split('/');
+                let current = tree;
+                parts.forEach((part, index) => {
+                    if (index === parts.length - 1) {
+                        current[part] = 'file:' + path; // It's a file
+                    } else {
+                        if (!current[part] || typeof current[part] === 'string') {
+                            current[part] = {}; // It's a folder
+                        }
+                        current = current[part];
+                    }
+                });
             });
+
+            // Render the tree recursively
+            function renderTree(node, parentElement, indentLevel) {
+                const keys = Object.keys(node).sort((a, b) => {
+                    // Folders first, then files
+                    const aIsFile = typeof node[a] === 'string';
+                    const bIsFile = typeof node[b] === 'string';
+                    if (!aIsFile && bIsFile) return -1;
+                    if (aIsFile && !bIsFile) return 1;
+                    return a.localeCompare(b);
+                });
+
+                keys.forEach(key => {
+                    const value = node[key];
+                    const div = document.createElement("div");
+                    div.style.padding = "3px";
+                    div.style.paddingLeft = (indentLevel * 12) + "px";
+                    div.style.cursor = "pointer";
+                    div.style.color = "#ff9d00";
+                    div.style.fontFamily = "monospace";
+                    
+                    if (typeof value === 'string') {
+                        // It's a file
+                        const filePath = value.replace('file:', '');
+                        div.textContent = "📄 " + key;
+                        div.onclick = function(event) {
+                            event.stopPropagation();
+                            // Your original file click logic goes here
+                            console.log("Clicked file: " + filePath);
+                            window.currentFile = filePath;
+                            fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
+                                .then(res => res.text())
+                                .then(fileData => {
+                                    document.getElementById('code-editor').value = fileData;
+                                    if (window.aceEditorRefresh) window.aceEditorRefresh();
+                                    fetch('http://127.0.0.1:5000/api/context/file', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
+                                    }).catch(e => console.warn(e));
+                                })
+                                .catch(err => alert("Failed to load file: " + err.message));
+                        };
+                    } else {
+                        // It's a folder
+                        const folderDiv = document.createElement("div");
+                        folderDiv.textContent = "📁 " + key;
+                        folderDiv.style.color = "#ff9d00";
+                        
+                        const childrenDiv = document.createElement("div");
+                        childrenDiv.style.display = "none"; // Collapsed by default
+                        
+                        folderDiv.onclick = function(e) {
+                            e.stopPropagation();
+                            childrenDiv.style.display = childrenDiv.style.display === "none" ? "block" : "none";
+                            folderDiv.textContent = (childrenDiv.style.display === "none" ? "📁 " : "📂 ") + key;
+                        };
+                        
+                        renderTree(value, childrenDiv, indentLevel + 1);
+                        div.appendChild(folderDiv);
+                        div.appendChild(childrenDiv);
+                        parentElement.appendChild(div);
+                        return;
+                    }
+                    parentElement.appendChild(div);
+                });
+            }
+
+            renderTree(tree, explorerDiv, 0);
         })
         .catch(error => {
             console.error("JS FETCH ERROR:", error);
