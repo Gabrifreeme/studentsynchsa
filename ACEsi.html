@@ -211,7 +211,7 @@
         .diff-unchanged { color: #888; }
     </style>
 
-</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>`n</head>
 <body>
 
     <div id="run-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:340px;">
@@ -392,7 +392,7 @@
               <div id="editor-area">
                 <pre id="highlight-layer" aria-hidden="true"></pre>
                 <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
-                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..."></textarea>
+                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; background:#000 !important; color:#ff9d00 !important; -webkit-text-fill-color:#ff9d00 !important; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:2;"></textarea>
                 <div id="editor-search">
                     <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
                     <span id="search-count"></span>
@@ -401,7 +401,7 @@
                     <button type="button" title="Close (Esc)" onclick="editorSearchClose()">&#215;</button>
                 </div>
               </div>
-                <div id="logs-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+                <div id="logs-overlay" style="color: #ff9d00 !important; background: #000 !important; -webkit-text-fill-color: #ff9d00 !important; display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
                 <div id="logs-overlay-inner" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1001; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
 
 
@@ -428,7 +428,7 @@
             body: JSON.stringify({ code: code })
         }).then(r => r.json()).then(d => {
             if (d.ok && d.fixed_code) {
-                document.getElementById('autofix-code').value = d.fixed_code;
+                document.getElementById('autofix-code').value = d.fixed_code; updateAutofixSummary();
                 document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
                 
                 document.getElementById('autofix-fix-btn').style.display = 'none';
@@ -629,6 +629,33 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('autofix-fix-btn').style.display = 'inline-block';
         document.getElementById('autofix-modal').style.display = 'block';
     }
+
+    function updateAutofixSummary() {
+        const original = document.getElementById('autofix-original').value;
+        const fixed = document.getElementById('autofix-code').value;
+
+        if (!original && !fixed) {
+            document.getElementById('autofix-summary').textContent = '';
+            return;
+        }
+
+        const diff = Diff.diffLines(original, fixed);
+        let added = 0;
+        let removed = 0;
+
+        diff.forEach(part => {
+            const lines = part.value.split('\n').filter(l => l.trim() !== '').length;
+            if (part.added)   added   += lines;
+            if (part.removed) removed += lines;
+        });
+
+        const parts = [];
+        if (added)   parts.push(`+${added} line${added   !== 1 ? 's' : ''} added`);
+        if (removed) parts.push(`-${removed} line${removed !== 1 ? 's' : ''} removed`);
+
+        document.getElementById('autofix-summary').textContent =
+            parts.length > 0 ? `Changes: ${parts.join(', ')}` : 'No changes detected';
+    }
         function runSelected(){
         var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked');
         if(checks.length===0){ alert('Select a command'); return; }
@@ -713,6 +740,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 </div>
             </div>
         </div>
+            <div id="autofix-summary" style="font-size:11px;color:#888;margin-bottom:8px;min-height:16px;"></div>
 <div id="terminal-panel" style="display:none; height:300px; background:#000; border-top: 2px solid #ff9d00; flex-direction:column; flex-shrink: 0; width: 100%;">
         <div style="display:flex; justify-content:space-between; padding: 10px; background: #111; border-bottom: 1px solid #333;">
             <span style="color:#ff9d00; font-weight:bold; font-family:'Roboto Mono', monospace;">ACESi Terminal</span>
@@ -787,6 +815,8 @@ document.addEventListener("DOMContentLoaded", function() {
         document.addEventListener('DOMContentLoaded', window.aceLoadLastEdit);
     })();
     </script>
+
+
 
 
 
