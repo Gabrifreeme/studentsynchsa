@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Diff View Test</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            color: #ff9d00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #ff9d00;
+            color: #000;
+        }
+
+        .diff-container {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .diff-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #111;
+            border: 1px solid #ff9d00;
+            padding: 10px;
+        }
+
+        .diff-header {
+            font-size: 12px;
+            margin-bottom: 10px;
+            color: #888;
+        }
+
+        .diff-content {
+            flex: 1;
+            overflow: auto;
+            white-space: pre;
+            line-height: 1.5;
+            font-size: 12px;
+            tab-size: 4;
+            -moz-tab-size: 4;
+        }
+
+        /* Diff highlighting styles */
+        .line-added {
+            background-color: rgba(46, 160, 67, 0.15);
+            border-left: 3px solid #2ea043;
+            padding-left: 8px;
+            margin-left: -8px;
+        }
+
+        .line-removed {
+            background-color: rgba(248, 81, 73, 0.15);
+            border-left: 3px solid #f85149;
+            padding-left: 8px;
+            margin-left: -8px;
+        }
+
+        .line-unchanged {
+            background-color: transparent;
+        }
+
+        .line-context {
+            color: #6e7681;
+            font-style: italic;
+        }
+
+        #jsdiff-status {
+            padding: 10px;
+            border: 1px solid #ff9d00;
+            background: #111;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            color: #00ff00;
+        }
+
+        .error {
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>ACESi Diff View Test</h1>
+        
+        <div class="test-section">
+            <div class="test-controls">
+                <button onclick="loadTestDiffs()">Load Test Cases</button>
+                <button onclick="clearDiffs()">Clear</button>
+                <button onclick="showSampleDiff()">Show Sample Diff</button>
+            </div>
+            
+            <div id="jsdiff-status">Loading...</div>
+        </div>
+
+        <div class="diff-container">
+            <div class="diff-panel">
+                <div class="diff-header">ORIGINAL</div>
+                <div id="original-content" class="diff-content"></div>
+            </div>
+            <div class="diff-panel">
+                <div class="diff-header">ACESI's FIX</div>
+                <div id="fixed-content" class="diff-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Load jsdiff from CDN
+        async function loadJSDiff() {
+            return new Promise((resolve, reject) => {
+                if (typeof jsdiff !== 'undefined') {
+                    resolve();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jsdiff@5.2.0/dist/jsdiff.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Function to render side-by-side diff
+        async function renderDiff(originalText, fixedText) {
+            try {
+                await loadJSDiff();
+                
+                const originalElement = document.getElementById('original-content');
+                const fixedElement = document.getElementById('fixed-content');
+                
+                // Clear previous content
+                originalElement.innerHTML = '';
+                fixedElement.innerHTML = '';
+                
+                // Handle empty/undefined cases
+                if (!originalText || !fixedText) {
+                    originalElement.textContent = originalText || '';
+                    fixedElement.textContent = fixedText || '';
+                    return;
+                }
+                
+                // Split into lines
+                const originalLines = originalText.split('\n');
+                const fixedLines = fixedText.split('\n');
+                
+                // Use jsdiff to get the diff
+                const diff = jsdiff.diffLines(originalText, fixedText);
+                
+                // Process diff for original panel
+                let originalHtml = '';
+                let fixedHtml = '';
+                let originalLineNum = 0;
+                let fixedLineNum = 0;
+                
+                diff.forEach((part, index) => {
+                    if (part.removed) {
+                        // Line removed from original
+                        for (let i = 0; i < part.count; i++) {
+                            originalLineNum++;
+                            originalHtml += `<div class="line-removed" data-line="${originalLineNum}">${escapeHtml(originalLines[originalLineNum - 1 - i] || '')}</div>`;
+                        }
+                        for (let i = 0; i < part.count; i++) {
+                            fixedLineNum++;
+                            fixedHtml += `<div class="line-context" data-line="${fixedLineNum}">${escapeHtml(fixedLines[fixedLineNum - 1 - i] || '')}</div>`;
+                        }
+                    } else if (part.added) {
+                        // Line added to fixed version
+                        for (let i = 0; i < part.count; i++) {
+                            originalLineNum++;
+                            originalHtml += `<div class="line-context" data-line="${originalLineNum}">${escapeHtml(originalLines[originalLineNum - 1 - i] || '')}</div>`;
+                        }
+                        for (let i = 0; i < part.count; i++) {
+                            fixedLineNum++;
+                            fixedHtml += `<div class="line-added" data-line="${fixedLineNum}">${escapeHtml(fixedLines[fixedLineNum - 1 - i] || '')}</div>`;
+                        }
+                    } else {
+                        // Unchanged line
+                        for (let i = 0; i < part.count; i++) {
+                            originalLineNum++;
+                            fixedLineNum++;
+                            const lineNum = originalLineNum;
+                            originalHtml += `<div class="line-unchanged" data-line="${lineNum}">${escapeHtml(originalLines[lineNum - 1] || '')}</div>`;
+                            fixedHtml += `<div class="line-unchanged" data-line="${lineNum}">${escapeHtml(fixedLines[lineNum - 1] || '')}</div>`;
+                        }
+                    }
+                });
+                
+                // Apply content
+                originalElement.innerHTML = originalHtml;
+                fixedElement.innerHTML = fixedHtml;
+                
+            } catch (error) {
+                console.error('Error rendering diff:', error);
+                document.getElementById('jsdiff-status').innerHTML = '<span class="error">Failed to render diff: ' + error.message + '</span>';
+                // Fallback to plain text display
+                document.getElementById('original-content').textContent = originalText || '';
+                document.getElementById('fixed-content').textContent = fixedText || '';
+            }
+        }
+
+        // Test case 1: Syntax error fix
+        const testCase1 = {
+            original: 'function add(a, b) {\n    return a + b;\n}',
+            fixed: 'function add(a, b) {\n    if (typeof a !== "number" || typeof b !== "number") {\n        throw new Error("Both arguments must be numbers");\n    }\n    return a + b;\n}'
+        };
+
+        // Test case 2: Import add
+        const testCase2 = {
+            original: 'const express = require("express");\nconst app = express();\n\napp.get("/", (req, res) => {\n    res.send("Hello World");\n});\n\napp.listen(3000);',
+            fixed: 'const express = require("express");\nconst app = express();\nconst cors = require("cors");\n\napp.use(cors());\n\napp.get("/", (req, res) => {\n    res.json({\n        message: "Hello World",\n        timestamp: new Date().toISOString()\n    });\n});\n\napp.listen(3000, () => {\n    console.log("Server running on port 3000");\n});'
+        };
+
+        // Load test diffs
+        async function loadTestDiffs() {
+            document.getElementById('jsdiff-status').innerHTML = '<span class="success">Loading test diffs...</span>';
+            
+            // Test case 1
+            await renderDiff(testCase1.original, testCase1.fixed);
+            document.getElementById('jsdiff-status').innerHTML = '<span class="success">Test case 1 (Syntax error fix) loaded successfully</span>';
+        }
+
+        // Clear diffs
+        function clearDiffs() {
+            document.getElementById('original-content').innerHTML = '';
+            document.getElementById('fixed-content').innerHTML = '';
+            document.getElementById('jsdiff-status').innerHTML = 'Ready';
+        }
+
+        // Show sample diff
+        async function showSampleDiff() {
+            await renderDiff(testCase2.original, testCase2.fixed);
+            document.getElementById('jsdiff-status').innerHTML = '<span class="success">Sample diff (Import add) loaded successfully</span>';
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadJSDiff();
+                document.getElementById('jsdiff-status').innerHTML = '<span class="success">JSDiff loaded successfully</span>';
+                // Load first test case by default
+                await loadTestDiffs();
+            } catch (error) {
+                document.getElementById('jsdiff-status').innerHTML = '<span class="error">Failed to load JSDiff: ' + error.message + '</span>';
+            }
+        });
+    </script>
+</body>
+</html>
