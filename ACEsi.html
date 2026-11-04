@@ -197,21 +197,37 @@
         ::-webkit-scrollbar-thumb { background: #ff9d00; border-radius: 4px; }
         .spinner { display: none; width: 16px; height: 16px; border: 2px solid #ff9d00; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
+    /* === AutoFix diff view === */
+.autofix-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; flex:1; margin-bottom:12px; min-height:0; }
+.autofix-pane {
+  width:100%; height:100%; box-sizing:border-box; 
+  background:#0a0a0a; color:#ccc; border:1px solid #333; border-radius:4px;
+  padding:10px; font-family:'Roboto Mono',monospace; font-size:13px;
+  overflow-y:auto; overflow-x:hidden; white-space:pre-wrap; word-wrap:break-word; tab-size:4;
+}
+.autofix-pane .ln { display:block; min-height:1.4em; padding-left:4px; border-left:3px solid transparent; }
+.autofix-pane .ln-add { background:rgba(0,255,0,0.15); color:#7fff7f; border-left-color:#00ff00; }
+.autofix-pane .ln-del { background:rgba(255,0,0,0.15); color:#ff7f7f; border-left-color:#ff0000; }
+.autofix-pane .ln-ctx { color:#888; }
+#autofix-summary { font-size:12px; color:#ff9d00; text-align:center; padding:6px; }
+</style>
 
     <style>
         select, select option {
             font-family: Arial, sans-serif !important;
         }
-    </style>
+    
+</style>
 
     <style>
         .diff-del { color: #4a0000; }      /* dark red */
         .diff-add { color: #003300; }      /* dark green */
         .diff-unchanged { color: #888; }
-    </style>
+    
+</style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>`n</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+</head>
 <body>
 
     <div id="run-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:340px;">
@@ -416,30 +432,6 @@
         </div>
     </div>
 <script>
-           function applyAutoFix() {
-        const code = document.getElementById('autofix-original').value;
-        if (!code.trim()) return;
-        
-        document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
-        
-        fetch('http://127.0.0.1:5000/api/autofix', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: code })
-        }).then(r => r.json()).then(d => {
-            if (d.ok && d.fixed_code) {
-                document.getElementById('autofix-code').value = d.fixed_code; updateAutofixSummary();
-                document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
-                
-                document.getElementById('autofix-fix-btn').style.display = 'none';
-                document.getElementById('autofix-save-btn').style.display = 'inline-block';
-            } else {
-                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + (d.error || 'Unknown') + '</span>';
-            }
-        }).catch(e => {
-            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + e.message + '</span>';
-        });
-    }
 document.addEventListener("DOMContentLoaded", function() {
     console.log("JS: Explorer script started");
     window.currentFile = null; // Track the currently opened file
@@ -613,49 +605,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
     <script>
-               function openAutoFix() {
-        const el = document.getElementById('code-editor');
-        let source = '';
-        if (el) {
-            if (el.CodeMirror) source = el.CodeMirror.getValue();
-            else if (el.env && el.env.editor) source = el.env.editor.getValue();
-            else source = el.value || '';
-        }
-
-        document.getElementById('autofix-original').value = source;
-        document.getElementById('autofix-code').value = '';
-        document.getElementById('autofix-result').innerHTML = '';
-        document.getElementById('autofix-save-btn').style.display = 'none';
-        document.getElementById('autofix-fix-btn').style.display = 'inline-block';
-        document.getElementById('autofix-modal').style.display = 'block';
-    }
-
-    function updateAutofixSummary() {
-        const original = document.getElementById('autofix-original').value;
-        const fixed = document.getElementById('autofix-code').value;
-
-        if (!original && !fixed) {
-            document.getElementById('autofix-summary').textContent = '';
-            return;
-        }
-
-        const diff = Diff.diffLines(original, fixed);
-        let added = 0;
-        let removed = 0;
-
-        diff.forEach(part => {
-            const lines = part.value.split('\n').filter(l => l.trim() !== '').length;
-            if (part.added)   added   += lines;
-            if (part.removed) removed += lines;
-        });
-
-        const parts = [];
-        if (added)   parts.push(`+${added} line${added   !== 1 ? 's' : ''} added`);
-        if (removed) parts.push(`-${removed} line${removed !== 1 ? 's' : ''} removed`);
-
-        document.getElementById('autofix-summary').textContent =
-            parts.length > 0 ? `Changes: ${parts.join(', ')}` : 'No changes detected';
-    }
         function runSelected(){
         var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked');
         if(checks.length===0){ alert('Select a command'); return; }
@@ -718,18 +667,19 @@ document.addEventListener("DOMContentLoaded", function() {
 
     <!-- Auto Fix Modal -->
         <div id="autofix-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:99999;backdrop-filter:blur(5px);">
-            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:90%;max-width:800px;max-height:80%;overflow:auto;margin:auto;">
+            <div style="position:fixed;top:2%;left:2%;width:96%;height:96%;background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;display:flex;flex-direction:column;box-sizing:border-box;">
                 <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
                 <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
+                <div id="autofix-summary"></div>
                 
-                <div style="display:flex;gap:10px;width:100%;height:300px;margin-bottom:12px;">
+                <div class="autofix-grid">
                     <div style="flex:1;display:flex;flex-direction:column;">
                         <div style="font-size:11px;margin-bottom:4px;color:#888;">Original</div>
-                        <textarea id="autofix-original" readonly style="width:100%;flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
+                        <div id="autofix-original" class="autofix-pane"></div>
                     </div>
                     <div style="flex:1;display:flex;flex-direction:column;">
                         <div style="font-size:11px;margin-bottom:4px;color:#888;">ACESi's Fix</div>
-                        <textarea id="autofix-code" style="width:100%;flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
+                        <div id="autofix-code" class="autofix-pane" contenteditable="true" spellcheck="false"></div>
                     </div>
                 </div>
                 
@@ -740,7 +690,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 </div>
             </div>
         </div>
-            <div id="autofix-summary" style="font-size:11px;color:#888;margin-bottom:8px;min-height:16px;"></div>
+            
 <div id="terminal-panel" style="display:none; height:300px; background:#000; border-top: 2px solid #ff9d00; flex-direction:column; flex-shrink: 0; width: 100%;">
         <div style="display:flex; justify-content:space-between; padding: 10px; background: #111; border-bottom: 1px solid #333;">
             <span style="color:#ff9d00; font-weight:bold; font-family:'Roboto Mono', monospace;">ACESi Terminal</span>
@@ -814,7 +764,143 @@ document.addEventListener("DOMContentLoaded", function() {
         window.aceLoadLastEdit();
         document.addEventListener('DOMContentLoaded', window.aceLoadLastEdit);
     })();
-    </script>
+    /* ===== AutoFix diff view v2 ===== */
+window._autofix = { original: '', fixed: '' };
+
+function _afixEscape(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _afixRender(){
+  var DiffLib = window.Diff || window.jsdiff;
+  if(!DiffLib || !DiffLib.diffLines) {
+    document.getElementById('autofix-original').innerText = window._autofix.original || '';
+    document.getElementById('autofix-code').innerText = window._autofix.fixed || '';
+    return;
+  }
+  var leftEl  = document.getElementById('autofix-original');
+  var rightEl = document.getElementById('autofix-code');
+  if(!leftEl || !rightEl) return;
+  var orig  = window._autofix.original || '';
+  var fixed = window._autofix.fixed || '';
+  if(typeof Diff === 'undefined' || !Diff.diffLines){
+    leftEl.innerHTML  = '<span class="ln ln-ctx">' + _afixEscape(orig)  + '</span>';
+    rightEl.innerHTML = '<span class="ln ln-add">' + _afixEscape(fixed) + '</span>';
+    return;
+  }
+  var parts = DiffLib.diffLines(orig, fixed);
+  var leftHtml = '', rightHtml = '';
+  parts.forEach(function(p){
+    var lines = p.value.split('\n');
+    if(lines.length && lines[lines.length-1] === '') lines.pop();
+    lines.forEach(function(ln){
+      var safe = _afixEscape(ln) + '\n';
+      if(p.added){
+        rightHtml += '<span class="ln ln-add">' + safe + '</span>';
+      } else if(p.removed){
+        leftHtml  += '<span class="ln ln-del">' + safe + '</span>';
+      } else {
+        leftHtml  += '<span class="ln ln-ctx">' + safe + '</span>';
+        rightHtml += '<span class="ln ln-ctx">' + safe + '</span>';
+      }
+    });
+  });
+  leftEl.innerHTML  = leftHtml;
+  rightEl.innerHTML = rightHtml;
+}
+
+function updateAutofixSummary(){
+  var s = document.getElementById('autofix-summary');
+  if(!s) return;
+  var o = window._autofix.original || '';
+  var f = window._autofix.fixed || '';
+  if(!o && !f){ s.textContent = ''; return; }
+  var DiffLib = window.Diff || window.jsdiff;
+  if(!DiffLib){ s.textContent = 'fix ready'; return; }
+  var added = 0, removed = 0;
+  DiffLib.diffLines(o, f).forEach(function(p){
+    var lines = p.value.split('\n');
+    if(lines.length && lines[lines.length-1] === '') lines.pop();
+    if(p.added)   added   += lines.length;
+    if(p.removed) removed += lines.length;
+  });
+  s.textContent = '+' + added + ' / -' + removed + ' lines';
+}
+
+function openAutoFix(){
+  var el = document.getElementById('code-editor');
+  var source = '';
+  if (el) {
+    if (el.CodeMirror) source = el.CodeMirror.getValue();
+    else if (el.env && el.env.editor) source = el.env.editor.getValue();
+    else source = el.value || '';
+  }
+  window._autofix.original = source;
+  window._autofix.fixed = '';
+  _afixRender();
+  var res = document.getElementById('autofix-result');
+  if(res) res.innerHTML = '<span style="color:#ff9d00;">Click Fix Code to request a fix.</span>';
+  var sb = document.getElementById('autofix-save-btn');
+  var fb = document.getElementById('autofix-fix-btn');
+  if(sb) sb.style.display = 'none';
+  if(fb) fb.style.display = 'inline-block';
+  var modal = document.getElementById('autofix-modal');
+  if(modal) modal.style.display = 'block';
+  updateAutofixSummary();
+}
+
+function applyAutoFix(){
+  var code = window._autofix.original || '';
+  var res = document.getElementById('autofix-result');
+  if(res) res.innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
+
+  fetch('http://127.0.0.1:5000/api/autofix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d && d.ok && d.fixed_code){
+      window._autofix.fixed = d.fixed_code;
+      _afixRender();
+      updateAutofixSummary();
+      if(res) res.innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
+      var fb = document.getElementById('autofix-fix-btn');
+      var sb = document.getElementById('autofix-save-btn');
+      if(fb) fb.style.display = 'none';
+      if(sb) sb.style.display = 'inline-block';
+    } else {
+      if(res) res.innerHTML = '<span style="color:#ff0000;">Error: ' + ((d && d.error) || 'Unknown') + '</span>';
+    }
+  })
+  .catch(function(e){
+    if(res) res.innerHTML = '<span style="color:#ff0000;">Request failed: ' + _afixEscape(e.message) + '</span>';
+  });
+}
+
+function saveFixedCode(){
+  var pane = document.getElementById('autofix-code');
+  var fixed = pane ? pane.innerText : (window._autofix.fixed || '');
+  if(!fixed){ alert('No fixed code to save.'); return; }
+  fetch('http://127.0.0.1:5000/api/save-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: fixed, filename: window._CURRENT_FILE || '' })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var res = document.getElementById('autofix-result');
+    if(res) res.innerHTML = (d && d.ok)
+      ? '<span style="color:#00ff00;">Saved.</span>'
+      : '<span style="color:#ff0000;">Save failed: ' + ((d && d.error) || 'unknown') + '</span>';
+  })
+  .catch(function(e){
+    var res = document.getElementById('autofix-result');
+    if(res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
+  });
+}
+</script>
 
 
 
