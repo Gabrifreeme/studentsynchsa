@@ -886,7 +886,7 @@ function saveFixedCode(){
   fetch('http://127.0.0.1:5000/api/save-file', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: fixed, filename: window._CURRENT_FILE || '' })
+    body: JSON.stringify({ content: fixed, filename: window.currentFile || '' })
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
