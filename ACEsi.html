@@ -381,7 +381,7 @@
             <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <button id="search-btn" class="btn" title="Find text or line (Ctrl+F)" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="editorSearchOpen()">Search</button>
                 <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
-                            <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
+                            <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="let el=document.getElementById('code-editor'); let c=el.CodeMirror?el.CodeMirror.getValue():(el.env&&el.env.editor?el.env.editor.getValue():el.value); document.getElementById('autofix-original').value=c; document.getElementById('autofix-code').value=''; document.getElementById('autofix-result').innerHTML=''; document.getElementById('autofix-save-btn').style.display='none'; document.getElementById('autofix-fix-btn').style.display='inline-block'; document.getElementById('autofix-modal').style.display='block'">Auto Fix</button>
             <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
             <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
                 <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
@@ -1546,6 +1546,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.addEventListener('DOMContentLoaded', window.aceLoadLastEdit);
     })();
     </script>
+
 
 
 
