@@ -416,29 +416,29 @@
         </div>
     </div>
 <script>
-        function openAutoFix() {
-        const el = document.getElementById('code-editor');
-        let source = '';
+           function applyAutoFix() {
+        const code = document.getElementById('autofix-original').value;
+        if (!code.trim()) return;
         
-        if (el) {
-            if (el.CodeMirror) source = el.CodeMirror.getValue();
-            else if (window.monaco && window.monaco.editor) {
-                const m = window.monaco.editor.getModels();
-                if (m.length) source = m[0].getValue();
+        document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
+        
+        fetch('http://127.0.0.1:5000/api/autofix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        }).then(r => r.json()).then(d => {
+            if (d.ok && d.fixed_code) {
+                document.getElementById('autofix-code').value = d.fixed_code;
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
+                
+                document.getElementById('autofix-fix-btn').style.display = 'none';
+                document.getElementById('autofix-save-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + (d.error || 'Unknown') + '</span>';
             }
-            else if (el.env && el.env.editor) source = el.env.editor.getValue();
-            else source = el.value || '';
-        }
-
-        const orig = document.getElementById('autofix-original');
-        const code = document.getElementById('autofix-code');
-        if (orig) orig.value = source;
-        if (code) code.value = '';
-        
-        const res = document.getElementById('autofix-result'); if (res) res.innerHTML = '';
-        const sBtn = document.getElementById('autofix-save-btn'); if (sBtn) sBtn.style.display = 'none';
-        const fBtn = document.getElementById('autofix-fix-btn'); if (fBtn) fBtn.style.display = 'inline-block';
-        const mdl = document.getElementById('autofix-modal'); if (mdl) mdl.style.display = 'block';
+        }).catch(e => {
+            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + e.message + '</span>';
+        });
     }
 document.addEventListener("DOMContentLoaded", function() {
     console.log("JS: Explorer script started");
@@ -613,7 +613,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
     <script>
-            function openAutoFixModal() {
+               function openAutoFix() {
         const el = document.getElementById('code-editor');
         let source = '';
         if (el) {
