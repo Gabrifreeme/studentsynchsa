@@ -900,6 +900,90 @@ function saveFixedCode(){
     if(res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
   });
 }
+        // --- RESTORED CLEAN SCRIPT ---
+        document.addEventListener("DOMContentLoaded", function() {
+            var editorEl = document.getElementById('code-editor');
+            if (editorEl && typeof CodeMirror !== 'undefined' && !editorEl.CodeMirror) {
+                var cm = CodeMirror.fromTextArea(editorEl, { mode: "dart", theme: "default", lineNumbers: true });
+                cm.setSize("100%", "100%");
+            }
+        });
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            const timerEl = document.getElementById('response-timer');
+            const spinnerLeft = document.getElementById('spinner-left');
+            const spinnerRight = document.getElementById('spinner-right');
+            const chatContainer = document.getElementById('chat-messages');
+
+            if (timerEl) { timerEl.style.display = 'block'; timerEl.textContent = '0.0s'; }
+            if (spinnerLeft) spinnerLeft.style.display = 'block';
+            if (spinnerRight) spinnerRight.style.display = 'block';
+            
+            const startTime = Date.now();
+            window._timerInterval = setInterval(() => { if (timerEl) timerEl.textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's'; }, 100);
+
+            chatContainer.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #333;margin-bottom:8px;margin-left:20px;"><b>You:</b> ' + text + '</div>';
+            input.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                const aiReply = data.reply;
+                const execMatch = aiReply.match(/\[EXEC:\s*(.+?)\]/i);
+
+                if (execMatch) {
+                    const command = execMatch[1].trim();
+                    chatContainer.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' + aiReply.split('[EXEC:')[0].trim() + '<br><span style="color:#888;">[Running: ' + command + ']</span></div>';
+                    
+                    const execRes = await fetch('/api/system/exec', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: command })
+                    });
+                    const execData = await execRes.json();
+                    
+                    let output = "";
+                    if (execData.ok) {
+                        output = (execData.stdout || "") + (execData.stderr ? "\n[STDERR]\n" + execData.stderr : "");
+                        if (!output.trim()) output = "[No output]";
+                    } else {
+                        output = "Error: " + (execData.error || "Unknown execution error");
+                    }
+                    
+                    chatContainer.innerHTML += '<div style="background:#0a0a0a;padding:8px 12px;border-radius:6px;border:1px solid #333;margin-bottom:8px;font-family:monospace;font-size:11px;color:#00ff00;white-space:pre-wrap;max-height:200px;overflow-y:auto;"><b>Terminal Output:</b><br>' + output + '</div>';
+                    
+                    const followRes = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: "The command [" + command + "] returned this output:\n" + output + "\n\nWhat should we do next?" })
+                    });
+                    const followData = await followRes.json();
+                    chatContainer.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' + followData.reply + '</div>';
+                } else {
+                    chatContainer.innerHTML += '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' + aiReply + '</div>';
+                }
+            } catch (e) {
+                chatContainer.innerHTML += '<div style="color:red;padding:8px;">Server error: ' + e.message + '</div>';
+            } finally {
+                if (window._timerInterval) clearInterval(window._timerInterval);
+                if (spinnerLeft) spinnerLeft.style.display = 'none';
+                if (spinnerRight) spinnerRight.style.display = 'none';
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        function sendChat() {
+            sendMessage();
+        }
 </script>
 
 
