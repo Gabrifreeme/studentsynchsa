@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <title>ACE</title>
@@ -52,7 +52,46 @@
                     body: JSON.stringify({ message: text })
                 });
                 const data = await res.json();
-                addMessage(data.reply, 'ace');
+                const aiReply = data.reply;
+                const execMatch = aiReply.match(/\[EXEC:\s*(.+?)\]/i);
+                
+                if (execMatch) {
+                    const command = execMatch[1].trim();
+                    addMessage(aiReply.split('[EXEC:')[0].trim() + "\n[Running command: " + command + "]", 'ace');
+                    
+                    try {
+                        const execRes = await fetch('/api/system/exec', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command: command })
+                        });
+                        const execData = await execRes.json();
+                        
+                        let output = "";
+                        if (execData.ok) {
+                            output = (execData.stdout || "") + (execData.stderr ? "\n[STDERR]\n" + execData.stderr : "");
+                            if (!output.trim()) output = "[No output]";
+                        } else {
+                            output = "Error: " + (execData.error || "Unknown execution error");
+                        }
+                        
+                        addMessage("Terminal Output:\n" + output, 'ace');
+                        
+                        // Feed it back to ACESi
+                        const followRes = await fetch('/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: "The command [" + command + "] returned this output:\n" + output + "\n\nWhat should we do next?" })
+                        });
+                        const followData = await followRes.json();
+                        addMessage(followData.reply, 'ace');
+                        
+                    } catch (e) {
+                        addMessage('Execution error: ' + e.message, 'ace');
+                    }
+                } else {
+                    addMessage(aiReply, 'ace');
+                }
             } catch (e) {
                 addMessage('Server error: ' + e.message, 'ace');
             }

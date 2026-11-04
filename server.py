@@ -2974,10 +2974,18 @@ def last_edit():
     return jsonify(_last_edit_info())
 
 
+@app.route('/chat-ui')
+def chat_ui():
+    resp = send_from_directory('.', 'ACE.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
 @app.route('/')
 def index():
     resp = send_from_directory('.', 'ACEsi.html')
-    # Never let the browser cache the chat UI — stale JS was the root cause of
     # "popup never shows" (old page missing the view-rendering code).
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -5188,7 +5196,10 @@ def chat():
                         "If the user asks you to EXPLAIN code, answer in plain text. "
             "If the user asks you to FIX or EDIT code, you MUST output the ENTIRE corrected file inside a standard markdown block. "
             "DO NOT use any tools. DO NOT output JSON."
-                        "If I ask you to fix or edit code, output the ENTIRE corrected file inside a standard markdown block like this: ```dart\n<code here>\n```. Do NOT use any tools. Do NOT output JSON."
+                        "If I ask you to fix or edit code, output the ENTIRE corrected file inside a standard markdown block like this: ```dart\n<code here>\n```. Do NOT use any tools. Do NOT output JSON. "
+            "EXECUTION SUPERPOWER: You have full access to the terminal at C:\\Users\\chris\\LipSyncStudent. "
+            "If you need to check dependencies, run flutter, or inspect files, you MUST output exactly `[EXEC: your_command_here]` on its own line. "
+            "I will run it and reply with the output."
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
@@ -5430,6 +5441,37 @@ def api_file_content():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+@app.route('/api/system/exec', methods=['POST'])
+def api_system_exec():
+    data = request.get_json(silent=True) or {}
+    cmd = data.get('command', '').strip()
+    if not cmd:
+        return jsonify({'ok': False, 'error': 'No command provided'}), 400
+    
+    # SECURITY: Force working directory to the project root
+    cwd = r'C:\Users\chris\LipSyncStudent'
+    
+    try:
+        # Run the command, capture output, set timeout to 30 seconds
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        return jsonify({
+            'ok': True,
+            'stdout': result.stdout,
+            'stderr': result.stderr,
+            'exit_code': result.returncode
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'ok': False, 'error': 'Command timed out after 30 seconds'}), 504
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 @app.route('/api/save-file', methods=['POST'])
 def api_save_file():
     # ACEsi.html posts form-encoded data; accept JSON too for other clients.
