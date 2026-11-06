@@ -96,23 +96,7 @@
         .btn:hover { background: #ff9d00; color: #000; }
         #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
         #editor-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
-        #highlight-layer {
-            position: absolute;
-            inset: 0;
-            box-sizing: border-box;
-            margin: 0;
-            padding: 10px;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 14px;
-            line-height: 21px;
-            white-space: pre;
-            tab-size: 4;
-            overflow: hidden;
-            color: #ff9d00;
-            background: transparent;
-            pointer-events: none;
-            z-index: 2;
-        }
+        #highlight-layer { display: none !important; visibility: hidden !important; z-index: -1 !important; }
         #search-marks {
             position: absolute;
             inset: 0;
@@ -210,23 +194,39 @@
 .autofix-pane .ln-del { background:rgba(255,0,0,0.15); color:#ff7f7f; border-left-color:#ff0000; }
 .autofix-pane .ln-ctx { color:#888; }
 #autofix-summary { font-size:12px; color:#ff9d00; text-align:center; padding:6px; }
+
 </style>
 
     <style>
-        select, select option {
-            font-family: Arial, sans-serif !important;
-        }
+    select, select option {
+        font-family: Arial, sans-serif !important;
+    }
+
+        #code-editor { display: none !important; }
+    #highlight-layer, #search-marks { display: none !important; }
+    #editor-area { position: relative !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; }
     
+    
+    /* Clean CodeMirror implementation */
+    #editor-area { position: relative !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; }
+    .CodeMirror { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; height: 100% !important; font-family: Consolas, Monaco, monospace !important; font-size: 14px !important; }
+    
+    /* Ensure only the CM gutter shows */
+    .CodeMirror-gutters { border-right: 1px solid #44475a !important; background: #282a36 !important; z-index: 3 !important; }
+    .CodeMirror-linenumber { color: #6272a4 !important; padding: 0 8px !important; }
+    .CodeMirror-lines { padding-left: 0 !important; }
+
+    /* Hide legacy layers completely */
+    #highlight-layer, #search-marks, #code-editor { display: none !important; }
+
 </style>
 
-    <style>
-        .diff-del { color: #4a0000; }      /* dark red */
-        .diff-add { color: #003300; }      /* dark green */
-        .diff-unchanged { color: #888; }
-    
 </style>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/dart/dart.min.js"></script>
 </head>
 <body>
 
@@ -404,10 +404,8 @@
             </div>
             </div>
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
-              <div id="line-numbers">1</div>
+              
               <div id="editor-area">
-                <pre id="highlight-layer" aria-hidden="true"></pre>
-                <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
                 <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; background:#000 !important; color:#ff9d00 !important; -webkit-text-fill-color:#ff9d00 !important; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:2;"></textarea>
                 <div id="editor-search">
                     <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
@@ -501,7 +499,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
                                 .then(res => res.text())
                                 .then(fileData => {
-                                    document.getElementById('code-editor').value = fileData;
+                                    if (window.globalCM) { window.globalCM.setValue(fileData); } else { document.getElementById('code-editor').value = fileData; }
                                     if (window.aceEditorRefresh) window.aceEditorRefresh();
                                     fetch('http://127.0.0.1:5000/api/context/file', {
                                         method: 'POST',
@@ -904,8 +902,7 @@ function saveFixedCode(){
         document.addEventListener("DOMContentLoaded", function() {
             var editorEl = document.getElementById('code-editor');
             if (editorEl && typeof CodeMirror !== 'undefined' && !editorEl.CodeMirror) {
-                var cm = CodeMirror.fromTextArea(editorEl, { mode: "dart", theme: "default", lineNumbers: true });
-                cm.setSize("100%", "100%");
+                window.globalCM = CodeMirror.fromTextArea(editorEl, { mode: "dart", theme: "dracula", lineNumbers: true, gutters: ["CodeMirror-linenumbers"] }); setTimeout(function(){ if (window.globalCM) { window.globalCM.refresh(); var g = document.querySelectorAll(".CodeMirror-gutter"); if (g.length > 1) { for (var i = 1; i < g.length; i++) { g[i].style.display = "none"; } } } }, 500); [0, 100, 500, 1500].forEach(function(ms){ setTimeout(function(){ if (window.globalCM) window.globalCM.refresh(); }, ms); });
             }
         });
 
@@ -985,6 +982,7 @@ function saveFixedCode(){
             sendMessage();
         }
 </script>
+
 
 
 
