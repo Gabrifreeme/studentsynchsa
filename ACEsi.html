@@ -210,17 +210,6 @@
 .autofix-pane .ln-del { background:rgba(255,0,0,0.15); color:#ff7f7f; border-left-color:#ff0000; }
 .autofix-pane .ln-ctx { color:#888; }
 #autofix-summary { font-size:12px; color:#ff9d00; text-align:center; padding:6px; }
-#code-editor { display: none !important; }
-#editor-area { position: relative !important; height: 100% !important; overflow: hidden !important; }
-.CodeMirror { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; height: 100% !important; font-family: 'Consolas', 'Monaco', monospace !important; font-size: 14px !important; }
-.cm-s-dracula.CodeMirror { background: #000 !important; }
-.cm-s-dracula .CodeMirror-gutters { background: #000 !important; border-right: 1px solid #ff9d00 !important; }
-.cm-s-dracula .CodeMirror-linenumber { color: #ff9d00 !important; }
-.cm-s-dracula span.cm-keyword { color: #ff79c6 !important; font-weight: bold !important; }
-.cm-s-dracula span.cm-string { color: #f1fa8c !important; }
-.cm-s-dracula span.cm-def, .cm-s-dracula span.cm-variable-2 { color: #50fa7b !important; }
-.cm-s-dracula span.cm-comment { color: #6272a4 !important; font-style: italic !important; }
-#explorer div:not(:has(div)):hover { background: rgba(255, 157, 0, 0.1) !important; }
 </style>
 
     <style>
@@ -228,17 +217,6 @@
             font-family: Arial, sans-serif !important;
         }
     
-#code-editor { display: none !important; }
-#editor-area { position: relative !important; height: 100% !important; overflow: hidden !important; }
-.CodeMirror { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; height: 100% !important; font-family: 'Consolas', 'Monaco', monospace !important; font-size: 14px !important; }
-.cm-s-dracula.CodeMirror { background: #000 !important; }
-.cm-s-dracula .CodeMirror-gutters { background: #000 !important; border-right: 1px solid #ff9d00 !important; }
-.cm-s-dracula .CodeMirror-linenumber { color: #ff9d00 !important; }
-.cm-s-dracula span.cm-keyword { color: #ff79c6 !important; font-weight: bold !important; }
-.cm-s-dracula span.cm-string { color: #f1fa8c !important; }
-.cm-s-dracula span.cm-def, .cm-s-dracula span.cm-variable-2 { color: #50fa7b !important; }
-.cm-s-dracula span.cm-comment { color: #6272a4 !important; font-style: italic !important; }
-#explorer div:not(:has(div)):hover { background: rgba(255, 157, 0, 0.1) !important; }
 </style>
 
     <style>
@@ -246,24 +224,17 @@
         .diff-add { color: #003300; }      /* dark green */
         .diff-unchanged { color: #888; }
     
-#code-editor { display: none !important; }
-#editor-area { position: relative !important; height: 100% !important; overflow: hidden !important; }
-.CodeMirror { position: absolute !important; top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; height: 100% !important; font-family: 'Consolas', 'Monaco', monospace !important; font-size: 14px !important; }
-.cm-s-dracula.CodeMirror { background: #000 !important; }
-.cm-s-dracula .CodeMirror-gutters { background: #000 !important; border-right: 1px solid #ff9d00 !important; }
-.cm-s-dracula .CodeMirror-linenumber { color: #ff9d00 !important; }
-.cm-s-dracula span.cm-keyword { color: #ff79c6 !important; font-weight: bold !important; }
-.cm-s-dracula span.cm-string { color: #f1fa8c !important; }
-.cm-s-dracula span.cm-def, .cm-s-dracula span.cm-variable-2 { color: #50fa7b !important; }
-.cm-s-dracula span.cm-comment { color: #6272a4 !important; font-style: italic !important; }
-#explorer div:not(:has(div)):hover { background: rgba(255, 157, 0, 0.1) !important; }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/dart/dart.min.js"></script>
+
+<style>
+    /* Highlight files (leaf nodes) on hover in the Explorer, VS Code style */
+    #explorer div:not(:has(div)):hover {
+        background-color: #333 !important;
+        color: #fff !important;
+    }
+</style>
 </head>
 <body>
 
@@ -441,7 +412,7 @@
             </div>
             </div>
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
-              
+              <div id="line-numbers">1</div>
               <div id="editor-area">
                 <pre id="highlight-layer" aria-hidden="true"></pre>
                 <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
@@ -538,7 +509,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
                                 .then(res => res.text())
                                 .then(fileData => {
-                                    if (window.globalCM) { window.globalCM.setValue(fileData); } else { document.getElementById('code-editor').value = fileData; }
+                                    document.getElementById('code-editor').value = fileData;
+                                    if (typeof updateLineNumbers === 'function') updateLineNumbers();
                                     if (window.aceEditorRefresh) window.aceEditorRefresh();
                                     fetch('http://127.0.0.1:5000/api/context/file', {
                                         method: 'POST',
@@ -941,8 +913,37 @@ function saveFixedCode(){
         document.addEventListener("DOMContentLoaded", function() {
             var editorEl = document.getElementById('code-editor');
             if (editorEl && typeof CodeMirror !== 'undefined' && !editorEl.CodeMirror) {
-                window.globalCM = CodeMirror.fromTextArea(editorEl, { mode: "dart", theme: "dracula", lineNumbers: true }); setTimeout(function() { if (window.globalCM) window.globalCM.refresh(); }, 200);
+                var cm = CodeMirror.fromTextArea(editorEl, { mode: "dart", theme: "default", lineNumbers: true });
+                cm.setSize("100%", "100%");
             }
+        });
+
+        // --- EDITOR LINE NUMBERS ---
+        // The textarea is still the editor (CodeMirror is not loaded), so keep a
+        // gutter in sync with its line count and vertical scroll position.
+        function updateLineNumbers() {
+            var ta = document.getElementById('code-editor');
+            var gutter = document.getElementById('line-numbers');
+            if (!ta || !gutter) return;
+            var count = ta.value.split('\n').length;
+            var lines = [];
+            for (var i = 1; i <= count; i++) lines.push(i);
+            gutter.textContent = lines.join('\n');
+            gutter.scrollTop = ta.scrollTop;
+        }
+
+        function syncLineNumbersScroll() {
+            var ta = document.getElementById('code-editor');
+            var gutter = document.getElementById('line-numbers');
+            if (ta && gutter) gutter.scrollTop = ta.scrollTop;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var ta = document.getElementById('code-editor');
+            if (!ta) return;
+            ta.addEventListener('input', updateLineNumbers);
+            ta.addEventListener('scroll', syncLineNumbersScroll);
+            updateLineNumbers();
         });
 
         async function sendMessage() {
@@ -1021,7 +1022,6 @@ function saveFixedCode(){
             sendMessage();
         }
 </script>
-
 
 
 
