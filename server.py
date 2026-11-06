@@ -154,11 +154,11 @@ CLOUDFLARE_ENDPOINT = (
     "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1"
     % CLOUDFLARE_ACCOUNT_ID)
 CLOUDFLARE_MODEL = os.environ.get(
-    "CLOUDFLARE_MODEL", "@cf/meta/llama-3.1-8b-instruct")
+    "CLOUDFLARE_MODEL", "@cf/qwen/qwen2.5-coder-32b-instruct")
 
 # Hugging Face Inference Providers - OpenAI-compatible router.
 HF_ENDPOINT = "https://router.huggingface.co/v1"
-HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-Coder-32B-Instruct")
+HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen3-32B")
 
 # Google Gemini - OpenAI-compatible endpoint. The free quota is per model, so
 # flash-lite keeps working when flash has spent its own daily allowance.
@@ -13173,6 +13173,15 @@ def provider_health(probe=True):
                     rec["total_usage"] = used
                     if isinstance(used, (int, float)):
                         rec["remaining_credits"] = round(total - used, 4)
+        elif name == "Cloudflare":
+            # Workers AI has no GET /ai/v1/models (it answers 405); the real
+            # catalogue endpoint is /ai/models/search.
+            ok, detail, _ = _probe_json(
+                ep.replace("/ai/v1", "/ai/models/search"),
+                {"Authorization": "Bearer %s" % key})
+            rec["reachable"] = ok
+            rec["detail"] = detail
+            rec["latency_ms"] = int((time.time() - t0) * 1000)
         else:
             ok, detail, _ = _probe_json(ep + "/models",
                                         {"Authorization": "Bearer %s" % key})
