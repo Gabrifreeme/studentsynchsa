@@ -992,6 +992,17 @@ FREELLM_API_KEY = FREELLM_API_KEY or _LK.get("freellm", "")
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY") or _LK.get("mistral", "")
 CLOUDFLARE_API_KEY = os.environ.get("CLOUDFLARE_API_KEY") or _LK.get("cloudflare", "")
 HF_API_KEY = os.environ.get("HF_API_KEY") or _LK.get("hf", "")
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY") or _LK.get("nvidia", "")
+NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1"
+NVIDIA_MODEL = "meta/llama-3.3-70b-instruct"
+
+SAMBANOVA_API_KEY = os.environ.get("SAMBANOVA_API_KEY") or _LK.get("sambanova", "")
+SAMBANOVA_ENDPOINT = "https://api.sambanova.ai/v1"
+SAMBANOVA_MODEL = "Meta-Llama-3.3-70B-Instruct"
+
+GITHUB_API_KEY = os.environ.get("GITHUB_API_KEY") or _LK.get("github", "")
+GITHUB_ENDPOINT = "https://models.inference.ai.azure.com"
+GITHUB_MODEL = "gpt-4o"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or _LK.get("gemini", "")
 
 def load_json(filename, default):
@@ -3115,6 +3126,9 @@ def _chat_providers(domain=""):
         ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
         ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
         ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
+                ("NVIDIA", NVIDIA_ENDPOINT, NVIDIA_API_KEY, NVIDIA_MODEL),
+                ("SambaNova", SAMBANOVA_ENDPOINT, SAMBANOVA_API_KEY, SAMBANOVA_MODEL),
+                ("GitHub", GITHUB_ENDPOINT, GITHUB_API_KEY, GITHUB_MODEL),
         ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
         ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
     ]
@@ -12693,6 +12707,9 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                                      ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
                                      ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
                                      ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
+                ("NVIDIA", NVIDIA_ENDPOINT, NVIDIA_API_KEY, NVIDIA_MODEL),
+                ("SambaNova", SAMBANOVA_ENDPOINT, SAMBANOVA_API_KEY, SAMBANOVA_MODEL),
+                ("GitHub", GITHUB_ENDPOINT, GITHUB_API_KEY, GITHUB_MODEL),
                                      ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
                                      ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
                                      ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL)):
@@ -12966,6 +12983,9 @@ def auto_fix_stream():
                 ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
                 ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
+                ("NVIDIA", NVIDIA_ENDPOINT, NVIDIA_API_KEY, NVIDIA_MODEL),
+                ("SambaNova", SAMBANOVA_ENDPOINT, SAMBANOVA_API_KEY, SAMBANOVA_MODEL),
+                ("GitHub", GITHUB_ENDPOINT, GITHUB_API_KEY, GITHUB_MODEL),
                 ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
                 ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL)
             ]
@@ -14747,5 +14767,7 @@ def restart_server():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 app.run(host='127.0.0.1', port=5000, debug=False)
+
+
 
 
