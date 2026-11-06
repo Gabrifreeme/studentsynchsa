@@ -94,7 +94,7 @@
         
         .btn { background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 10px; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 11px; margin-right: 4px; }
         .btn:hover { background: #ff9d00; color: #000; }
-        #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
+        #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px 40px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
         #editor-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
         #highlight-layer {
             position: absolute;
@@ -112,6 +112,9 @@
             background: transparent;
             pointer-events: none;
             z-index: 2;
+            /* Extra room so the overlay can scroll as far as the textarea,
+               whose horizontal scrollbar shrinks its own viewport. */
+            padding-bottom: 40px;
         }
         #search-marks {
             position: absolute;
@@ -146,11 +149,15 @@
         }
         #code-editor::selection { background: rgba(255, 157, 0, 0.35); }
         #code-editor::placeholder { color: #7a5a1a; }
+        /* Fallback: keep the plain orange text until the highlighter has rendered */
+        #code-editor { background: #000; color: #ff9d00; -webkit-text-fill-color: #ff9d00; caret-color: #ff9d00; }
+        body.syntax-on #code-editor { background: transparent !important; color: transparent !important; -webkit-text-fill-color: transparent !important; }
+        body.syntax-on #code-editor::placeholder { color: #7a5a1a; -webkit-text-fill-color: #7a5a1a; }
         .hl-com { color: #6b7280; font-style: italic; }
-        .hl-str { color: #7ec699; }
+        .hl-str { color: #f1fa8c; }
         .hl-num { color: #d19a66; }
-        .hl-kw { color: #ffb84d; font-weight: bold; }
-        .hl-fn { color: #61afef; }
+        .hl-kw { color: #ff79c6; font-weight: bold; }
+        .hl-fn { color: #50fa7b; }
         .hl-op { color: #c8c8c8; }
         .hl-tag { color: #e06c75; }
         .hl-attr { color: #d19a66; }
@@ -416,7 +423,7 @@
               <div id="editor-area">
                 <pre id="highlight-layer" aria-hidden="true"></pre>
                 <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
-                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; background:#000 !important; color:#ff9d00 !important; -webkit-text-fill-color:#ff9d00 !important; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:2;"></textarea>
+                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:3;"></textarea>
                 <div id="editor-search">
                     <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
                     <span id="search-count"></span>
@@ -932,18 +939,84 @@ function saveFixedCode(){
             gutter.scrollTop = ta.scrollTop;
         }
 
-        function syncLineNumbersScroll() {
+        // --- DART SYNTAX HIGHLIGHTING ---
+        // The textarea stays the real editor (caret, selection, scrolling).
+        // Its text is transparent and a <pre> underneath draws the coloured copy.
+        var DART_KEYWORDS = /^(?:abstract|as|assert|async|await|base|break|case|catch|class|const|continue|covariant|default|deferred|do|dynamic|else|enum|export|extends|extension|external|factory|false|final|finally|for|Function|get|hide|if|implements|import|in|interface|is|late|library|mixin|new|null|on|operator|part|required|rethrow|return|sealed|set|show|static|super|switch|sync|this|throw|true|try|typedef|var|void|when|while|with|yield)$/;
+
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function highlightDart(src) {
+            var re = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|('''[\s\S]*?'''|"""[\s\S]*?"""|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*")|([A-Za-z_]\w*)|(0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(@[A-Za-z_]\w*)/g;
+            var out = '', last = 0, m;
+            while ((m = re.exec(src))) {
+                if (m.index > last) out += escapeHtml(src.slice(last, m.index));
+                if (m[1]) {
+                    out += '<span class="hl-com">' + escapeHtml(m[0]) + '</span>';
+                } else if (m[2]) {
+                    out += '<span class="hl-str">' + escapeHtml(m[0]) + '</span>';
+                } else if (m[3]) {
+                    if (DART_KEYWORDS.test(m[3])) {
+                        out += '<span class="hl-kw">' + m[3] + '</span>';
+                    } else if (/^\s*\(/.test(src.slice(re.lastIndex))) {
+                        out += '<span class="hl-fn">' + m[3] + '</span>';
+                    } else {
+                        out += m[3];
+                    }
+                } else if (m[4]) {
+                    out += '<span class="hl-num">' + m[4] + '</span>';
+                } else if (m[5]) {
+                    out += '<span class="hl-at">' + m[5] + '</span>';
+                }
+                last = re.lastIndex;
+            }
+            out += escapeHtml(src.slice(last));
+            return out;
+        }
+
+        function renderHighlight() {
+            var ta = document.getElementById('code-editor');
+            var layer = document.getElementById('highlight-layer');
+            if (!ta || !layer) return;
+            try {
+                layer.innerHTML = highlightDart(ta.value) + '\n';
+                document.body.classList.add('syntax-on');
+            } catch (err) {
+                layer.innerHTML = '';
+                document.body.classList.remove('syntax-on');
+                return;
+            }
+            syncEditorScroll();
+        }
+        window.aceEditorRefresh = renderHighlight;
+
+        // Keep the gutter and highlight overlay aligned with the textarea.
+        function syncEditorScroll() {
             var ta = document.getElementById('code-editor');
             var gutter = document.getElementById('line-numbers');
-            if (ta && gutter) gutter.scrollTop = ta.scrollTop;
+            var layer = document.getElementById('highlight-layer');
+            if (!ta) return;
+            if (gutter) gutter.scrollTop = ta.scrollTop;
+            if (layer) {
+                layer.scrollTop = ta.scrollTop;
+                layer.scrollLeft = ta.scrollLeft;
+            }
+        }
+
+        function syncLineNumbersScroll() {
+            syncEditorScroll();
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             var ta = document.getElementById('code-editor');
             if (!ta) return;
             ta.addEventListener('input', updateLineNumbers);
+            ta.addEventListener('input', renderHighlight);
             ta.addEventListener('scroll', syncLineNumbersScroll);
             updateLineNumbers();
+            renderHighlight();
         });
 
         async function sendMessage() {
