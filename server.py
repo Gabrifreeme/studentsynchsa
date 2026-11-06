@@ -3111,13 +3111,12 @@ def _chat_providers(domain=""):
                   GROQ_MODEL_BROWSER else GROQ_MODEL)
     return [
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
+        ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
+        ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+        ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+        ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
         ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
         ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
-        ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
-        ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-        ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-        ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
-        ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
     ]
 
 
@@ -12690,12 +12689,12 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
         print("🔌 ACE_OFFLINE=1 set — skipping cloud providers, using local Ollama")
     else:
         for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-                                     ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                                     ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
                                      ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+                                     ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                                     ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
                                      ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
                                      ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
-                                     ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
-                                     ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
                                      ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL)):
             res = one(name, ep, key, model)
             if res is not None:
@@ -12963,12 +12962,12 @@ def auto_fix_stream():
         # If a local model was requested, skip the cloud providers completely
         providers = [
                 ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-                ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
                 ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-                ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
-                ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
+                ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
                 ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
-                ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL)
+                ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
+                ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL)
             ]
         
         for name, endpoint, api_key, model in providers:
