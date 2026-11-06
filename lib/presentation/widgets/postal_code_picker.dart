@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/sa_postal_codes.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/data/sa_postal_codes.dart';
 
 /// A complete, searchable picker for South African postal codes.
 ///

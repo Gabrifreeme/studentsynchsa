@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:studentsyncsa/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
 
 class PdfGenerator {
   Future<List<int>> generateApplicationPdf(

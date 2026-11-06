@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studentsyncsa/services/its_url_fixer.dart';
+import 'package:lipsyncstudent/services/its_url_fixer.dart';
 
 void main() {
   group('ItsUrl.expandProcedure', () {

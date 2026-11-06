@@ -1,0 +1,14 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 17532
+[boot] git HEAD  : ce7b489  (+170 uncommitted)
+[boot] server.py : mtime=19:05:50  547182 bytes
+[boot] devtools_service.py: mtime=18:14:52  38956 bytes
+[boot] ace_config.yaml: mtime=18:26:06  6096 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off

@@ -1,0 +1,82 @@
+🛑 E-STOP armed at boot; ACE_AUTO_AGENTS=False
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 8068
+[boot] git HEAD  : 0715dd2  (+12 modified)
+[boot] server.py : mtime=23:59:27  704231 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 7  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=True. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🔴 E-STOP PERSISTED ON BOOT (reason=armed at boot: autonomous agents are off by default, source=boot) — ACEsi is silent until the un-kill word arrives.
+ * Serving Flask app 'server'
+ * Debug mode: off
+🟢 E-STOP CLEARED
+📨 Incoming message length: 100 chars
+[domain] explicit tool 'web_search' -> net (tool domains: ['net'])
+🧠 ui_script bail: prompt is 100 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1838 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1838 affordable=106]]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 61 -> 11 tools, ~1157 tokens
+SUBMIT-GUARD: field filled via cdp_evaluate (field=username, submit required next: False)
+🔧 /chat executed cdp_evaluate ok=True
+🪶 reduced schema: 61 -> 11 tools, ~1157 tokens
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1907 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1907 affordable=106]]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 8.0s before attempt 4 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+⏳ OpenRouter 429: waiting 2.0s before attempt 2 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+⏳ OpenRouter 429: waiting 4.0s before attempt 3 (Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model request)
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 61 -> 11 tools, ~1157 tokens
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1968 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1968 affordable=106]]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 61 -> 11 tools, ~1157 tokens
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1968 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1968 affordable=106]]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (poolside/laguna-s-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 61 -> 18 tools, ~1876 tokens
+❌ OpenRouter (poolside/laguna-xs-2.1:free) 429: Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day [retry budget exhausted]
+🪶 reduced schema: 61 -> 11 tools, ~1157 tokens

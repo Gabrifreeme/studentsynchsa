@@ -1,0 +1,33 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 15660
+[boot] git HEAD  : ce7b489  (+2 modified)
+[boot] server.py : mtime=19:19:49  547386 bytes
+[boot] devtools_service.py: mtime=18:14:52  38956 bytes
+[boot] ace_config.yaml: mtime=18:26:06  6096 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 396 chars
+[domain] explicit tool 'cdp_network_requests' -> ui (tool domains: ['net', 'ui'])
+🧠 ui_script bail: URL/DevTools/CDP task - deferring to the model-driven loop
+❌ OpenRouter 404: {"error":{"message":"This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731","code":404}
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 75. To increase, visit https:/
+❌ OpenRouter 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 30. To increase, visit https:/
+❌ Groq 413: {"error":{"message":"Request too large for model `qwen/qwen3.8-27b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on input tokens pe
+❌ Cerebras 402: {"message":"Payment required to access this resource. Visit your billing tab.","type":"payment_required_error","param":"quota","code":"payment_required"}
+❌ FreeLLM 429: {"error":{"message":"All models rate-limited after 1 attempt. Soonest cooldown reset ~5s. Attempt trail: groq/openai/gpt-oss-safeguard-20b key1: daily_quota_exh
+❌ FreeLLM 429: {"error":{"message":"All models rate-limited after 1 attempt. Soonest cooldown reset ~2s. Attempt trail: groq/openai/gpt-oss-120b key1: daily_quota_exhausted. L
+❌ FreeLLM 429: {"error":{"message":"All models rate-limited after 1 attempt. Soonest cooldown reset ~0s. Attempt trail: groq/openai/gpt-oss-20b key1: daily_quota_exhausted. La
+❌ FreeLLM 429: {"error":{"message":"All models rate-limited after 1 attempt. Soonest cooldown reset ~2s. Attempt trail: groq/openai/gpt-oss-120b key1: daily_quota_exhausted. L
+❌ OpenRouter-fallback 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 75. To increase, visit https:/
+❌ OpenRouter-fallback 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 30. To increase, visit https:/
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False
+📨 Incoming message length: 396 chars
+[domain] explicit tool 'cdp_network_requests' -> ui (tool domains: ['net', 'ui'])
+🧠 ui_script bail: URL/DevTools/CDP task - deferring to the model-driven loop

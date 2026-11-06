@@ -1,4 +1,4 @@
-import 'package:studentsyncsa/domain/models/offline_resource.dart';
+import 'package:lipsyncstudent/domain/models/offline_resource.dart';
 
 class University {
   final String id;

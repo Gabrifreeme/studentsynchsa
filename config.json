@@ -1,0 +1,7 @@
+{
+  "provider": "groq",
+  "model": "qwen2.5-coder:7b",
+  "groq_key": "",
+  "openrouter_key": "",
+  "system_prompt": "You are ACEsi you are good in what you do!"
+}

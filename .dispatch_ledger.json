@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "dispatch_1",
+      "title": "test complex prompt",
+      "tool": null,
+      "args": {
+        "user_message": "test complex prompt"
+      },
+      "depends_on": [],
+      "soft_depends_on": [],
+      "status": "failed",
+      "attempts": 1,
+      "tool_attempts": 0,
+      "result": null,
+      "error": "subtask has no tool assigned",
+      "created_at": 1789840030.0309615,
+      "started_at": 1789840030.0340788,
+      "ended_at": 1789840030.0367055
+    }
+  ]
+}

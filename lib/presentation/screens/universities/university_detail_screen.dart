@@ -3,14 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/core/utils/pdf_download.dart';
-import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
-import 'package:studentsyncsa/presentation/providers/university_provider.dart';
-import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/pdf_generator.dart';
-import 'package:studentsyncsa/services/its_url_fixer.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/core/utils/pdf_download.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
+import 'package:lipsyncstudent/presentation/providers/university_provider.dart';
+import 'package:lipsyncstudent/presentation/screens/universities/offline_tab.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/services/pdf_generator.dart';
+import 'package:lipsyncstudent/services/its_url_fixer.dart';
 
 
 class UniversityDetailScreen extends ConsumerWidget {
@@ -429,7 +429,7 @@ class UniversityDetailScreen extends ConsumerWidget {
     final profile = ref.read(profileProvider).valueOrNull;
     if (profile != null) {
       final data = StringBuffer();
-      data.writeln('StudentSyncSA Profile Data');
+      data.writeln('LipSyncStudent Profile Data');
       data.writeln('──────────────────────────');
       data.writeln('Name: ${profile.personal.firstName} ${profile.personal.lastName}');
       data.writeln('ID: ${profile.personal.idNumber}');

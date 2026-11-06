@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/domain/repositories/profile_repository.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/domain/repositories/profile_repository.dart';
 
 class ProfileNotifier extends StateNotifier<AsyncValue<StudentProfile?>> {
   late final ProfileRepository _repo;

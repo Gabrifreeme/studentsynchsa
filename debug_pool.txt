@@ -1,0 +1,2365 @@
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=code, fallback_size=14
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=general, fallback_size=28
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2538
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2538
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2538
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2486
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2486
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2486
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2568
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2568
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2568
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2521
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2521
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2521
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2493
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2493
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2493
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=1200
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2545
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2545
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2545
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=6, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=net, fallback_size=5, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=3000
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=True, want_device=False, budget=3000
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=11, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=62, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2573
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2573
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2573
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2594
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2594
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2594
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=code, fallback_size=15, returning=fallback
+build_reduced_schema: base_schema size=15, want_files=False, want_device=False, budget=2500
+  pool has web_search=False, webfetch=False, curl=False
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=31, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=48, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=28, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=3000
+  pool has web_search=True, webfetch=True, curl=True
+_reduced_tool_pool: active_domain=general, fallback_size=8, returning=TOOLS_SCHEMA
+build_reduced_schema: base_schema size=40, want_files=False, want_device=False, budget=2500
+  pool has web_search=True, webfetch=True, curl=True

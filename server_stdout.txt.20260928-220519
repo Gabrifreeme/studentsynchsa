@@ -1,0 +1,199 @@
+🛑 E-STOP armed at boot; ACE_AUTO_AGENTS=False
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 17132
+[boot] git HEAD  : 0715dd2  (+2 modified)
+[boot] server.py : mtime=19:22:06  699228 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+[boot] E-STOP armed=True. auto_agents=False. threads: job_watch=OFF, task_queue=OFF, ntfy=OFF, email=OFF, summary=OFF, reminder=OFF.
+------------------------------------------------------------------
+🔴 E-STOP PERSISTED ON BOOT (reason=armed at boot: autonomous agents are off by default, source=boot) — ACEsi is silent until the un-kill word arrives.
+ * Serving Flask app 'server'
+ * Debug mode: off
+🟢 E-STOP CLEARED
+📨 Incoming message length: 292 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🧠 ui_script bail: prompt is 292 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1700 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1700 affordable=151]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 30 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1700 > 170. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1700 affordable=170]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_device ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap '--- Please select ---' resolved from dump -> 535,750
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'Universities' resolved from dump -> 146,97
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 4.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 1.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+  ui_tap 'University of Venda' resolved from dump -> 600,498
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 8.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+  ui_tap 'Back' resolved from dump -> 42,78
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 13.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 4464, Requested 3990. Please t [retry budget exhausted]
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 3462 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=3462 affordable=151]]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+💳 OpenRouter 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 3462 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=3462 affordable=160]]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 4325, Requested 3990. Please t [retry budget exhausted]
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=True
+⏰ /chat stop: time budget 240s reached
+🧠 Mood recorded: tired
+📨 Incoming message length: 626 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🧠 ui_script bail: prompt is 626 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1788 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1788 affordable=151]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 30 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1788 > 170. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1788 affordable=170]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap '--- Please select ---' resolved from dump -> 512,951
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'No' resolved from dump -> 512,895
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap '--- Please select ---' resolved from dump -> 512,1023
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_tap 'No' resolved from dump -> 512,967
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_tap ok=False
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+🔧 /chat executed ui_swipe ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_tap ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 10.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+⏳ Groq 429: waiting 3.0s before attempt 3 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 3 (max_tokens=4096)
+📨 Incoming message length: 687 chars
+[domain] explicit tool 'ui_tap' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🧠 ui_script bail: prompt is 687 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1874 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1874 affordable=151]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 30 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1874 > 170. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1874 affordable=170]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+📨 Incoming message length: 142 chars
+[domain] explicit tool 'ui_dump' -> ui (tool domains: ['ui'])
+[cdp-strip] device task: removed ['cdp_connect', 'cdp_console_logs', 'cdp_dom_state', 'cdp_evaluate', 'cdp_get_response_body', 'cdp_navigate', 'cdp_network_requests', 'cdp_status']
+🧠 ui_script bail: prompt is 142 chars (> 80) - prose, not a terse step list - deferring to the model-driven loop
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1690 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1690 affordable=151]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 11 tools, ~1246 tokens
+💳 OpenRouter 402: balance affords only 30 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1690 > 170. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1690 affordable=170]]
+[cdp-strip] final schema (11): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command', 'read_file']
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens
+[cdp-strip] final schema (10): ['ui_connect', 'ui_device', 'ui_dump', 'ui_app_open', 'ui_tap', 'ui_type', 'ui_swipe', 'ui_key', 'ui_screenshot', 'run_command']
+  ui_dump: gave 1 dropdown option(s) real tap points
+🔧 /chat executed ui_dump ok=True
+🪶 reduced schema: 54 -> 10 tools, ~1187 tokens

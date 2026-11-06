@@ -1,26 +1,29 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
-import 'package:studentsyncsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
-import 'package:studentsyncsa/presentation/screens/applications/application_tracker_screen.dart';
-import 'package:studentsyncsa/presentation/screens/aps/aps_calculator_screen.dart';
-import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
-import 'package:studentsyncsa/presentation/screens/chat/chat_screen.dart';
-import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
-import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
-import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.dart';
-import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
-import 'package:studentsyncsa/presentation/screens/share_video_screen.dart';
-import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
-import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
-import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/application_helper_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/university_detail_screen.dart';
-import 'package:studentsyncsa/presentation/screens/universities/university_webview_screen.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/presentation/providers/auth_provider.dart';
+import 'package:lipsyncstudent/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/applications/application_tracker_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/aps/aps_calculator_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/auth/signup_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/chat/chat_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/dashboard/dashboard_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/funding/funding_detail_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/funding/funding_list_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/profile/profile_onboarding_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/share_video_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/notifications/notifications_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/settings/privacy_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/settings/settings_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/universities/application_helper_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/universities/universities_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/universities/university_detail_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/universities/university_webview_screen.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
 
 final GlobalKey<NavigatorState> _rootNavigator = GlobalKey<NavigatorState>();
 
@@ -28,6 +31,31 @@ final _authRefresh = ValueNotifier<int>(0);
 
 void triggerAuthRedirect() {
   _authRefresh.value++;
+}
+
+/// Opens a university or bursary portal in the in-app browser, with the
+/// student's profile attached.
+///
+/// Star Auto-Fill needs the profile as a JSON object; without it the screen
+/// injects nothing and the ⭐ button never appears. The profile loads
+/// asynchronously at startup, so this watches [profileProvider] rather than
+/// reading it once: if the user opens a portal before the profile is ready,
+/// the screen receives the JSON the moment it arrives and re-injects into the
+/// page that is already on screen.
+Widget _portalWebView(BuildContext context, GoRouterState state) {
+  final rawUrl = state.uri.queryParameters['url'] ?? '';
+  final rawName = state.uri.queryParameters['name'] ?? 'University';
+
+  return Consumer(
+    builder: (context, ref, _) {
+      final profile = ref.watch(profileProvider).valueOrNull;
+      return UniversityWebViewScreen(
+        url: Uri.decodeComponent(rawUrl),
+        universityName: Uri.decodeComponent(rawName),
+        profileJson: profile == null ? null : jsonEncode(profile.toJson()),
+      );
+    },
+  );
 }
 
 final appRouter = GoRouter(
@@ -104,14 +132,7 @@ final appRouter = GoRouter(
                     GoRoute(
                       path: 'webview',
                       name: 'university-webview',
-                      builder: (context, state) {
-                        final rawUrl = state.uri.queryParameters['url'] ?? '';
-                        final rawName = state.uri.queryParameters['name'] ?? 'University';
-                        return UniversityWebViewScreen(
-                          url: Uri.decodeComponent(rawUrl),
-                          universityName: Uri.decodeComponent(rawName),
-                        );
-                      },
+                      builder: _portalWebView,
                     ),
                   ],
                 ),
@@ -145,14 +166,7 @@ final appRouter = GoRouter(
                     GoRoute(
                       path: 'webview',
                       name: 'funding-webview',
-                      builder: (context, state) {
-                        final rawUrl = state.uri.queryParameters['url'] ?? '';
-                        final rawName = state.uri.queryParameters['name'] ?? 'Funding';
-                        return UniversityWebViewScreen(
-                          url: Uri.decodeComponent(rawUrl),
-                          universityName: Uri.decodeComponent(rawName),
-                        );
-                      },
+                      builder: _portalWebView,
                     ),
                   ],
                 ),

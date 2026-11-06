@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
-import 'package:studentsyncsa/domain/models/student_profile.dart';
-import 'package:studentsyncsa/services/autofill_script.dart' as star;
-import 'package:studentsyncsa/services/its_url_fixer.dart';
+import 'package:lipsyncstudent/data/repositories/profile_repository_impl.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
+import 'package:lipsyncstudent/services/autofill_script.dart' as star;
+import 'package:lipsyncstudent/services/its_url_fixer.dart';
 
 class UniversityPortalScreen extends StatefulWidget {
   final String universityName;
@@ -201,40 +201,40 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
     }
   }
 
-  void _showAutofillConfirmDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Text('⭐', style: TextStyle(fontSize: 28)),
-            SizedBox(width: 8),
-            Text('Auto-fill Form'),
-          ],
-        ),
-        content: const Text(
-          "You like me to try and auto fill this page?",
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('No'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _runAutofill();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.shade700,
-            ),
-            child: const Text('Yes', style: TextStyle(color: Colors.white)),
-          ),
+ void _showAutofillConfirmDialog() {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Row(
+        children: [
+          Text('⭐', style: TextStyle(fontSize: 28)),
+          SizedBox(width: 8),
+          Text('Auto-fill Form'),
         ],
       ),
-    );
-  }
+      content: const Text(
+        "You like me to try and auto fill this page?",
+        style: TextStyle(fontSize: 16),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('No'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.of(ctx).pop();
+            await _runAutofill();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.amber.shade700,
+          ),
+          child: const Text('Yes', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> _runAutofill() async {
     try {
@@ -451,11 +451,6 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
         backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.star, color: Colors.amber, size: 30),
-            onPressed: _showAutofillConfirmDialog,
-            tooltip: 'Auto-fill form',
-          ),
           IconButton(
             icon: const Icon(Icons.open_in_browser),
             onPressed: _openInChrome,

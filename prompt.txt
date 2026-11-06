@@ -1,0 +1,24 @@
+"I'm working on a custom AI IDE (Flask backend, HTML/JS frontend). I have a side-by-side 'Auto Fix' modal in ACEsi.html.
+
+The Problem:
+The left panel (<textarea id="autofix-original">) is completely invisible. It shows solid dark-red blocks instead of text. Another AI diagnosed this as the "Transparent textarea + highlight-layer pattern" — meaning the code is being written to the textarea's .value, but CSS is hiding it (e.g., color: transparent or an overlay is covering it).
+
+Current CSS on the textareas:
+
+html
+<textarea id="autofix-original" readonly style="width:100%;flex:1;background:#000 !important;color:#ff9d00 !important;-webkit-text-fill-color:#ff9d00 !important;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
+(Even with !important on the color and background, the red blocks persist).
+
+The JavaScript:
+I have a function openAutoFix() that grabs the text from the main editor using CodeMirror's getValue() and assigns it to document.getElementById('autofix-original').value.
+
+What I need from you:
+
+Why is the text invisible despite color: #ff9d00 !important? Is there a global CSS rule in ACEsi.html overriding it?
+
+Give me the exact CSS or JavaScript snippet to force the text to be visible and kill the red background blocks once and for all.
+
+The right panel (id="autofix-code") shows green blocks and has the same issue.
+
+Assume I want to keep the text area looking like a standard black box with orange text. No fancy overlays."
+

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/core/utils/offline_download.dart';
-import 'package:studentsyncsa/domain/models/offline_resource.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/core/utils/offline_download.dart';
+import 'package:lipsyncstudent/domain/models/offline_resource.dart';
 
 class OfflineTab extends StatelessWidget {
   final String universityId;

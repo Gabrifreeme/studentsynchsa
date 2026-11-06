@@ -1,0 +1,830 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACESi</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000000;
+            color: #ff9d00;
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #dev-toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #ff9d00;
+            background: #000;
+        }
+        .btn {
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+        }
+        .btn:hover { background: #ff9d00; color: #000; }
+        
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .panel {
+            border: 1px solid #ff9d00;
+            display: flex;
+            flex-direction: column;
+            margin: 5px;
+        }
+        #chat-panel { width: 33.333%; }
+        #code-panel { width: 33.333%; }
+        #explorer-panel { width: 33.333%; }
+        
+        .panel-header {
+            padding: 10px;
+            border-bottom: 1px solid #ff9d00;
+            font-weight: bold;
+            background: #000;
+        }
+        
+        #chat-messages { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            padding: 10px; 
+            overflow-y: auto; 
+        }
+        .msg-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ff9d00;
+            color: #ff9d00;
+            background: #1a1a1a;
+            word-wrap: break-word;
+        }
+        .msg-left {
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        .msg-right {
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+            text-align: right;
+        }
+        #explorer { flex: 1; overflow-y: auto; padding: 10px; }
+        
+        .file {
+            padding: 8px;
+            border: 1px solid #ff9d00;
+            margin-bottom: 5px;
+            cursor: pointer;
+            color: #ff9d00;
+        }
+        .file:hover { background: #ff9d00; color: #000; }
+        
+        .btn { background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 10px; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 11px; margin-right: 4px; }
+        .btn:hover { background: #ff9d00; color: #000; }
+        #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
+        #editor-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        #highlight-layer {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 21px;
+            white-space: pre;
+            tab-size: 4;
+            overflow: hidden;
+            color: #ff9d00;
+            background: transparent;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #search-marks {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+        }
+        #search-marks-inner { position: absolute; top: 0; left: 0; }
+        .search-mark { position: absolute; background: rgba(255, 200, 0, 0.40); border-radius: 2px; }
+        .search-mark.current { background: rgba(255, 200, 0, 0.60); box-shadow: inset 0 0 0 1px #ff9d00; }
+        #code-editor {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            color: transparent;
+            border: none;
+            padding: 10px;
+            margin: 0;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 21px;
+            white-space: pre;
+            tab-size: 4;
+            overflow: auto;
+            outline: none;
+            resize: none;
+            z-index: 3;
+        }
+        #code-editor::selection { background: rgba(255, 157, 0, 0.35); }
+        #code-editor::placeholder { color: #7a5a1a; }
+        .hl-com { color: #6b7280; font-style: italic; }
+        .hl-str { color: #7ec699; }
+        .hl-num { color: #d19a66; }
+        .hl-kw { color: #ffb84d; font-weight: bold; }
+        .hl-fn { color: #61afef; }
+        .hl-op { color: #c8c8c8; }
+        .hl-tag { color: #e06c75; }
+        .hl-attr { color: #d19a66; }
+        .hl-at { color: #c678dd; }
+        .hl-prop { color: #61afef; }
+        .hl-sel { color: #e5c07b; }
+        #editor-search {
+            display: none;
+            position: absolute;
+            top: 6px;
+            right: 14px;
+            z-index: 999;
+            align-items: center;
+            gap: 4px;
+            background: #111;
+            border: 1px solid #ff9d00;
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        #search-input {
+            width: 150px;
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 3px 5px;
+            font-family: inherit;
+            font-size: 11px;
+            outline: none;
+        }
+        #search-count { min-width: 48px; text-align: center; color: #888; }
+        #editor-search button {
+            background: #000;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 2px 6px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        #editor-search button:hover { background: #ff9d00; color: #000; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #ff9d00; border-radius: 4px; }
+        .spinner { display: none; width: 16px; height: 16px; border: 2px solid #ff9d00; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+
+    <style>
+        select, select option {
+            font-family: Arial, sans-serif !important;
+        }
+    </style>
+
+    <style>
+        .diff-del { color: #4a0000; }      /* dark red */
+        .diff-add { color: #003300; }      /* dark green */
+        .diff-unchanged { color: #888; }
+    </style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>`n</head>
+<body>
+
+    <div id="run-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:340px;">
+        <div style="font-weight:bold;margin-bottom:8px;">Run Commands</div>
+        <div style="margin-bottom:10px;">
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter run -d chrome --no-resident"> flutter run (chrome)</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter run"> flutter run (device)</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter build apk --debug"> flutter build apk</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter pub get"> flutter pub get</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter clean"> flutter clean</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter test"> flutter test</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter analyze"> flutter analyze</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter doctor"> flutter doctor</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter devices"> flutter devices</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="flutter run -d R52N518ESBE"> SM T515 tablet (R52N518ESBE)</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="scrcpy"> scrcpy</label>
+        </div>
+        <div style="border-top:1px solid #ff9d00;padding-top:8px;margin-top:8px;">
+            
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="inspect"> Inspect</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="adb"> adb</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="dir"> dir</label>
+            
+        </div>
+        <div style="border-top:1px solid #ff9d00;padding-top:8px;margin-top:8px;">
+            <div style="font-size:10px;color:#ff9d00;margin-bottom:4px;">System & Maintenance</div>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="adb devices"> adb devices</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="git status"> git status</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="git commit"> git commit</label>
+            <label style="display:block;margin:4px 0;"><input type="checkbox" value="explorer ."> Open Project Folder</label>
+            
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+            <button onclick="runSelected()" style="flex:1;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;">Run Selected</button>
+            <button onclick="document.getElementById('run-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;">Close</button>
+        </div>
+    </div>
+
+    <div id="inspect-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
+        <div style="font-weight:bold;margin-bottom:8px;">Inspect Tools</div>
+        <button onclick="addOutput('ðŸ” DOM: '+document.documentElement.outerHTML.substring(0,80)+'...')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">View DOM</button>
+        <button onclick="alert('Styles loaded')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Check CSS</button>
+        <button onclick="console.log('ACEsi inspect')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Console</button>
+        <button onclick="document.getElementById('inspect-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
+    </div>
+
+    <div id="messily-panel" style="display:none;position:fixed;top:60px;right:20px;background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
+        <div style="font-weight:bold;margin-bottom:8px;">Messily Tool</div>
+        <button onclick="addOutput('ðŸ§¹ Clear log');var cm=document.getElementById('chat-messages');if(cm){cm.querySelectorAll('.tool-output').forEach(function(x){x.remove();});}" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Clear Log</button>
+        <button onclick="addOutput('ðŸ“‹ Copy buffer')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Copy</button>
+        <button onclick="addOutput('ðŸ§ª Test ping')" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Test Ping</button>
+        <button onclick="document.getElementById('messily-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
+    </div>
+
+    <div id="settings-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:450px;">
+        <div style="margin-bottom:12px;">
+            <button data-tab="settings-tab-ai" onclick="switchTab('settings-tab-ai')" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;margin-right:4px;">AI Engine</button>
+            <button data-tab="settings-tab-prompt" onclick="switchTab('settings-tab-prompt')" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;margin-right:4px;">System Prompt</button>
+            <button data-tab="settings-tab-tools" onclick="switchTab('settings-tab-tools')" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Tools & Integrations</button>
+        </div>
+        
+        <!-- AI Engine Tab -->
+        <div id="settings-tab-ai" class="tab-content" style="display:block; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
+            <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">AI Engine</div>
+            <div style="display:flex;gap:12px;">
+                <div style="flex:1;">
+                    <label style="display:block;margin-bottom:4px;font-size:11px;">Provider</label>
+                    <select id="settings-provider" style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
+                        <option value="groq">Groq</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="ollama">Local Ollama</option>
+                    </select>
+                </div>
+                <div style="flex:1;">
+                    <label style="display:block;margin-bottom:4px;font-size:11px;">Model</label>
+                    <select id="settings-model" style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
+                        
+                        <option value="gpt-oss-20b">gpt-oss-20b</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <div style="font-size:11px;color:#888;">API Keys stored in config.json on server</div>
+                <div style="margin-top:4px;">
+                    <label style="display:block;margin-bottom:2px;font-size:10px;">Groq API Key</label>
+                    <input type="text" id="settings-groq-key" style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;" placeholder="Enter Groq API Key">
+                    <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">OpenRouter API Key</label>
+                    <input type="text" id="settings-openrouter-key" style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;" placeholder="Enter OpenRouter API Key">
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Prompt Tab -->
+        <div id="settings-tab-prompt" class="tab-content" style="display:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
+            <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">System Prompt</div>
+            <textarea id="settings-prompt" style="width:100%;height:150px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-family:'Roboto Mono',monospace;font-size:11px;resize:vertical;outline:none;" placeholder="System prompt loaded..."></textarea>
+            <div style="margin-top:8px; text-align:center;">
+                <button onclick="saveSystemPrompt()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Save Prompt</button>
+            </div>
+        </div>
+        
+        <!-- Tools & Integrations Tab -->
+        <div id="settings-tab-tools" class="tab-content" style="display:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
+            <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">Tools & Integrations</div>
+            <div style="margin-bottom:8px;">
+                <label style="display:block;margin-bottom:4px;font-size:11px;">
+                    <input type="checkbox" id="show-toolbar" style="margin-right:4px;width:auto;" onclick="toggleDeveloperToolbar()"> Show Developer Toolbar
+                </label>
+            </div>
+            <button onclick="clearChatHistory()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Clear Chat History</button>
+            <button onclick="fetchNotifications()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Fetch Notifications</button>
+            <button onclick="triggerPing()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Send Ping</button>
+            <button onclick="connectGoogleDrive()" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Google Drive</button>
+        </div>
+        
+        <div style="text-align:center;margin-top:16px;">
+            <button onclick="saveSettings()" style="background:#ff9d00;color:#000;border:none;padding:8px 16px;font-size:11px;font-weight:bold;cursor:pointer;">Save All Settings</button>
+            <button onclick="document.getElementById('settings-panel').style.display='none'" style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-size:11px;">Close</button>
+        </div>
+    </div>
+
+    <div id="dev-toolbar" style="display:flex;justify-content:center;gap:10px;padding:10px;border-bottom:1px solid #ff9d00;background:#000;flex-wrap:wrap;align-items:center;">
+        <button class="btn" title="Run Execution" onclick="document.getElementById('run-panel').style.display='block'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Run Run ▶</button>
+        <button class="btn" title="Open Terminal" onclick="document.getElementById('terminal-panel').style.display='flex'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;">Terminal</button>
+        <button class="btn" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;" onclick="openSettings()">Settings</button>
+       <button class="btn" title="Restart App" onclick="restartAcesi()">Restart</button>
+        <button class="btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
+    </div>
+
+    <div id="portal-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
+        <div style="font-weight:bold;margin-bottom:8px;">Portal Status</div>
+        <button onclick="fetch('http://127.0.0.1:5000/api/portal/status').then(r=>r.json()).then(d=>addOutput('Portal: '+(d.status||'active'))).catch(e=>addOutput('Portal error: '+e.message))" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Check Status</button>
+        <button onclick="document.getElementById('portal-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
+    </div>
+    <div id="scrcpy-panel" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:12px;z-index:10000;font-family:Roboto Mono,monospace;color:#ff9d00;width:260px;">
+        <div style="font-weight:bold;margin-bottom:8px;">SCRCPY Status</div>
+        <button onclick="fetch('http://127.0.0.1:5000/api/scr').then(r=>r.json()).then(d=>addOutput('SCRCPY: '+(d.status||'running'))).catch(e=>addOutput('SCRCPY error: '+e.message))" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Start/Stop</button>
+        <button onclick="document.getElementById('scrcpy-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
+    </div>
+
+    <div id="main-container">
+        <!-- Chat Panel -->
+        <div id="chat-panel" class="panel" style="width:33%;">
+            <div class="panel-header">CONVERSATION</div>
+            <div id="chat-messages" style="flex:1;overflow-y:auto;padding:10px;"><div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> <span id="ace-greeting">Chris, I'm here. Active and ready.</span><span id="ace-session" style="display:block;color:#9a9a9a;font-size:12px;margin-top:4px;white-space:pre-line;"></span></div></div>
+            <div id="response-timer" style="text-align:center;font-size:12px;color:#ff9d00;margin-bottom:4px;height:16px;font-weight:bold;"></div>
+            <div style="display:flex;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
+                <input id="chat-input" type="text" placeholder="Ask ACEsi..." style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;" onkeydown="if(event.key==='Enter') sendChat()">
+                <button onclick="sendMessage()" title="Send" style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;" onmousedown="console.log('Send clicked')">Send</button>
+            </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-top:1px solid #ff9d00; background:#000; width:100%; box-sizing:border-box;">
+    <div id="spinner-left" class="spinner" style="width:20px;"></div>
+    
+    <div style="display:flex; gap:6px; flex:1; justify-content:center;">
+        <button onclick="document.getElementById('chat-input').focus()" title="Mic" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🎤</button>
+        <button onclick="alert('Speaker: audio feedback on')" title="Speaker" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🔊</button>
+        <button onclick="document.getElementById('chat-file').click()" title="Upload" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">➕</button>
+    </div>
+
+    <div id="spinner-right" class="spinner" style="width:20px;"></div>
+</div>
+        </div>
+
+        <!-- Code Editor Panel -->
+        <div id="code-panel" class="panel">
+            <div class="panel-header">CODE EDITOR
+            <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <button id="search-btn" class="btn" title="Find text or line (Ctrl+F)" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="editorSearchOpen()">Search</button>
+                <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
+                            <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="openAutoFix()"">Auto Fix</button>
+            <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+            <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
+                <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
+            </div>
+            </div>
+            <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
+              <div id="line-numbers">1</div>
+              <div id="editor-area">
+                <pre id="highlight-layer" aria-hidden="true"></pre>
+                <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
+                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; background:#000 !important; color:#ff9d00 !important; -webkit-text-fill-color:#ff9d00 !important; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:2;"></textarea>
+                <div id="editor-search">
+                    <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
+                    <span id="search-count"></span>
+                    <button type="button" title="Previous match (Shift+Enter)" onclick="editorSearchPrev()">&#8593;</button>
+                    <button type="button" title="Next match (Enter)" onclick="editorSearchNext()">&#8595;</button>
+                    <button type="button" title="Close (Esc)" onclick="editorSearchClose()">&#215;</button>
+                </div>
+              </div>
+                <div id="logs-overlay" style="color: #ff9d00 !important; background: #000 !important; -webkit-text-fill-color: #ff9d00 !important; display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+                <div id="logs-overlay-inner" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1001; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
+
+
+            </div>
+        </div>
+
+
+        <!-- Explorer Panel -->
+        <div id="explorer-panel" class="panel">
+            <div class="panel-header">EXPLORER</div>
+            <div id="explorer">Loading...</div>
+        </div>
+    </div>
+<script>
+           function applyAutoFix() {
+        const code = document.getElementById('autofix-original').value;
+        if (!code.trim()) return;
+        
+        document.getElementById('autofix-result').innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
+        
+        fetch('http://127.0.0.1:5000/api/autofix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        }).then(r => r.json()).then(d => {
+            if (d.ok && d.fixed_code) {
+                document.getElementById('autofix-code').value = d.fixed_code; updateAutofixSummary();
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
+                
+                document.getElementById('autofix-fix-btn').style.display = 'none';
+                document.getElementById('autofix-save-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + (d.error || 'Unknown') + '</span>';
+            }
+        }).catch(e => {
+            document.getElementById('autofix-result').innerHTML = '<span style="color:#ff0000;">Error: ' + e.message + '</span>';
+        });
+    }
+document.addEventListener("DOMContentLoaded", function() {
+    console.log("JS: Explorer script started");
+    window.currentFile = null; // Track the currently opened file
+    
+    // Use the exact URL that we know is working from the curl command
+    fetch('/api/files') 
+        .then(response => {
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log("JS: Data received", data);
+            const explorerDiv = document.getElementById('explorer'); // Make sure this ID matches your HTML container // Make sure this ID matches your HTML container
+            if (!explorerDiv) {
+                console.error("Could not find the explorer container div!");
+                return;
+            }
+            
+            explorerDiv.innerHTML = ""; // Clear "Loading..."
+            
+                        // Build a nested tree from the flat paths
+            const tree = {};
+            data.forEach(path => {
+                const parts = path.split('/');
+                let current = tree;
+                parts.forEach((part, index) => {
+                    if (index === parts.length - 1) {
+                        current[part] = 'file:' + path; // It's a file
+                    } else {
+                        if (!current[part] || typeof current[part] === 'string') {
+                            current[part] = {}; // It's a folder
+                        }
+                        current = current[part];
+                    }
+                });
+            });
+
+            // Render the tree recursively
+            function renderTree(node, parentElement, indentLevel) {
+                const keys = Object.keys(node).sort((a, b) => {
+                    // Folders first, then files
+                    const aIsFile = typeof node[a] === 'string';
+                    const bIsFile = typeof node[b] === 'string';
+                    if (!aIsFile && bIsFile) return -1;
+                    if (aIsFile && !bIsFile) return 1;
+                    return a.localeCompare(b);
+                });
+
+                keys.forEach(key => {
+                    const value = node[key];
+                    const div = document.createElement("div");
+                    div.style.padding = "3px";
+                    div.style.paddingLeft = (indentLevel * 12) + "px";
+                    div.style.cursor = "pointer";
+                    div.style.color = "#ff9d00";
+                    div.style.fontFamily = "monospace";
+                    
+                    if (typeof value === 'string') {
+                        // It's a file
+                        const filePath = value.replace('file:', '');
+                        div.textContent = "📄 " + key;
+                        div.onclick = function(event) {
+                            event.stopPropagation();
+                            // Your original file click logic goes here
+                            console.log("Clicked file: " + filePath);
+                            window.currentFile = filePath;
+                            fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
+                                .then(res => res.text())
+                                .then(fileData => {
+                                    document.getElementById('code-editor').value = fileData;
+                                    if (window.aceEditorRefresh) window.aceEditorRefresh();
+                                    fetch('http://127.0.0.1:5000/api/context/file', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
+                                    }).catch(e => console.warn(e));
+                                })
+                                .catch(err => alert("Failed to load file: " + err.message));
+                        };
+                    } else {
+                        // It's a folder
+                        const folderDiv = document.createElement("div");
+                        folderDiv.textContent = "📁 " + key;
+                        folderDiv.style.color = "#ff9d00";
+                        
+                        const childrenDiv = document.createElement("div");
+                        childrenDiv.style.display = "none"; // Collapsed by default
+                        
+                        folderDiv.onclick = function(e) {
+                            e.stopPropagation();
+                            childrenDiv.style.display = childrenDiv.style.display === "none" ? "block" : "none";
+                            folderDiv.textContent = (childrenDiv.style.display === "none" ? "📁 " : "📂 ") + key;
+                        };
+                        
+                        renderTree(value, childrenDiv, indentLevel + 1);
+                        div.appendChild(folderDiv);
+                        div.appendChild(childrenDiv);
+                        parentElement.appendChild(div);
+                        return;
+                    }
+                    parentElement.appendChild(div);
+                });
+            }
+
+            renderTree(tree, explorerDiv, 0);
+        })
+        .catch(error => {
+            console.error("JS FETCH ERROR:", error);
+            const explorerDiv = document.getElementById('explorer-content');
+            if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
+        });
+});
+
+
+                  async function runTerminalCommand() {
+        const input = document.getElementById('terminal-input');
+        const output = document.getElementById('terminal-output');
+        const cmd = input.value.trim();
+        
+        if (!cmd) return;
+        
+        // Print the command with a smiley
+        output.innerHTML += "<div><span style='color:#ff9d00;'>😊 " + cmd + "</span></div>";
+        output.scrollTop = output.scrollHeight;
+        input.value = '';
+        
+        try {
+            const eventSource = new EventSource('/run_stream?cmd=' + encodeURIComponent(cmd));
+            
+            eventSource.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                
+                if (data.line) {
+                    output.innerHTML += "<div style='color:#e0e0e0; margin:0; font-family:monospace;'>" + data.line + "</div>";
+                } else if (data.done) {
+                    output.innerHTML += "<div style='color:#00ff00; font-weight:bold;'>Done ❤️</div>";
+                    eventSource.close();
+                } else if (data.error) {
+                    output.innerHTML += "<div style='color:#ff0000;'>" + data.error + "</div>";
+                    eventSource.close();
+                }
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            eventSource.onerror = function() {
+                // If the connection drops, show the heart anyway!
+                output.innerHTML += "<div style='color:#00ff00; font-weight:bold;'>Done ❤️</div>";
+                eventSource.close();
+            };
+            
+        } catch (e) {
+            output.innerHTML += "<span style='color:#ff0000;'>Failed to run command: " + e.message + "</span>";
+        }
+    }
+        async function restartAcesi() {
+        if (!confirm("Restart ACESi Server? The UI will reload in 8 seconds.")) return;
+        
+        try {
+            await fetch('/restart', { method: 'POST' });
+            
+            // Show a message on the screen
+            document.body.innerHTML = "<div style='color:#ff9d00; background:#000; height:100vh; display:flex; justify-content:center; align-items:center; font-family:monospace; font-size:24px;'>Restarting ACESi... Please wait.</div>";
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 8000); 
+        } catch (e) {
+            alert("Failed to send restart signal.");
+        }
+    }
+
+</script>
+    <script>
+               function openAutoFix() {
+        const el = document.getElementById('code-editor');
+        let source = '';
+        if (el) {
+            if (el.CodeMirror) source = el.CodeMirror.getValue();
+            else if (el.env && el.env.editor) source = el.env.editor.getValue();
+            else source = el.value || '';
+        }
+
+        document.getElementById('autofix-original').value = source;
+        document.getElementById('autofix-code').value = '';
+        document.getElementById('autofix-result').innerHTML = '';
+        document.getElementById('autofix-save-btn').style.display = 'none';
+        document.getElementById('autofix-fix-btn').style.display = 'inline-block';
+        document.getElementById('autofix-modal').style.display = 'block';
+    }
+
+    function updateAutofixSummary() {
+        const original = document.getElementById('autofix-original').value;
+        const fixed = document.getElementById('autofix-code').value;
+
+        if (!original && !fixed) {
+            document.getElementById('autofix-summary').textContent = '';
+            return;
+        }
+
+        const diff = Diff.diffLines(original, fixed);
+        let added = 0;
+        let removed = 0;
+
+        diff.forEach(part => {
+            const lines = part.value.split('\n').filter(l => l.trim() !== '').length;
+            if (part.added)   added   += lines;
+            if (part.removed) removed += lines;
+        });
+
+        const parts = [];
+        if (added)   parts.push(`+${added} line${added   !== 1 ? 's' : ''} added`);
+        if (removed) parts.push(`-${removed} line${removed !== 1 ? 's' : ''} removed`);
+
+        document.getElementById('autofix-summary').textContent =
+            parts.length > 0 ? `Changes: ${parts.join(', ')}` : 'No changes detected';
+    }
+        function runSelected(){
+        var checks = document.querySelectorAll('#run-panel input[type=checkbox]:checked');
+        if(checks.length===0){ alert('Select a command'); return; }
+        
+        // Open the terminal panel
+        document.getElementById('terminal-panel').style.display = 'flex';
+        
+        // Hide the run panel
+        document.getElementById('run-panel').style.display = 'none';
+        
+        // For each selected command, push it into the new terminal input and run it
+        checks.forEach(function(c, index){
+            setTimeout(() => {
+                const input = document.getElementById('terminal-input');
+                input.value = c.value;
+                runTerminalCommand();
+            }, index * 1500); // 1.5-second delay between commands
+        });
+    }
+    function toggleModelPicker(e){
+        var btn = document.getElementById('modelBtn');
+        var existing = document.getElementById('model-dropdown');
+        if(existing){ existing.remove(); btn.style.display='inline-block'; return; }
+        btn.style.display='none';
+        var m = document.createElement('div');
+        m.id = 'model-dropdown';
+        m.style.cssText = 'position:absolute;bottom:40px;right:12px;background:#000;border:1px solid #ff9d00;padding:4px;z-index:9999;font-family:Roboto Mono,monospace;color:#ff9d00;';
+        var models = ['>qwen2.5-coder:7b<','gpt-oss-20b','llama-3.1-8b','deepseek-coder-v2','phi-3-mini','mistral-instruct'];
+        models.forEach(function(mm){
+            var d = document.createElement('div');
+            d.textContent = mm;
+            d.style.cssText = 'color:#ff9d00;cursor:pointer;padding:4px 8px;';
+            d.onmouseover = function(){ d.style.background='#ff9d00'; d.style.color='#000'; };
+            d.onmouseout = function(){ d.style.background='#000'; d.style.color='#ff9d00'; };
+            d.onclick = function(ev){
+                ev.stopPropagation();
+                document.getElementById('modelBtn').textContent = mm + ' –¾';
+                document.getElementById('modelBtn').style.display='inline-block';
+                m.remove();
+                alert('Model switched to: ' + mm);
+            };
+            m.appendChild(d);
+        });
+        btn.parentNode.appendChild(m);
+    }
+    document.addEventListener('click', function(e){
+        if(document.getElementById('model-dropdown') && !e.target.closest('#modelBtn') && !e.target.closest('#model-dropdown')){
+            document.getElementById('model-dropdown').remove();
+            document.getElementById('modelBtn').style.display='inline-block';
+        }
+    });
+    </script>
+    <div id="bottom-status" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#000;border-top:1px solid #ff9d00;font-family:'Roboto Mono',monospace;font-size:12px;color:#ff9d00;flex-shrink:0;">
+        <span style="font-weight:bold;">ACEsi</span> <span>|</span>
+        <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
+        <span style="flex:1;"></span>
+        <span>Model:</span>
+        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS 20B –¾</button>
+    </div>
+
+    <!-- Auto Fix Modal -->
+        <div id="autofix-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:99999;backdrop-filter:blur(5px);">
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:90%;max-width:800px;max-height:80%;overflow:auto;margin:auto;">
+                <div style="font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Auto Fix - Fix Syntax Errors</div>
+                <div id="autofix-result" style="margin-bottom:12px;padding:6px;border:1px solid #ff9d00;font-size:12px;min-height:24px;text-align:center;"></div>
+                
+                <div style="display:flex;gap:10px;width:100%;height:300px;margin-bottom:12px;">
+                    <div style="flex:1;display:flex;flex-direction:column;">
+                        <div style="font-size:11px;margin-bottom:4px;color:#888;">Original</div>
+                        <textarea id="autofix-original" readonly style="width:100%;flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;">
+                        <div style="font-size:11px;margin-bottom:4px;color:#888;">ACESi's Fix</div>
+                        <textarea id="autofix-code" style="width:100%;flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
+                    </div>
+                </div>
+                
+                <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+                    <button onclick="document.getElementById('autofix-modal').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Close</button>
+                    <button id="autofix-fix-btn" onclick="applyAutoFix()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:12px;">Fix Code</button>
+                    <button id="autofix-save-btn" onclick="saveFixedCode()" style="display:none; background:#000;color:#00ff00;border:1px solid #00ff00;padding:6px 12px;font-size:12px;">Save to File</button>
+                </div>
+            </div>
+        </div>
+            <div id="autofix-summary" style="font-size:11px;color:#888;margin-bottom:8px;min-height:16px;"></div>
+<div id="terminal-panel" style="display:none; height:300px; background:#000; border-top: 2px solid #ff9d00; flex-direction:column; flex-shrink: 0; width: 100%;">
+        <div style="display:flex; justify-content:space-between; padding: 10px; background: #111; border-bottom: 1px solid #333;">
+            <span style="color:#ff9d00; font-weight:bold; font-family:'Roboto Mono', monospace;">ACESi Terminal</span>
+            <button onclick="document.getElementById('terminal-panel').style.display='none'" style="background:transparent;color:#ff9d00;border:none;cursor:pointer;font-weight:bold;">✕ Close</button>
+        </div>
+        <div id="terminal-output" style="flex:1; overflow-y:auto; color:#e0e0e0; font-family:'Roboto Mono', monospace; font-size:12px; white-space:pre-wrap; padding:10px; background:#000;"></div>
+        <div style="display:flex; padding: 10px; background: #111; border-top: 1px solid #333;">
+            <input type="text" id="terminal-input" placeholder="Type a command..." style="flex:1; background:#000; color:#e0e0e0; border:none; outline:none; padding:4px; font-family:'Roboto Mono', monospace; font-size:14px;" onkeydown="if(event.key === 'Enter') runTerminalCommand()">
+        </div>
+    </div>
+
+    <script>
+    // Opening line: name the last real change in this project instead of a canned
+    // "Ready and waiting". The text comes from /api/last_edit, which reads git (the
+    // last commit, or newer uncommitted edits). If the endpoint is unreachable the
+    // static sentence already in the markup stays, so the panel is never blank.
+    (function () {
+        var FALLBACK = "Chris, I'm here. Ready and waiting.";
+
+        function greetingText() {
+            var e = window.__lastEdit;
+            if (!e || !e.ok || !e.phrase) return FALLBACK;
+            var s = 'Chris, our last change was ' + e.phrase + '.';
+            // Say whether the server is actually running that change. Without this
+            // the line is only a description of the disk, not of what is live.
+            if (e.runtime_note) s += ' ' + e.runtime_note + '.';
+            // And what the current stretch of work has been, rebuilt from commits,
+            // chat and saves - so a long session is not invisible.
+            if (e.session_note) s += ' ' + e.session_note + '.';
+            return s;
+        }
+
+        // Second line: what this stretch of work has been, and the last long one.
+        // Rebuilt server-side from commits + chat + saves, not from memory.
+        function sessionText() {
+            var e = window.__lastEdit;
+            if (!e || !e.ok) return '';
+            var parts = [];
+            if (e.session_note) parts.push(e.session_note);
+            if (e.prior_note) parts.push(e.prior_note);
+            return parts.join('\n');
+        }
+
+        function renderGreeting() {
+            var els = document.querySelectorAll('#ace-greeting');
+            for (var i = 0; i < els.length; i++) {
+                els[i].textContent = greetingText();
+                var box = els[i].parentNode;
+                var sess = box ? box.querySelector('#ace-session') : null;
+                if (sess) sess.textContent = sessionText();
+                if (window.__lastEdit && window.__lastEdit.detail) {
+                    els[i].title = window.__lastEdit.detail;
+                    if (sess) sess.title = window.__lastEdit.detail;
+                }
+            }
+        }
+
+        window.aceGreetingText = greetingText;
+        window.aceGreetingHtml = function () {
+            return '<span id="ace-greeting">' + escapeHtml(greetingText()) + '</span>' +
+                '<span id="ace-session" style="display:block;color:#9a9a9a;font-size:12px;' +
+                'margin-top:4px;white-space:pre-line;">' + escapeHtml(sessionText()) + '</span>';
+        };
+        window.aceLoadLastEdit = function () {
+            fetch('/api/last_edit', { cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { window.__lastEdit = d; renderGreeting(); })
+                .catch(function () { /* keep the static line */ });
+        };
+
+        window.aceLoadLastEdit();
+        document.addEventListener('DOMContentLoaded', window.aceLoadLastEdit);
+    })();
+    </script>
+
+
+
+
+
+
+
+
+
+
+
+
+

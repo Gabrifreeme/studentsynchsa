@@ -76,6 +76,8 @@ emails.json
 email_notify_rules.local.json
 server_stdout.txt
 server_stderr.txt
+server_stdout.txt.*
+server_stderr.txt.*
 
 ace_memory.json
 
@@ -104,3 +106,9 @@ audit.log
 
 # Standing preferences (personal: name, location, study) - local only
 preferences.json
+web-app/.next/
+web-app/node_modules/
+__pycache__/
+*.pyc
+.dart_tool/
+build/

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ACEsi Auto-fix Script</title>
+</head>
+<body>
+<script>
+(function () {
+  var API_URL   = "http://127.0.0.1:5000/api/autofix";
+  var EDITOR_ID = "codeEditor";
+
+  function toast(msg, isError) {
+    var t = document.getElementById("autofix-toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "autofix-toast";
+      t.style.cssText =
+        "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);" +
+        "max-width:90vw;padding:10px 16px;border-radius:8px;z-index:99999;" +
+        "font:14px sans-serif;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.4);";
+      document.body.appendChild(t);
+    }
+    t.style.background = isError ? "#c62828" : "#2e7d32";
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.style.display = "none"; }, isError ? 6000 : 2500);
+  }
+
+  function getEditor() {
+    return document.getElementById(EDITOR_ID) || document.getElementById("code-editor") || document.querySelector("textarea");
+  }
+
+  var busy = false;
+
+  async function autoFix(btn) {
+    if (busy) return;
+    var editor = getEditor();
+    if (!editor) { toast("Auto-fix: editor textarea not found", true); return; }
+
+    var code = editor.value || editor.innerText || editor.textContent || "";
+    if (!code.trim()) { toast("Editor is empty", true); return; }
+
+    busy = true;
+    var originalLabel = btn.textContent;
+    btn.textContent = "Fixing...";
+    btn.disabled = true;
+    toast("Sending code to AI...", false);
+
+    try {
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 120000);
+
+      var res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      var data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || ("Server error " + res.status));
+
+      if (editor.tagName === "TEXTAREA") {
+        editor.value = data.fixed_code;
+      } else {
+        editor.innerText = data.fixed_code;
+      }
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+      toast("Code fixed", false);
+    } catch (err) {
+      var m = (err && err.name === "AbortError") ? "Request timed out" : (err.message || String(err));
+      toast("Auto-fix failed: " + m, true);
+    } finally {
+      busy = false;
+      btn.textContent = originalLabel;
+      btn.disabled = false;
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("button, [role='button'], .btn, a");
+    if (!btn) return;
+    var label = ((btn.id || "") + " " + (btn.textContent || "")).toLowerCase();
+    if (!/auto[\s_-]?fix/.test(label)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    autoFix(btn);
+  }, true);
+
+  window.addEventListener("error", function (e) { toast("JS error: " + e.message, true); });
+})();
+</script>
+</body>
+</html>

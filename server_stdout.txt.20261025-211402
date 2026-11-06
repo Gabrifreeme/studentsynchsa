@@ -1,0 +1,64 @@
+✅ Ollama reachable — 3 model(s) loaded: ['qwen2.5-coder:1.5b', 'qwen2.5:14b', 'qwen2.5-coder:7b']
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 14616
+[boot] git HEAD  : 0715dd2  (+16 modified)
+[boot] server.py : mtime=21:05:33  722850 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 0 chars
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=10 timeout=(30, 240) tools=yes
+📋 [21:06:06] Sending to Ollama (qwen2.5-coder:1.5b) — 10 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:06:22] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:63417-\u003e127.0.0.1:63299: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:63417->127.0.0.1:63299: wsarecv: An existing connection was forcibly closed by the remote host.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(30, 240) tools=yes
+📋 [21:06:22] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:06:37] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:63567-\u003e127.0.0.1:63473: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:63567->127.0.0.1:63473: wsarecv: An existing connection was forcibly closed by the remote host.
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:06:37] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=486
+💳 OpenRouter-fallback 402: balance affords only 53 max_tokens, retrying smaller
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=poolside/laguna-s-2.1 msgs=4 timeout=(10, 90) tools=yes
+📋 [21:06:37] Sending to OpenRouter-fallback (poolside/laguna-s-2.1) — 4 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=415
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1764 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1764 affordable=106]]
+🪶 reduced schema: 48 -> 13 tools, ~1519 tokens
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [OpenRouter-fallback] POST https://openrouter.ai/api/v1/chat/completions model=nvidia/nemotron-3-super-120b-a12b msgs=4 timeout=(10, 90) tools=yes
+📋 [21:06:37] Sending to OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) — 4 messages, tools=yes
+📥 [OpenRouter-fallback] HTTP 402 len=957
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[Fallback] Cloud API rate limited. Switching to local Ollama.
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=1 timeout=(15, 300) tools=yes
+📋 [21:06:37] Sending to Ollama (qwen2.5-coder:1.5b) — 1 messages, tools=yes
+📥 [Ollama] HTTP 200 len=436
+📋 [21:10:43] Ollama responded OK (436 bytes)
+🚨 _chat_one PROXY ENV: {'NO_PROXY': '*', 'HTTP_PROXY': '', 'HTTPS_PROXY': '', 'ALL_PROXY': ''}
+📤 [Ollama] POST http://127.0.0.1:11434/v1/chat/completions model=qwen2.5-coder:1.5b msgs=5 timeout=(15, 300) tools=yes
+📋 [21:10:43] Sending to Ollama (qwen2.5-coder:1.5b) — 5 messages, tools=yes
+📥 [Ollama] HTTP 500 len=238
+📋 [21:10:49] Ollama error: HTTP 500 — {"error":{"message":"an error was encountered while running the model: read tcp 127.0.0.1:49191-\u003e127.0.0.1:63631: w
+❌ Ollama (qwen2.5-coder:1.5b) 500: an error was encountered while running the model: read tcp 127.0.0.1:49191->127.0.0.1:63631: wsarecv: An existing connection was forcibly closed by the remote host.
+[ACE-DISPATCH] All providers exhausted. tried=['Ollama', 'Ollama'] ollama=True
+📋 [21:10:49] Dispatch complete: 10 messages, model=qwen2.5-coder:1.5b
+[ACE-DISPATCH] no models available. per-provider reasons:
+  Ollama 500: an error was encountered while running the model: read tcp 127.0.0.1:63417->127.0.0.1:63299: wsarecv: An exist
+  OpenRouter-fallback 402: Prompt tokens limit exceeded: 1764 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrad
+  OpenRouter-fallback 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3

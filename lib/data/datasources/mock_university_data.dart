@@ -1,5 +1,5 @@
-import 'package:studentsyncsa/domain/models/offline_resource.dart';
-import 'package:studentsyncsa/domain/models/university.dart';
+import 'package:lipsyncstudent/domain/models/offline_resource.dart';
+import 'package:lipsyncstudent/domain/models/university.dart';
 
 class MockUniversityData {
   static OfflineResource _webview(
@@ -60,8 +60,11 @@ class MockUniversityData {
       shortName: 'UNIVEN',
       province: 'Limpopo',
       website: 'https://www.univen.ac.za',
+      // The only URL that creates the ITS session. Loading gw1view directly
+      // returns the "Access Denied" stub, so the wizard is bootstrapped from
+      // gw1startup and then redirects itself to gw1view.
       applicationUrl:
-          'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+          'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'https://usaf.ac.za/wp-content/uploads/2023/08/University_of_Venda-logo.webp',
       hasApplicationFee: true,
       applicationFee: 200,
@@ -648,7 +651,7 @@ class MockUniversityData {
       shortName: 'UCT',
       province: 'Western Cape',
       website: 'https://www.uct.ac.za',
-      applicationUrl: 'https://www.uct.ac.za/apply',
+      applicationUrl: 'https://www.uct.ac.za/main/apply',
       logoUrl: 'https://usaf.ac.za/wp-content/uploads/2023/08/University_of_Cape_Town-logo.webp',
       hasApplicationFee: true,
       applicationFee: 300,

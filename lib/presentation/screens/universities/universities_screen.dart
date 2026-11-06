@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/domain/models/university.dart';
-import 'package:studentsyncsa/presentation/providers/university_provider.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/domain/models/university.dart';
+import 'package:lipsyncstudent/presentation/providers/university_provider.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 
 class UniversitiesScreen extends ConsumerStatefulWidget {
   const UniversitiesScreen({super.key});
@@ -294,12 +294,15 @@ class _UniversityCardState extends State<_UniversityCard> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: widget.logoColor.withValues(alpha: 0.2),
-                        image: uni.logoUrl.isNotEmpty
-                            ? DecorationImage(
-                                image: NetworkImage(uni.logoUrl),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
+                                                    image: uni.logoUrl.isNotEmpty && !uni.logoUrl.contains('University_of_Zululand-logo.webp')
+                                ? DecorationImage(
+                                    image: NetworkImage(uni.logoUrl),
+                                    fit: BoxFit.cover,
+                                    onError: (exception, stackTrace) {
+                                      debugPrint('Failed to load logo: ${uni.logoUrl}');
+                                    },
+                                  )
+                                : null,
                       ),
                       child: uni.logoUrl.isEmpty
                           ? Icon(

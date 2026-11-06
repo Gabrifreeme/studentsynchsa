@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>ACE</title>
+    <style>
+        body { background: #0f0f12; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+        #chat { max-width: 800px; margin: 0 auto; }
+        .msg { padding: 8px 0; }
+        .user { color: #7fc8ff; }
+        .ace { color: #e8e8f0; }
+        #input-area { display: flex; gap: 10px; margin-top: 20px; }
+        #input-area input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #1e1e28; color: #eee; }
+        #input-area button { padding: 10px 20px; border: none; border-radius: 8px; background: #7a6aff; color: #fff; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="spinner-container" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; pointer-events: none;">
+    <iframe src="web/loading-spinner.html" style="width: 200px; height: 200px; border: none; overflow: hidden; mix-blend-mode: screen;" scrolling="no" title="Loading Spinner"></iframe>
+</div>
+    <div id="chat">
+        <div class="msg ace">Hi, Chris. I'm here.</div>
+        <div id="messages"></div>
+    </div>
+    <div id="input-area">
+        <input type="text" id="userInput" placeholder="Type your message...">
+        <button id="sendBtn">Send</button>
+    </div>
+    <script>
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function addMessage(text, sender) {
+           document.getElementById('spinner-container').style.display = 'none';
+            const div = document.createElement('div');
+            div.className = 'msg ' + sender;
+            div.textContent = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+            addMessage(text, 'user');
+            input.value = '';
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                const aiReply = data.reply;
+                const execMatch = aiReply.match(/\[EXEC:\s*(.+?)\]/i);
+                
+                if (execMatch) {
+                    const command = execMatch[1].trim();
+                    addMessage(aiReply.split('[EXEC:')[0].trim() + "\n[Running command: " + command + "]", 'ace');
+                    
+                    try {
+                        const execRes = await fetch('/api/system/exec', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command: command })
+                        });
+                        const execData = await execRes.json();
+                        
+                        let output = "";
+                        if (execData.ok) {
+                            output = (execData.stdout || "") + (execData.stderr ? "\n[STDERR]\n" + execData.stderr : "");
+                            if (!output.trim()) output = "[No output]";
+                        } else {
+                            output = "Error: " + (execData.error || "Unknown execution error");
+                        }
+                        
+                        addMessage("Terminal Output:\n" + output, 'ace');
+                        
+                        // Feed it back to ACESi
+                        const followRes = await fetch('/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: "The command [" + command + "] returned this output:\n" + output + "\n\nWhat should we do next?" })
+                        });
+                        const followData = await followRes.json();
+                        addMessage(followData.reply, 'ace');
+                        
+                    } catch (e) {
+                        addMessage('Execution error: ' + e.message, 'ace');
+                    }
+                } else {
+                    addMessage(aiReply, 'ace');
+                }
+            } catch (e) {
+                addMessage('Server error: ' + e.message, 'ace');
+            }
+        }
+
+        sendBtn.onclick = sendMessage;
+        input.onkeydown = e => { if (e.key === 'Enter') sendMessage(); };
+    </script>
+</body>
+</html>

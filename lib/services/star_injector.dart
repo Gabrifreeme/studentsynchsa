@@ -2,7 +2,8 @@
 class StarInjector {
   static String getStarScript() {
     return '''
-    (function() {
+       (function() {
+      return; // <--- ADD THIS LINE
       if (window._starInjected) return;
       window._starInjected = true;
       

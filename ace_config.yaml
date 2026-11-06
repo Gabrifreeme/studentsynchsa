@@ -5,7 +5,7 @@
 
 global:
   version: "1.0"
-  default_context: "studentsyncsa"
+  default_context: "lipsyncstudent"
   auto_save: true
   # LLM provider profile names referenced by context.llm_profile
   # Each profile: provider chain (first available wins), then fallback to local Ollama.
@@ -41,7 +41,7 @@ global:
 # Tools not listed here are unavailable when the context is active.
 # "all" = every tool is available. Otherwise a subset.
 tool_caps:
-  studentsyncsa:
+  lipsyncstudent:
     allowed: ["ui", "code", "net", "ctrl"]
     tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "view_user_file", "grep", "write_file", "edit_file",
             "run_command", "git_status", "git_log", "git_commit", "git_branch",
@@ -76,17 +76,17 @@ tool_caps:
 
 contexts:
   # ── Default: StudentSyncSA (full backward compatibility) ─────────────────────
-  studentsyncsa:
+  lipsyncstudent:
     name: "StudentSyncSA"
     type: "flutter_android"
-    app_package: "com.studentsyncsa.studentsyncsa"
+    app_package: "com.lipsyncstudent.lipsyncstudent"
     project_root: "/Users/chris/StudentSyncSA"
     activity: "MainActivity"
     # ITS portal integration
     startup_url: "https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP"
     cdp_url_fragment: "univen|ITS_OAP"
     llm_profile: "cloud"
-    tool_caps: "studentsyncsa"
+    tool_caps: "lipsyncstudent"
     # Saved tasks / shortcuts
     shortcuts:
       its_application: "ui_task.its_application"

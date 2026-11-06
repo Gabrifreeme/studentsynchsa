@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -19,7 +19,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.shield_rounded,
               title: 'Privacy Notice',
               children: [
-                'studentsyncsa respects your privacy. We collect only what you choose to share, use it solely to help you apply to South African universities and bursaries, and never sell your data.',
+                'LipSyncStudent respects your privacy. We collect only what you choose to share, use it solely to help you apply to South African universities and bursaries, and never sell your data.',
                 'Your data stays on your device by default. When you apply, information is shared only with the institution you choose. This notice explains what we collect, why, and your rights.',
               ],
             ),
@@ -47,7 +47,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.cookie_outlined,
               title: 'Cookies & Tracking',
               children: [
-                'studentsyncsa does not use cookies or tracking scripts in the app. We do not serve ads, embed third-party trackers, or build behavioural profiles.',
+                'LipSyncStudent does not use cookies or tracking scripts in the app. We do not serve ads, embed third-party trackers, or build behavioural profiles.',
                 'When you visit our website (studentsyncsa.app), we may use essential cookies for site functionality and anonymous analytics (page views, browser type) to improve the site. No personal data is collected through these cookies.',
                 'Third-party links (university websites, bursary portals) have their own cookie policies. We recommend reviewing them separately.',
               ],
@@ -60,7 +60,7 @@ class PrivacyScreen extends StatelessWidget {
               title: 'Data Security Measures',
               children: [
                 'Local Storage: Your profile and application data are stored in encrypted local storage (Hive) on your device. No cloud storage is used unless you explicitly enable sync.',
-                'No External Servers: studentsyncsa does not maintain a central database of user profiles. Your data stays with you.',
+                'No External Servers: LipSyncStudent does not maintain a central database of user profiles. Your data stays with you.',
                 'Encryption: Any data transmitted during application submissions uses HTTPS/TLS encryption. Future cloud sync features will use end-to-end encryption.',
                 'Authentication: The app uses anonymous local authentication. No passwords or biometric data are transmitted or stored externally.',
                 'Regular Audits: We review our data practices regularly to ensure compliance with POPIA and evolving privacy best practices.',
@@ -116,7 +116,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.toggle_on_outlined,
               title: 'Consent & Granular Controls',
               children: [
-                'studentsyncsa uses a simple, transparent consent model. You are not asked to consent to data collection upfront — the app works entirely offline by default.',
+                'LipSyncStudent uses a simple, transparent consent model. You are not asked to consent to data collection upfront — the app works entirely offline by default.',
                 'Granular consent options will be introduced when cloud features (sync, backup) are added. At that point, you will be able to choose:',
                 '• Essential: local-only storage required for the app to function',
                 '• Sync & Backup: encrypt your data to the cloud for cross-device access',
@@ -132,7 +132,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.architecture_outlined,
               title: 'Privacy-by-Design Principles',
               children: [
-                'studentsyncsa is engineered with privacy as the default, not an afterthought.',
+                'LipSyncStudent is engineered with privacy as the default, not an afterthought.',
               ],
               trailing: Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -216,7 +216,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.article_outlined,
               title: 'Data Processing Agreements',
               children: [
-                'studentsyncsa does not share your data with third-party processors. All data is stored locally on your device.',
+                'LipSyncStudent does not share your data with third-party processors. All data is stored locally on your device.',
                 'When you submit an application to a university or bursary, data is sent directly to that institution\'s systems. Each institution acts as an independent data controller under POPIA.',
                 'If future features introduce third-party services (e.g., cloud backup providers), we will publish Data Processing Agreements (DPAs) here and notify you before any data leaves your device.',
               ],
@@ -319,7 +319,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.school_rounded,
               title: 'Student Data & Consent',
               children: [
-                'studentsyncsa is designed for prospective university students. If you are under 18, please review this policy with a parent or guardian.',
+                'LipSyncStudent is designed for prospective university students. If you are under 18, please review this policy with a parent or guardian.',
                 'By using the app, you consent to the collection and use of your information as described here. You may withdraw consent at any time by clearing your data and uninstalling the app.',
                 'We do not sell, rent, or trade your personal information to third parties. Your data is used exclusively for the purpose of facilitating your educational applications.',
               ],

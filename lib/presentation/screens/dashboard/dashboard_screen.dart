@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:studentsyncsa/core/theme/app_theme.dart';
-import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
-import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
-import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
-import 'package:studentsyncsa/presentation/providers/sync_provider.dart';
-import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
+import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/data/datasources/local/hive_database.dart';
+import 'package:lipsyncstudent/presentation/providers/auth_provider.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
+import 'package:lipsyncstudent/presentation/providers/sync_provider.dart';
+import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:lipsyncstudent/services/sync_service.dart' as sync_service;
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -29,7 +29,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               const StarAvatar(size: 32),
               const SizedBox(width: 8),
-              const Text('studentsyncsa', style: TextStyle(fontSize: 16)),
+              const Text('LipSyncStudent', style: TextStyle(fontSize: 16)),
             ],
           ),
           actions: [

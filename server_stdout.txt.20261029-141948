@@ -1,0 +1,16 @@
+✅ Ollama reachable — 1 model(s) loaded: ['qwen2.5-coder:1.5b']
+🧠 ace_config.yaml loaded: contexts=lipsyncstudent, generic, web_only, code default=lipsyncstudent
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 14016
+[boot] git HEAD  : 1a7afbf  (+6 modified)
+[boot] server.py : mtime=13:57:04  734055 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=21:20:04  6119 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s

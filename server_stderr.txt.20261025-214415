@@ -1,0 +1,12 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+Traceback (most recent call last):
+  File "C:\Users\chris\StudentSyncSA\server.py", line 5793, in chat
+    reply = _chat_dispatch(
+        llm_messages, user_message=user_message, preferred_model=model
+    )
+  File "C:\Users\chris\StudentSyncSA\server.py", line 5165, in _chat_dispatch
+    _outstanding = _outstanding_subtasks(user_message, names)
+  File "C:\Users\chris\StudentSyncSA\server.py", line 10666, in _outstanding_subtasks
+    for label, tools, pattern in _SUBTASK_PROBES
+                                 ^^^^^^^^^^^^^^^
+NameError: name '_SUBTASK_PROBES' is not defined

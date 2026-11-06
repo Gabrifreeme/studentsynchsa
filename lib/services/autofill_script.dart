@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+// autofill_script.dart  –  LipSyncStudent Star Auto-Fill
 //
 // Built specifically for ITS (Oracle PL/SQL) university portals used by
 // UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and
@@ -249,15 +249,15 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   // ── 3. Generic fuzzy fieldMap (fallback for non-ITS sites) ────────────
   var fieldMap = {
-    firstName:         ['firstname','first name','fname','given name','name'],
-    lastName:          ['lastname','last name','surname','lname','family name'],
+    firstName:         ['firstname','first name','fname','given name','name','first names'],
+    lastName:          ['lastname','last name','surname','lname','family name','maiden name'],
     initials:          ['initials'],
     title:             ['title','salutation'],
     gender:            ['gender','sex'],
     idNumber:          ['id number','idnumber','identity number','national id','id no','passport'],
     dateOfBirth:       ['date of birth','dateofbirth','dob','birth date','birthdate','birthday'],
     email:             ['email','e-mail','email address'],
-    phone:             ['cell','cellphone','mobile','phone','telephone','contact number'],
+    phone:             ['cell','cellphone','mobile','phone','telephone','contact number','cellphone number','cell number'],
     workPhone:         ['work phone','work tel','telephone work'],
     address:           ['address','street','physical address'],
     addressLine2:      ['address 2','suburb','town','city'],
@@ -265,7 +265,7 @@ String _script(String profileJson, {required bool addFloatingStar}) {
     postalCode:        ['postal code','postalcode','post code','postcode','zip'],
     nationality:       ['nationality','citizenship','citizen'],
     isSACitizen:       ['sa citizen','possession of','valid sa','sa id'],
-    homeLanguage:      ['home language','homelanguage','language'],
+    homeLanguage:      ['home language','homelanguage','language','correspondence language'],
     populationGroup:   ['population group','ethnicity'],
     raceValue:         ['race','population group'],
     maritalStatus:     ['marital status','maritalstatus'],
@@ -313,15 +313,15 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   function findOption(sel, want) {    if (!want) return null;
     var wl = want.toLowerCase().trim();
-    var wlWords = wl.split(/\s+/);
+    var wlWords = wl.split(/s+/);
     var best = null, bestScore = -1;
     for (var i = 0; i < sel.options.length; i++) {
       var opt = sel.options[i];
       if (isPlaceholder(opt.text)) continue;
       var tl = opt.text.toLowerCase().trim();
       var vl = opt.value.toLowerCase().trim();
-      var tlWords = tl.split(/\s+/);
-      var vlWords = vl.split(/\s+/);
+      var tlWords = tl.split(/s+/);
+      var vlWords = vl.split(/s+/);
       var score = -1;
       // 100: exact text/value equals want
       if (tl === wl || vl === wl) score = 100;
@@ -405,13 +405,29 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       el.getAttribute('title') || '',
       el.getAttribute('data-field') || '',
     ];
+    // Scan closest visible label for generic portals
     if (el.labels && el.labels.length) {
-      parts.push(el.labels[0].textContent);
+      for (var li = 0; li < el.labels.length; li++) {
+        parts.push(el.labels[li].textContent || '');
+      }
     } else {
-      var lid = el.getAttribute('for') || el.getAttribute('aria-labelledby');
-      if (lid) {
-        var lel = document.getElementById(lid);
-        if (lel) parts.push(lel.textContent);
+      // Scan closest visible label via 'for' attribute (label -> input link)
+      var inputId = el.id || '';
+      if (!inputId && el.name) inputId = el.name;
+      if (inputId) {
+        var inputLabels = document.querySelectorAll('label[for="' + inputId + '"]');
+        for (var lblIdx = 0; lblIdx < inputLabels.length; lblIdx++) {
+          parts.push(inputLabels[lblIdx].textContent || '');
+        }
+      }
+      // Also scan via aria-labelledby
+      var ariaLblIds = el.getAttribute('aria-labelledby');
+      if (ariaLblIds) {
+        var ids = ariaLblIds.split(/s+/);
+        for (var a = 0; a < ids.length; a++) {
+          var lbl = document.getElementById(ids[a]);
+          if (lbl) parts.push(lbl.textContent || '');
+        }
       }
       var p = el.parentElement;
       for (var d = 0; d < 6 && p; d++) {
@@ -438,21 +454,210 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   function fuzzyMatch(el) {
     var text = elText(el);
+    // For email: only match when label explicitly contains 'email'
+    // Prevents 'email' from winning on unrelated labels via partial match.
     var bestKey = null, bestScore = 0;
     for (var key in fieldMap) {
       var aliases = fieldMap[key];
       for (var j = 0; j < aliases.length; j++) {
-        if (text.indexOf(aliases[j]) !== -1) {
-          var score = aliases[j].length * 2;
+        var alias = aliases[j];
+        // Email guard: require the word 'email' be present in label for email key
+        if (key === 'email' && text.indexOf('email') === -1 && text.indexOf('e-mail') === -1 && text.indexOf('mail') === -1) continue;
+        if (text.indexOf(alias) !== -1) {
+          var score = alias.length * 2;
           if (score > bestScore) { bestScore = score; bestKey = key; }
-          break;
         }
       }
     }
+    // If best match is weak (< 4 chars alias * 2 = 8), leave blank rather than guessing
+    if (bestScore < 8) return null;
     return bestKey;
   }
 
-  // ── 5. Main autofill ───────────────────────────────────────────────────
+  // ── 5. Hardcoded NWU page-specific sequence ────────────────────────────
+  // Visible debug div so we can confirm the script is running.
+  (function createDebugDiv() {
+    var d = document.getElementById('ssa-debug-div');
+    if (!d) {
+      d = document.createElement('div');
+      d.id = 'ssa-debug-div';
+      d.style.position = 'fixed';
+      d.style.top = '0';
+      d.style.left = '0';
+      d.style.zIndex = '9999';
+      d.style.background = 'black';
+      d.style.color = 'lime';
+      d.style.padding = '10px';
+      d.style.fontFamily = 'monospace';
+      d.style.fontSize = '14px';
+      d.innerHTML = '<b>[SSA] Autofill running...</b>';
+      document.body.appendChild(d);
+    }
+  })();
+
+  function _fillNwuByPosition() {
+    var html = document.body.innerHTML.toLowerCase();
+    if (html.indexOf('nwu') === -1 && html.indexOf('nwu.ac.za') === -1) return false;
+
+    var selects = document.querySelectorAll(
+      'select:not([disabled])',
+    );
+    // Collect all visible controls in document order
+    var ns = [];
+    var allInputs = document.querySelectorAll('input:not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), select:not([disabled]), textarea');
+    for (var i = 0; i < allInputs.length; i++) {
+      var c = allInputs[i];
+      // NEVER interact with CAPTCHA/reCAPTCHA elements — student solves manually
+      var parent = c.parentNode;
+      var skipCap = false;
+      // Check if element or any parent has recaptcha-related class/id
+      while (parent && parent !== document.body) {
+        var cls = (parent.className || '').toString().toLowerCase();
+        var id = (parent.id || '').toString().toLowerCase();
+        if (cls.indexOf('g-recaptcha') !== -1 || cls.indexOf('recaptcha') !== -1 || id.indexOf('recaptcha') !== -1 || (parent.getAttribute && parent.getAttribute('data-sitekey'))) { skipCap = true; break; }
+        parent = parent.parentNode;
+      }
+      if (skipCap) continue;
+      if (c.disabled || c.getAttribute('hidden') !== null || (c.getAttribute('type') || '').toLowerCase() === 'hidden') continue;
+      ns.push(c);
+    }
+
+    // Stop if there are fewer than 4 visible controls — most pages are not this.
+    if (ns.length < 4) return false;
+
+    // ── Ordered mapping (12 fields ── NWU): ────────────────────────────
+    //   0  Nationality (dropdown)     -> nationality (South Africa)
+    //   1  Identity Number            -> idNumber
+    //   2  Surname                    -> lastName
+    //   3  Initials                   -> initials
+    //   4  First Names                -> firstName
+    //   5  Date Of Birth              -> dateOfBirth
+    //   6  Title                      -> title
+    //   7  Maiden Name                -> lastName
+    //   8  Email Address              -> email
+    //   9  Home Language (dropdown)   -> homeLanguage
+    //  10  Correspondence Language    -> homeLanguage
+    //  11  Cellphone Number           -> phone
+    var vsi = {
+      'nationality':       (vs.nationality && vs.nationality.trim()) ? vs.nationality : 'South Africa',
+      'idNumber':          vs.idNumber,
+      'lastName':          vs.lastName,
+      'initials':          vs.initials,
+      'firstName':         vs.firstName,
+      'dateOfBirth':       vs.dateOfBirth,
+      'title':             vs.title,
+      'email':             vs.email,
+      'homeLanguage':      vs.homeLanguage,
+      'phone':             vs.phone,
+    };
+
+    function visible(el) {
+      var t = (el.type || '');
+      return t !== 'submit' && t !== 'button' && t !== 'reset' && t !== 'image';
+    }
+    function tryFill(el, key) {
+      if (!el) return false;
+      // Nationality dropdown: default to first real option when profile empty
+      if (key === 'nationality' && (!vsi[key] || vsi[key] === '')) {
+        if (el.tagName === 'SELECT' && el.options && el.options.length > 0) {
+          for (var ni = 0; ni < el.options.length; ni++) {
+            var txt = (el.options[ni].textContent || '').toLowerCase().trim();
+            if (txt && txt.indexOf('--') === -1 && txt.indexOf('please') === -1) {
+              el.value = el.options[ni].value;
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      if (!vsi[key] || vsi[key] === '') return false;
+      var value = vsi[key];
+      var tag = el.tagName;
+      if (tag === 'SELECT') {
+        var opt = null;
+        // Try exact match first for 'South Africa' on Nationality dropdown
+        for (var i = 0; i < el.options.length; i++) {
+          var optTextRaw = (el.options[i].textContent || '').trim();
+          if (optTextRaw.toLowerCase() === 'south africa') { opt = el.options[i]; break; }
+        }
+        // Then try partial/text match
+        if (!opt) {
+          for (var i = 0; i < el.options.length; i++) {
+            var optText = (el.options[i].textContent || '').toLowerCase().trim();
+            if (optText.indexOf(value.toLowerCase()) !== -1 || value.toLowerCase().indexOf(optText) !== -1) { opt = el.options[i]; break; }
+          }
+        }
+        if (!opt) opt = el.options[0];
+        if (opt) {
+          el.value = opt.value;
+          // Simulate a real user interaction (click + events) for custom dropdowns
+          try { opt.click(); } catch (e2) {}
+          el.dispatchEvent(new Event('focus', { bubbles: true }));
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new Event('blur', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }
+      try {
+        if (el.removeAttribute) el.removeAttribute('readonly');
+        if (el.removeAttribute) el.removeAttribute('disabled');
+      } catch (e) {}
+      el.style.display = 'block';
+      el.style.visibility = 'visible';
+      try {
+        if (el.removeAttribute) el.removeAttribute('readonly');
+        if (el.removeAttribute) el.removeAttribute('disabled');
+      } catch (e) {}
+      el.style.display = 'block';
+      el.style.visibility = 'visible';
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('blur', { bubbles: true }));
+      return true;
+    }
+
+    var filled = 0;
+    for (var k = 0; k < ns.length && k < 12; k++) {
+      var key = '';
+      if (k === 0) key = 'nationality';
+      else if (k === 1) key = 'idNumber';
+      else if (k === 2) key = 'lastName';
+      else if (k === 3) key = 'initials';
+      else if (k === 4) key = 'firstName';
+      else if (k === 5) key = 'dateOfBirth';
+      else if (k === 6) key = 'title';
+      else if (k === 7) key = 'lastName';
+      else if (k === 8) key = 'email';
+      else if (k === 9) key = 'homeLanguage';
+      else if (k === 10) key = 'homeLanguage';
+      else if (k === 11) key = 'phone';
+      if (!vsi[key] || vsi[key] === '' || (vsi[key] + '').toLowerCase().indexOf('http') !== -1 || (vsi[key] + '').toLowerCase().indexOf('.ac.za') !== -1) continue;
+      var el = ns[k];
+      console.log('[autofill] field', k, 'key=', key, 'tag=', el.tagName, 'value=', vsi[key], 'hasSetter=', !!(Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set));
+      if (el.tagName === 'SELECT') {
+        for (var i = 0; i < el.options.length; i++) {
+          if ((el.options[i].text || '').toLowerCase().indexOf((vsi[key] || '').toLowerCase()) !== -1) { el.value = el.options[i].value; break; }
+        }
+      } else {
+        el.value = vsi[key];
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      var label = key === 'idNumber' ? 'Identity' : key === 'lastName' ? 'Surname/Maiden' : key === 'initials' ? 'Initials' : key === 'firstName' ? 'First Names' : key === 'dateOfBirth' ? 'DOB' : key === 'title' ? 'Title' : key === 'email' ? 'Email' : key === 'homeLanguage' ? 'Language' : key === 'phone' ? 'Cell' : key === 'nationality' ? 'Nationality' : key;
+      var dd = document.getElementById('ssa-debug-div');
+      if (dd) dd.innerHTML += '<br>Filled ' + label;
+      filled++;
+    }
+    return filled > 0;
+  }
+  if (_fillNwuByPosition()) return; // NWU: use the hardcoded sequence.
+
+  // ── 5b. Main autofill ─────────────────────────────────────────────────
   function doAutofill() {
     if (!firstName && !lastName && !email) {
       showToast('No profile data. Please complete your profile first.', '#EF4444');
@@ -520,7 +725,27 @@ String _script(String profileJson, {required bool addFloatingStar}) {
       }
     }
 
-    // ── Handle Select2 AJAX dropdowns (Race, Province) ─────────────────────
+    // Fallback: generic position-based fill when IDs missing (e.g. UWC portals)
+    if (filled === 0) {
+      var allInputs2 = document.querySelectorAll('input:not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), select:not([disabled]), textarea');
+      for (var p = 0; p < allInputs2.length && p < 8; p++) {
+        var el2 = allInputs2[p];
+        if (el2.disabled || el2.getAttribute('hidden') !== null || (el2.getAttribute('type') || '').toLowerCase() === 'hidden') continue;
+        var mapVals = [vs.lastName, vs.firstName, vs.email, vs.dateOfBirth, vs.phone, vs.idNumber, vs.initials, vs.title];
+        if (!mapVals[p] || mapVals[p] === '') continue;
+        var value2 = mapVals[p];
+        if (el2.tagName === 'SELECT') {
+          for (var i = 0; i < el2.options.length; i++) {
+            if ((el2.options[i].text || '').toLowerCase().indexOf((value2 || '').toLowerCase()) !== -1) { el2.value = el2.options[i].value; break; }
+          }
+        } else {
+          el2.value = value2;
+        }
+        el2.dispatchEvent(new Event('input', { bubbles: true }));
+        el2.dispatchEvent(new Event('change', { bubbles: true }));
+        filled++;
+      }
+    }
     function setSelect2Ajax(selector, valueText) {
       if (!valueText) return false;
       var el = document.querySelector(selector);
@@ -734,18 +959,16 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
   ${addFloatingStar ? '''
   // Floating star button injected into the page
-  (function() {
-    if (document.getElementById('ssa-star')) return;
-    var star = document.createElement('div');
-    star.id = 'ssa-star';
-    star.innerHTML = '⭐';
-    star.title = 'Star Auto-Fill';
-    star.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;'
-      + 'background:#0F1624;border-radius:50%;z-index:2147483646;cursor:pointer;'
-      + 'display:flex;align-items:center;justify-content:center;'
-      + 'box-shadow:0 4px 20px rgba(124,58,237,0.5);border:2px solid #7C3AED;'
-      + 'color:#FFD700;font-size:32px;user-select:none;';
-    star.onclick = doAutofill;
+     // Floating star button injected into the page (DISABLED)
+    /*
+    (function() {
+      if (document.getElementById('ssa-star')) return;
+      var star = document.createElement('div');
+      star.id = 'ssa-star';
+      star.innerHTML = '⭐';
+      // ... (the rest of the block)
+      }
+    */
     function tryAppend() {
       if (document.body) document.body.appendChild(star);
       else setTimeout(tryAppend, 300);
@@ -757,4 +980,179 @@ String _script(String profileJson, {required bool addFloatingStar}) {
 
 })();
 ''';
+}
+
+/// Returns JS that hooks the portal's Apply/Submit/Next button and resolves
+/// relative URLs against the page's own base URI. Re-injection safe: it
+/// de-dups listeners via a per-element data attribute and never bails out
+/// early so sub-page navigations keep working.
+String buildNavigationFixScript() {
+  return '${'''
+(function() {
+  var SELECTOR = 'button[type="submit"], input[type="submit"], button[data-id="NEXT"], #B_NEXT, button[data-id="APPLY"], button[data-id="SUBMIT"], input[value="Apply"], input[value="Submit"], input[value="Next"], button[class*="t-Button"], a[class*="t-Button"], button[class*="button"]';
+
+  function resolveUrl(url) {
+    try {
+      // Relative URLs (common on ITS portals: "gw1view", "../oap", "?p=1")
+      // must be resolved against the page's own base URI, not the app's.
+      return new URL(url, document.baseURI).href;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function hook(el) {
+    if (!el) return;
+    // De-dup: never attach twice to the same element, even across re-injections.
+    if (el.getAttribute('data-ssa-nav-hooked') === '1') return;
+    el.setAttribute('data-ssa-nav-hooked', '1');
+
+    el.addEventListener('click', function(e) {
+      var href = el.getAttribute('href');
+      if (!href) return;   // no href -> let the native submit happen
+      var resolved = resolveUrl(href);
+      console.log('[ssa-nav] ' + (el.textContent || '').trim() +
+                   ' -> ' + href + ' (resolved: ' + resolved + ')');
+      window.location.assign(resolved);
+    }, true);   // capture: true -> runs before other scripts / preventDefault
+  }
+
+  function scan() {
+    var nodes = document.querySelectorAll(SELECTOR);
+    for (var i = 0; i < nodes.length; i++) {
+      hook(nodes[i]);
+    }
+  }
+
+  // Initial scan on every injection (re-injection safe: no global early return).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scan);
+  } else {
+    scan();
+  }
+
+  // Re-scan on sub-page navigation: the portal re-renders the button bar and
+  // a one-time injection would miss it. Guard the interval so repeated
+  // injections never stack timers.
+  if (!window.__ssaNavTimer) {
+    var _t = setInterval(scan, 1500);
+    window.__ssaNavTimer = true;
+    setTimeout(function() {
+      try { clearInterval(_t); window.__ssaNavTimer = false; } catch (e) {}
+    }, 15000);
+  }
+
+  console.log('[ssa-nav] navigation fix installed: ' + SELECTOR);
+})();
+'''
+  .trim()}\n';
+}
+
+/// Returns JS that removes the old/stale postal-code picker markup from the
+/// page so the new one can take its place without duplicate rows.
+String buildRemoveOldPostalPickerScript() {
+  return '${'''
+(function() {
+  // Remove any previously injected postal-code picker UI (old styling /
+  // duplicate rows) before the new one is added.
+  var old = document.getElementById('ssa-postal-picker');
+  if (old) {
+    old.remove();
+    console.log('[ssa-postal] removed old picker');
+  }
+  var legacy = document.querySelector('[data-ssa-postal-picker]');
+  if (legacy) {
+    legacy.remove();
+    console.log('[ssa-postal] removed legacy picker');
+  }
+})();
+'''
+  .trim()}\n';
+}
+
+/// Returns JS that injects the new postal-code picker into the page.
+/// The picker is a small dropdown populated from the profile's postal code;
+/// selecting a value writes it back into the portal's postal fields.
+String buildPostalCodePickerScript(String profileJson) {
+  return '${'''
+(function() {
+  var profile = $profileJson;
+
+  function gv(path) {
+    var parts = path.split('.');
+    var o = profile;
+    for (var i = 0; i < parts.length; i++) {
+      if (o == null || typeof o !== 'object') return '';
+      o = o[parts[i]];
+    }
+    return (o !== null && o !== undefined) ? String(o) : '';
+  }
+
+  var postalCode = gv('address.postalCode');
+
+  if (document.getElementById('ssa-postal-picker')) return; // already injected
+
+  var sel = document.createElement('select');
+  sel.id = 'ssa-postal-picker';
+  sel.title = 'Postal code';
+  sel.style.cssText = 'font-size:13px;padding:4px 6px;border:1px solid #999;border-radius:4px;';
+
+  var placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '-- Select postal code --';
+  sel.appendChild(placeholder);
+
+  if (postalCode) {
+    var opt = document.createElement('option');
+    opt.value = postalCode;
+    opt.textContent = postalCode;
+    opt.selected = true;
+    sel.appendChild(opt);
+  }
+
+  sel.addEventListener('change', function() {
+    var val = sel.value;
+    if (!val) return;
+    // Write the selected postal code into the portal's postal fields.
+    var targets = [
+      'input[name="oapStreetAddrPCodeRq"]',
+      'input[name="oapStreetAddrPCodeRq_desc"]',
+      'input[name="oapPostalAddrPCodeRq"]',
+      'input[name="oapPostalAddrPCodeRq_desc"]',
+      'input[name="P_POSTAL_CODE"]',
+      'input[name="P_POST_CODE"]',
+      'input[name="P_POSTAL"]',
+      'input[name="postal_code"]',
+      'input[name="postalcode"]',
+      'input[name="post_code"]',
+      'input[name="postcode"]'
+    ];
+    for (var i = 0; i < targets.length; i++) {
+      var el = document.querySelector(targets[i]);
+      if (!el) continue;
+      try { el.removeAttribute('readonly'); el.removeAttribute('disabled'); } catch (e) {}
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+    console.log('[ssa-postal] postal code set to ' + val);
+  });
+
+  // Attach to the postal-code row if one exists, otherwise float it.
+  var anchor =
+    document.querySelector('input[name="oapStreetAddrPCodeRq"]') ||
+    document.querySelector('input[name="P_POSTAL_CODE"]') ||
+    document.querySelector('input[name="postalcode"]');
+  if (anchor && anchor.parentElement) {
+    anchor.parentElement.appendChild(sel);
+  } else if (document.body) {
+    sel.style.cssText += 'position:fixed;top:80px;right:20px;z-index:2147483646;';
+    document.body.appendChild(sel);
+  }
+
+  console.log('[ssa-postal] picker injected (code: ' + (postalCode || 'none') + ')');
+})();
+'''
+  .trim()}\n';
 }

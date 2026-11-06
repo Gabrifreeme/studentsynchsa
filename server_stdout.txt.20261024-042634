@@ -1,0 +1,55 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 13480
+[boot] git HEAD  : 0715dd2  (+15 modified)
+[boot] server.py : mtime=04:24:09  662908 bytes
+[boot] devtools_service.py: mtime=02:33:14  42139 bytes
+[boot] ace_config.yaml: mtime=03:37:27  6113 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 38 chars
+[domain] explicit tool 'weather' -> net (tool domains: ['net'])
+🪶 reduced schema: 62 -> 21 tools, ~2509 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 21 tools, ~2509 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2384 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2384 affordable=106]]
+🪶 reduced schema: 62 -> 21 tools, ~2509 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in/London?format=3"} out={"url": "https://wttr.in/London?format=3"}
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+💳 OpenRouter 402: balance affords only 53 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 2324 > 106. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=2324 affordable=106]]
+🪶 reduced schema: 62 -> 20 tools, ~2398 tokens
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: This request requires more credits, or fewer max_tokens. You requested up to 512 tokens, but can only afford 3. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful"} out={"command": "echo test successful"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] webfetch in={"url": "https://wttr.in?format=3"} out={"url": "https://wttr.in?format=3"}
+🔧 /chat executed webfetch ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful"} out={"command": "echo test successful"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful"} out={"command": "echo test successful"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful"} out={"command": "echo test successful"}
+🔧 /chat executed run_command ok=True
+🪶 reduced schema: 62 -> 14 tools, ~1800 tokens
+[normalize] run_command in={"command": "echo test successful"} out={"command": "echo test successful"}
+🛑 /chat stop: repeated identical batch ('run_command', '{"command": "echo test successful"}')
+⏳ Groq 429: waiting 20.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)

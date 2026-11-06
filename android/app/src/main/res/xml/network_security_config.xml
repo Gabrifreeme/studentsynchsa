@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext (HTTP) traffic for ALL domains.
+         NOTE: this does NOT bypass certificate validation. It only controls
+         which CAs are trusted. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+            <!-- Many OEM trust stores predate this root. Without it the
+                 *.ufs.ac.za chain has no anchor: "Trust anchor for
+                 certification path not found" / net_error -202. -->
+            <certificates src="@raw/sectigo_root_r46" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">ufs.ac.za</domain>
+        <domain includeSubdomains="true">univen.ac.za</domain>
+        <domain includeSubdomains="true">univenierp01.univen.ac.za</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+            <certificates src="@raw/sectigo_root_r46" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

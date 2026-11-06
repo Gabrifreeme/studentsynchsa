@@ -1,0 +1,100 @@
+🧠 ace_config.yaml loaded: contexts=studentsyncsa, generic, web_only, code default=studentsyncsa
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 9516
+[boot] git HEAD  : e5a42dd  (+1 modified)
+[boot] server.py : mtime=00:28:16  598834 bytes
+[boot] devtools_service.py: mtime=18:14:52  38956 bytes
+[boot] ace_config.yaml: mtime=18:26:06  6096 bytes
+[boot] cdp tools : 8  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_status]
+[boot] python    : 3.14.6
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+ * Serving Flask app 'server'
+ * Debug mode: off
+📧 email watch: primed mailboxes, now polling every 120s
+📨 Incoming message length: 236 chars
+[domain] explicit tool 'cdp_network_requests' -> ui (tool domains: ['net', 'ui'])
+🧠 ui_script bail: URL/DevTools/CDP task - deferring to the model-driven loop
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1830 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1830 affordable=151]]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 30 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1830 > 170. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1830 affordable=170]]
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+🔧 /chat executed cdp_connect ok=True
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+🔧 /chat executed cdp_navigate ok=True
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+SUBMIT-GUARD: field filled via cdp_evaluate (field=username, submit required next: False)
+🔧 /chat executed cdp_evaluate ok=True
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+REPEAT-FIELD-GUARD: username already filled but model re-filled it; nudging (n=1)
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+SUBMIT-GUARD: field filled via cdp_evaluate (field=password, submit required next: True)
+🔧 /chat executed cdp_evaluate ok=True
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+SUBMIT-GUARD: submit seen via cdp_evaluate
+🔧 /chat executed cdp_evaluate ok=True
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 3.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+REPEAT-FIELD-GUARD: username already filled but model re-filled it; nudging (n=2)
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 5.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+REPEAT-FIELD-GUARD: username already filled but model re-filled it; nudging (n=3)
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 14.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+READ-GUARD: submit seen but next call was cdp_evaluate; nudging for the POST read (n=1)
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 2.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+READ-GUARD: submit seen but next call was cdp_evaluate; nudging for the POST read (n=2)
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 15.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+✅ Groq recovered on attempt 2 (max_tokens=4096)
+SUBMIT-GUARD: field filled via cdp_evaluate (field=username, submit required next: False)
+🔧 /chat executed cdp_evaluate ok=False
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+⏳ Groq 429: waiting 12.0s before attempt 2 (Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49)
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 5922, Requested 2165. Please t [retry budget exhausted]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1878 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1878 affordable=151]]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1878 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1878 affordable=160]]
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+SUBMIT-GUARD: field filled via cdp_evaluate (field=username, submit required next: False)
+🔧 /chat executed cdp_evaluate ok=False
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+SUBMIT-GUARD: field filled via cdp_evaluate (field=username, submit required next: False)
+🔧 /chat executed cdp_evaluate ok=False
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6540, Requested 2058. Please t [retry budget exhausted]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+❌ OpenRouter (deepseek/deepseek-v4-flash-0731:free) 404: This model is unavailable for free. The paid version is available now - use this slug instead: deepseek/deepseek-v4-flash-0731 [model slug not found or retired at this provider]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1852 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1852 affordable=151]]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1852 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1852 affordable=160]]
+🪶 reduced schema: 61 -> 12 tools, ~1402 tokens
+❌ Groq (openai/gpt-oss-120b) 429: Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01kwa73vd7e5katq49skaj0c4r` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6445, Requested 2166. Please t [retry budget exhausted]
+❌ Cerebras (gpt-oss-120b) 402: Payment required to access this resource. Visit your billing tab.
+❌ FreeLLM (auto) 429: All models rate-limited after 1 attempt. Soonest cooldown reset ~12s. Attempt trail: groq/openai/gpt-oss-safeguard-20b key1: daily_quota_exhausted. Last error: Groq API error 413: Request too large fo [daily/period quota exhausted - not retrying]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter-fallback 402: balance affords only 75 max_tokens, retrying smaller
+❌ OpenRouter-fallback (poolside/laguna-s-2.1) 402: Prompt tokens limit exceeded: 1852 > 151. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1852 affordable=151]]
+🪶 reduced schema: 61 -> 15 tools, ~1552 tokens
+💳 OpenRouter-fallback 402: balance affords only 34 max_tokens, retrying smaller
+❌ OpenRouter-fallback (nvidia/nemotron-3-super-120b-a12b) 402: Prompt tokens limit exceeded: 1852 > 160. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account [balance cannot cover the PROMPT itself - needs credits, not a smaller max_tokens [need=1852 affordable=160]]
+[ACE-DISPATCH] All providers exhausted. tried=['OpenRouter', 'OpenRouter', 'OpenRouter', 'Groq', 'Cerebras', 'FreeLLM'] ollama=False

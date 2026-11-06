@@ -1,6 +1,9 @@
+﻿
+
 # -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
+_CURRENT_CONTEXT = {}
 import requests
 import json
 import base64
@@ -59,6 +62,20 @@ except Exception:
     pass
 
 app = Flask(__name__)
+
+import logging
+import sys
+
+# Force werkzeug to log to the terminal
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.INFO)
+werkzeug_logger.handlers.clear()
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter('%(message)s'))
+werkzeug_logger.addHandler(handler)
+werkzeug_logger.propagate = False
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Load provider keys from a gitignored .env without requiring python-dotenv.
@@ -196,6 +213,10 @@ def init_db():
     c.execute('CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)')
+    # One row per file save: the raw material for "what did we work on last
+    # night?". Git knows the current diff, but only this table knows *when*
+    # each individual save happened.
+    c.execute('CREATE TABLE IF NOT EXISTS change_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, path TEXT, line INTEGER, added INTEGER, removed INTEGER, source TEXT, note TEXT)')
     conn.commit()
     conn.close()
 
@@ -283,7 +304,84 @@ def save_conversation(role, content):
     c.execute("INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)", (datetime.now().isoformat(), role, content))
     conn.commit()
     conn.close()
+    
+    # ===== Context awareness (currently open file in the Explorer) =====
+import threading as _ctx_threading
+# ===== Context awareness (Multi-file Pin System) =====
+import threading as _ctx_threading
+_CURRENT_CONTEXT = []
+_CURRENT_CONTEXT_LOCK = _ctx_threading.Lock()
 
+@app.route('/api/context/file', methods=['POST', 'OPTIONS'])
+def api_context_file_set():
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json(silent=True) or {}
+    path = data.get('path')
+    content = data.get('content')
+    pin = bool(data.get('pin', False))  # True = add to list, False = replace list
+    
+    if not path or not isinstance(path, str):
+        return jsonify({'ok': False, 'error': 'path required'}), 400
+        
+    safe = _ide_path(path)
+    if not safe or not os.path.isfile(safe):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+        
+    if content is None:
+        try:
+            with open(safe, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+            
+    snippet = content if len(content) <= 8000 else content[:8000] + '\n... [truncated]'
+    ts = datetime.now().isoformat()
+    
+    with _CURRENT_CONTEXT_LOCK:
+        if not pin:
+            _CURRENT_CONTEXT.clear() # Normal click: clear the slate
+            
+        # Remove existing entry for this file so we don't get duplicates
+        _CURRENT_CONTEXT[:] = [f for f in _CURRENT_CONTEXT if f['path'] != path]
+        
+        # Add the new file to the front of the list
+        _CURRENT_CONTEXT.insert(0, {'path': path, 'content': snippet, 'timestamp': ts})
+        
+        # Keep max 5 files to protect the AI token limit
+        if len(_CURRENT_CONTEXT) > 5:
+            _CURRENT_CONTEXT.pop()
+            
+    return jsonify({'ok': True, 'path': path, 'pinned_count': len(_CURRENT_CONTEXT)})
+
+@app.route('/api/context/clear', methods=['POST'])
+def api_context_clear():
+    with _CURRENT_CONTEXT_LOCK:
+        _CURRENT_CONTEXT.clear()
+    return jsonify({'ok': True})
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json(silent=True) or {}
+    path = data.get('path')
+    content = data.get('content')
+    if not path or not isinstance(path, str):
+        return jsonify({'ok': False, 'error': 'path required'}), 400
+    safe = _ide_path(path)
+    if not safe or not os.path.isfile(safe):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    if content is None:
+        try:
+            with open(safe, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+    snippet = content if len(content) <= 8000 else content[:8000] + '\n... [truncated]'
+    ts = datetime.now().isoformat()
+    with _CURRENT_CONTEXT_LOCK:
+        _CURRENT_CONTEXT['path'] = path
+        _CURRENT_CONTEXT['content'] = snippet
+        _CURRENT_CONTEXT['timestamp'] = ts
+    return jsonify({'ok': True, 'path': path, 'timestamp': ts, 'length': len(content)})
 # ===== Memory (facts I hold about Chris) =====
 def get_memories():
     conn = sqlite3.connect('ace_memory.db')
@@ -682,7 +780,7 @@ def summarize_session(messages, max_length=800):
     # Format conversation
     conv_text = "\n".join([f"{m['role']}: {m['content'][:500]}" for m in messages])
     prompt = _SESSION_SUMMARY_PROMPT.format(conversation=conv_text)
-    msgs = [{"role": "user", "content": prompt}]
+      
     try:
         reply = _chat_dispatch(msgs, user_message=prompt, preferred_model=None)
         if reply:
@@ -2174,10 +2272,720 @@ def build_context_block(light=False):
 
 LAST_FILE_PATH = None
 
+
+# ===== "What did we last do?" for the opening greeting =====
+# The chat greeted every session with the same canned "I'm here. Ready and
+# waiting." That is stale the moment work happens. Instead the greeting asks
+# the repo: the last commit when the tree is clean, or the uncommitted edits
+# when they are newer than that commit. Cached briefly, because the UI asks on
+# every page load and again after "Clear history".
+_LAST_EDIT_CACHE = {"at": 0.0, "value": None}
+_LAST_EDIT_TTL_S = 10.0
+
+# Runtime logs are rewritten on every restart. They are not edits, and letting
+# them win "newest" would greet every session with a log rotation.
+_LOG_PATH_RE = re.compile(r"^server_(stdout|stderr)\.txt(\.|$)")
+
+# This process's own identity. A greeting must not call a change "live" when
+# the file was written after this process started: that code is on disk, not in
+# memory. Comparing mtimes to this timestamp is how we know the difference.
+_SERVER_START_TS = time.time()
+_SERVER_PID = os.getpid()
+
+
+def _git_out(args, timeout=10):
+    """Run git in the project root; return stdout, or '' on any failure.
+
+    Only trailing newlines are trimmed: `git status --porcelain` starts each
+    line with a space for unstaged entries, and `.strip()` would eat the status
+    column of the first line, shifting every path by one character.
+    """
+    try:
+        r = subprocess.run(["git"] + args, cwd=PROJECT_ROOT,
+                           capture_output=True, text=True, timeout=timeout,
+                           encoding="utf-8", errors="replace")
+        return (r.stdout or "").rstrip("\r\n") if r.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def _rel_time(seconds):
+    """'8 minutes ago' / '2 days ago' - readable, never a raw timestamp."""
+    seconds = max(0, int(seconds))
+    if seconds < 90:
+        return "just now"
+    if seconds < 3600:
+        n = seconds // 60
+        return "%d minute%s ago" % (n, "" if n == 1 else "s")
+    if seconds < 86400:
+        n = seconds // 3600
+        return "%d hour%s ago" % (n, "" if n == 1 else "s")
+    n = seconds // 86400
+    return "%d day%s ago" % (n, "" if n == 1 else "s")
+
+
+def _numstat_path(path):
+    """Resolve the new name from git's `old => new` / `dir/{a => b}/f` forms."""
+    path = path.strip()
+    if " => " not in path:
+        return path
+    if "{" in path and "}" in path:
+        pre, rest = path.split("{", 1)
+        mid, post = rest.split("}", 1)
+        if " => " in mid:
+            return pre + mid.split(" => ", 1)[1] + post
+    return path.split(" => ", 1)[1]
+
+
+def _parse_numstat(text):
+    """Parse `--numstat` output into {new_path: (added, removed)}.
+
+    Binary files have '-' where the counts belong; they map to (None, None).
+    """
+    stats = {}
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        added, removed, path = parts
+        stats[_numstat_path(path)] = (
+            int(added) if added.isdigit() else None,
+            int(removed) if removed.isdigit() else None,
+        )
+    return stats
+
+
+def _first_changed_lines(diff_text):
+    """Map new-file path -> first changed line number, from a unified diff."""
+    lines = {}
+    current = None
+    for raw in diff_text.splitlines():
+        if raw.startswith("+++ "):
+            target = raw[4:].strip()
+            if target.startswith('"') and target.endswith('"'):
+                target = target[1:-1]
+            if target.startswith("b/"):
+                target = target[2:]
+            current = None if target == "/dev/null" else target
+        elif raw.startswith("@@") and current:
+            m = re.search(r"\+(\d+)", raw)
+            if m and current not in lines:
+                lines[current] = int(m.group(1))
+    return lines
+
+
+def _count_lines(path):
+    """Line count for an untracked file, or None when it is binary/missing."""
+    try:
+        with open(os.path.join(PROJECT_ROOT, path), "rb") as fh:
+            data = fh.read(2_000_000)
+    except OSError:
+        return None
+    if b"\x00" in data:
+        return None
+    if not data:
+        return 0
+    return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
+
+
+def _size_text(added, removed):
+    """'(+4/-2 lines)' - the shape of a change, never a bare file name."""
+    if added is None or removed is None:
+        return "binary file"
+    bits = []
+    if added:
+        bits.append("+%d" % added)
+    if removed:
+        bits.append("-%d" % removed)
+    if not bits:
+        return "no line changes"
+    total = (added or 0) + (removed or 0)
+    return "%s line%s" % ("/".join(bits), "" if total == 1 else "s")
+
+
+def _uptime_text(seconds):
+    """'5 minutes' / '2 hours' - an age, not a point in time ('ago' is wrong)."""
+    seconds = max(0, int(seconds))
+    if seconds < 90:
+        return "less than a minute"
+    if seconds < 3600:
+        n = seconds // 60
+        return "%d minute%s" % (n, "" if n == 1 else "s")
+    if seconds < 86400:
+        n = seconds // 3600
+        return "%d hour%s" % (n, "" if n == 1 else "s")
+    n = seconds // 86400
+    return "%d day%s" % (n, "" if n == 1 else "s")
+
+
+def _is_elevated():
+    """True when this server holds administrator rights (Windows)."""
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def _server_runtime():
+    """Facts about the process answering this request."""
+    up = max(0, time.time() - _SERVER_START_TS)
+    return {
+        "pid": _SERVER_PID,
+        "uptime_seconds": int(up),
+        "uptime": _uptime_text(up),
+        "elevated": _is_elevated(),
+    }
+
+
+def _server_loads(path):
+    """Whether the running server loaded this file at boot."""
+    base = os.path.basename(path)
+    return path.lower().endswith((".py", ".pyw", ".pyd")) or base in (
+        "ace_config.yaml", "ace_config.yml")
+
+
+def _needs_restart(path, mtime):
+    """Whether this change is in a file the running server loaded at boot."""
+    return _server_loads(path) and mtime > _SERVER_START_TS
+
+
+def _runtime_note(newest_path, pending, runtime):
+    """One sentence on whether the running server actually has this change.
+
+    Always names the process, so the sentence is evidence of a live server
+    rather than a description of the disk.
+    """
+    who = "This server (pid %d, up %s)" % (runtime["pid"], runtime["uptime"])
+    if pending:
+        names = ", ".join(pending[:3])
+        if len(pending) > 3:
+            names += " (+%d more)" % (len(pending) - 3)
+        return "Restart ACEsi to apply it - %s changed after %s started" % (names, who.lower())
+    low = newest_path.lower()
+    if low.endswith((".html", ".htm", ".js", ".css")):
+        return "%s serves it from disk, so a page refresh is enough" % who
+    if low.endswith(".dart"):
+        return "%s does not run it - the app needs a rebuild" % who
+    if low.endswith((".ps1", ".bat", ".cmd")):
+        return "%s reads it from disk when it runs it, so nothing needs restarting" % who
+    if _server_loads(newest_path):
+        return "%s has it loaded" % who
+    return "%s does not load it" % who
+
+
+def _runtime_detail(runtime, pending):
+    """Tooltip line: which process is answering, and what it is missing."""
+    line = "Running: pid %d, up %s%s" % (
+        runtime["pid"], runtime["uptime"],
+        ", elevated (admin rights)" if runtime["elevated"] else "")
+    if pending:
+        line += " - not loaded yet: " + ", ".join(pending[:6])
+        if len(pending) > 6:
+            line += " (+%d more)" % (len(pending) - 6)
+    return line
+
+
+# ---------------------------------------------------------------------------
+# Work sessions
+#
+# A greeting that only knows the newest diff cannot answer "we worked 7 hours
+# on context awareness last night". Nothing was recording that: git stores
+# commits, the conversations table stores chat, and the editor never recorded
+# its own saves. This section adds the missing save log and groups all three
+# sources into continuous sessions, so the answer is reconstructed from
+# events rather than guessed.
+# ---------------------------------------------------------------------------
+
+# ===== Work session data path =====
+# PROJECT_ROOT is defined lower down (line 5626); resolve the db path lazily
+# so that module-level code doesn't run before the constant exists.
+def _memory_db_path():
+    return os.path.join(PROJECT_ROOT, 'ace_memory.db')
+_SESSION_GAP_S = 60 * 60          # this much silence ends a session
+_SESSION_CACHE = {"at": 0.0, "value": None}
+_SESSION_TTL_S = 30.0
+
+_TOPIC_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "into", "your",
+    "have", "feat", "fix", "chore", "refactor", "wip", "final", "fully",
+    "completed", "complete", "working", "works", "added", "add", "now",
+    "can", "all", "new", "file", "files", "part", "bug", "state", "clean",
+    "checkpoint", "some", "more", "only", "also", "when", "then", "them",
+}
+
+
+def _change_log_connect():
+    """Open ace_memory.db, creating the save log if this is an older install."""
+    conn = sqlite3.connect(_memory_db_path(), timeout=10)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS change_log ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, path TEXT, "
+        "line INTEGER, added INTEGER, removed INTEGER, source TEXT, note TEXT)")
+    return conn
+
+
+def _diff_span(old, new):
+    """(first changed line, added, removed) for a single save.
+
+    Scans from both ends instead of running a full diff: an editor save is
+    almost always one contiguous hunk, which keeps this fast even on a
+    14,000-line file where difflib would take seconds.
+    """
+    a = (old or "").splitlines()
+    b = (new or "").splitlines()
+    start = 0
+    limit = min(len(a), len(b))
+    while start < limit and a[start] == b[start]:
+        start += 1
+    end_a, end_b = len(a), len(b)
+    while end_a > start and end_b > start and a[end_a - 1] == b[end_b - 1]:
+        end_a -= 1
+        end_b -= 1
+    return start + 1, end_b - start, end_a - start
+
+
+def _log_change(path, old_text, new_text, source='editor'):
+    """Record one save (file, line, +/-) so sessions can be rebuilt later."""
+    try:
+        rel = os.path.relpath(os.path.abspath(path), PROJECT_ROOT).replace('\\', '/')
+    except Exception:
+        rel = str(path)
+    try:
+        line, added, removed = _diff_span(old_text, new_text)
+    except Exception:
+        line, added, removed = None, None, None
+    try:
+        conn = _change_log_connect()
+        with conn:
+            conn.execute(
+                "INSERT INTO change_log (ts, path, line, added, removed, source) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (datetime.now().isoformat(timespec='seconds'),
+                 rel, line, added, removed, source))
+        conn.close()
+    except Exception as e:
+        print("change_log: could not record %s: %s" % (rel, e))
+
+
+def _change_log_events(days):
+    since = (datetime.now() - timedelta(days=days)).isoformat(timespec='seconds')
+    events = []
+    try:
+        conn = _change_log_connect()
+        rows = conn.execute(
+            "SELECT ts, path, line, added, removed FROM change_log "
+            "WHERE ts >= ? ORDER BY ts", (since,)).fetchall()
+        conn.close()
+    except Exception:
+        return events
+    for ts, path, line, added, removed in rows:
+        try:
+            at = datetime.fromisoformat(ts).timestamp()
+        except Exception:
+            continue
+        events.append({"at": at, "kind": "save", "path": path,
+                       "line": line, "added": added, "removed": removed})
+    return events
+
+
+def _commit_events(days):
+    """Commits from the last few days, as activity timestamps + subjects."""
+    out = _git_out(["log", "--since=%d days ago" % days,
+                    "--pretty=%ct%x09%cI%x09%s"], timeout=20)
+    events = []
+    for raw in out.splitlines():
+        parts = raw.split("\t", 2)
+        if len(parts) != 3:
+            continue
+        try:
+            at = float(parts[0])
+        except ValueError:
+            continue
+        events.append({"at": at, "kind": "commit", "iso": parts[1],
+                       "subject": parts[2]})
+    return events
+
+
+def _message_events(days):
+    """Chat messages, which keep a session alive between commits and saves."""
+    since = (datetime.now() - timedelta(days=days)).isoformat(timespec='seconds')
+    events = []
+    try:
+        conn = sqlite3.connect(_memory_db_path(), timeout=10)
+        rows = conn.execute(
+            "SELECT timestamp, role FROM conversations "
+            "WHERE timestamp >= ? ORDER BY timestamp", (since,)).fetchall()
+        conn.close()
+    except Exception:
+        return events
+    for ts, role in rows:
+        try:
+            at = datetime.fromisoformat(ts).timestamp()
+        except Exception:
+            continue
+        events.append({"at": at, "kind": "message", "role": role})
+    return events
+
+
+def _group_sessions(events, gap_s=_SESSION_GAP_S):
+    """Split a time-ordered event stream wherever the silence exceeds gap_s."""
+    sessions = []
+    for ev in sorted(events, key=lambda e: e["at"]):
+        if sessions and ev["at"] - sessions[-1]["last"] <= gap_s:
+            sessions[-1]["last"] = ev["at"]
+            sessions[-1]["events"].append(ev)
+        else:
+            sessions.append({"first": ev["at"], "last": ev["at"],
+                             "events": [ev]})
+    return sessions
+
+
+def _session_topic(subjects):
+    """The phrase that recurs in a session's commit subjects, if there is one.
+
+    "context awareness" or "real-time terminal" is what a person would call
+    the session. A one-off phrase is not a label, so it must appear twice.
+    Ties go to the phrase used most recently: a long night usually ends on
+    the thing that became the session's name.
+    """
+    from collections import Counter
+    counts = Counter()
+    last_seen = {}
+    for idx, subject in enumerate(subjects):
+        words = [w.lower().strip('.:,;()[]') for w in
+                 re.findall(r"[A-Za-z][A-Za-z0-9+#._-]*", subject or "")]
+        words = [w for w in words if len(w) > 2 and w not in _TOPIC_STOPWORDS]
+        for a, b in zip(words, words[1:]):
+            key = a + " " + b
+            counts[key] += 1
+            last_seen[key] = idx
+    repeated = [(n, last_seen[p], p) for p, n in counts.items() if n >= 2]
+    if repeated:
+        repeated.sort(reverse=True)
+        return repeated[0][2]
+    return ""
+
+
+def _duration_text(seconds):
+    """'7h 31m' - a length of time, never a time of day."""
+    minutes = max(1, int(seconds) // 60)
+    hours, mins = divmod(minutes, 60)
+    if hours and mins:
+        return "%dh %dm" % (hours, mins)
+    if hours:
+        return "%dh" % hours
+    return "%dm" % mins
+
+
+def _session_note(s, label=None):
+    """One sentence: how long, when, how much work, and what it was about."""
+    if label is None:
+        label = "This session" if s["ongoing"] else "Last session"
+    bits = ["%s: %s" % (label, s["duration"])]
+    bits.append(s["when"])
+    if s["commits"]:
+        bits.append("%d commit%s" % (s["commits"],
+                                     "" if s["commits"] == 1 else "s"))
+    if s["messages"]:
+        bits.append("%d message%s" % (s["messages"],
+                                      "" if s["messages"] == 1 else "s"))
+    if s["saves"]:
+        bits.append("%d save%s" % (s["saves"],
+                                   "" if s["saves"] == 1 else "s"))
+    note = ", ".join(bits)
+    if s["topic"]:
+        note += ' - mostly "%s"' % s["topic"]
+    elif s["last_subject"]:
+        note += ' - last commit "%s"' % s["last_subject"]
+    return note
+
+
+def _summarize_session(s, now):
+    """Turn one grouped stretch of activity into a reportable record."""
+    first, last = s["first"], s["last"]
+    commits = [e for e in s["events"] if e["kind"] == "commit"]
+    messages = [e for e in s["events"] if e["kind"] == "message"]
+    saves = [e for e in s["events"] if e["kind"] == "save"]
+    files = []
+    for e in saves:
+        if e["path"] not in files:
+            files.append(e["path"])
+    start_dt = datetime.fromtimestamp(first)
+    end_dt = datetime.fromtimestamp(last)
+    if start_dt.date() == end_dt.date():
+        when = "%s to %s" % (start_dt.strftime("%Y-%m-%d %H:%M"),
+                             end_dt.strftime("%H:%M"))
+    else:
+        when = "%s to %s" % (start_dt.strftime("%Y-%m-%d %H:%M"),
+                             end_dt.strftime("%Y-%m-%d %H:%M"))
+    value = {
+        "ok": True,
+        "start": first,
+        "end": last,
+        "duration_seconds": int(last - first),
+        "duration": _duration_text(last - first),
+        "ongoing": (now - last) < _SESSION_GAP_S,
+        "commits": len(commits),
+        "messages": len(messages),
+        "saves": len(saves),
+        "files": files[:8],
+        "topic": _session_topic([c["subject"] for c in commits]),
+        "last_subject": commits[-1]["subject"] if commits else "",
+        "when": when,
+    }
+    value["note"] = _session_note(value)
+    return value
+
+
+def _recent_session(days=10):
+    """Rebuild the most recent work session from commits, chat and saves.
+
+    There is no start/stop button to consult, so a session is defined as
+    activity with no gap longer than _SESSION_GAP_S. The events already
+    existed; they had simply never been grouped.
+
+    The most recent session is the headline. When it is still short, the last
+    long session is carried along as "Before that", because that is what a
+    person means by "we worked 7 hours on it last night".
+    """
+    now = time.time()
+    cached = _SESSION_CACHE
+    if cached["value"] and now - cached["at"] < _SESSION_TTL_S:
+        return cached["value"]
+
+    events = (_commit_events(days) + _message_events(days)
+              + _change_log_events(days))
+    # A single commit or a two-minute burst is not a "session".
+    qualifying = [g for g in _group_sessions(events)
+                  if g["last"] - g["first"] >= 20 * 60]
+    value = {"ok": False}
+    if qualifying:
+        value = _summarize_session(qualifying[-1], now)
+        if value["duration_seconds"] < 2 * 3600:
+            for g in reversed(qualifying[:-1]):
+                if g["last"] - g["first"] >= 2 * 3600:
+                    prior = _summarize_session(g, now)
+                    prior["note"] = _session_note(prior, label="Before that")
+                    value["prior"] = prior
+                    value["prior_note"] = prior["note"]
+                    break
+    cached.update({"at": now, "value": value})
+    return value
+
+
+def _last_edit_info():
+    """Describe the last real change to this project, in detail.
+
+    Uncommitted edits win when they are newer than HEAD: that is the edit the
+    user just watched happen, and reporting an older commit instead would be
+    the same staleness this replaced. For each file we report the first changed
+    line and how many lines moved, because "5 files changed" is not an answer
+    to "what did we just do?".
+
+    Semantic wording ("a syntax error fix") can only come from a commit
+    subject. An uncommitted edit has no description attached, so it is
+    described factually - file, line, size - rather than guessed at.
+    """
+    now = time.time()
+    cached = _LAST_EDIT_CACHE
+    if cached["value"] and now - cached["at"] < _LAST_EDIT_TTL_S:
+        return cached["value"]
+
+    runtime = _server_runtime()
+
+    commit_hash = _git_out(["log", "-1", "--format=%h"])
+    commit_msg = _git_out(["log", "-1", "--format=%s"])
+    commit_iso = _git_out(["log", "-1", "--format=%cI"])
+    commit_ts = 0.0
+    if commit_iso:
+        try:
+            commit_ts = datetime.fromisoformat(commit_iso).timestamp()
+        except Exception:
+            commit_ts = 0.0
+
+    # core.quotepath=false keeps non-ASCII paths readable instead of "\\303\\251".
+    changed = []
+    status = _git_out(["-c", "core.quotepath=false", "status", "--porcelain"])
+    for line in status.splitlines():
+        if len(line) < 4:
+            continue
+        state = line[:2]
+        path = line[3:].strip()
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+        if " -> " in path:          # rename: report the new name
+            path = path.split(" -> ", 1)[1]
+        if _LOG_PATH_RE.match(os.path.basename(path)):
+            continue                # rotated stdout/stderr, not a code edit
+        try:
+            full = os.path.join(PROJECT_ROOT, path)
+            if os.path.isfile(full):
+                mtime = os.path.getmtime(full)
+            elif "D" in state:
+                # The file is gone; the parent directory's mtime is the closest
+                # honest signal of when the deletion happened.
+                mtime = os.path.getmtime(os.path.dirname(full))
+            else:
+                continue            # submodule/gitlink: not an edit to this tree
+        except OSError:
+            continue
+        changed.append({"path": path, "at": mtime,
+                        "untracked": state == "??", "deleted": "D" in state})
+    changed.sort(key=lambda c: c["at"], reverse=True)
+    newest = changed[0] if changed else None
+
+    def describe(entry):
+        """(phrase fragment, tooltip line) for one changed file."""
+        path = entry["path"]
+        if entry.get("deleted"):
+            size = _size_text(*stats.get(path, (None, None)))
+            return ("a deletion of %s (%s)" % (path, size),
+                    "%s - deleted (%s)" % (path, size))
+        if entry["untracked"]:
+            n = _count_lines(path)
+            if n is None:
+                return ("a new binary file %s" % path,
+                        "%s - new file (binary, untracked)" % path)
+            return ("a new file %s (%d line%s)" % (path, n, "" if n == 1 else "s"),
+                    "%s - new file, %d lines (untracked)" % (path, n))
+        added, removed = stats.get(path, (None, None))
+        line = hunks.get(path)
+        where = " at line %d" % line if line else ""
+        size = _size_text(added, removed)
+        return ("an edit in %s%s (%s)" % (path, where, size),
+                "%s%s (%s)" % (path, where, size))
+
+    stats, hunks = {}, {}
+    if any(not c["untracked"] for c in changed):
+        # One diff covers staged and unstaged tracked edits at once.
+        stats = _parse_numstat(_git_out(
+            ["-c", "core.quotepath=false", "diff", "HEAD", "--numstat"]))
+        hunks = _first_changed_lines(_git_out(
+            ["-c", "core.quotepath=false", "diff", "HEAD", "-U0"]))
+
+    if newest and newest["at"] > commit_ts:
+        phrase_body, newest_detail = describe(newest)
+        rel = _rel_time(now - newest["at"])
+        extras = len(changed) - 1
+        suffix = ""
+        if extras > 0:
+            suffix = " (plus %d other file%s)" % (extras, "" if extras == 1 else "s")
+        lines = [describe(c)[1] for c in changed[:8]]
+        if len(changed) > 8:
+            lines.append("... and %d more" % (len(changed) - 8))
+        pending = [c["path"] for c in changed
+                   if _needs_restart(c["path"], c["at"])]
+        value = {
+            "ok": True,
+            "source": "working-tree",
+            "phrase": "%s, saved %s, not committed yet%s" % (phrase_body, rel, suffix),
+            "runtime_note": _runtime_note(newest["path"], pending, runtime),
+            "detail": "Not committed yet - newest saved %s:\n%s\n%s" % (
+                rel, "\n".join(lines), _runtime_detail(runtime, pending)),
+            "file": newest["path"],
+            "files": [c["path"] for c in changed],
+            "runtime": dict(runtime, pending_restart=pending),
+        }
+    elif status.strip():
+        # The tree is dirty but nothing could be stated (e.g. only a mode bit or
+        # an unreadable path). Better a vague truth than an older commit.
+        value = {
+            "ok": True,
+            "source": "working-tree",
+            "phrase": "uncommitted changes in the working tree, not committed yet",
+            "detail": "Uncommitted:\n" + status.strip() + "\n" + _runtime_detail(runtime, []),
+            "files": [],
+            "runtime": dict(runtime, pending_restart=[]),
+        }
+    elif commit_hash:
+        subject = commit_msg if len(commit_msg) <= 70 else commit_msg[:67] + "..."
+        commit_stats = _parse_numstat(_git_out(
+            ["-c", "core.quotepath=false", "show", "--format=", "--numstat", commit_hash]))
+        commit_hunks = _first_changed_lines(_git_out(
+            ["-c", "core.quotepath=false", "show", "--format=", "-U0", commit_hash]))
+        rel = _rel_time(now - commit_ts)
+        phrase = 'commit %s "%s"' % (commit_hash, subject)
+        detail_lines = []
+        # Prefer the file the commit subject names ("fix syntax error in
+        # ACEsi.html") over whichever file merely had the most lines churn:
+        # the subject is what the human remembers doing.
+        subject_lower = commit_msg.lower()
+        named = [p for p in commit_stats
+                 if os.path.basename(p) and os.path.basename(p).lower() in subject_lower]
+        ranked = sorted(commit_stats,
+                        key=lambda p: (commit_stats[p][0] or 0) + (commit_stats[p][1] or 0),
+                        reverse=True)
+        biggest = (named[0] if named else ranked[0]) if ranked else None
+        if biggest:
+            added, removed = commit_stats[biggest]
+            line = commit_hunks.get(biggest)
+            where = " at line %d" % line if line else ""
+            phrase += " - %s%s (%s)" % (biggest, where, _size_text(added, removed))
+            for p in ranked:
+                a, r = commit_stats[p]
+                ln = commit_hunks.get(p)
+                detail_lines.append("  %s%s (%s)" % (
+                    p, " at line %d" % ln if ln else "", _size_text(a, r)))
+        phrase += ", committed %s" % rel
+        pending = []
+        for p in commit_stats:
+            try:
+                mtime = os.path.getmtime(os.path.join(PROJECT_ROOT, p))
+            except OSError:
+                continue
+            if _needs_restart(p, mtime):
+                pending.append(p)
+        value = {
+            "ok": True,
+            "source": "commit",
+            "phrase": phrase,
+            "runtime_note": _runtime_note(biggest or "", pending, runtime),
+            "detail": '%s "%s" committed %s:\n%s\n%s' % (
+                commit_hash, commit_msg, rel, "\n".join(detail_lines),
+                _runtime_detail(runtime, pending)),
+            "commit": commit_hash,
+            "files": list(commit_stats),
+            "runtime": dict(runtime, pending_restart=pending),
+        }
+    else:
+        value = {"ok": False, "reason": "no git history available"}
+
+    # What the current stretch of work has been, not just the newest diff.
+    if value.get("ok"):
+        session = _recent_session()
+        if session.get("ok"):
+            value["session"] = session
+            value["session_note"] = session.get("note", "")
+            extra = [session["note"]]
+            if session.get("prior_note"):
+                value["prior_session_note"] = session["prior_note"]
+                extra.append(session["prior_note"])
+            value["detail"] = (value.get("detail", "") + "\n" +
+                               "\n".join(extra)).strip()
+
+    _LAST_EDIT_CACHE.update({"at": now, "value": value})
+    return value
+
+
+@app.route('/api/last_edit')
+def last_edit():
+    """What the last real change to this project was - feeds the greeting."""
+    return jsonify(_last_edit_info())
+
+
+@app.route('/chat-ui')
+def chat_ui():
+    resp = send_from_directory('.', 'ACE.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
 @app.route('/')
 def index():
     resp = send_from_directory('.', 'ACEsi.html')
-    # Never let the browser cache the chat UI — stale JS was the root cause of
     # "popup never shows" (old page missing the view-rendering code).
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -2288,7 +3096,7 @@ def _find_provider_for_model(preferred_model):
     rather than silently falling back to the cloud."""
     if not preferred_model:
         return None
-    if preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL):
+    if preferred_model and (preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL) or 'qwen' in preferred_model or 'llama' in preferred_model):
         if OLLAMA_ENABLED:
             return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
         return None
@@ -2491,10 +3299,13 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
             if _normalize_tool_messages(msgs):
                 body["messages"] = msgs
                 print(f"🧹 {name}: rewrote null tool args to match the schema")
+            _live_log("%s -> %s (%d msgs)" % (name, model, len(msgs)))
             r = requests.post(f"{endpoint}/chat/completions",
                 headers=headers,
                 json=body,
                 timeout=timeout)
+            _live_log("%s <- HTTP %d %s" % (name, r.status_code, 
+    "😊" if r.status_code in (200, 204) else "❌"))
         except requests.exceptions.Timeout:
             _prov_record(name, model, "timeout", "no response in time",
                          "timeout=%s" % (timeout,))
@@ -3241,25 +4052,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             if active is None:
                 got = None
                 tc = "required" if (_ui_task(user_message) and not names) else "auto"
-                # If a preferred model is set, try that provider first.
-                providers = []
-                if preferred_model:
-                    prov = _find_provider_for_model(preferred_model)
-                    if prov:
-                        providers.append(prov)
-                    # Also try fallbacks for the same provider
-                    if prov and prov[0] == "Groq":
-                        for m in GROQ_FALLBACKS:
-                            if m != preferred_model:
-                                providers.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, m))
-                    elif prov and prov[0] == "OpenRouter":
-                        for m in OPENROUTER_FALLBACKS:
-                            if m != preferred_model:
-                                providers.append(("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, m))
-                # Then try the standard providers.
-                for p in _chat_providers(active_domain):
-                    if p not in providers:
-                        providers.append(p)
+                # FORCE GROQ ONLY - Local models removed
+                providers = [("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL)]
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
@@ -3791,6 +4585,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                     "raised %s: %s" % (type(e).__name__, e))
                         print("💥 tool %s raised %s: %s"
                               % (run_name, type(e).__name__, e), flush=True)
+                _live_log("tool %s -> %s" % (run_name, "ok" if ok else "fail"))
                 if ok and run_name == "ui_dump":
                     # An explicit ui_dump's result is fed straight back to the
                     # model, so it now has real screen state to tap from.
@@ -3978,12 +4773,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # deterministically so the popup appears (no LLM required).
     if not names and not (last_text and last_text.strip()):
         _auto_picked = _auto_open_user_file()
-        msg = _AGENT["last_reply"]
-        if not (msg and msg.strip()):
+        if _auto_picked:
             with _AGENT_LOCK:
-                _AGENT["last_reply"] = (("Opened the file you asked for.")
-                                        if _auto_picked else (last_text or ""))
-        return _AGENT["last_reply"]
+                _AGENT["last_reply"] = "Opened the file you asked for."
+            return _AGENT["last_reply"]
+        # The model produced no text and no tool ran: every provider failed.
+        # Do NOT replay a reply from an earlier turn (that is how each message
+        # echoed the previous answer, e.g. "Good afternoon. I'm here."). Return
+        # None so /chat reports the real per-provider failure instead.
+        with _AGENT_LOCK:
+            _AGENT["last_reply"] = ""
+        return None
 
     # Auto-capture a screenshot if the user asked for one but the model didn't.
     if names:
@@ -4019,7 +4819,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
 def chat():
     data = request.json
     user_message = data.get('message', '')
-    # E-STOP: kill mode = total silence. No conversation saved, no model touched.
+    requested_model = data.get('model', '')
+    requested_provider = data.get('provider', '')
+  
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
     save_conversation("user", user_message)
@@ -4241,6 +5043,25 @@ def chat():
             return jsonify({"reply": f"❌ Could not read file: {e}"})
 
     # Greeting check — time-aware
+    # Deterministic clock: the server knows the time, so don't let a model that
+    # ignored the [Current time] context answer "I don't have a clock".
+    if re.match(
+        r"(?i)^\s*(?:hey[,\s]+|hi[,\s]+)?"
+        r"(?:(?:what(?:'s|s|\s+is)?|tell\s+me|give\s+me|show\s+me)\s+(?:the\s+)?(?:current\s+)?"
+        r"|(?:the\s+)?current\s+)"
+        r"(?:date(?:\s*(?:and|&)\s*time)?|time(?:\s*(?:and|&)\s*date)?|day)"
+        r"(?:\s+(?:is\s+it|now|today))?"
+        r"\s*(?:please)?\s*[?.!]*$",
+        user_message,
+    ):
+        _now = datetime.now()
+        reply = "It's %s, %s." % (
+            _now.strftime("%A, %d %B %Y"),
+            _now.strftime("%I:%M %p").lstrip("0"),
+        )
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
     if user_message.lower().strip() in ["hello", "hi"]:
         hour = datetime.now().hour
         if hour < 5:
@@ -4367,92 +5188,18 @@ def chat():
             "Never invent personal history, memories, or references to past events that are not in the context below. "
             "Use the facts and journal entries below naturally when they are relevant — not every message. "
             "Keep replies short unless Chris asks for more.\n\n"
+            "TIME: The [Current time: ...] line in the context below is the real current date and time. "
+            "Use it for any date or time question; never say you don't have a clock.\n\n"
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
-            "[Facts I know about Chris], [Shared history — recent journal entries], and the recent "
-            "conversation turns at the end of this prompt. They are loaded from your database on every "
-            "message, so you remember across conversations. When Chris asks 'can you remember / do you "
-            "have memory / check your memory', answer YES and quote the exact facts from those blocks — "
-            "do not say you have no memory. If Chris tells you something to remember, reply "
-            "with: remember <key> = <value> (this stores a new fact).\n\n"
-            "DEVICE + DEV TOOLS: You can ACTUALLY perform actions yourself — you are not limited to "
-            "talking. When Chris asks you to do something on the device or app (open the app, tap, swipe, "
-            "type, press a key, navigate, take a screenshot, check what is on screen), CALL the ui_* tools "
-            "(ui_app_open, ui_tap, ui_swipe, ui_type, ui_key, ui_dump, ui_screenshot). For code work you "
-            "have read_file, edit_file, write_file, run_command, flutter_test, flutter_analyze, git_*, "
-            "build_apk, pub_*, and the cdp_* webview tools. ACT, do not ask the user to provide commands. "
-            "Never defer back to the user with 'please provide commands' — you have the tools, so use them.\n"
-            "FILE TOOLS: You have FULL access to Chris's PC (Documents, Pictures, Desktop, Downloads, any folder). When he asks you to look at, find, open, or show a file, use list_user_files to locate the folder, then view_user_file (accepts a full path OR a bare filename like 'GEPFGEPF' — it searches automatically) to display it inline in the chat. "
-            "If view_user_file's search fails, run list_user_files on the specific folder to confirm the exact filename first. "
-            "The tool open_user_file is ONLY for 'launch externally in "
-            "default app' — do NOT use it for normal 'show me the file' requests.\n"
-            "WEB IMAGES: when Chris asks to 'get a picture of X', 'show me an image of Y', or 'open the picture "
-            "from the internet', you MUST actually display it: after web_search/webfetch returns a link, call "
-            "view_web_image with the image URL (the .jpg/.png/.gif link itself) so the picture pops up in the chat. "
-            "Do NOT just paste the URL into your reply.\n"
-            "EMAIL + PHONE ALERTS: a background watcher already polls Chris's Gmail and "
-            "Yahoo every ~2 minutes and pushes a PHONE notification (ntfy) when an email "
-            "matches a watch rule (NSFAS is already watched). So when he says 'keep an eye "
-            "on my email, tell me when an NSFAS mail arrives' or 'check my NSFAS email': "
-            "call check_email to look NOW, and tell him plainly that alerts are set to his "
-            "PHONE and are already active. Never suggest he set up a filter in his email "
-            "client, check his spam folder, or contact NSFAS directly — that is a "
-            "deflection. Only add a NEW sender with the email_rules tool if he names one. "
-            "If he says he does NOT want a local/desktop notification, do not use any "
-            "Windows toast — ntfy to his phone is the channel.\n"
-            "NEVER repeat a tool call that just errored — use the error message to fix the path, then try once more.\n"
-            "STANDING PREFERENCES: the moment Chris states how he wants things done "
-            "('call me Braam', 'answer in Afrikaans', 'use metric units', 'keep it to two "
-            "lines', 'no bullet points', 'be more formal'), call set_preference with that "
-            "key and value, then confirm it in one short sentence. Do this WITHOUT being "
-            "asked to remember it. Always pick the key from the tool's list — never invent "
-            "a key name like 'name_preference'. If he tells you to STOP following one, call "
-            "forget_preference. If he asks what you always do for him, call "
-            "list_preferences. Any preference stored this way overrides your default "
-            "style in every later reply until it is changed or removed.\n"
-            "NAVIGATION RULE: for a navigation request (e.g. 'open the app, go to the Venda ITS portal, "
-            "screenshot it') you MUST actually navigate step by step and verify: ui_app_open, then ui_dump "
-            "to read the screen, then ui_tap/ui_swipe/ui_type to move toward the target, ui_dump again to "
-            "confirm each screen change, and only ui_screenshot AFTER the last ui_dump proves the target is "
-            "visible. A screenshot of the launch screen is NOT reaching the target — never finish a "
-            "navigation after just opening the app. Use ui_dump (text hierarchy) to know where you are; you "
-            "cannot see images. Screenshots are shown to Chris in a popup and are NOT saved to disk unless "
-            "Chris asked to keep the file (only then pass save=true). In your reply, cite the real "
-            "page content from the last ui_dump and what you actually did — never invent a screenshot "
-            "filename, a web page you did not load, or a Chrome/CDP step you never ran.\n"
-            "STYLE: never narrate your reasoning in prose — no 'I will', no 'The dump shows', no "
-            "commentary between actions. Output ONLY the tool call, then when the task is done give a "
-            "SHORT, plain report (a few lines, like a text message): what you did and the key on-screen "
-            "values. Do not lecture or recap the whole process.\n"
-"AUTO-TRACK: When Chris gives you 2 or more separate instructions\n"
-"in one message (e.g. \"do X, do Y, and do Z\"), break them into\n"
-"tracked tasks automatically. After finishing each one, mark it\n"
-"done. In your FINAL reply, always end with a progress line:\n"
-"\"Progress: X/Y tasks done\" (e.g. \"Progress: 3/3 tasks done\" or\n"
-"\"Progress: 2/3 tasks done — 1 pending\").\n"
-"HTTPS WARNING: if a ui_dump shows Chrome's 'Your connection is not private' / ERR_CERT / "
-            "HSTS warning for the ITS portal, type thisisunsafe (ui_type {\"text\": \"thisisunsafe\"}) "
-            "to bypass it and continue — the expired certificate is expected and safe. If ACEsi's "
-            "server already auto-typed it, keep navigating from the fresh ui_dump.\n"
-            "RESEARCH + SAVE: when Chris EXPLICITLY asks you to research something AND save the "
-            "results to a file (e.g. 'research X and save it to notes.txt'), CALL web_search "
-            "(or curl/webfetch) to gather the data, then call open_in_vscode with the full "
-            "formatted findings (path = the filename Chris asked for, content = the markdown). "
-            "That opens the findings in VS Code as a DRAFT for Chris to review — it does NOT "
-            "write the final file. Then stop and tell Chris the draft is open for review in VS "
-            "Code and that you will save it to <path> when he says 'save it'.\n"
-            "IMPORTANT: For simple factual questions (e.g. 'what is X?', 'who is Y?'), just "
-            "answer directly from the tool results. Do NOT save to a file unless explicitly asked.\n\n"
-            "ANSWER QUALITY RULES — NEVER VIOLATE:\n"
-            "1. When web_search returns results, SYNTHESIZE them into a DEFINITIVE answer. Never say 'it depends', 'it's unclear', or 'would you like more detail?'. Give the exact answer the user asked for.\n"
-            "2. For 'who is X?' or 'what is X?' — give a complete, direct answer from the search results. Do NOT end with 'would you like more detail?', 'is there anything specific?', 'would you like me to dig deeper?', 'want me to go deeper?', or ANY question back to the user.\n"
-            "3. If search results contain the answer, STATE IT CLEARLY. Do not hedge, deflect, or ask follow-up questions.\n"
-            "4. For historical/factual questions (oldest book, who was Mandela, market prices) — give the concrete fact from the sources. If sources disagree, cite the consensus or most authoritative source.\n"
-            "5. NEVER end a factual answer with a question back to the user.\n"
-            "6. FORBIDDEN PHRASES — NEVER USE: 'Would you like me to...', 'Want me to...', 'Would you like...', 'Would you like more...', 'Is there anything...', 'Let me know if...', 'Shall I...', 'Do you want...'. These are DEFLECTIONS. Answer directly instead.\n"
-            + _mood_softener_line()
-            + build_context_block()
-            + _prefs_text
-            + "\n\n" + _GROUNDING_DIRECTIVE + "\n\n" + _GROUNDING_FALLBACK
+            "[Facts I know about Chris], [Shared history - recent journal entries], and the recent "
+            "conversation. Use them. Weave them in naturally when relevant.\n\n"
+                        "If the user asks you to EXPLAIN code, answer in plain text. "
+            "If the user asks you to FIX or EDIT code, you MUST output the ENTIRE corrected file inside a standard markdown block. "
+            "DO NOT use any tools. DO NOT output JSON."
+                        "If I ask you to fix or edit code, output the ENTIRE corrected file inside a standard markdown block like this: ```dart\n<code here>\n```. Do NOT use any tools. Do NOT output JSON. "
+            "EXECUTION SUPERPOWER: You have full access to the terminal at C:\\Users\\chris\\LipSyncStudent. "
+            "If you need to check dependencies, run flutter, or inspect files, you MUST output exactly `[EXEC: your_command_here]` on its own line. "
+            "I will run it and reply with the output."
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
@@ -4461,12 +5208,22 @@ def chat():
         for h in history:
             if h.get('role') in ('user', 'assistant'):
                 llm_messages.append({"role": h['role'], "content": h['content']})
+        if _CURRENT_CONTEXT:
+                                    ctx_str = "\n\n[System Note: The user has asked about the attached code. The answer is a simple text explanation. You must reply with text directly. DO NOT use any tools. Task complete.]\n"
+        for f in _CURRENT_CONTEXT:
+                ctx_str += f"--- FILE: {f['path']} ---\n{f['content']}\n\n"
+                ctx_str += "]"
+                user_message += ctx_str
+
         llm_messages.append({"role": "user", "content": user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
+        model = requested_model if requested_model else model
         reply = _chat_dispatch(llm_messages, user_message=user_message, preferred_model=model)
+        _live_log("dispatch done: %d msgs, %s"
+                  % (len(llm_messages), "reply" if reply else "no reply"))
         if reply:
             # Playbook memory: record which tools proved useful on this task.
             with _AGENT_LOCK:
@@ -4507,6 +5264,61 @@ def chat():
             _AGENT["last_reply"] = f"Error: {type(e).__name__}: {e}"
         return jsonify({"reply": f"Error: {str(e)}"})
 
+def _strip_code_fences(text):
+    """Return model output as raw code.
+
+    The prompt asks for no markdown, but models wrap the answer in a fence
+    often enough that stripping it is cheaper than a retry. The longest fenced
+    block is the one that holds the code; the surrounding prose is discarded.
+    """
+    text = (text or "").strip()
+    if "```" in text:
+        blocks = re.findall(r"```[^\n]*\n(.*?)```", text, re.S)
+        text = max(blocks, key=len).strip() if blocks else text.replace("```", "").strip()
+    return text
+
+
+
+@app.route('/api/autofix', methods=['POST', 'OPTIONS'])
+def autofix():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    data = request.json or {}
+    code = data.get('code', '')
+    if not code.strip():
+        return jsonify({"ok": False, "error": "No code provided"})
+
+    msgs = [
+        {
+            "role": "system",
+            "content": "You are an expert Dart code fixer. Fix the syntax errors in the code provided. Return ONLY the raw fixed code. No markdown, no explanations, no backticks."
+        },
+        {
+            "role": "user",
+            "content": code
+        }
+    ]
+
+    try:
+        # Force Groq directly
+        if GROQ_API_KEY:
+            reply, _, _ = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs, tool_choice="none")
+            if reply:
+                return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": "Groq"})
+        
+        # Fallback to the first provider that works
+        for name, endpoint, api_key, model in _chat_providers():
+            if not api_key: continue
+            try:
+                reply, _, _ = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
+                if reply:
+                    return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": name})
+            except: pass
+            
+        return jsonify({"ok": False, "error": "All providers failed or returned empty."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 @app.route('/history', methods=['GET'])
 def history():
     limit = min(int(request.args.get('limit', 100)), 500)
@@ -4584,6 +5396,108 @@ def list_files():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+# ===== IDE Explorer routes (ACEsi.html calls these) =====
+# The reverted server only had /files, which returns {files: [...]} for a
+# different directory. ACEsi.html expects a plain array of "lib/..." paths from
+# /api/files, plain text from /api/file-content, and form-encoded input on
+# /api/save-file. Without these the Explorer sits on "Loading..." forever.
+_IDE_ROOT = os.path.dirname(os.path.abspath(__file__))
+_IDE_LIB = os.path.join(_IDE_ROOT, 'lib')
+
+
+def _ide_path(rel):
+    """Resolve an Explorer path inside the project root, or None if it escapes."""
+    rel = (rel or '').strip().replace('\\', '/')
+    if not rel or rel.startswith('/') or '..' in rel.split('/'):
+        return None
+    full = os.path.realpath(os.path.join(_IDE_ROOT, rel))
+    root = os.path.realpath(_IDE_ROOT)
+    if full != root and not full.startswith(root + os.sep):
+        return None
+    return full
+
+
+@app.route('/api/files', methods=['GET'])
+def api_files():
+    files = []
+    if os.path.isdir(_IDE_LIB):
+        for root, _dirs, names in os.walk(_IDE_LIB):
+            for name in names:
+                if name.endswith('.dart'):
+                    rel = os.path.relpath(os.path.join(root, name), _IDE_ROOT)
+                    files.append(rel.replace('\\', '/'))
+    return jsonify(sorted(files))
+
+
+@app.route('/api/file-content', methods=['GET'])
+def api_file_content():
+    full = _ide_path(request.args.get('path'))
+    if not full or not os.path.isfile(full):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    try:
+        with open(full, 'r', encoding='utf-8', errors='replace') as f:
+            return Response(f.read(), mimetype='text/plain')
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/system/exec', methods=['POST'])
+def api_system_exec():
+    data = request.get_json(silent=True) or {}
+    cmd = data.get('command', '').strip()
+    if not cmd:
+        return jsonify({'ok': False, 'error': 'No command provided'}), 400
+    
+    # SECURITY: Force working directory to the project root
+    cwd = r'C:\Users\chris\LipSyncStudent'
+    
+    try:
+        # Run the command, capture output, set timeout to 30 seconds
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        return jsonify({
+            'ok': True,
+            'stdout': result.stdout,
+            'stderr': result.stderr,
+            'exit_code': result.returncode
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'ok': False, 'error': 'Command timed out after 30 seconds'}), 504
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+@app.route('/api/save-file', methods=['POST'])
+def api_save_file():
+    # ACEsi.html posts form-encoded data; accept JSON too for other clients.
+    data = request.get_json(silent=True) or {}
+    filename = request.form.get('filename') or data.get('filename')
+    content = request.form.get('content')
+    if content is None:
+        content = data.get('content')
+    full = _ide_path(filename)
+    if not full or content is None:
+        return jsonify({'ok': False, 'error': 'Missing filename or content'}), 400
+    try:
+        old = ''
+        try:
+            with open(full, 'r', encoding='utf-8', errors='replace') as f:
+                old = f.read()
+        except OSError:
+            old = ''            # new file: the save creates it
+        with open(full, 'w', encoding='utf-8') as f:
+            f.write(content)
+        _log_change(full, old, content, source='explorer')
+        print("💾 Explorer: saved %s (%d chars)" % (filename, len(content)))
+        return jsonify({'ok': True, 'message': 'Saved!'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 def strip_code_fences(code):
     """Remove a leading ```<lang> ... trailing ``` wrapper if the model added one."""
     if not code:
@@ -4619,8 +5533,15 @@ def write_file():
     path = data.get('path', '')
     content = data.get('content', '')
     try:
+        old = ''
+        try:
+            with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                old = f.read()
+        except OSError:
+            old = ''
         with open(path, 'w') as f:
             f.write(content)
+        _log_change(path, old, content, source='write')
         return jsonify({'status': 'saved'})
     except Exception as e:
         return jsonify({'error': str(e)})
@@ -7500,6 +8421,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "read_user_file",
         "description": "Read a file's content from anywhere on Chris's PC (any folder: Documents, Pictures, Desktop, Downloads, etc). Accepts a full path or a bare filename. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+        {"type": "function", "function": {"name": "web_search",
+        "description": "Search web and return results with content snippets; answer directly from those. Args: query, max_results.",
+        "parameters": {"type": "object", "additionalProperties": False, "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "view_user_file",
         "description": "VIEW a file from Chris's PC inline in the ACEsi chat window as a popup. Use this when the user wants to SEE the file content (images, PDFs, text) inside ACEsi. Accepts a full path or a bare filename. Returns base64 for images (png, jpg, gif, webp, bmp, tiff), PDFs, and text. Args: path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
@@ -11414,6 +12338,7 @@ def run_agent(user_message):
                         ok = False
                     else:
                         ok, result = _call_tool(name, args)
+                    _live_log("tool %s -> %s" % (name, "ok" if ok else "fail"))
                     executed_any = True
                     calls_history.append(name)
                     with _AGENT_LOCK:
@@ -11644,12 +12569,14 @@ def run_agent(user_message):
 # Returns (text, tool_calls) where tool_calls is a list of (name, args_dict).
 # Passes the native tools= schema to the provider so the model can emit
 # structured tool_calls instead of free-form prose (the stall fix).
+
 def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
-              allowed_names=None):
+              allowed_names=None, requested_model=None, requested_provider=None):
     # Free-tier providers cap input tokens per minute (Groq ITPM = 7000). Sending
     # the full 54-tool schema (~8.9k tok) with the agent prompt trips a 413, which
     # made every /opencode task look like "all providers are down". Restrict to the
     # task's domain tools first, then trim further if still over budget.
+    # ── FORCE LOCAL OLLAMA IF SELECTED ──
     tools_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names) if allowed_names else TOOLS_SCHEMA
     tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
 
@@ -11993,11 +12920,14 @@ def auto_fix_stream():
             {"role": "user", "content": content}
         ]
         fixed_code = None
-        for name, endpoint, api_key, model in (
-            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-            ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-            ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-        ):
+        # If a local model was requested, skip the cloud providers completely
+        providers = [
+                ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+                ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
+                ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)
+            ]
+        
+        for name, endpoint, api_key, model in providers:
             if not api_key:
                 continue
             try:
@@ -13511,6 +14441,164 @@ def _boot_banner():
         pass
 
 
+import collections
+import threading
+
+class _LogBuffer:
+    """Bounded live-log ring shared by every /api/logs viewer.
+
+    Each viewer keeps its own cursor, so a line reaches ALL connected viewers
+    instead of being consumed by whichever one reads first. The ring drops the
+    oldest lines once full, so an idle server cannot grow without bound.
+    """
+    def __init__(self, maxlen=500):
+        self._lines = collections.deque(maxlen=maxlen)
+        self._next_seq = 0
+        self._cond = threading.Condition()
+
+    def put(self, message):
+        line = message.replace("\n", " | ")
+        with self._cond:
+            self._lines.append((self._next_seq, line))
+            self._next_seq += 1
+            self._cond.notify_all()
+
+    def follow(self):
+        with self._cond:
+            # Start at the oldest retained line so a newly opened viewer shows
+            # recent history, capped by the ring size rather than by uptime.
+            cursor = self._next_seq - len(self._lines)
+        while True:
+            with self._cond:
+                if cursor >= self._next_seq:
+                    self._cond.wait(5)
+                oldest = self._next_seq - len(self._lines)
+                if cursor < oldest:
+                    cursor = oldest  # viewer fell behind; skip dropped lines
+                if cursor < self._next_seq:
+                    line = self._lines[cursor - oldest][1]
+                    cursor += 1
+                else:
+                    line = None
+            yield line
+
+
+_LOG_QUEUE = _LogBuffer()
+
+# Mirror Python logging (all loggers, DEBUG and up) into the live stream. The
+# server already prints plenty, but background services (ntfy polling every
+# 30s, provider HTTP calls) only log; without this the panel looks dead between
+# user-visible events even though the backend is working.
+class _LiveLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            _LOG_QUEUE.put(msg)
+            # Echo to the real console as well, so the PowerShell window shows
+            # the same background activity as the panel. sys.__stdout__ is the
+            # original stream, not the SimpleLogger wrapper, so the line is not
+            # queued twice.
+            out = sys.__stdout__
+            if out is not None:
+                out.write(msg + "\n")
+                out.flush()
+        except Exception:
+            pass
+
+_live_handler = _LiveLogHandler()
+_live_handler.setLevel(logging.DEBUG)
+_live_handler.setFormatter(logging.Formatter('%(message)s'))
+logging.getLogger().addHandler(_live_handler)
+logging.getLogger().setLevel(logging.DEBUG)
+
+
+def _live_log(msg):
+    """Timestamped action line; shows in the panel and the PowerShell window."""
+    logging.getLogger("acesi.actions").info(
+        "[%s] %s", time.strftime("%H:%M:%S"), msg)
+
+
+@app.route('/api/logs')
+def api_logs():
+    def generate():
+        yield "data: Connected to live server logs...\n\n"
+        for line in _LOG_QUEUE.follow():
+            if line is None:
+                yield "data: : keep-alive\n\n"
+            else:
+                import json
+                # Force JSON encoding to protect the emojis
+                yield f"data: {json.dumps({'log': line})}\n\n"
+                
+    return Response(generate(), mimetype='text/event-stream; charset=utf-8', headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
+
+import sys
+import re
+import queue
+
+class SimpleLogger:
+    def __init__(self, original, log_queue):
+        self.original = original
+        self.queue = log_queue
+
+    def write(self, message):
+        try:
+            msg_text = message
+            if '* Running on http://127.0.0.1:5000' in msg_text:
+                msg_text = msg_text.rstrip() + ' ✅\n'
+            elif 'ntfy.sh' in msg_text:
+                msg_text = msg_text.rstrip() + ' ⭐\n'
+            else:
+                import re
+                match = re.search(r'\s(\d{3})\s', msg_text)
+                if match:
+                    status = match.group(1)
+                    if status in ('200', '201', '202', '204'):
+                        msg_text = msg_text.rstrip() + ' 😊\n'
+                    elif status.startswith(('4', '5')):
+                        msg_text = msg_text.rstrip() + ' ❌\n'
+
+            self.original.write(msg_text)
+            if hasattr(self, 'queue') and self.queue:
+                self.queue.put(msg_text)
+        except Exception:
+            pass
+
+    def flush(self):
+        if hasattr(self, 'original'):
+            self.original.flush()
+
+sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
+sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
+
+
+# The werkzeug handler was built from the ORIGINAL sys.stdout, before the
+# wrapper above existed, so it wrote straight to the terminal and the viewer
+# never saw request lines. Point it at the wrapper; SimpleLogger still passes
+# everything through to the terminal, so nothing is lost.
+for _h in logging.getLogger('werkzeug').handlers:
+    if isinstance(_h, logging.StreamHandler):
+        _h.stream = sys.stdout
+
+@app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
+def api_settings():
+    from flask import request, jsonify
+    if request.method == 'OPTIONS':
+        return '', 200
+    if request.method == 'POST':
+        data = request.get_json()
+        import json
+        with open('config.json', 'w') as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"ok": True, "message": "Settings saved"})
+    if request.method == 'GET':
+        import json
+        try:
+            with open('config.json', 'r') as f:
+                return jsonify(json.load(f))
+        except:
+            return jsonify({})
+
 if __name__ == '__main__':
     _boot_banner()
     # Boot E-STOP check: if ACEsi was killed before shutdown, come back stopped.
@@ -13525,4 +14613,85 @@ if __name__ == '__main__':
     # stale code (seen: qwen going off to Google because the deterministic
     # executor wasn't loaded). Reloads are handled by the ace_host watchdog
     # via its restart flag instead.
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    import threading, time as _t
+    def _hb_func():
+        """Animated ASCII ECG heartbeat: cycles through wave characters every 5s,
+        using \r to overwrite in-place so it doesn't interfere with print() output."""
+        # Waveform frames: flat, rising, peak, falling, flat
+        frames = ['_', '/', '|', '\\', '_']
+        idx = 0
+        while True:
+            _t.sleep(5)  # Full heartbeat interval
+            # Animate 10 frames within the 5s interval for smooth wave
+            for _ in range(10):
+                idx = (idx + 1) % len(frames)
+                sys.stdout.write('\r' + frames[idx])
+                sys.stdout.flush()
+                _t.sleep(0.5)  # 0.1s would be 50 frames, 0.5s is 10 frames for simplicity
+    _hb = threading.Thread(target=_hb_func, daemon=True)
+    _hb.start()
+    
+@app.route('/run_stream', methods=['GET'])
+def run_stream():
+    import subprocess
+    cmd = request.args.get('cmd', '')
+    if not cmd:
+        return "No command provided", 400
+
+    def generate():
+        try:
+            process = subprocess.Popen(
+                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, encoding='utf-8', errors='replace'
+            )
+            for line in iter(process.stdout.readline, ''):
+                if line:
+                    yield f"data: {json.dumps({'line': line})}\n\n"
+            process.stdout.close()
+            process.wait()
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
+
+
+
+@app.route('/restart', methods=['POST'])
+def restart_server():
+    """Restart from the UI without killing unrelated Python programs.
+
+    This used to launch restart_server.bat, whose `taskkill /F /IM python.exe`
+    terminates every Python process on the machine - other tools included - and
+    then starts the server with no logs and no verification. restart_server.ps1
+    stops only the process holding port 5000, keeps stdout/stderr on disk and
+    prints a stale-code verdict.
+
+    The two-second delay lets this HTTP response reach the browser before the
+    script stops the process that is serving it. The batch file stays as a
+    fallback for machines where the script is missing.
+    """
+    import subprocess
+    root = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(root, "restart_server.ps1")
+    if os.path.isfile(script):
+        safe = script.replace("'", "''")
+        cmd = [
+            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+            "-WindowStyle", "Hidden", "-Command",
+            "Start-Sleep -Seconds 2; & '%s'" % safe,
+        ]
+        try:
+            subprocess.Popen(cmd, cwd=root,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
+            return jsonify({"status": "restarting", "via": "restart_server.ps1"})
+        except Exception as e:
+            print("[restart] ps1 failed (%s), falling back to .bat" % e)
+    try:
+        subprocess.Popen("restart_server.bat", shell=True,
+                         creationflags=subprocess.CREATE_NEW_CONSOLE)
+        return jsonify({"status": "restarting", "via": "restart_server.bat"})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+app.run(host='127.0.0.1', port=5000, debug=False)
