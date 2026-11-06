@@ -5,4 +5,5 @@ Start-Process powershell -ArgumentList '-WindowStyle', 'Hidden', '-Command', 'cd
 Start-Sleep -Seconds 6
 
 # Launch the desktop app window (pywebview) pointing to the Chat UI
-python -c "import webview; webview.create_window('ACESi', 'http://127.0.0.1:5000/chat-ui', width=1200, height=800); webview.start()"
+python -c "import webview; webview.create_window('ACESi', 'http://127.0.0.1:5000/', width=1200, height=800); webview.start()"
+

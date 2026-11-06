@@ -127,7 +127,7 @@ def _load_local_keys():
     return {}
 
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "qwen/qwen3.8-27b"
+GROQ_MODEL = "openai/gpt-oss-120b"
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
 # form and then reads the network panel instead of submitting, which prompting
 # did not fix. This is a config key, not a constant, so the model can be
@@ -3014,7 +3014,7 @@ def chat_ui():
 
 @app.route('/')
 def index():
-    resp = send_from_directory('.', 'ACEsi.html')
+    resp = send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'ACEsi.html')
     # "popup never shows" (old page missing the view-rendering code).
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -14747,3 +14747,5 @@ def restart_server():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 app.run(host='127.0.0.1', port=5000, debug=False)
+
+
