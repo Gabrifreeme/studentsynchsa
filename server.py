@@ -141,6 +141,31 @@ _BROWSER_DOMAINS = ("ui", "net")
 CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
 CEREBRAS_MODEL = "gpt-oss-120b"
 
+# Mistral AI - OpenAI-compatible, code-specialised. codestral-latest was
+# verified live against /v1/models. The key comes from env var or
+# .ace_keys.local, loaded just like the other provider keys.
+MISTRAL_ENDPOINT = "https://api.mistral.ai/v1"
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "codestral-latest")
+
+# Cloudflare Workers AI - OpenAI-compatible, requires the account id in the URL.
+CLOUDFLARE_ACCOUNT_ID = os.environ.get(
+    "CLOUDFLARE_ACCOUNT_ID", "29b0959e887bb4d1707a8965ea19f446")
+CLOUDFLARE_ENDPOINT = (
+    "https://api.cloudflare.com/client/v4/accounts/%s/ai/v1"
+    % CLOUDFLARE_ACCOUNT_ID)
+CLOUDFLARE_MODEL = os.environ.get(
+    "CLOUDFLARE_MODEL", "@cf/meta/llama-3.1-8b-instruct")
+
+# Hugging Face Inference Providers - OpenAI-compatible router.
+HF_ENDPOINT = "https://router.huggingface.co/v1"
+HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-Coder-32B-Instruct")
+
+# Google Gemini - OpenAI-compatible endpoint. The free quota is per model, so
+# flash-lite keeps working when flash has spent its own daily allowance.
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_FALLBACK_MODELS = ("gemini-2.5-flash-lite",)
+
 # FreeLLMAPI (Railway)
 FREELLM_ENDPOINT = "https://freellmapi-production-1394.up.railway.app/v1"
 FREELLM_API_KEY = os.environ.get("FREELLM_API_KEY", "")
@@ -964,6 +989,10 @@ CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY") or _LK.get("cerebras", "")
 # live in either gitignored local store instead of only in source or .env.
 OPENROUTER_API_KEY = OPENROUTER_API_KEY or _LK.get("openrouter", "")
 FREELLM_API_KEY = FREELLM_API_KEY or _LK.get("freellm", "")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY") or _LK.get("mistral", "")
+CLOUDFLARE_API_KEY = os.environ.get("CLOUDFLARE_API_KEY") or _LK.get("cloudflare", "")
+HF_API_KEY = os.environ.get("HF_API_KEY") or _LK.get("hf", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or _LK.get("gemini", "")
 
 def load_json(filename, default):
     path = os.path.join(DATA_DIR, filename)
@@ -3082,8 +3111,12 @@ def _chat_providers(domain=""):
                   GROQ_MODEL_BROWSER else GROQ_MODEL)
     return [
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
+        ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
+        ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
+        ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
         ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
         ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+        ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
         ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL),
     ]
 
@@ -3096,13 +3129,16 @@ def _find_provider_for_model(preferred_model):
     rather than silently falling back to the cloud."""
     if not preferred_model:
         return None
+    # Exact matches must win. The cloud Groq and HuggingFace models are also
+    # called qwen/..., so running the bare 'qwen' heuristic first sent a cloud
+    # selection to the local Ollama server instead of the provider that serves it.
+    for name, ep, key, mdl in _chat_providers():
+        if key and mdl and mdl == preferred_model:
+            return (name, ep, key, mdl)
     if preferred_model and (preferred_model in (OLLAMA_MODEL, OLLAMA_CHAT_MODEL) or 'qwen' in preferred_model or 'llama' in preferred_model):
         if OLLAMA_ENABLED:
             return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
         return None
-    for name, ep, key, mdl in _chat_providers():
-        if key and mdl and mdl == preferred_model:
-            return (name, ep, key, mdl)
     if preferred_model in GROQ_FALLBACKS:
         return ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, preferred_model)
     if preferred_model in OPENROUTER_FALLBACKS:
@@ -12656,6 +12692,10 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
         for name, ep, key, model in (("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
                                      ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
                                      ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+                                     ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
+                                     ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
+                                     ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
+                                     ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
                                      ("FreeLLM", FREELLM_ENDPOINT, FREELLM_API_KEY, FREELLM_MODEL)):
             res = one(name, ep, key, model)
             if res is not None:
@@ -12924,7 +12964,11 @@ def auto_fix_stream():
         providers = [
                 ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
                 ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-                ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL)
+                ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+                ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
+                ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
+                ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
+                ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL)
             ]
         
         for name, endpoint, api_key, model in providers:
