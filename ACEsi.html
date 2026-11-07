@@ -255,6 +255,38 @@
     color: #000 !important;
   }
 </style>
+<style>
+  /* Force CodeMirror to obey the panel height */
+  #editor-area {
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  
+  /* The magic: force the wrapper and scroller to match the panel */
+  .CodeMirror {
+    height: 100% !important;
+  }
+  
+  .CodeMirror-scroll {
+    height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+  }
+  
+  /* Amber Scrollbars */
+  .CodeMirror-scroll::-webkit-scrollbar {
+    width: 12px !important;
+    height: 12px !important;
+  }
+  .CodeMirror-scroll::-webkit-scrollbar-track {
+    background: #111 !important;
+  }
+  .CodeMirror-scroll::-webkit-scrollbar-thumb {
+    background: #ff9d00 !important;
+    border: 2px solid #111 !important;
+    border-radius: 6px !important;
+  }
+</style>
 </head>
 <body>
 
@@ -1277,6 +1309,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for the explorer to load its tree
+    setTimeout(function() {
+        var explorer = document.getElementById('explorer');
+        if (explorer) {
+            explorer.addEventListener('click', function(e) {
+                // Find the closest div that was clicked
+                var target = e.target.closest('div');
+                if (target && target.innerText) {
+                    var fileName = target.innerText.trim();
+                    // Don't load folders (they have emojis or no .dart extension)
+                    if (fileName.indexOf('.dart') !== -1 || fileName.indexOf('.yaml') !== -1) {
+                        window.loadFile(fileName);
+                    }
+                }
+            });
+        }
+    }, 1000); // Wait 1 second for the tree to render
 });
 </script>
 </body>
