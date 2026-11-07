@@ -95,7 +95,7 @@
         .btn { background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 10px; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 11px; margin-right: 4px; }
         .btn:hover { background: #ff9d00; color: #000; }
         #line-numbers { width: 48px; box-sizing: border-box; padding: 10px 8px 40px; font-family: 'Roboto Mono', monospace; font-size: 14px; line-height: 21px; color: #b37200; text-align: right; background: #000; border-right: 1px solid #ff9d00; overflow: hidden; white-space: pre; user-select: none; flex-shrink: 0; }
-        #editor-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        #editor-area { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
         #highlight-layer {
             position: absolute;
             inset: 0;
@@ -525,6 +525,19 @@ document.addEventListener("DOMContentLoaded", function() {
                         current = current[part];
                     }
                 });
+
+                // ResizeObserver to measure #code-editor-wrap and adjust CodeMirror size
+                var resizeObserver = new ResizeObserver(function(entries) {
+                    for (var entry of entries) {
+                        var wrap = document.getElementById('code-editor-wrap');
+                        if (wrap) {
+                            var wrapHeight = wrap.clientHeight;
+                            cm.setSize('100%', wrapHeight + 'px');
+                            cm.refresh();
+                        }
+                    }
+                });
+                resizeObserver.observe(document.getElementById('code-editor-wrap'));
             });
 
             // Render the tree recursively
