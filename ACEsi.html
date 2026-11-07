@@ -1199,7 +1199,10 @@ window.editorSearchOpen = function() {
     if (s) { s.style.display = 'block'; document.getElementById('search-input').focus(); }
 };
 window.openSettings = function() {
-    alert('Settings panel is being rebuilt.');
+    var panel = document.getElementById('settings-panel');
+    if (panel) {
+        panel.style.display = 'block';
+    }
 };
     fetch('/api/files').then(r => r.json()).then(data => {
         const exp = document.getElementById('explorer');
@@ -1279,6 +1282,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 </body>
 </html>
+
 
 
 
