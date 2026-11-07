@@ -235,12 +235,25 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 
+</script>
+</script>
+
 <style>
     /* Highlight files (leaf nodes) on hover in the Explorer, VS Code style */
     #explorer div:not(:has(div)):hover {
         background-color: #333 !important;
         color: #fff !important;
     }
+</style>
+<style>
+  ::selection {
+    background: #ff9d00 !important;
+    color: #000 !important;
+  }
+  ::-moz-selection {
+    background: #ff9d00 !important;
+    color: #000 !important;
+  }
 </style>
 </head>
 <body>
@@ -412,10 +425,10 @@
             <div style="float:right;margin-left:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <button id="search-btn" class="btn" title="Find text or line (Ctrl+F)" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="editorSearchOpen()">Search</button>
                 <button id="save-btn" class="btn" title="Save current file" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Save</button>
-                            <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="openAutoFix()"">Auto Fix</button>
-            <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
-            <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
-                <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;">Copy</button>
+                <button class="btn" title="Auto Fix" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;" onclick="openAutoFix()">Auto Fix</button>
+                <button id="clear-btn" class="btn" title="Clear editor" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+                <button id="copy-btn" class="btn" title="Copy to clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
+                <button id="paste-btn" class="btn" title="Paste from clipboard" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Paste</button>
             </div>
             </div>
             <div id="code-editor-wrap" style="display:flex;flex:1;overflow:hidden;background:#000;position:relative;">
@@ -423,14 +436,12 @@
               <div id="editor-area">
                 <pre id="highlight-layer" aria-hidden="true"></pre>
                 <div id="search-marks" aria-hidden="true"><div id="search-marks-inner"></div></div>
-                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="width:100%; height:100%; border:none; padding:10px; font-family:'Roboto Mono',monospace; font-size:14px; resize:none; outline:none; position:absolute; top:0; left:0; z-index:3;"></textarea>
-                <div id="editor-search">
-                    <input id="search-input" type="text" placeholder="Find text or :line" oninput="editorSearch(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(event.shiftKey){editorSearchPrev();}else{editorSearchNext();}}else if(event.key==='Escape'){editorSearchClose();}">
-                    <span id="search-count"></span>
-                    <button type="button" title="Previous match (Shift+Enter)" onclick="editorSearchPrev()">&#8593;</button>
-                    <button type="button" title="Next match (Enter)" onclick="editorSearchNext()">&#8595;</button>
-                    <button type="button" title="Close (Esc)" onclick="editorSearchClose()">&#215;</button>
-                </div>
+                <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Select a file to edit..." style="display: none !important;"></textarea>
+              <div id="editor-search" style="display:none; position:absolute; top:10px; left:10px; background:#000; border:1px solid #ff9d00; padding:8px; z-index:100; display:flex; gap:120px; align-items:center; box-shadow: 0 4px 10px #000;">
+    <input id="search-input" type="text" placeholder="Find text..." style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:4px; width: 200px;" onkeydown="if(event.key==='Enter'){ window.find(this.value, false, false, true, false, false, false); }">
+    <button type="button" onclick="window.find(document.getElementById('search-input').value, false, false, true, false, false, false);" style="background:#ff9d00; color:#000; cursor:pointer;">Find</button>
+    <button type="button" onclick="document.getElementById('editor-search').style.display='none';" style="background:#ff9d00; color:#000; cursor:pointer;">X</button>
+</div>
               </div>
                 <div id="logs-overlay" style="color: #ff9d00 !important; background: #000 !important; -webkit-text-fill-color: #ff9d00 !important; display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1000; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
                 <div id="logs-overlay-inner" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #ff9d00; z-index: 1001; overflow-y: auto; padding: 10px; font-family: monospace; white-space: pre-wrap; box-sizing: border-box;"></div>
@@ -619,6 +630,29 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
+// --- Restore missing button event listeners ---
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.onclick = function() { if (typeof saveFile === 'function') saveFile(); else if (typeof saveCurrentFile === 'function') saveCurrentFile(); else console.log('Save function missing'); };
+
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) clearBtn.onclick = function() { if (window.globalCM) window.globalCM.setValue(''); };
+
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) copyBtn.onclick = function() { if (window.globalCM) navigator.clipboard.writeText(window.globalCM.getValue()); };
+
+        const pasteBtn = document.getElementById('paste-btn');
+        if (pasteBtn) pasteBtn.onclick = async function() { 
+            try { 
+                const text = await navigator.clipboard.readText(); 
+                if (window.globalCM) window.globalCM.replaceSelection(text); 
+            } catch(e) { console.error('Paste failed', e); } 
+        };
+    }, 800); // Wait for CodeMirror to finish initializing
+});
+</script>
+</script>
 </script>
     <script>
         function runSelected(){
@@ -672,7 +706,30 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('modelBtn').style.display='inline-block';
         }
     });
-    </script>
+    // --- Restore missing button event listeners ---
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.onclick = function() { if (typeof saveFile === 'function') saveFile(); else if (typeof saveCurrentFile === 'function') saveCurrentFile(); else console.log('Save function missing'); };
+
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) clearBtn.onclick = function() { if (window.globalCM) window.globalCM.setValue(''); };
+
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) copyBtn.onclick = function() { if (window.globalCM) navigator.clipboard.writeText(window.globalCM.getValue()); };
+
+        const pasteBtn = document.getElementById('paste-btn');
+        if (pasteBtn) pasteBtn.onclick = async function() { 
+            try { 
+                const text = await navigator.clipboard.readText(); 
+                if (window.globalCM) window.globalCM.replaceSelection(text); 
+            } catch(e) { console.error('Paste failed', e); } 
+        };
+    }, 800); // Wait for CodeMirror to finish initializing
+});
+</script>
+</script>
+</script>
     <div id="bottom-status" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#000;border-top:1px solid #ff9d00;font-family:'Roboto Mono',monospace;font-size:12px;color:#ff9d00;flex-shrink:0;">
         <span style="font-weight:bold;">ACEsi</span> <span>|</span>
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
@@ -1094,12 +1151,134 @@ function saveFixedCode(){
         function sendChat() {
             sendMessage();
         }
+// --- Restore missing button event listeners ---
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.onclick = function() { if (typeof saveFile === 'function') saveFile(); else if (typeof saveCurrentFile === 'function') saveCurrentFile(); else console.log('Save function missing'); };
+
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) clearBtn.onclick = function() { if (window.globalCM) window.globalCM.setValue(''); };
+
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) copyBtn.onclick = function() { if (window.globalCM) navigator.clipboard.writeText(window.globalCM.getValue()); };
+
+        const pasteBtn = document.getElementById('paste-btn');
+        if (pasteBtn) pasteBtn.onclick = async function() { 
+            try { 
+                const text = await navigator.clipboard.readText(); 
+                if (window.globalCM) window.globalCM.replaceSelection(text); 
+            } catch(e) { console.error('Paste failed', e); } 
+        };
+    }, 800); // Wait for CodeMirror to finish initializing
+});
+</script>
+</script>
 </script>
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+console.log("ACEsi Emergency Restore Loaded");
+window.editorSearchOpen = function() {
+    const s = document.getElementById('editor-search');
+    if (s) { s.style.display = 'block'; document.getElementById('search-input').focus(); }
+};
+window.openSettings = function() {
+    alert('Settings panel is being rebuilt.');
+};
+    fetch('/api/files').then(r => r.json()).then(data => {
+        const exp = document.getElementById('explorer');
+        if (exp) {
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                html += '<div style="cursor:pointer; padding:2px 8px;" onclick="loadFile(\'' + data[i] + '\')">' + data[i] + '</div>';
+            }
+            exp.innerHTML = html;
+        }
+    }).catch(e => console.error('Explorer error:', e));
+window.loadFile = function(filename) {
+    fetch('/api/file-content?path=' + encodeURIComponent(filename)).then(r => r.text()).then(text => {
+        if (window.globalCM) window.globalCM.setValue(text);
+    }).catch(e => console.error('Load error:', e));
+};
+window.saveFile = function() {
+    if (!window.globalCM) return;
+    const text = window.globalCM.getValue();
+    fetch('/api/save_file', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: window.activeFile || 'lib/main.dart', content: text})
+    }).then(r => r.json()).then(d => console.log('Saved:', d)).catch(e => console.error(e));
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.onclick = window.saveFile;
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) clearBtn.onclick = function() { if (window.globalCM) window.globalCM.setValue(''); };
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) copyBtn.onclick = function() { if (window.globalCM) navigator.clipboard.writeText(window.globalCM.getValue()); };
+        const pasteBtn = document.getElementById('paste-btn');
+        if (pasteBtn) pasteBtn.onclick = async function() {
+            try { const text = await navigator.clipboard.readText(); if (window.globalCM) window.globalCM.replaceSelection(text); } catch(e) { console.error('Paste failed', e); }
+        };
+    }, 1000);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Force hide the stuck search bar
+    var searchBar = document.getElementById('editor-search');
+    if (searchBar) {
+        searchBar.style.setProperty('display', 'none', 'important');
+    }
+
+    // 2. Wire up the buttons using event delegation to bypass any missing IDs
+    document.body.addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        
+        var text = btn.innerText.trim();
+        
+        if (text === 'Search') {
+            if (searchBar) { searchBar.style.display = 'flex'; document.getElementById('search-input').focus(); }
+        } else if (text === 'Clear') {
+            if (window.globalCM) window.globalCM.setValue('');
+        } else if (text === 'Copy') {
+            if (window.globalCM) navigator.clipboard.writeText(window.globalCM.getValue());
+        } else if (text === 'Paste') {
+            navigator.clipboard.readText().then(function(t) { if (window.globalCM) window.globalCM.replaceSelection(t); });
+        } else if (text === 'Save') {
+            if (window.globalCM) {
+                fetch('/api/save_file', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({path: 'lib/main.dart', content: window.globalCM.getValue()})
+                }).then(r => r.json()).then(d => alert('Saved!')).catch(e => alert('Error saving'));
+            }
+        }
+    });
+});
+</script>
+</body>
+</body>
+</html>
 
 
 
