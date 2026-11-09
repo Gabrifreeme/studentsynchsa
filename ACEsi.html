@@ -666,6 +666,15 @@
             #line-numbers { font-size: 13px !important; line-height: 20px !important; }
         }
 
+        /* Mobile model bar: show only on phones/tablets */
+        @media (max-width: 768px) {
+            #mobile-model-bar { display: block !important; }
+            #current-model-indicator, #model-spinner { display: none !important; }
+        }
+
+        /* Hide mobile model bar on desktop */
+        #mobile-model-bar { display: none; }
+
         /* ===== Amber hover on all buttons ===== */
         button:hover {
             background: #ff9d00 !important;
@@ -714,6 +723,28 @@
             background: #ff9d00 !important;
             color: #000 !important;
             border: 1px solid #ff9d00 !important;
+        }
+
+        /* Model status spinner */
+        #model-spinner {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-left: 6px;
+            border-radius: 50%;
+            border: 2px solid;
+            animation: model-spin 1s linear infinite;
+            vertical-align: middle;
+        }
+        #model-spinner.status-ok {
+            border-color: #00ff00;
+        }
+        #model-spinner.status-dead {
+            border-color: #ff0000;
+        }
+        @keyframes model-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -840,7 +871,7 @@
                     <label style="display:block;margin-bottom:4px;font-size:11px;">Model</label>
                     <select id="settings-model"
                         style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
-                        <option value="gpt-oss-20b">gpt-oss-20b</option>
+                        <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
                         <option value="llama-3.1-70b-versatile">llama-3.1-70b-versatile</option>
                         <option value="qwen-qwq-32b">qwen-qwq-32b</option>
                     </select>
@@ -1038,6 +1069,7 @@
                         style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🔊</button>
                     <button onclick="document.getElementById('chat-file').click()" title="Upload"
                         style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">➕</button>
+                    <span id="mobile-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:1px 6px;border-radius:3px;margin-left:8px;">openai/gpt-oss-120b</span><span id="mobile-model-spinner" class="status-ok" title="Model status: OK"></span>
                 </div>
 
                 <div id="spinner-right" class="spinner" style="width:20px;"></div>
@@ -1452,7 +1484,7 @@
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
-        <span id="current-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;">gpt-oss-20b</span>
+        <span id="current-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;">openai/gpt-oss-120b</span><span id="model-spinner" class="status-ok" title="Model status: OK"></span>
     </div>
 
     <!-- Auto Fix Modal -->
@@ -2082,7 +2114,7 @@
                 if (d.provider) document.getElementById('settings-provider').value = d.provider;
                 updateModelsForProvider();
                 if (d.model) document.getElementById('settings-model').value = d.model;
-                document.getElementById('current-model-indicator').textContent = d.model || 'gpt-oss-20b';
+                document.getElementById('current-model-indicator').textContent = d.model || 'openai/gpt-oss-120b';
                 if (d.groq_key) document.getElementById('settings-groq-key').value = d.groq_key;
                 if (d.openrouter_key) document.getElementById('settings-openrouter-key').value = d.openrouter_key;
                 if (d.ollama_host) document.getElementById('settings-ollama-host').value = d.ollama_host;
@@ -2098,6 +2130,13 @@
                 if (d.sambanova_key) document.getElementById('settings-sambanova-key').value = d.sambanova_key;
                 if (d.github_key) document.getElementById('settings-github-key').value = d.github_key;
                 if (d.system_prompt) document.getElementById('settings-prompt').value = d.system_prompt;
+                // Set default model if none saved
+                if (!d.model) {
+                    document.getElementById('settings-model').value = document.getElementById('settings-model').options[0]?.value || '';
+                }
+                document.getElementById('current-model-indicator').textContent = document.getElementById('settings-model').value || 'openai/gpt-oss-120b';
+                document.getElementById('mobile-model-indicator').textContent = document.getElementById('settings-model').value || 'openai/gpt-oss-120b';
+                checkModelStatus();
             } catch (e) {
                 console.warn('Could not load settings:', e);
             }
@@ -2135,6 +2174,7 @@
                 .then(function (d) {
                     if (d && d.ok) {
                         document.getElementById('current-model-indicator').textContent = model;
+                        document.getElementById('mobile-model-indicator').textContent = model;
                         // Restart server so new API keys take effect
                         return fetch('http://127.0.0.1:5000/restart', {
                             method: 'POST',
@@ -2147,9 +2187,37 @@
                 })
                 .then(function(d) {
                     alert('Settings saved. Server is restarting to apply new API keys.');
+                    checkModelStatus();
                 })
                 .catch(function (e) {
                     alert('Save failed: ' + e.message);
+                });
+        }
+
+        /* ===== Check Model Status ===== */
+        function checkModelStatus() {
+            var provider = document.getElementById('settings-provider').value;
+            var model = document.getElementById('settings-model').value;
+            var spinner = document.getElementById('model-spinner');
+
+            // Quick test: send a minimal chat request to see if the model responds
+            fetch('http://127.0.0.1:5000/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: 'ping' })
+            })
+                .then(function (r) {
+                    if (r.ok) {
+                        spinner.className = 'status-ok';
+                        spinner.title = 'Model status: OK (' + model + ')';
+                    } else {
+                        spinner.className = 'status-dead';
+                        spinner.title = 'Model status: ERROR (' + r.status + ')';
+                    }
+                })
+                .catch(function (e) {
+                    spinner.className = 'status-dead';
+                    spinner.title = 'Model status: UNREACHABLE';
                 });
         }
 
@@ -2597,3 +2665,5 @@ window.splitVideoPrompt = function() {
 </script>
 </body>
 </html>
+
+
