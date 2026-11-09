@@ -342,7 +342,7 @@ static const List<String> _countryList = [
     'XHOSA',
     'ZULU',
   ];
-
+     // ignore: unused_field
   static const _schoolList = [
     'A. MUGAGULI SECONDARY SCHOOL',
     'A.B MAKAPAN SECONDARY SCHOOL',

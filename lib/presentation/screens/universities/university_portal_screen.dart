@@ -201,6 +201,7 @@ class _UniversityPortalScreenState extends State<UniversityPortalScreen> {
     }
   }
 
+ // ignore: unused_element
  void _showAutofillConfirmDialog() {
   showDialog(
     context: context,

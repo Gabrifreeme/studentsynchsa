@@ -160,7 +160,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
                        "button,input[type='submit']{background-color:#000000!important;color:#ff9d00!important;border:1px solid #ff9d00!important;border-radius:6px!important;padding:8px 16px!important;font-weight:bold!important;}";
           
           // Using backticks to safely wrap the CSS string for JavaScript
-          String js = "var style=document.createElement('style'); style.innerHTML=\`" + css + "\`; document.head.appendChild(style);";
+          String js = "var style=document.createElement('style'); style.innerHTML=$css; document.head.appendChild(style);";
           
           await _acesiController.runJavaScript(js);
         } catch (e) {
@@ -379,6 +379,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _injectPageScripts() async {
     try {
       await _controller.runJavaScript(star.buildNavigationFixScript());
@@ -478,6 +479,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
                   'window.requestFlutterAutofill();',
                 );
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Autofill triggered'),
@@ -488,6 +490,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
               } catch (e) {
                 debugPrint('Test autofill error: $e');
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Autofill failed: $e'),
