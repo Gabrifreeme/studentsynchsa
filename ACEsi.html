@@ -951,6 +951,10 @@
             <button onclick="connectGoogleDrive()"
                 style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Google
                 Drive</button>
+            <button onclick="openMemoryManager()"
+                style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Memory</button>
+            <button onclick="openSkillsManager()"
+                style="width:100%;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-size:11px;">Skills</button>
         </div>
 
         <div style="text-align:center;margin-top:16px;">
@@ -2212,6 +2216,141 @@
         }
         function connectGoogleDrive() {
             alert('Google Drive integration: configure in settings and use the file picker.');
+        }
+
+        /* ===== Memory Manager ===== */
+        async function openMemoryManager() {
+            try {
+                const r = await fetch('http://127.0.0.1:5000/memory/all');
+                const d = await r.json();
+                const mem = d.memory || {};
+                const keys = Object.keys(mem).sort();
+                let html = '<div style="max-height:300px;overflow-y:auto;margin-bottom:8px;">';
+                if (!keys.length) html += '<div style="color:#888;font-size:11px;">No memories stored yet.</div>';
+                keys.forEach(function(k) {
+                    var v = mem[k] && mem[k].value ? mem[k].value : String(mem[k]);
+                    html += '<div style="border:1px solid #ff9d00;padding:6px;margin:4px 0;background:#0a0a0a;">';
+                    html += '<div style="color:#ff9d00;font-size:10px;font-weight:bold;">' + escapeHtml(k) + '</div>';
+                    html += '<div style="color:#ccc;font-size:11px;white-space:pre-wrap;margin-top:2px;">' + escapeHtml(v) + '</div>';
+                    html += '<button onclick="forgetMemory(\'' + escapeJs(k) + '\')" style="background:#000;color:#ff0000;border:1px solid #ff0000;padding:2px 6px;font-size:10px;margin-top:4px;">Delete</button>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                html += '<div style="display:flex;gap:6px;">';
+                html += '<input id="mem-key" type="text" placeholder="Key" style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+                html += '<input id="mem-val" type="text" placeholder="Value" style="flex:2;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+                html += '<button onclick="setMemory()" style="background:#00ff00;color:#000;border:none;padding:4px 10px;font-size:11px;">Add</button>';
+                html += '</div>';
+                html += '<div style="margin-top:6px;"><button onclick="document.getElementById(\'mem-manager\').remove()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 10px;font-size:11px;">Close</button></div>';
+
+                var old = document.getElementById('mem-manager');
+                if (old) old.remove();
+
+                var dlg = document.createElement('div');
+                dlg.id = 'mem-manager';
+                dlg.style.cssText = 'position:fixed;top:10%;left:10%;width:80%;max-width:600px;background:#000;border:2px solid #ff9d00;padding:16px;z-index:20000;font-family:"Roboto Mono",monospace;color:#ff9d00;';
+                dlg.innerHTML = '<div style="font-weight:bold;font-size:13px;margin-bottom:10px;color:#ff9d00;">Memory — Facts About Chris</div>' + html;
+                document.body.appendChild(dlg);
+            } catch (e) {
+                alert('Memory error: ' + e.message);
+            }
+        }
+
+        async function setMemory() {
+            var k = document.getElementById('mem-key').value.trim();
+            var v = document.getElementById('mem-val').value.trim();
+            if (!k || !v) { alert('Key and value required.'); return; }
+            try {
+                await fetch('http://127.0.0.1:5000/memory/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: k, value: v })
+                });
+                document.getElementById('mem-key').value = '';
+                document.getElementById('mem-val').value = '';
+                openMemoryManager();
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        async function forgetMemory(key) {
+            if (!confirm('Forget memory: ' + key + '?')) return;
+            try {
+                await fetch('http://127.0.0.1:5000/memory/forget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: key })
+                });
+                openMemoryManager();
+            } catch (e) {
+                alert('Delete failed: ' + e.message);
+            }
+        }
+
+        /* ===== Skills Manager ===== */
+        async function openSkillsManager() {
+            try {
+                const r = await fetch('http://127.0.0.1:5000/memory/all');
+                const d = await r.json();
+                var mem = d.memory || {};
+                var skillKeys = Object.keys(mem).filter(function(k) { return k.startsWith('skills.'); }).sort();
+                let html = '<div style="max-height:300px;overflow-y:auto;margin-bottom:8px;">';
+                if (!skillKeys.length) html += '<div style="color:#888;font-size:11px;">No skills stored yet.</div>';
+                skillKeys.forEach(function(k) {
+                    var v = mem[k] && mem[k].value ? mem[k].value : String(mem[k]);
+                    html += '<div style="border:1px solid #ff9d00;padding:6px;margin:4px 0;background:#0a0a0a;">';
+                    html += '<div style="color:#ff9d00;font-size:10px;font-weight:bold;">' + escapeHtml(k) + '</div>';
+                    html += '<div style="color:#ccc;font-size:11px;white-space:pre-wrap;margin-top:2px;">' + escapeHtml(v) + '</div>';
+                    html += '<button onclick="forgetMemory(\'' + escapeJs(k) + '\')" style="background:#000;color:#ff0000;border:1px solid #ff0000;padding:2px 6px;font-size:10px;margin-top:4px;">Delete</button>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                html += '<div style="display:flex;gap:6px;">';
+                html += '<input id="skill-key" type="text" placeholder="e.g. skills.cooking" style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+                html += '<input id="skill-val" type="text" placeholder="What Chris knows/can do" style="flex:2;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+                html += '<button onclick="setSkill()" style="background:#00ff00;color:#000;border:none;padding:4px 10px;font-size:11px;">Add</button>';
+                html += '</div>';
+                html += '<div style="margin-top:6px;"><button onclick="document.getElementById(\'skill-manager\').remove()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 10px;font-size:11px;">Close</button></div>';
+
+                var old = document.getElementById('skill-manager');
+                if (old) old.remove();
+
+                var dlg = document.createElement('div');
+                dlg.id = 'skill-manager';
+                dlg.style.cssText = 'position:fixed;top:10%;left:10%;width:80%;max-width:600px;background:#000;border:2px solid #ff9d00;padding:16px;z-index:20000;font-family:"Roboto Mono",monospace;color:#ff9d00;';
+                dlg.innerHTML = '<div style="font-weight:bold;font-size:13px;margin-bottom:10px;color:#ff9d00;">Skills — What Chris Knows</div>' + html;
+                document.body.appendChild(dlg);
+            } catch (e) {
+                alert('Skills error: ' + e.message);
+            }
+        }
+
+        async function setSkill() {
+            var k = document.getElementById('skill-key').value.trim();
+            var v = document.getElementById('skill-val').value.trim();
+            if (!k || !v) { alert('Key and value required.'); return; }
+            var fullKey = k.startsWith('skills.') ? k : 'skills.' + k;
+            try {
+                await fetch('http://127.0.0.1:5000/memory/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: fullKey, value: v })
+                });
+                document.getElementById('skill-key').value = '';
+                document.getElementById('skill-val').value = '';
+                openSkillsManager();
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function escapeJs(s) {
+            return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         }
 
         /* ===== Initialize settings on open ===== */

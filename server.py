@@ -5536,6 +5536,10 @@ def chat():
             "If Chris asks to split, cut, trim, or convert a video, never write Flutter/Dart code and never say you cannot do it: emit the ffmpeg [EXEC] line, or call run_command. "
             "Plain video-split requests are handled before you are called, so don't duplicate that work."
         )
+        # Append the user-saved system prompt from Settings if present.
+        _saved_sys_prompt = get_config("system_prompt", "")
+        if _saved_sys_prompt and str(_saved_sys_prompt).strip():
+            system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
         history = get_recent_conversation(9)[:-1]
