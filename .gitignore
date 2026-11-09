@@ -70,6 +70,10 @@ drive_token.json
 
 ntfy_topic.txt
 
+# Browser cookies / session tokens exported for yt-dlp (credentials - never commit)
+cookies.txt
+*_cookies.txt
+
 # email watch: IMAP app-passwords + runtime seen-cache (secrets / local state)
 emails.json
 .email_watch_state.json

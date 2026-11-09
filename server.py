@@ -4990,6 +4990,103 @@ def _ffmpeg_video_reply(user_message):
         os.path.basename(src), mode, (out or "")[-1500:])
 
 
+# ---------------------------------------------------------------------------
+# Deterministic YouTube download (yt-dlp)
+# "Download this YouTube video and split it into 30-second clips" must work even
+# when the page is age/consent gated. yt-dlp reads Chris's own signed-in Firefox
+# session, so no cookie file is written to disk. Like the splitter above, this
+# runs before the model, so a refusal or hallucinated Flutter code can't happen.
+_YT_URL_RE = re.compile(
+    r'(?i)https?://(?:www\.|m\.|music\.)?'
+    r'(?:youtube\.com/(?:watch\?[^\s"\'<>]*?\bv=|shorts/|live/|embed/)|youtu\.be/)'
+    r'([A-Za-z0-9_-]{11})')
+_YT_SPLIT_RE = re.compile(r'(?i)\b(?:split|cut|trim|chop|slice|segment)\b')
+# Only act when Chris asks for a file; a message that merely mentions a link
+# ("look at this video") must go to the model, not trigger a 350 MB download.
+_YT_INTENT_RE = re.compile(
+    r'(?i)\b(?:download|save|grab|fetch|split|cut|trim|chop|slice|segment)\b')
+
+
+def _yt_dlp_exe():
+    """yt-dlp from PATH, else the winget shim, else the bare name."""
+    for p in os.environ.get('PATH', '').split(os.pathsep):
+        cand = os.path.join(p, 'yt-dlp.exe')
+        if os.path.isfile(cand):
+            return cand
+    cand = os.path.expanduser(r'~\AppData\Local\Microsoft\WinGet\Links\yt-dlp.exe')
+    if os.path.isfile(cand):
+        return cand
+    return 'yt-dlp'
+
+
+def _clip_seconds(msg):
+    """Clip length in seconds parsed from a message, or None."""
+    tc = _VIDEO_TC_RE.search(msg)
+    if tc:
+        return float(int(tc.group(1)) * 3600 + int(tc.group(2)) * 60 + int(tc.group(3)))
+    ln = _VIDEO_LEN_RE.search(msg)
+    if ln:
+        return float(ln.group(1))
+    return None
+
+
+def _youtube_reply(user_message):
+    """Download a YouTube video (and split it when asked) without the LLM."""
+    if not user_message:
+        return None
+    m = _YT_URL_RE.search(user_message)
+    if not m:
+        return None
+    if not _YT_INTENT_RE.search(user_message):
+        return None
+    vid = m.group(1)
+    url = 'https://www.youtube.com/watch?v=' + vid
+    want_split = bool(_YT_SPLIT_RE.search(user_message))
+    secs = _clip_seconds(user_message)
+    if want_split and not secs:
+        secs = 5.0
+
+    dest_dir = os.path.join(os.path.expanduser('~'), 'Videos')
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except OSError:
+        pass
+    outtmpl = os.path.join(dest_dir, 'youtube_%s.%%(ext)s' % vid)
+    target = os.path.join(dest_dir, 'youtube_%s.mp4' % vid)
+    exe = _yt_dlp_exe()
+
+    note = ''
+    if not os.path.isfile(target):
+        base = [exe, '--no-playlist', '--newline', '--merge-output-format', 'mp4',
+                '-f', 'bv*+ba/b', '-S', 'res:1080',
+                '-o', outtmpl]
+        ok, out = False, ''
+        # Chris's own signed-in session; Firefox first, then Chrome, then none.
+        for cookie_args in (['--cookies-from-browser', 'firefox'],
+                            ['--cookies-from-browser', 'chrome'],
+                            []):
+            ok, out = _run_args(base + cookie_args + [url], timeout=3600)
+            if ok and os.path.isfile(target):
+                break
+        if not ok or not os.path.isfile(target):
+            tail = (out or '')[-1500:]
+            tip = ("\n\nIf it needs a sign-in, sign in to YouTube in Firefox, "
+                   "close Firefox, and try again.")
+            return "Couldn't download that YouTube video.\n\n%s%s" % (tail, tip)
+    else:
+        note = ' (already downloaded)'
+
+    if not want_split or not secs:
+        size_mb = os.path.getsize(target) / (1024.0 * 1024.0)
+        return "Downloaded `%s`%s.\n- %s (%.1f MB)" % (
+            os.path.basename(target), note, target, size_mb)
+
+    split_reply = _ffmpeg_video_reply(
+        'split "%s" into %g-second clips' % (target, secs))
+    head = "Downloaded `%s`%s.\n\n" % (os.path.basename(target), note)
+    return head + (split_reply or "Download finished, but the split didn't run.")
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -5344,6 +5441,14 @@ def chat():
         else:
             hint = "a file path like lib/path/file.dart, C:\\path\\file.dart, or just file.dart"
             return jsonify({"reply": "I need a file path and error description. Say: 'auto-fix " + hint + ". The error is: ...'"})
+
+    # Deterministic YouTube path: download (and optionally split) before the
+    # model runs, so age/consent gates and prompt drift can't block it.
+    _yt_reply = _youtube_reply(user_message)
+    if _yt_reply:
+        print("📥 yt-dlp fast-path handled YouTube request")
+        save_conversation("assistant", _yt_reply)
+        return jsonify({"reply": _yt_reply})
 
     # Deterministic ffmpeg path: plain-English "split this video into N-second
     # clips" never reaches the model, so it cannot hallucinate Flutter code or
