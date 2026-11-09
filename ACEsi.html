@@ -491,9 +491,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 
-    </script>
-    </script>
-
     <style>
         /* Highlight files (leaf nodes) on hover in the Explorer, VS Code style */
         #explorer div:not(:has(div)):hover {
@@ -668,6 +665,41 @@
             #code-editor { font-size: 13px !important; line-height: 20px !important; }
             #line-numbers { font-size: 13px !important; line-height: 20px !important; }
         }
+
+        /* ===== Amber hover on all buttons ===== */
+        button:hover {
+            background: #ff9d00 !important;
+            color: #000 !important;
+        }
+
+        /* Collapsible section styling */
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #111;
+            color: #ff9d00;
+            border: 1px solid #ff9d00;
+            padding: 6px 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            margin: 6px 0;
+        }
+        .collapsible-header:hover {
+            background: #ff9d00;
+            color: #000;
+        }
+        .collapsible-content {
+            display: none;
+            padding: 10px;
+            border: 1px solid #ff9d00;
+            border-top: none;
+            background: #0a0a0a;
+        }
+        .collapsible-content.open {
+            display: block;
+        }
     </style>
 </head>
 
@@ -752,8 +784,8 @@
             style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
     </div>
 
-    <div id="settings-panel"
-        style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:450px;">
+        <div id="settings-panel"
+        style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:520px;max-height:85vh;overflow-y:auto;">
         <div style="margin-bottom:12px;">
             <button data-tab="settings-tab-ai" onclick="switchTab('settings-tab-ai')"
                 style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;margin-right:4px;">AI
@@ -770,38 +802,95 @@
         <div id="settings-tab-ai" class="tab-content"
             style="display:block; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
             <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">AI Engine</div>
+
             <div style="display:flex;gap:12px;">
                 <div style="flex:1;">
                     <label style="display:block;margin-bottom:4px;font-size:11px;">Provider</label>
                     <select id="settings-provider"
-                        style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
+                        style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;"
+                        onchange="updateModelsForProvider()">
                         <option value="groq">Groq</option>
+                        <option value="gemini">Gemini</option>
                         <option value="openrouter">OpenRouter</option>
-                        <option value="ollama">Local Ollama</option>
+                        <option value="cerebras">Cerebras</option>
+                        <option value="huggingface">HuggingFace</option>
+                        <option value="mistral">Mistral</option>
+                        <option value="cloudflare">Cloudflare</option>
+                        <option value="nvidia">NVIDIA</option>
+                        <option value="sambanova">SambaNova</option>
+                        <option value="github">GitHub</option>
                     </select>
                 </div>
                 <div style="flex:1;">
                     <label style="display:block;margin-bottom:4px;font-size:11px;">Model</label>
                     <select id="settings-model"
                         style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">
-
                         <option value="gpt-oss-20b">gpt-oss-20b</option>
+                        <option value="llama-3.1-70b-versatile">llama-3.1-70b-versatile</option>
+                        <option value="qwen-qwq-32b">qwen-qwq-32b</option>
                     </select>
                 </div>
             </div>
-            <div style="margin-top:8px;">
-                <div style="font-size:11px;color:#888;">API Keys stored in config.json on server</div>
-                <div style="margin-top:4px;">
-                    <label style="display:block;margin-bottom:2px;font-size:10px;">Groq API Key</label>
-                    <input type="text" id="settings-groq-key"
-                        style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
-                        placeholder="Enter Groq API Key">
-                    <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">OpenRouter API
-                        Key</label>
-                    <input type="text" id="settings-openrouter-key"
-                        style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
-                        placeholder="Enter OpenRouter API Key">
-                </div>
+
+            <!-- API Keys in collapsible dropdown -->
+            <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                <span>🔑 API Keys</span>
+                <span style="font-size:10px;">▼</span>
+            </div>
+            <div class="collapsible-content" id="api-keys-collapse">
+                <div style="font-size:10px;color:#888;margin-bottom:6px;">Keys are saved to config.json on the server.</div>
+                <label style="display:block;margin-bottom:2px;font-size:10px;">Groq API Key</label>
+                <input type="text" id="settings-groq-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter Groq API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">OpenRouter API Key</label>
+                <input type="text" id="settings-openrouter-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter OpenRouter API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Ollama Host (default http://localhost:11434)</label>
+                <input type="text" id="settings-ollama-host"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="http://localhost:11434">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">OpenAI API Key</label>
+                <input type="text" id="settings-openai-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="sk-...">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Anthropic API Key</label>
+                <input type="text" id="settings-anthropic-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="sk-ant-...">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Gemini API Key</label>
+                <input type="text" id="settings-gemini-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter Gemini API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Cerebras API Key</label>
+                <input type="text" id="settings-cerebras-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter Cerebras API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">SambaNova API Key</label>
+                <input type="text" id="settings-sambanova-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter SambaNova API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">HuggingFace API Key</label>
+                <input type="text" id="settings-hf-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter HF API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Mistral API Key</label>
+                <input type="text" id="settings-mistral-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter Mistral API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Cloudflare API Key</label>
+                <input type="text" id="settings-cloudflare-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter Cloudflare API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">NVIDIA API Key</label>
+                <input type="text" id="settings-nvidia-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter NVIDIA API Key">
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">GitHub API Key</label>
+                <input type="text" id="settings-github-key"
+                    style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
+                    placeholder="Enter GitHub API Key">
             </div>
         </div>
 
@@ -810,8 +899,8 @@
             style="display:none; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #ff9d00;">
             <div style="font-size:12px;color:#ff9d00;margin-bottom:6px;">System Prompt</div>
             <textarea id="settings-prompt"
-                style="width:100%;height:150px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-family:'Roboto Mono',monospace;font-size:11px;resize:vertical;outline:none;"
-                placeholder="System prompt loaded..."></textarea>
+                style="width:100%;height:200px;background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:8px;font-family:'Roboto Mono',monospace;font-size:11px;resize:vertical;outline:none;"
+                placeholder="System prompt..."></textarea>
             <div style="margin-top:8px; text-align:center;">
                 <button onclick="saveSystemPrompt()"
                     style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Save
@@ -827,6 +916,12 @@
                 <label style="display:block;margin-bottom:4px;font-size:11px;">
                     <input type="checkbox" id="show-toolbar" style="margin-right:4px;width:auto;"
                         onclick="toggleDeveloperToolbar()"> Show Developer Toolbar
+                </label>
+            </div>
+            <div style="margin-bottom:8px;">
+                <label style="display:block;margin-bottom:4px;font-size:11px;">
+                    <input type="checkbox" id="ntfy-enable" style="margin-right:4px;width:auto;"> Enable ntfy Push
+                    Notifications
                 </label>
             </div>
             <button onclick="clearChatHistory()"
@@ -944,7 +1039,7 @@
                         style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;"
                         onclick="openAutoFix()">Auto Fix</button>
                     <button id="clear-btn" class="btn" title="Clear editor"
-                        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Clear</button>
+                        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">🧹 Clear</button>
                     <button id="copy-btn" class="btn" title="Copy to clipboard"
                         style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
                     <button id="paste-btn" class="btn" title="Paste from clipboard"
@@ -961,15 +1056,15 @@
                     <textarea id="code-editor" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off"
                         placeholder="Select a file to edit..."></textarea>
                     <div id="editor-search"
-                        style="display:none; position:absolute; top:10px; left:10px; background:#000; border:1px solid #ff9d00; padding:8px; z-index:100; display:flex; gap:120px; align-items:center; box-shadow: 0 4px 10px #000;">
+                        style="display:none; position:absolute; top:10px; left:10px; background:#000; border:1px solid #ff9d00; padding:8px; z-index:100; display:flex; gap:8px; align-items:center; box-shadow: 0 4px 10px #000;">
                         <input id="search-input" type="text" placeholder="Find text..."
                             style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:4px; width: 200px;"
                             onkeydown="if(event.key==='Enter'){ window.find(this.value, false, false, true, false, false, false); }">
                         <button type="button"
                             onclick="window.find(document.getElementById('search-input').value, false, false, true, false, false, false);"
                             style="background:#ff9d00; color:#000; cursor:pointer;">Find</button>
-                        <button type="button" onclick="document.getElementById('editor-search').style.display='none';"
-                            style="background:#ff9d00; color:#000; cursor:pointer;">X</button>
+                        <button type="button" onclick="document.getElementById('search-input').value=''; document.getElementById('editor-search').style.display='none';"
+                            style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;cursor:pointer;">✕</button>
                     </div>
                 </div>
                 <div id="logs-overlay"
@@ -1185,26 +1280,37 @@
                 if (saveBtn) saveBtn.onclick = function () {
                     const content = codeEditor ? codeEditor.value : '';
                     if (!content.trim()) { alert('Editor is empty.'); return; }
+                    var filename = window.currentFile || '';
+                    if (!filename) {
+                        filename = prompt('Enter filename to save (e.g. lib/main.dart):', '');
+                        if (!filename) { return; } // user cancelled
+                        window.currentFile = filename;
+                    }
                     fetch('http://127.0.0.1:5000/api/save-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: content, filename: window.currentFile || '' })
+                        body: JSON.stringify({ content: content, filename: filename })
                     }).then(r => r.json())
                         .then(d => {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = (d && d.ok)
-                                ? '<span style="color:#00ff00;">Saved.</span>'
-                                : '<span style="color:#ff0000;">Save failed: ' + ((d && d.error) || 'unknown') + '</span>';
+                            if (d && d.ok) {
+                                alert('Saved: ' + filename);
+                            } else {
+                                alert('Save failed: ' + ((d && d.error) || 'unknown'));
+                            }
                         })
                         .catch(function (e) {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
+                            alert('Save failed: ' + _afixEscape(e.message));
                         });
                 };
 
                 const clearBtn = document.getElementById('clear-btn');
                 if (clearBtn) clearBtn.onclick = function () {
-                    if (codeEditor) codeEditor.value = '';
+                    if (codeEditor) {
+                        codeEditor.value = '';
+                        var layer = document.getElementById('highlight-layer');
+                        if (layer) layer.textContent = '';
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    }
                 };
 
                 const copyBtn = document.getElementById('copy-btn');
@@ -1232,8 +1338,6 @@
                 };
             }, 800); // Wait for CodeMirror to finish initializing
         });
-    </script>
-    </script>
     </script>
     <script>
         function runSelected() {
@@ -1255,38 +1359,6 @@
                 }, index * 1500); // 1.5-second delay between commands
             });
         }
-        function toggleModelPicker(e) {
-            var btn = document.getElementById('modelBtn');
-            var existing = document.getElementById('model-dropdown');
-            if (existing) { existing.remove(); btn.style.display = 'inline-block'; return; }
-            btn.style.display = 'none';
-            var m = document.createElement('div');
-            m.id = 'model-dropdown';
-            m.style.cssText = 'position:absolute;bottom:40px;right:12px;background:#000;border:1px solid #ff9d00;padding:4px;z-index:9999;font-family:Roboto Mono,monospace;color:#ff9d00;';
-            var models = ['>qwen2.5-coder:7b<', 'gpt-oss-20b', 'llama-3.1-8b', 'deepseek-coder-v2', 'phi-3-mini', 'mistral-instruct'];
-            models.forEach(function (mm) {
-                var d = document.createElement('div');
-                d.textContent = mm;
-                d.style.cssText = 'color:#ff9d00;cursor:pointer;padding:4px 8px;';
-                d.onmouseover = function () { d.style.background = '#ff9d00'; d.style.color = '#000'; };
-                d.onmouseout = function () { d.style.background = '#000'; d.style.color = '#ff9d00'; };
-                d.onclick = function (ev) {
-                    ev.stopPropagation();
-                    document.getElementById('modelBtn').textContent = mm + ' –¾';
-                    document.getElementById('modelBtn').style.display = 'inline-block';
-                    m.remove();
-                    alert('Model switched to: ' + mm);
-                };
-                m.appendChild(d);
-            });
-            btn.parentNode.appendChild(m);
-        }
-        document.addEventListener('click', function (e) {
-            if (document.getElementById('model-dropdown') && !e.target.closest('#modelBtn') && !e.target.closest('#model-dropdown')) {
-                document.getElementById('model-dropdown').remove();
-                document.getElementById('modelBtn').style.display = 'inline-block';
-            }
-        });
         // --- Restore missing button event listeners ---
         document.addEventListener('DOMContentLoaded', function () {
             setTimeout(function () {
@@ -1296,26 +1368,37 @@
                 if (saveBtn) saveBtn.onclick = function () {
                     const content = codeEditor ? codeEditor.value : '';
                     if (!content.trim()) { alert('Editor is empty.'); return; }
+                    var filename = window.currentFile || '';
+                    if (!filename) {
+                        filename = prompt('Enter filename to save (e.g. lib/main.dart):', '');
+                        if (!filename) { return; } // user cancelled
+                        window.currentFile = filename;
+                    }
                     fetch('http://127.0.0.1:5000/api/save-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: content, filename: window.currentFile || '' })
+                        body: JSON.stringify({ content: content, filename: filename })
                     }).then(r => r.json())
                         .then(d => {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = (d && d.ok)
-                                ? '<span style="color:#00ff00;">Saved.</span>'
-                                : '<span style="color:#ff0000;">Save failed: ' + ((d && d.error) || 'unknown') + '</span>';
+                            if (d && d.ok) {
+                                alert('Saved: ' + filename);
+                            } else {
+                                alert('Save failed: ' + ((d && d.error) || 'unknown'));
+                            }
                         })
                         .catch(function (e) {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
+                            alert('Save failed: ' + _afixEscape(e.message));
                         });
                 };
 
                 const clearBtn = document.getElementById('clear-btn');
                 if (clearBtn) clearBtn.onclick = function () {
-                    if (codeEditor) codeEditor.value = '';
+                    if (codeEditor) {
+                        codeEditor.value = '';
+                        var layer = document.getElementById('highlight-layer');
+                        if (layer) layer.textContent = '';
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    }
                 };
 
                 const copyBtn = document.getElementById('copy-btn');
@@ -1344,17 +1427,13 @@
             }, 800); // Wait for CodeMirror to finish initializing
         });
     </script>
-    </script>
-    </script>
     <div id="bottom-status"
         style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#000;border-top:1px solid #ff9d00;font-family:'Roboto Mono',monospace;font-size:12px;color:#ff9d00;flex-shrink:0;">
         <span style="font-weight:bold;">ACEsi</span> <span>|</span>
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
-        <button id="modelBtn" onclick="toggleModelPicker(event)" title="Select Model"
-            style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;cursor:pointer;">GPT-OSS
-            20B –¾</button>
+        <span id="current-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;">gpt-oss-20b</span>
     </div>
 
     <!-- Auto Fix Modal -->
@@ -1832,26 +1911,37 @@
                 if (saveBtn) saveBtn.onclick = function () {
                     const content = codeEditor ? codeEditor.value : '';
                     if (!content.trim()) { alert('Editor is empty.'); return; }
+                    var filename = window.currentFile || '';
+                    if (!filename) {
+                        filename = prompt('Enter filename to save (e.g. lib/main.dart):', '');
+                        if (!filename) { return; } // user cancelled
+                        window.currentFile = filename;
+                    }
                     fetch('http://127.0.0.1:5000/api/save-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: content, filename: window.currentFile || '' })
+                        body: JSON.stringify({ content: content, filename: filename })
                     }).then(r => r.json())
                         .then(d => {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = (d && d.ok)
-                                ? '<span style="color:#00ff00;">Saved.</span>'
-                                : '<span style="color:#ff0000;">Save failed: ' + ((d && d.error) || 'unknown') + '</span>';
+                            if (d && d.ok) {
+                                alert('Saved: ' + filename);
+                            } else {
+                                alert('Save failed: ' + ((d && d.error) || 'unknown'));
+                            }
                         })
                         .catch(function (e) {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
+                            alert('Save failed: ' + _afixEscape(e.message));
                         });
                 };
 
                 const clearBtn = document.getElementById('clear-btn');
                 if (clearBtn) clearBtn.onclick = function () {
-                    if (codeEditor) codeEditor.value = '';
+                    if (codeEditor) {
+                        codeEditor.value = '';
+                        var layer = document.getElementById('highlight-layer');
+                        if (layer) layer.textContent = '';
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    }
                 };
 
                 const copyBtn = document.getElementById('copy-btn');
@@ -1897,17 +1987,228 @@
 
 
 
+    
     <script>
-        console.log("ACEsi Emergency Restore Loaded");
-        window.editorSearchOpen = function () {
-            const s = document.getElementById('editor-search');
-            if (s) { s.style.display = 'block'; document.getElementById('search-input').focus(); }
-        };
+        /* ===== Settings Tab Switching ===== */
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(function(el) {
+                el.style.display = 'none';
+            });
+            // Remove active styling from all tab buttons
+            document.querySelectorAll('[data-tab]').forEach(function(btn) {
+                btn.style.background = '#111';
+            });
+            // Show selected tab
+            var selected = document.getElementById(tabId);
+            if (selected) selected.style.display = 'block';
+            // Highlight active button
+            var activeBtn = document.querySelector('[data-tab="' + tabId + '"]');
+            if (activeBtn) activeBtn.style.background = '#ff9d00';
+            activeBtn.style.color = '#000';
+        }
+
+        /* ===== Collapsible Section Toggle ===== */
+        function toggleCollapsible(header) {
+            var content = header.nextElementSibling;
+            var arrow = header.querySelector('span:last-child');
+            if (content && content.classList.contains('collapsible-content')) {
+                if (content.classList.contains('open')) {
+                    content.classList.remove('open');
+                    arrow.textContent = '▼';
+                } else {
+                    content.classList.add('open');
+                    arrow.textContent = '▲';
+                }
+            }
+        }
+
+        /* ===== Update Models Based on Provider ===== */
+        function updateModelsForProvider() {
+            var provider = document.getElementById('settings-provider').value;
+            var modelSelect = document.getElementById('settings-model');
+            if (!modelSelect) return;
+            modelSelect.innerHTML = '';
+            var models = [];
+            switch (provider) {
+                case 'groq':
+                    models = ['openai/gpt-oss-120b'];
+                    break;
+                case 'gemini':
+                    models = ['gemini-2.5-flash'];
+                    break;
+                case 'openrouter':
+                    models = ['deepseek/deepseek-v4-flash-0731:free'];
+                    break;
+                case 'cerebras':
+                    models = ['gpt-oss-120b'];
+                    break;
+                case 'huggingface':
+                    models = ['Qwen/Qwen3-32B'];
+                    break;
+                case 'mistral':
+                    models = ['codestral-latest'];
+                    break;
+                case 'cloudflare':
+                    models = ['@cf/qwen/qwen2.5-coder-32b-instruct'];
+                    break;
+                case 'nvidia':
+                    models = ['meta/llama-3.3-70b-instruct'];
+                    break;
+                case 'sambanova':
+                    models = ['Meta-Llama-3.3-70B-Instruct'];
+                    break;
+                case 'github':
+                    models = ['gpt-4o'];
+                    break;
+            }
+            models.forEach(function(m) {
+                var o = document.createElement('option');
+                o.value = m;
+                o.textContent = m;
+                modelSelect.appendChild(o);
+            });
+        }
+
+        /* ===== Load Settings from Server ===== */
+        async function loadSettings() {
+            try {
+                var r = await fetch('http://127.0.0.1:5000/api/settings');
+                var d = await r.json();
+                if (d.provider) document.getElementById('settings-provider').value = d.provider;
+                updateModelsForProvider();
+                if (d.model) document.getElementById('settings-model').value = d.model;
+                document.getElementById('current-model-indicator').textContent = d.model || 'gpt-oss-20b';
+                if (d.groq_key) document.getElementById('settings-groq-key').value = d.groq_key;
+                if (d.openrouter_key) document.getElementById('settings-openrouter-key').value = d.openrouter_key;
+                if (d.ollama_host) document.getElementById('settings-ollama-host').value = d.ollama_host;
+                if (d.openai_key) document.getElementById('settings-openai-key').value = d.openai_key;
+                if (d.anthropic_key) document.getElementById('settings-anthropic-key').value = d.anthropic_key;
+                if (d.gemini_key) document.getElementById('settings-gemini-key').value = d.gemini_key;
+                if (d.cerebras_key) document.getElementById('settings-cerebras-key').value = d.cerebras_key;
+                if (d.sambanova_key) document.getElementById('settings-sambanova-key').value = d.sambanova_key;
+                if (d.hf_key) document.getElementById('settings-hf-key').value = d.hf_key;
+                if (d.mistral_key) document.getElementById('settings-mistral-key').value = d.mistral_key;
+                if (d.cloudflare_key) document.getElementById('settings-cloudflare-key').value = d.cloudflare_key;
+                if (d.nvidia_key) document.getElementById('settings-nvidia-key').value = d.nvidia_key;
+                if (d.sambanova_key) document.getElementById('settings-sambanova-key').value = d.sambanova_key;
+                if (d.github_key) document.getElementById('settings-github-key').value = d.github_key;
+                if (d.system_prompt) document.getElementById('settings-prompt').value = d.system_prompt;
+            } catch (e) {
+                console.warn('Could not load settings:', e);
+            }
+        }
+
+        /* ===== Save All Settings ===== */
+        function saveSettings() {
+            var provider = document.getElementById('settings-provider').value;
+            var model = document.getElementById('settings-model').value;
+            var data = {
+                provider: provider,
+                model: model,
+                groq_key: document.getElementById('settings-groq-key').value,
+                openrouter_key: document.getElementById('settings-openrouter-key').value,
+                ollama_host: document.getElementById('settings-ollama-host').value,
+                openai_key: document.getElementById('settings-openai-key').value,
+                anthropic_key: document.getElementById('settings-anthropic-key').value,
+                gemini_key: document.getElementById('settings-gemini-key').value,
+                cerebras_key: document.getElementById('settings-cerebras-key').value,
+                sambanova_key: document.getElementById('settings-sambanova-key').value,
+                hf_key: document.getElementById('settings-hf-key').value,
+                mistral_key: document.getElementById('settings-mistral-key').value,
+                cloudflare_key: document.getElementById('settings-cloudflare-key').value,
+                nvidia_key: document.getElementById('settings-nvidia-key').value,
+                sambanova_key: document.getElementById('settings-sambanova-key').value,
+                github_key: document.getElementById('settings-github-key').value,
+                system_prompt: document.getElementById('settings-prompt').value
+            };
+            fetch('http://127.0.0.1:5000/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d && d.ok) {
+                        document.getElementById('current-model-indicator').textContent = model;
+                        alert('Settings saved successfully.');
+                    } else {
+                        alert('Save failed: ' + ((d && d.message) || 'unknown'));
+                    }
+                })
+                .catch(function (e) {
+                    alert('Save failed: ' + e.message);
+                });
+        }
+
+        /* ===== Save System Prompt ===== */
+        function saveSystemPrompt() {
+            var prompt = document.getElementById('settings-prompt').value;
+            fetch('http://127.0.0.1:5000/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ system_prompt: prompt })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d && d.ok) {
+                        alert('System prompt saved.');
+                    } else {
+                        alert('Save failed: ' + ((d && d.message) || 'unknown'));
+                    }
+                })
+                .catch(function (e) {
+                    alert('Save failed: ' + e.message);
+                });
+        }
+
+        /* ===== Tools & Integrations ===== */
+        function toggleDeveloperToolbar() {
+            var cb = document.getElementById('show-toolbar');
+            var tb = document.getElementById('dev-toolbar');
+            if (tb) tb.style.display = cb.checked ? 'flex' : 'none';
+        }
+        function clearChatHistory() {
+            if (confirm('Clear all chat history?')) {
+                var container = document.getElementById('chat-messages');
+                if (container) container.innerHTML = '';
+                alert('Chat history cleared.');
+            }
+        }
+        function fetchNotifications() {
+            alert('Notifications feature: check your ntfy app for pushes.');
+        }
+        function triggerPing() {
+            fetch('http://127.0.0.1:5000/api/system/exec', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: 'echo ping' })
+            }).then(function (r) { return r.json(); })
+                .then(function (d) { alert('Ping sent: ' + ((d && d.ok) ? 'ok' : 'failed')); })
+                .catch(function (e) { alert('Ping failed: ' + e.message); });
+        }
+        function connectGoogleDrive() {
+            alert('Google Drive integration: configure in settings and use the file picker.');
+        }
+
+        /* ===== Initialize settings on open ===== */
+        var _settingsInitialized = false;
+        var _origOpenSettings = window.openSettings;
         window.openSettings = function () {
             var panel = document.getElementById('settings-panel');
             if (panel) {
                 panel.style.display = 'block';
+                switchTab('settings-tab-ai');
+                if (!_settingsInitialized) {
+                    loadSettings();
+                    _settingsInitialized = true;
+                }
             }
+        };
+        console.log("ACEsi Emergency Restore Loaded");
+        window.editorSearchOpen = function () {
+            const s = document.getElementById('editor-search');
+            if (s) { s.style.display = 'block'; document.getElementById('search-input').focus(); }
         };
         window.loadFile = function (filename) {
             fetch('/api/file-content?path=' + encodeURIComponent(filename)).then(r => r.text()).then(text => {
@@ -1937,26 +2238,37 @@
                 if (saveBtn) saveBtn.onclick = function () {
                     const content = codeEditor ? codeEditor.value : '';
                     if (!content.trim()) { alert('Editor is empty.'); return; }
+                    var filename = window.currentFile || '';
+                    if (!filename) {
+                        filename = prompt('Enter filename to save (e.g. lib/main.dart):', '');
+                        if (!filename) { return; } // user cancelled
+                        window.currentFile = filename;
+                    }
                     fetch('http://127.0.0.1:5000/api/save-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: content, filename: window.currentFile || '' })
+                        body: JSON.stringify({ content: content, filename: filename })
                     }).then(r => r.json())
                         .then(d => {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = (d && d.ok)
-                                ? '<span style="color:#00ff00;">Saved.</span>'
-                                : '<span style="color:#ff0000;">Save failed: ' + ((d && d.error) || 'unknown') + '</span>';
+                            if (d && d.ok) {
+                                alert('Saved: ' + filename);
+                            } else {
+                                alert('Save failed: ' + ((d && d.error) || 'unknown'));
+                            }
                         })
                         .catch(function (e) {
-                            var res = document.getElementById('autofix-result');
-                            if (res) res.innerHTML = '<span style="color:#ff0000;">Save failed: ' + _afixEscape(e.message) + '</span>';
+                            alert('Save failed: ' + _afixEscape(e.message));
                         });
                 };
 
                 const clearBtn = document.getElementById('clear-btn');
                 if (clearBtn) clearBtn.onclick = function () {
-                    if (codeEditor) codeEditor.value = '';
+                    if (codeEditor) {
+                        codeEditor.value = '';
+                        var layer = document.getElementById('highlight-layer');
+                        if (layer) layer.textContent = '';
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    }
                 };
 
                 const copyBtn = document.getElementById('copy-btn');
@@ -2050,7 +2362,6 @@
         });
     </script>
 
-</body>
 <script>
 window.splitVideoPrompt = function() {
     var file = prompt("Enter the full path to your video file:\nExample: C:\\Users\\chris\\Videos\\test_video.mp4");
