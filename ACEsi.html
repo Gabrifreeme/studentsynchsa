@@ -1909,16 +1909,6 @@
                 panel.style.display = 'block';
             }
         };
-        fetch('/api/files').then(r => r.json()).then(data => {
-            const exp = document.getElementById('explorer');
-            if (exp) {
-                var html = '';
-                for (var i = 0; i < data.length; i++) {
-                    html += '<div style="cursor:pointer; padding:2px 8px;" onclick="loadFile(\'' + data[i] + '\')">' + data[i] + '</div>';
-                }
-                exp.innerHTML = html;
-            }
-        }).catch(e => console.error('Explorer error:', e));
         window.loadFile = function (filename) {
             fetch('/api/file-content?path=' + encodeURIComponent(filename)).then(r => r.text()).then(text => {
                 var ta = document.getElementById('code-editor');
@@ -2059,27 +2049,7 @@
             });
         });
     </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Wait for the explorer to load its tree
-            setTimeout(function () {
-                var explorer = document.getElementById('explorer');
-                if (explorer) {
-                    explorer.addEventListener('click', function (e) {
-                        // Find the closest div that was clicked
-                        var target = e.target.closest('div');
-                        if (target && target.innerText) {
-                            var fileName = target.innerText.trim();
-                            // Don't load folders (they have emojis or no .dart extension)
-                            if (fileName.indexOf('.dart') !== -1 || fileName.indexOf('.yaml') !== -1) {
-                                window.loadFile(fileName);
-                            }
-                        }
-                    });
-                }
-            }, 1000); // Wait 1 second for the tree to render
-        });
-    </script>
+
 </body>
 <script>
 window.splitVideoPrompt = function() {

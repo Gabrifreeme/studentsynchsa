@@ -5755,10 +5755,18 @@ def _ide_path(rel):
 @app.route('/api/files', methods=['GET'])
 def api_files():
     files = []
-    if os.path.isdir(_IDE_LIB):
-        for root, _dirs, names in os.walk(_IDE_LIB):
+    _IDE_EXCLUDE_DIRS = {
+        '.git', 'build', 'node_modules', '.dart_tool',
+        'android', 'ios', 'windows', 'linux', 'macos', 'web',
+        '__pycache__',
+    }
+    _IDE_EXTENSIONS = {'.dart', '.py', '.html', '.yaml', '.json', '.md'}
+    if os.path.isdir(_IDE_ROOT):
+        for root, dirs, names in os.walk(_IDE_ROOT):
+            dirs[:] = [d for d in dirs if d not in _IDE_EXCLUDE_DIRS]
             for name in names:
-                if name.endswith('.dart'):
+                ext = os.path.splitext(name)[1].lower()
+                if ext in _IDE_EXTENSIONS:
                     rel = os.path.relpath(os.path.join(root, name), _IDE_ROOT)
                     files.append(rel.replace('\\', '/'))
     return jsonify(sorted(files))
