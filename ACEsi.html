@@ -1566,10 +1566,15 @@
             var pane = document.getElementById('autofix-code');
             var fixed = pane ? pane.innerText : (window._autofix.fixed || '');
             if (!fixed) { alert('No fixed code to save.'); return; }
+            var filename = window.currentFile || '';
+            if (!filename) {
+                filename = prompt('Enter filename to save (e.g. lib/main.dart):', '');
+                if (!filename) { return; } // user cancelled
+            }
             fetch('http://127.0.0.1:5000/api/save-file', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: fixed, filename: window.currentFile || '' })
+                body: JSON.stringify({ content: fixed, filename: filename })
             })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
