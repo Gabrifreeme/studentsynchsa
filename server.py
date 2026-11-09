@@ -420,15 +420,26 @@ def api_context_clear():
 def get_memories():
     conn = sqlite3.connect('ace_memory.db')
     c = conn.cursor()
-    c.execute("SELECT key, value, updated FROM memories ORDER BY updated DESC")
+    c.execute("SELECT key, value, updated, sort_order FROM memories ORDER BY sort_order ASC, key ASC")
     rows = c.fetchall()
     conn.close()
-    return {k: {"value": v, "updated": u} for k, v, u in rows}
+    return {k: {"value": v, "updated": u, "sort_order": so} for k, v, u, so in rows}
 
-def set_memory(key, value):
+def set_memory(key, value, sort_order=None):
     conn = sqlite3.connect('ace_memory.db')
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO memories (key, value, updated) VALUES (?, ?, ?)", (key, value, datetime.now().isoformat()))
+    if sort_order is not None:
+        c.execute("INSERT OR REPLACE INTO memories (key, value, updated, sort_order) VALUES (?, ?, ?, ?)", (key, value, datetime.now().isoformat(), sort_order))
+    else:
+        c.execute("INSERT OR REPLACE INTO memories (key, value, updated, sort_order) VALUES (?, ?, ?, COALESCE((SELECT sort_order FROM memories WHERE key = ?), 0))", (key, value, datetime.now().isoformat(), key))
+    conn.commit()
+    conn.close()
+    _mirror_memories_to_json()
+
+def set_memory_sort_order(key, sort_order):
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("UPDATE memories SET sort_order = ? WHERE key = ?", (sort_order, key))
     conn.commit()
     conn.close()
     _mirror_memories_to_json()
@@ -5536,6 +5547,10 @@ def chat():
             "If Chris asks to split, cut, trim, or convert a video, never write Flutter/Dart code and never say you cannot do it: emit the ffmpeg [EXEC] line, or call run_command. "
             "Plain video-split requests are handled before you are called, so don't duplicate that work."
         )
+        # Append the user-saved system prompt from Settings if present.
+        _saved_sys_prompt = get_config("system_prompt", "")
+        if _saved_sys_prompt and str(_saved_sys_prompt).strip():
+            system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
         # Append the user-saved system prompt from Settings if present.
         _saved_sys_prompt = get_config("system_prompt", "")
         if _saved_sys_prompt and str(_saved_sys_prompt).strip():
@@ -13406,6 +13421,31 @@ def memory_bulk():
 def memory_forget():
     key = (request.json or {}).get('key', '')
     forget_memory(key)
+    return jsonify({"ok": True})
+
+@app.route('/memory/reorder', methods=['POST'])
+def memory_reorder():
+    """Swap sort_order between two keys to reorder them."""
+    data = request.json or {}
+    key1 = data.get('key1', '').strip()
+    key2 = data.get('key2', '').strip()
+    if not key1 or not key2:
+        return jsonify({"error": "key1 and key2 required"})
+    conn = sqlite3.connect('ace_memory.db')
+    c = conn.cursor()
+    c.execute("SELECT sort_order FROM memories WHERE key = ?", (key1,))
+    row1 = c.fetchone()
+    c.execute("SELECT sort_order FROM memories WHERE key = ?", (key2,))
+    row2 = c.fetchone()
+    if not row1 or not row2:
+        conn.close()
+        return jsonify({"error": "key not found"})
+    so1, so2 = row1[0], row2[0]
+    c.execute("UPDATE memories SET sort_order = ? WHERE key = ?", (so2, key1))
+    c.execute("UPDATE memories SET sort_order = ? WHERE key = ?", (so1, key2))
+    conn.commit()
+    conn.close()
+    _mirror_memories_to_json()
     return jsonify({"ok": True})
 
 # ===== Journal endpoints =====
