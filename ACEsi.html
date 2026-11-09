@@ -700,6 +700,21 @@
         .collapsible-content.open {
             display: block;
         }
+
+        /* Settings tab buttons: unselected tabs show black bg + amber text + amber border.
+           The switchTab() JS sets inline background=#111 on unselected tabs; this !important
+           CSS overrides it so unselected tabs match the requested look (#000 bg, #ff9d00 text/border).
+           Active tab keeps solid amber background via the JS inline style. */
+        #settings-panel button[data-tab] {
+            background: #000 !important;
+            color: #ff9d00 !important;
+            border: 1px solid #ff9d00 !important;
+        }
+        #settings-panel button[data-tab]:hover {
+            background: #ff9d00 !important;
+            color: #000 !important;
+            border: 1px solid #ff9d00 !important;
+        }
     </style>
 </head>
 
@@ -2032,22 +2047,22 @@
             var models = [];
             switch (provider) {
                 case 'groq':
-                    models = ['openai/gpt-oss-120b'];
+                    models = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'llama-3.1-70b-versatile', 'gemma-7b-it'];
                     break;
                 case 'gemini':
-                    models = ['gemini-2.5-flash'];
+                    models = ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
                     break;
                 case 'openrouter':
-                    models = ['deepseek/deepseek-v4-flash-0731:free'];
+                    models = ['deepseek/deepseek-v4-flash-0731:free', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'meta-llama/llama-3.1-405b-instruct'];
                     break;
                 case 'cerebras':
-                    models = ['gpt-oss-120b'];
+                    models = ['gpt-oss-120b', 'llama-3.3-70b'];
                     break;
                 case 'huggingface':
-                    models = ['Qwen/Qwen3-32B'];
+                    models = ['Qwen/Qwen3-32B', 'Qwen/Qwen2.5-72B-Instruct'];
                     break;
                 case 'mistral':
-                    models = ['codestral-latest'];
+                    models = ['codestral-latest', 'mistral-large-latest'];
                     break;
                 case 'cloudflare':
                     models = ['@cf/qwen/qwen2.5-coder-32b-instruct'];
@@ -2056,10 +2071,10 @@
                     models = ['meta/llama-3.3-70b-instruct'];
                     break;
                 case 'sambanova':
-                    models = ['Meta-Llama-3.3-70B-Instruct'];
+                    models = ['Meta-Llama-3.3-70B-Instruct', 'Llama-3.1-405B-Instruct'];
                     break;
                 case 'github':
-                    models = ['gpt-4o'];
+                    models = ['gpt-4o', 'gpt-4o-mini'];
                     break;
             }
             models.forEach(function(m) {
@@ -2131,10 +2146,18 @@
                 .then(function (d) {
                     if (d && d.ok) {
                         document.getElementById('current-model-indicator').textContent = model;
-                        alert('Settings saved successfully.');
+                        // Restart server so new API keys take effect
+                        return fetch('http://127.0.0.1:5000/restart', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                        }).then(function (r) { return r.json(); })
                     } else {
                         alert('Save failed: ' + ((d && d.message) || 'unknown'));
                     }
+                })
+                .then(function(d) {
+                    alert('Settings saved. Server is restarting to apply new API keys.');
                 })
                 .catch(function (e) {
                     alert('Save failed: ' + e.message);

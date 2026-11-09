@@ -14979,16 +14979,40 @@ for _h in logging.getLogger('werkzeug').handlers:
 @app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
 def api_settings():
     from flask import request, jsonify
+    import json
+    import os
     if request.method == 'OPTIONS':
         return '', 200
     if request.method == 'POST':
         data = request.get_json()
-        import json
         with open('config.json', 'w') as f:
             json.dump(data, f, indent=2)
-        return jsonify({"ok": True, "message": "Settings saved"})
+        # Persist API keys to .ace_keys.local so they take effect on server restart.
+        # server.py reads these via _load_local_keys() at startup.
+        key_map = {
+            'groq': data.get('groq_key', ''),
+            'gemini': data.get('gemini_key', ''),
+            'openrouter': data.get('openrouter_key', ''),
+            'cerebras': data.get('cerebras_key', ''),
+            'huggingface': data.get('hf_key', ''),
+            'mistral': data.get('mistral_key', ''),
+            'cloudflare': data.get('cloudflare_key', ''),
+            'nvidia': data.get('nvidia_key', ''),
+            'sambanova': data.get('sambanova_key', ''),
+            'github': data.get('github_key', ''),
+        }
+        keys_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.ace_keys.local')
+        existing = {}
+        try:
+            with open(keys_file, 'r', encoding='utf-8') as f:
+                existing = json.load(f) or {}
+        except Exception:
+            pass
+        existing.update({k: v for k, v in key_map.items() if v})
+        with open(keys_file, 'w', encoding='utf-8') as f:
+            json.dump(existing, f, indent=2)
+        return jsonify({"ok": True, "message": "Settings saved", "restart": True})
     if request.method == 'GET':
-        import json
         try:
             with open('config.json', 'r') as f:
                 return jsonify(json.load(f))
