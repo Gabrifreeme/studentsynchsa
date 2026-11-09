@@ -4864,6 +4864,132 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     return summary
 
 
+# ---------------------------------------------------------------------------
+# Deterministic video splitting (ffmpeg)
+# "Please split C:\...\clip.mp4 into 5-second clips" must always work. The chat
+# model was told to emit an [EXEC: ffmpeg ...] tag but kept replying with Flutter
+# code instead, so this path bypasses the model entirely: parse the request,
+# build the command, run it, and report the files that were actually created.
+_VIDEO_EXT = r'(?:mp4|mov|mkv|avi|webm|m4v|flv|wmv|mpg|mpeg|ts)'
+_VIDEO_PATH_RE = re.compile(
+    r'(?i)(?:"([^"\r\n]+\.%s)"|\'([^\'\r\n]+\.%s)\'|([A-Za-z]:[\\/][^\r\n"\'<>|]+?\.%s))'
+    % (_VIDEO_EXT, _VIDEO_EXT, _VIDEO_EXT))
+_VIDEO_LEN_RE = re.compile(r'(?i)\b(\d+(?:\.\d+)?)\s*(?:-|\s)?\s*(?:seconds?|secs?|s)\b')
+_VIDEO_TC_RE = re.compile(r'\b(\d{1,2}):(\d{2}):(\d{2})\b')
+_VIDEO_ASK_RE = re.compile(r'(?i)\b(?:ffmpeg|split|cut|trim|segment|chop|slice)\b')
+
+
+def _ffmpeg_video_reply(user_message):
+    """Return a reply string when the message is a video-split request, else None."""
+    if not user_message:
+        return None
+    msg = user_message.strip()
+    if not _VIDEO_ASK_RE.search(msg):
+        return None
+    m = _VIDEO_PATH_RE.search(msg)
+    if not m:
+        return None
+    raw = next((g for g in m.groups() if g), '')
+    src = os.path.expanduser(os.path.expandvars(raw.strip().strip('"\'')))
+    if not os.path.isabs(src):
+        src = os.path.abspath(src)
+    if not os.path.isfile(src):
+        return ("I couldn't find that video: `%s`.\n"
+                "Check the path and try again, e.g. "
+                "`split C:\\Users\\chris\\Videos\\test_video.mp4 into 5-second clips`.") % src
+    # _run_args uses shell=True on Windows, so refuse shell metacharacters.
+    if re.search(r'[&|<>^]', src):
+        return "That path contains shell metacharacters, so I won't run it: `%s`" % src
+
+    secs = None
+    tc = _VIDEO_TC_RE.search(msg)
+    if tc:
+        secs = int(tc.group(1)) * 3600 + int(tc.group(2)) * 60 + int(tc.group(3))
+    else:
+        ln = _VIDEO_LEN_RE.search(msg)
+        if ln:
+            secs = float(ln.group(1))
+    note = ""
+    if not secs or secs <= 0:
+        secs = 5.0
+        note = " (no clip length given, so I used 5 seconds)"
+    secs_txt = "%g" % secs
+
+    stem, ext = os.path.splitext(src)
+    outpat = stem + "_part_%03d" + ext
+    dirname = os.path.dirname(src) or "."
+    prefix = os.path.basename(stem) + "_part_"
+
+    def _clips():
+        try:
+            return [f for f in os.listdir(dirname)
+                    if f.startswith(prefix) and f.lower().endswith(ext.lower())]
+        except OSError:
+            return []
+
+    # Clear outputs from an earlier run so the report describes what exists now.
+    for f in _clips():
+        try:
+            os.remove(os.path.join(dirname, f))
+        except OSError:
+            pass
+
+    def _duration():
+        # ffprobe is bundled with ffmpeg; without it we simply skip the check.
+        try:
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                                "format=duration", "-of", "default=nw=1:nk=1", src],
+                               capture_output=True, text=True, timeout=30)
+            return float((r.stdout or "0").strip() or 0)
+        except Exception:
+            return 0.0
+
+    total = _duration()
+    expected = 0
+    if total > secs:
+        expected = int(total // secs) + (1 if (total % secs) > 0.25 else 0)
+
+    # Pass 1: stream copy - fast, no quality loss; cuts land on keyframes.
+    ok, out = _run_args(["ffmpeg", "-hide_banner", "-y", "-i", src,
+                         "-map", "0:v:0", "-map", "0:a?", "-c", "copy",
+                         "-segment_time", secs_txt, "-f", "segment",
+                         "-reset_timestamps", "1", outpat], timeout=900)
+    mode = "stream copy"
+    made = sorted(_clips())
+    # Copy can only cut on keyframes: a long GOP yields ONE full-length file.
+    # If it produced fewer clips than the duration calls for, re-encode instead.
+    if not ok or (expected >= 2 and len(made) < expected):
+        for f in made:
+            try:
+                os.remove(os.path.join(dirname, f))
+            except OSError:
+                pass
+        ok, out = _run_args(["ffmpeg", "-hide_banner", "-y", "-i", src,
+                             "-map", "0:v:0", "-map", "0:a?",
+                             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                             "-c:a", "aac", "-force_key_frames",
+                             "expr:gte(t,n_forced*%s)" % secs_txt,
+                             "-segment_time", secs_txt, "-segment_time_delta", "0.1",
+                             "-f", "segment",
+                             "-reset_timestamps", "1", outpat], timeout=900)
+        mode = "re-encode"
+        made = sorted(_clips())
+
+    clips_now = sorted(_clips())
+    listing = "\n".join("- " + os.path.join(dirname, f) for f in (made or clips_now)[:20])
+    if ok and (made or clips_now):
+        extra = ""
+        if mode == "stream copy":
+            extra = ("\n(Stream copy is fast but cuts land on keyframes, so a clip "
+                     "can be a little longer than %ss.)" % secs_txt)
+        return ("Split `%s` into %s-second clips%s using %s.\n"
+                "Created %d file(s):\n%s%s") % (
+                    os.path.basename(src), secs_txt, note, mode,
+                    len(made or clips_now), listing, extra)
+    return "ffmpeg couldn't split `%s` (%s).\n\n%s" % (
+        os.path.basename(src), mode, (out or "")[-1500:])
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -5219,6 +5345,15 @@ def chat():
             hint = "a file path like lib/path/file.dart, C:\\path\\file.dart, or just file.dart"
             return jsonify({"reply": "I need a file path and error description. Say: 'auto-fix " + hint + ". The error is: ...'"})
 
+    # Deterministic ffmpeg path: plain-English "split this video into N-second
+    # clips" never reaches the model, so it cannot hallucinate Flutter code or
+    # refuse. Runs the real command and reports the files it created.
+    _video_reply = _ffmpeg_video_reply(user_message)
+    if _video_reply:
+        print("🎬 ffmpeg fast-path handled video request")
+        save_conversation("assistant", _video_reply)
+        return jsonify({"reply": _video_reply})
+
     try:
         print(f"📨 Incoming message length: {len(user_message)} chars")
         # Truncate to stay within context window (safety for free-tier models)
@@ -5242,13 +5377,13 @@ def chat():
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
             "[Facts I know about Chris], [Shared history - recent journal entries], and the recent "
             "conversation. Use them. Weave them in naturally when relevant.\n\n"
-                        "If the user asks you to EXPLAIN code, answer in plain text. "
-            "If the user asks you to FIX or EDIT code, you MUST output the ENTIRE corrected file inside a standard markdown block. "
-            "DO NOT use any tools. DO NOT output JSON."
-                        "If I ask you to fix or edit code, output the ENTIRE corrected file inside a standard markdown block like this: ```dart\n<code here>\n```. Do NOT use any tools. Do NOT output JSON. "
-            "EXECUTION SUPERPOWER: You have full access to the terminal at C:\\Users\\chris\\LipSyncStudent. "
-            "If you need to check dependencies, run flutter, or inspect files, you MUST output exactly `[EXEC: your_command_here]` on its own line. "
-            "I will run it and reply with the output."
+                        "If the user asks you to EXPLAIN code, answer in plain text and do not call tools. "
+            "If the user asks you to FIX or EDIT code, you MUST output the ENTIRE corrected file inside one ```dart block. Do not output JSON. "
+            "EXECUTION: you can run shell commands on this Windows PC with the run_command tool, and you may also write a command as one line in the form [EXEC: command]. "
+            "Use that for ffmpeg, flutter, adb, and inspecting files. "
+            "Example: [EXEC: ffmpeg -i \"C:\\path\\input.mp4\" -c copy -map 0 -segment_time 5 -f segment -reset_timestamps 1 \"C:\\path\\out_%03d.mp4\"]. "
+            "If Chris asks to split, cut, trim, or convert a video, never write Flutter/Dart code and never say you cannot do it: emit the ffmpeg [EXEC] line, or call run_command. "
+            "Plain video-split requests are handled before you are called, so don't duplicate that work."
         )
 
         # Recent turns (minus the just-saved current message) give ACEsi context.
@@ -9556,6 +9691,7 @@ _LLM_INPUT_TOKEN_BUDGET = 6200
 # find things on the web/file system. Everything else is droppable when the
 # payload is too big for the provider.
 _LLM_CORE_TOOLS = {
+    "run_command", "execute_command", "exec",
     "web_search", "view_web_image", "webfetch", "curl",
     "view_user_file", "list_user_files", "read_file", "grep", "list_files",
     "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
@@ -14767,6 +14903,11 @@ def restart_server():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 app.run(host='127.0.0.1', port=5000, debug=False)
+
+
+
+
+
 
 
 
