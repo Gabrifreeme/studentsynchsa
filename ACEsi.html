@@ -431,6 +431,33 @@
             color: #888;
         }
 
+        /* Line numbers for Auto Fix diff panes */
+        .autofix-row {
+            display: flex;
+            align-items: flex-start;
+            min-height: 1.4em;
+        }
+
+        .autofix-ln {
+            flex-shrink: 0;
+            width: 36px;
+            text-align: right;
+            color: #666;
+            user-select: none;
+            -webkit-user-select: none;
+            padding: 0 8px 0 4px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 13px;
+            line-height: 1.4em;
+        }
+
+        .autofix-code {
+            flex: 1;
+            min-width: 0;
+            padding-left: 4px;
+            border-left: 3px solid transparent;
+        }
+
         #autofix-summary {
             font-size: 12px;
             color: #ff9d00;
@@ -1454,11 +1481,24 @@
             return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
+        function _afixNumberedLines(text, cls) {
+            var lines = text.split('\n');
+            if (lines.length && lines[lines.length - 1] === '') lines.pop();
+            var html = '';
+            lines.forEach(function (ln, i) {
+                var safe = _afixEscape(ln) + '\n';
+                html += '<div class="autofix-row"><span class="autofix-ln">' + (i + 1) + '</span><span class="ln ' + cls + ' autofix-code">' + safe + '</span></div>';
+            });
+            return html;
+        }
+
         function _afixRender() {
             var DiffLib = window.Diff || window.jsdiff;
             if (!DiffLib || !DiffLib.diffLines) {
-                document.getElementById('autofix-original').innerText = window._autofix.original || '';
-                document.getElementById('autofix-code').innerText = window._autofix.fixed || '';
+                var leftEl = document.getElementById('autofix-original');
+                var rightEl = document.getElementById('autofix-code');
+                if (leftEl) leftEl.innerHTML = _afixNumberedLines(window._autofix.original || '', 'ln-ctx');
+                if (rightEl) rightEl.innerHTML = _afixNumberedLines(window._autofix.fixed || '', 'ln-add');
                 return;
             }
             var leftEl = document.getElementById('autofix-original');
@@ -1467,24 +1507,32 @@
             var orig = window._autofix.original || '';
             var fixed = window._autofix.fixed || '';
             if (typeof Diff === 'undefined' || !Diff.diffLines) {
-                leftEl.innerHTML = '<span class="ln ln-ctx">' + _afixEscape(orig) + '</span>';
-                rightEl.innerHTML = '<span class="ln ln-add">' + _afixEscape(fixed) + '</span>';
+                leftEl.innerHTML = _afixNumberedLines(orig, 'ln-ctx');
+                rightEl.innerHTML = _afixNumberedLines(fixed, 'ln-add');
                 return;
             }
             var parts = DiffLib.diffLines(orig, fixed);
             var leftHtml = '', rightHtml = '';
+            var leftLn = 0, rightLn = 0;
             parts.forEach(function (p) {
                 var lines = p.value.split('\n');
                 if (lines.length && lines[lines.length - 1] === '') lines.pop();
                 lines.forEach(function (ln) {
                     var safe = _afixEscape(ln) + '\n';
+                    var row = function(lnNum, cssClass, content) {
+                        return '<div class="autofix-row"><span class="autofix-ln">' + lnNum + '</span><span class="ln ' + cssClass + ' autofix-code">' + content + '</span></div>';
+                    };
                     if (p.added) {
-                        rightHtml += '<span class="ln ln-add">' + safe + '</span>';
+                        rightLn++;
+                        rightHtml += row(rightLn, 'ln-add', safe);
                     } else if (p.removed) {
-                        leftHtml += '<span class="ln ln-del">' + safe + '</span>';
+                        leftLn++;
+                        leftHtml += row(leftLn, 'ln-del', safe);
                     } else {
-                        leftHtml += '<span class="ln ln-ctx">' + safe + '</span>';
-                        rightHtml += '<span class="ln ln-ctx">' + safe + '</span>';
+                        leftLn++;
+                        rightLn++;
+                        leftHtml += row(leftLn, 'ln-ctx', safe);
+                        rightHtml += row(rightLn, 'ln-ctx', safe);
                     }
                 });
             });
@@ -1564,7 +1612,16 @@
 
         function saveFixedCode() {
             var pane = document.getElementById('autofix-code');
-            var fixed = pane ? pane.innerText : (window._autofix.fixed || '');
+            var fixed = '';
+            if (pane) {
+                var codeSpans = pane.getElementsByClassName('autofix-code');
+                if (codeSpans.length > 0) {
+                    fixed = Array.from(codeSpans).map(function (s) { return s.textContent; }).join('');
+                } else {
+                    fixed = pane.innerText;
+                }
+            }
+            fixed = fixed || (window._autofix.fixed || '');
             if (!fixed) { alert('No fixed code to save.'); return; }
             var filename = window.currentFile || '';
             if (!filename) {
