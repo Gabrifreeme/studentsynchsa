@@ -201,6 +201,15 @@ OLLAMA_ENABLED = bool(os.environ.get("ACE_OLLAMA", "") or _ollama_reachable())
 NTFY_TOPIC = "ACEsi0102"
 NTFY_INBOUND_PASSPHRASE = "acesi0102"
 NTFY_SERVER = "https://ntfy.sh"
+# Gabriel's ntfy topic (Chris's son). Put Gabriel's topic id in
+# ntfy_gabriel_topic.txt (gitignored) next to this file, or edit the
+# constant below. The ntfy app on Gabriel's phone must subscribe to it.
+_NTFY_GABRIEL_TOPIC_FILE = "ntfy_gabriel_topic.txt"
+try:
+    with open(_NTFY_GABRIEL_TOPIC_FILE, "r", encoding="utf-8") as _gf:
+        NTFY_TOPIC_GABRIEL = _gf.read().strip() or None
+except Exception:
+    NTFY_TOPIC_GABRIEL = None
 SERVER_PORT = int(os.environ.get("ACESI_PORT", "5000"))
 
 _GROUNDING_DIRECTIVE = (
@@ -1405,8 +1414,11 @@ def _record_self_ntfy_id(r):
         pass
 
 
-def send_ntfy(title, message):
+def send_ntfy(title, message, topic=None):
+    """Send a push notification via ntfy.
+    topic=None -> Chris's topic (NTFY_TOPIC). Pass Gabriel's topic id to notify him."""
     try:
+        target_topic = topic or NTFY_TOPIC
         # Titles travel as an HTTP header, which requests encodes as latin-1, so
         # an em-dash in a title (e.g. "ACEsi — Email alert") used to raise
         # UnicodeEncodeError and the phone never got the alert. Keep the title
@@ -1414,7 +1426,7 @@ def send_ntfy(title, message):
         # is sent as UTF-8 bytes and has no such limit.
         safe_title = str(title).encode("ascii", "replace").decode("ascii")
         r = requests.post(
-            f"{NTFY_SERVER}/{NTFY_TOPIC}",
+            f"{NTFY_SERVER}/{target_topic}",
             data=str(message).encode('utf-8'),
             headers={"Priority": "high", "Title": safe_title},
             timeout=10
@@ -1424,6 +1436,16 @@ def send_ntfy(title, message):
     except Exception as e:
         print(f"⚠️ ntfy error: {e}")
         return False
+
+
+def send_ntfy_gabriel(message, title="ACEsi"):
+    """Send a push notification to Gabriel's ntfy topic.
+    Returns True on success. Gabriel's ntfy app must be subscribed to
+    NTFY_TOPIC_GABRIEL (see ntfy_gabriel_topic.txt)."""
+    if not NTFY_TOPIC_GABRIEL:
+        print("⚠️ Gabriel ntfy topic not configured (ntfy_gabriel_topic.txt)")
+        return False
+    return send_ntfy(title, message, topic=NTFY_TOPIC_GABRIEL)
 def send_test_ping():
     send_ntfy("ACEsi Test", "This is a test ping from ACEsi")
 
@@ -4982,10 +5004,18 @@ def _ffmpeg_video_reply(user_message):
         if mode == "stream copy":
             extra = ("\n(Stream copy is fast but cuts land on keyframes, so a clip "
                      "can be a little longer than %ss.)" % secs_txt)
-        return ("Split `%s` into %s-second clips%s using %s.\n"
+        reply = ("Split `%s` into %s-second clips%s using %s.\n"
                 "Created %d file(s):\n%s%s") % (
                     os.path.basename(src), secs_txt, note, mode,
                     len(made or clips_now), listing, extra)
+        # Notify Gabriel when a video task completes
+        try:
+            send_ntfy_gabriel(
+                "Video task complete",
+                "Gabriel Video task complete — click here")
+        except Exception:
+            pass
+        return reply
     return "ffmpeg couldn't split `%s` (%s).\n\n%s" % (
         os.path.basename(src), mode, (out or "")[-1500:])
 
@@ -5078,13 +5108,29 @@ def _youtube_reply(user_message):
 
     if not want_split or not secs:
         size_mb = os.path.getsize(target) / (1024.0 * 1024.0)
-        return "Downloaded `%s`%s.\n- %s (%.1f MB)" % (
+        reply = "Downloaded `%s`%s.\n- %s (%.1f MB)" % (
             os.path.basename(target), note, target, size_mb)
+        # Notify Gabriel when a video task completes
+        try:
+            send_ntfy_gabriel(
+                "Video task complete",
+                "Gabriel Video task complete — click here")
+        except Exception:
+            pass
+        return reply
 
     split_reply = _ffmpeg_video_reply(
         'split "%s" into %g-second clips' % (target, secs))
     head = "Downloaded `%s`%s.\n\n" % (os.path.basename(target), note)
-    return head + (split_reply or "Download finished, but the split didn't run.")
+    reply = head + (split_reply or "Download finished, but the split didn't run.")
+    # Notify Gabriel when a video task completes
+    try:
+        send_ntfy_gabriel(
+            "Video task complete",
+            "Gabriel Video task complete — click here")
+    except Exception:
+        pass
+    return reply
 
 
 @app.route('/chat', methods=['POST'])
@@ -8579,6 +8625,19 @@ def tool_notify(title="ACEsi", message="Ping from ACEsi"):
             else (False, "ntfy push failed (check internet / ntfy app subscription)"))
 
 
+def tool_notify_gabriel(title="ACEsi", message="Ping from ACEsi"):
+    """Send a push notification (ntfy) to Gabriel's phone. Returns (ok, result).
+    Args: title (optional, default 'ACEsi'), message (optional).
+    NOTE: Gabriel's ntfy app must be subscribed to NTFY_TOPIC_GABRIEL."""
+    if not NTFY_TOPIC_GABRIEL:
+        return False, "Gabriel ntfy topic not configured (ntfy_gabriel_topic.txt)"
+    if not message or not str(message).strip():
+        return False, "notify usage: message=<text> [title=<title>]"
+    ok = send_ntfy(str(title), str(message), topic=NTFY_TOPIC_GABRIEL)
+    return (True, f"Notified Gabriel '{title}': {str(message)[:80]}" if ok
+            else (False, "ntfy push to Gabriel failed (check internet / subscription)"))
+
+
 def tool_check_email(force_all=True):
     """Check Chris's Gmail/Yahoo inboxes NOW and phone-push (ntfy) anything
     matching an enabled rule in email_notify_rules.json (e.g. NSFAS).
@@ -8678,6 +8737,7 @@ TOOLS = {
     "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
     "view_web_image": (tool_view_web_image, ("url",)),
     "notify": (tool_notify, ("title", "message")),
+    "notify_gabriel": (tool_notify_gabriel, ("title", "message")),
     "check_email": (tool_check_email, ("force_all",)),
     "list_email_rules": (tool_list_email_rules, ()),
     "get_time": (tool_get_time, ()),
@@ -8908,6 +8968,12 @@ TOOLS_SCHEMA = [
             "title": {"type": "string", "title": "title", "description": "Optional. Notification title, default 'ACEsi'."},
             "message": {"type": "string", "title": "message", "description": "Optional. The message text to push. Default 'Ping from ACEsi'."}},
             "required": []}}},
+    {"type": "function", "function": {"name": "notify_gabriel",
+        "description": "Send a push notification to Gabriel's phone via ntfy. Use when Chris asks to notify Gabriel. Args: title (optional, default 'ACEsi'), message (optional text to send). NOTE: Gabriel's ntfy app must be subscribed to the topic in ntfy_gabriel_topic.txt.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string", "title": "title", "description": "Optional. Notification title, default 'ACEsi'."},
+            "message": {"type": "string", "title": "message", "description": "Optional. The message text to push. Default 'Ping from ACEsi'."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "check_email",
         "description": "Check Chris's Gmail and Yahoo inboxes NOW and push a PHONE notification (ntfy) for any email matching his watch rules (e.g. NSFAS). Use this when he asks about email out of the blue ('check my email', 'any NSFAS email?', 'did I get an NSFAS mail?'). A background watcher already does this every ~2 minutes; this tool forces it immediately. Args: force_all (optional boolean, default true — true re-checks the whole recent inbox, false only looks for mail newer than the last poll).",
         "parameters": {"type": "object", "properties": {
@@ -9060,6 +9126,10 @@ OLLAMA_TOOLS_SCHEMA = [
         "description": "Send a push notification to Chris's phone via ntfy. Use when Chris asks to 'ping my phone', 'notify me'. Args: message (text), title optional.",
         "parameters": {"type": "object", "properties": {
             "title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+    {"type": "function", "function": {"name": "notify_gabriel",
+        "description": "Send a push notification to Gabriel's phone via ntfy. Args: message (text), title optional.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
     {"type": "function", "function": {"name": "check_email",
         "description": "Check Chris's Gmail/Yahoo now and phone-push (ntfy) anything matching his watch rules (e.g. NSFAS). Args: force_all optional boolean.",
         "parameters": {"type": "object", "properties": {
@@ -9104,7 +9174,7 @@ OLLAMA_SYS_PROMPT = (
 _ICONS = {
     "list_files": "📂", "read_file": "📄", "grep": "🔍",
     "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
-    "run_command": "▶", "notify": "🔔", "web_search": "🔎", "webfetch": "🌐",
+    "run_command": "▶", "notify": "🔔", "notify_gabriel": "👨‍👦", "web_search": "🔎", "webfetch": "🌐",
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
     "todo_remove": "🗑️", "note": "📝",
     "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
@@ -9390,6 +9460,9 @@ NET_TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "notify",
         "description": "Send push notification via ntfy. Args: message, title.",
         "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
+    {"type": "function", "function": {"name": "notify_gabriel",
+        "description": "Send push notification to Gabriel via ntfy. Args: message, title.",
+        "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "message": {"type": "string"}}, "required": ["message"]}}},
     {"type": "function", "function": {"name": "restart",
         "description": "Restart server/cdp/ollama. Args: what.",
         "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": ["what"]}}},
@@ -9430,6 +9503,8 @@ _TOOL_DOMAINS = {
     "restart": "ctrl",
     # push notification to Chris's phone (available in every domain, like ctrl)
     "notify": "ctrl",
+    # push notification to Gabriel's phone (available in every domain, like ctrl)
+    "notify_gabriel": "ctrl",
     # email watch: polls Gmail/Yahoo and phone-pushes matches (NSFAS etc.)
     "check_email": "ctrl",
     "list_email_rules": "ctrl",
@@ -9799,7 +9874,7 @@ _LLM_CORE_TOOLS = {
     "run_command", "execute_command", "exec",
     "web_search", "view_web_image", "webfetch", "curl",
     "view_user_file", "list_user_files", "read_file", "grep", "list_files",
-    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
+    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify", "notify_gabriel",
     "ui_dump", "ui_screenshot", "ui_app_open", "ui_tap", "ui_type", "ui_swipe",
 }
 

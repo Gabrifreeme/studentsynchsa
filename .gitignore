@@ -69,6 +69,7 @@ drive_credentials.json
 drive_token.json
 
 ntfy_topic.txt
+ntfy_gabriel_topic.txt
 
 # Browser cookies / session tokens exported for yt-dlp (credentials - never commit)
 cookies.txt

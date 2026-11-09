@@ -755,9 +755,10 @@
                 style="text-align:center;font-size:12px;color:#ff9d00;margin-bottom:4px;height:16px;font-weight:bold;">
             </div>
             <div style="display:flex;gap:6px;padding:8px;border-top:1px solid #ff9d00;background:#000;">
-                <input id="chat-input" type="text" placeholder="Ask ACEsi..."
-                    style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;"
-                    onkeydown="if(event.key==='Enter') sendChat()">
+                <textarea id="chat-input" placeholder="Ask ACEsi..." rows="3" wrap="soft"
+                    style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:inherit;outline:none;resize:vertical;min-height:44px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"
+                    onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}">
+                </textarea>
                 <button onclick="sendMessage()" title="Send"
                     style="background:#ff9d00;color:#000;border:none;padding:6px 12px;border-radius:3px;font-family:inherit;font-weight:bold;cursor:pointer;"
                     onmousedown="console.log('Send clicked')">Send</button>
