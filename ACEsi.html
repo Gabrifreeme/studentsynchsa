@@ -1521,27 +1521,12 @@
             function greetingText() {
                 var e = window.__lastEdit;
                 if (!e || !e.ok || !e.phrase) return FALLBACK;
-                var s = 'Chris, our last change was ' + e.phrase + '.';
-                // Say whether the server is actually running that change. Without this
-                // the line is only a description of the disk, not of what is live.
-                if (e.runtime_note) s += ' ' + e.runtime_note + '.';
-                // And what the current stretch of work has been, rebuilt from commits,
-                // chat and saves - so a long session is not invisible.
-                if (e.session_note) s += ' ' + e.session_note + '.';
-                return s;
+                return 'Chris, our last change was ' + e.phrase + '.';
             }
 
-            // Second line: what this stretch of work has been, and the last long one.
-            // Rebuilt server-side from commits + chat + saves, not from memory.
             function sessionText() {
-                var e = window.__lastEdit;
-                if (!e || !e.ok) return '';
-                var parts = [];
-                if (e.session_note) parts.push(e.session_note);
-                if (e.prior_note) parts.push(e.prior_note);
-                return parts.join('\n');
+                return '';
             }
-
             function renderGreeting() {
                 var els = document.querySelectorAll('#ace-greeting');
                 for (var i = 0; i < els.length; i++) {
