@@ -670,6 +670,13 @@
         @media (max-width: 768px) {
             #mobile-model-bar { display: block !important; }
             #current-model-indicator, #model-spinner { display: none !important; }
+            #mobile-model-indicator {
+                vertical-align: middle !important;
+            }
+            #mobile-model-spinner {
+                vertical-align: middle !important;
+                margin-top: 0 !important;
+            }
         }
 
         /* Hide mobile model bar on desktop */
@@ -728,11 +735,11 @@
         /* Model status spinner */
         #model-spinner {
             display: inline-block;
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             margin-left: 6px;
             border-radius: 50%;
-            border: 2px solid;
+            border: 3px solid;
             animation: model-spin 1s linear infinite;
             vertical-align: middle;
         }
@@ -740,6 +747,23 @@
             border-color: #00ff00;
         }
         #model-spinner.status-dead {
+            border-color: #ff0000;
+        }
+        /* Mobile model spinner */
+        #mobile-model-spinner {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-left: 6px;
+            border-radius: 50%;
+            border: 3px solid;
+            animation: model-spin 1s linear infinite;
+            vertical-align: middle;
+        }
+        #mobile-model-spinner.status-ok {
+            border-color: #00ff00;
+        }
+        #mobile-model-spinner.status-dead {
             border-color: #ff0000;
         }
         @keyframes model-spin {
@@ -1062,7 +1086,7 @@
                 style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-top:1px solid #ff9d00; background:#000; width:100%; box-sizing:border-box;">
                 <div id="spinner-left" class="spinner" style="width:20px;"></div>
 
-                <div style="display:flex; gap:6px; flex:1; justify-content:center;">
+                <div style="display:flex; gap:6px; align-items:center; flex:1; justify-content:center;">
                     <button onclick="document.getElementById('chat-input').focus()" title="Mic"
                         style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🎤</button>
                     <button onclick="alert('Speaker: audio feedback on')" title="Speaker"
