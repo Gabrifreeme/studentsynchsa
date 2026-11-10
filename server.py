@@ -138,9 +138,6 @@ GROQ_MODEL_BROWSER = os.environ.get("GROQ_MODEL_BROWSER", "openai/gpt-oss-120b")
 _BROWSER_DOMAINS = ("ui", "net")
 
 
-CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1"
-CEREBRAS_MODEL = "gpt-oss-120b"
-
 # Mistral AI - OpenAI-compatible, code-specialised. codestral-latest was
 # verified live against /v1/models. The key comes from env var or
 # .ace_keys.local, loaded just like the other provider keys.
@@ -1004,7 +1001,6 @@ _data_lock = threading.RLock()
 # Resolve provider keys now that DATA_DIR exists (env var takes priority over file).
 _LK = _load_local_keys()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or _LK.get("groq", "")
-CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY") or _LK.get("cerebras", "")
 # Same env-then-.ace_keys.local fallback as the other providers, so a key can
 # live in either gitignored local store instead of only in source or .env.
 OPENROUTER_API_KEY = OPENROUTER_API_KEY or _LK.get("openrouter", "")
@@ -5779,14 +5775,14 @@ def api_files():
         'android', 'ios', 'windows', 'linux', 'macos', 'web',
         '__pycache__',
     }
-    _IDE_EXTENSIONS = {'.dart', '.py', '.html', '.yaml', '.json', '.md'}
-    if os.path.isdir(_IDE_ROOT):
-        for root, dirs, names in os.walk(_IDE_ROOT):
+    _IDE_EXTENSIONS = {'.dart'}
+    if os.path.isdir(_IDE_LIB):
+        for root, dirs, names in os.walk(_IDE_LIB):
             dirs[:] = [d for d in dirs if d not in _IDE_EXCLUDE_DIRS]
             for name in names:
                 ext = os.path.splitext(name)[1].lower()
                 if ext in _IDE_EXTENSIONS:
-                    rel = os.path.relpath(os.path.join(root, name), _IDE_ROOT)
+                    rel = os.path.relpath(os.path.join(root, name), _IDE_LIB)
                     files.append(rel.replace('\\', '/'))
     return jsonify(sorted(files))
 
@@ -9901,9 +9897,9 @@ _LLM_CORE_TOOLS = {
     "run_command", "execute_command", "exec",
     "web_search", "view_web_image", "webfetch", "curl",
     "view_user_file", "list_user_files", "read_file", "grep", "list_files",
-    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify", "notify_gabriel",
-    "ui_dump", "ui_screenshot", "ui_app_open", "ui_tap", "ui_type", "ui_swipe",
-}
+    "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
+    }
+
 
 
 def _fit_schema_to_budget(messages, tools_schema, max_tokens, budget=_LLM_INPUT_TOKEN_BUDGET):

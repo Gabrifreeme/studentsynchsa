@@ -431,7 +431,21 @@
             color: #888;
         }
 
+        /* Explorer tree icons - replace emoji with CSS */
+        .folder-icon {
+            color: #ff9d00;
+            margin-right: 6px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .file-icon {
+            color: #888;
+            margin-right: 6px;
+            font-size: 11px;
+        }
+
         /* Line numbers for Auto Fix diff panes */
+        .autofix-row {
         .autofix-row {
             display: flex;
             align-items: flex-start;
@@ -1234,7 +1248,7 @@
                             if (typeof value === 'string') {
                                 // It's a file
                                 const filePath = value.replace('file:', '');
-                                div.textContent = "📄 " + key;
+                                div.innerHTML = '<span class="file-icon">▪</span> ' + key;
                                 div.onclick = function (event) {
                                     event.stopPropagation();
                                     // Your original file click logic goes here
@@ -1257,7 +1271,7 @@
                             } else {
                                 // It's a folder
                                 const folderDiv = document.createElement("div");
-                                folderDiv.textContent = "📁 " + key;
+                                folderDiv.innerHTML = '<span class="folder-icon">▶</span> ' + key;
                                 folderDiv.style.color = "#ff9d00";
 
                                 const childrenDiv = document.createElement("div");
@@ -1266,7 +1280,7 @@
                                 folderDiv.onclick = function (e) {
                                     e.stopPropagation();
                                     childrenDiv.style.display = childrenDiv.style.display === "none" ? "block" : "none";
-                                    folderDiv.textContent = (childrenDiv.style.display === "none" ? "📁 " : "📂 ") + key;
+                                    folderDiv.querySelector('.folder-icon').textContent = childrenDiv.style.display === 'none' ? '▶' : '▼';
                                 };
 
                                 renderTree(value, childrenDiv, indentLevel + 1);
@@ -1334,6 +1348,7 @@
 
             try {
                 await fetch('/restart', { method: 'POST' });
+                sessionStorage.setItem('ace_restarting', '1');
 
                 // Show a message on the screen
                 document.body.innerHTML = "<div style='color:#ff9d00; background:#000; height:100vh; display:flex; justify-content:center; align-items:center; font-family:monospace; font-size:24px;'>Restarting ACESi... Please wait.</div>";
@@ -1346,8 +1361,203 @@
             }
         }
 
+        // Expose globally so the Restart button can call it
+        window.restartAcesi = restartAcesi;
+
+        window.restartAcesi = restartAcesi;
+
         // --- Restore missing button event listeners ---
-        document.addEventListener('DOMContentLoaded', function () {
+        
+        // Load Explorer file list
+        async function loadExplorer() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error("HTTP error " + response.status);
+                const data = await response.json();
+                console.log("Explorer data received", data);
+                const explorerDiv = document.getElementById('explorer');
+                if (!explorerDiv) {
+                    console.error("Could not find the explorer container div!");
+                    return;
+                }
+                explorerDiv.innerHTML = ""; // Clear "Loading..."
+                // Build a nested tree from the flat paths
+                const tree = {};
+                data.forEach(path => {
+                    const parts = path.split('/');
+                    let current = tree;
+                    parts.forEach((part, index) => {
+                        if (index === parts.length - 1) {
+                            current[part] = 'file:' + path; // It's a file
+                        } else {
+                            if (!current[part] || typeof current[part] === 'string') {
+                                current[part] = {}; // It's a folder
+                            }
+                            current = current[part];
+                        }
+                    });
+                });
+                // Render the tree recursively
+                function renderTree(node, parentElement, indentLevel) {
+                    const keys = Object.keys(node).sort((a, b) => {
+                        const aIsFile = typeof node[a] === 'string';
+                        const bIsFile = typeof node[b] === 'string';
+                        if (!aIsFile && bIsFile) return -1;
+                        if (aIsFile && !bIsFile) return 1;
+                        return a.localeCompare(b);
+                    });
+                    keys.forEach(key => {
+                        const value = node[key];
+                        const div = document.createElement('div');
+                        div.style.padding = '3px';
+                        div.style.paddingLeft = (indentLevel * 12) + 'px';
+                        div.style.cursor = 'pointer';
+                        div.style.color = '#ff9d00';
+                        div.style.fontFamily = 'monospace';
+                        if (typeof value === 'string') {
+                            const filePath = value.replace('file:', '');
+                            div.textContent = '\u2704 ' + key;
+                            div.onclick = function (event) {
+                                event.stopPropagation();
+                                console.log('Clicked file: ' + filePath);
+                                window.currentFile = filePath;
+                                fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
+                                    .then(res => res.text())
+                                    .then(fileData => {
+                                        document.getElementById('code-editor').value = fileData;
+                                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                                        if (window.aceEditorRefresh) window.aceEditorRefresh();
+                                        fetch('http://127.0.0.1:5000/api/context/file', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
+                                        }).catch(e => console.warn(e));
+                                    })
+                                    .catch(err => alert('Failed to load file: ' + err.message));
+                            };
+                        } else {
+                            const folderDiv = document.createElement('div');
+                            folderDiv.textContent = '\u263c ' + key;
+                            folderDiv.style.color = '#ff9d00';
+                            const childrenDiv = document.createElement('div');
+                            childrenDiv.style.display = 'none'; // Collapsed by default
+                            folderDiv.onclick = function (e) {
+                                e.stopPropagation();
+                                childrenDiv.style.display = childrenDiv.style.display === 'none' ? 'block' : 'none';
+                                folderDiv.textContent = (childrenDiv.style.display === 'none' ? '\u263c ' : '\u263d ') + key;
+                            };
+                            renderTree(value, childrenDiv, indentLevel + 1);
+                            div.appendChild(folderDiv);
+                            div.appendChild(childrenDiv);
+                            parentElement.appendChild(div);
+                            return;
+                        }
+                        parentElement.appendChild(div);
+                    });
+                }
+                renderTree(tree, explorerDiv, 0);
+            } catch (e) {
+                console.error('Explorer error:', e);
+                const explorerDiv = document.getElementById('explorer');
+                if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
+            }
+        }
+
+        // Load Explorer file list
+        async function loadExplorer() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error("HTTP error " + response.status);
+                const data = await response.json();
+                console.log("Explorer data received", data);
+                const explorerDiv = document.getElementById('explorer');
+                if (!explorerDiv) {
+                    console.error("Could not find the explorer container div!");
+                    return;
+                }
+                explorerDiv.innerHTML = ""; // Clear "Loading..."
+                // Build a nested tree from the flat paths
+                const tree = {};
+                data.forEach(path => {
+                    const parts = path.split('/');
+                    let current = tree;
+                    parts.forEach((part, index) => {
+                        if (index === parts.length - 1) {
+                            current[part] = 'file:' + path; // It's a file
+                        } else {
+                            if (!current[part] || typeof current[part] === 'string') {
+                                current[part] = {}; // It's a folder
+                            }
+                            current = current[part];
+                        }
+                    });
+                });
+                // Render the tree recursively
+                function renderTree(node, parentElement, indentLevel) {
+                    const keys = Object.keys(node).sort((a, b) => {
+                        const aIsFile = typeof node[a] === 'string';
+                        const bIsFile = typeof node[b] === 'string';
+                        if (!aIsFile && bIsFile) return -1;
+                        if (aIsFile && !bIsFile) return 1;
+                        return a.localeCompare(b);
+                    });
+                    keys.forEach(key => {
+                        const value = node[key];
+                        const div = document.createElement('div');
+                        div.style.padding = '3px';
+                        div.style.paddingLeft = (indentLevel * 12) + 'px';
+                        div.style.cursor = 'pointer';
+                        div.style.color = '#ff9d00';
+                        div.style.fontFamily = 'monospace';
+                        if (typeof value === 'string') {
+                            const filePath = value.replace('file:', '');
+                            div.textContent = '\u2704 ' + key;
+                            div.onclick = function (event) {
+                                event.stopPropagation();
+                                console.log('Clicked file: ' + filePath);
+                                window.currentFile = filePath;
+                                fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
+                                    .then(res => res.text())
+                                    .then(fileData => {
+                                        document.getElementById('code-editor').value = fileData;
+                                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                                        if (window.aceEditorRefresh) window.aceEditorRefresh();
+                                        fetch('http://127.0.0.1:5000/api/context/file', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
+                                        }).catch(e => console.warn(e));
+                                    })
+                                    .catch(err => alert('Failed to load file: ' + err.message));
+                            };
+                        } else {
+                            const folderDiv = document.createElement('div');
+                            folderDiv.textContent = '\u263c ' + key;
+                            folderDiv.style.color = '#ff9d00';
+                            const childrenDiv = document.createElement('div');
+                            childrenDiv.style.display = 'none'; // Collapsed by default
+                            folderDiv.onclick = function (e) {
+                                e.stopPropagation();
+                                childrenDiv.style.display = childrenDiv.style.display === 'none' ? 'block' : 'none';
+                                folderDiv.textContent = (childrenDiv.style.display === 'none' ? '\u263c ' : '\u263d ') + key;
+                            };
+                            renderTree(value, childrenDiv, indentLevel + 1);
+                            div.appendChild(folderDiv);
+                            div.appendChild(childrenDiv);
+                            parentElement.appendChild(div);
+                            return;
+                        }
+                        parentElement.appendChild(div);
+                    });
+                }
+                renderTree(tree, explorerDiv, 0);
+            } catch (e) {
+                console.error('Explorer error:', e);
+                const explorerDiv = document.getElementById('explorer');
+                if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
+            }
+        }
+document.addEventListener('DOMContentLoaded', function () {
             setTimeout(function () {
                 const codeEditor = document.getElementById('code-editor');
 
@@ -2686,6 +2896,18 @@ window.splitVideoPrompt = function() {
         alert("Done! Check the folder for your clips.");
     }).catch(e => alert("Error: " + e));
 };
+
+<script>
+// Show confirmation if server restarted
+if (sessionStorage.getItem('ace_restarting') === '1') {
+    sessionStorage.removeItem('ace_restarting');
+    var msg = document.createElement('div');
+    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00ff00;color:#000;padding:12px 24px;border-radius:6px;font-family:monospace;font-size:14px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+    msg.textContent = '\u2705 ACEsis server restarted successfully!';
+    document.body.appendChild(msg);
+    setTimeout(function() { msg.remove(); }, 5000);
+}
+</script>
 </script>
 </body>
 </html>
