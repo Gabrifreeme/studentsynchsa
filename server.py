@@ -5794,16 +5794,24 @@ def api_files():
     _IDE_EXCLUDE_DIRS = {
         '.git', 'build', 'node_modules', '.dart_tool',
         'android', 'ios', 'windows', 'linux', 'macos', 'web',
-        '__pycache__',
+        '__pycache__', '.idea', '.vscode', 'dist', 'target',
+        'venv', '.venv', 'env', 'coverage', '.next', '.nuxt',
     }
-    _IDE_EXTENSIONS = {'.dart'}
-    if os.path.isdir(_IDE_LIB):
-        for root, dirs, names in os.walk(_IDE_LIB):
+    _IDE_EXTENSIONS = {
+        '.dart', '.py', '.html', '.htm', '.js', '.ts', '.jsx', '.tsx',
+        '.css', '.scss', '.sass', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg',
+        '.txt', '.md', '.rst', '.log', '.csv',
+        '.sql', '.sh', '.ps1', '.bat', '.cmd',
+        '.xml', '.svg', '.vue', '.svelte',
+        '.env', '.gitignore', '.dockerignore',
+    }
+    if os.path.isdir(_IDE_ROOT):
+        for root, dirs, names in os.walk(_IDE_ROOT):
             dirs[:] = [d for d in dirs if d not in _IDE_EXCLUDE_DIRS]
             for name in names:
                 ext = os.path.splitext(name)[1].lower()
-                if ext in _IDE_EXTENSIONS:
-                    rel = os.path.relpath(os.path.join(root, name), _IDE_LIB)
+                if ext in _IDE_EXTENSIONS or name.startswith('.'):
+                    rel = os.path.relpath(os.path.join(root, name), _IDE_ROOT)
                     files.append(rel.replace('\\', '/'))
     return jsonify(sorted(files))
 

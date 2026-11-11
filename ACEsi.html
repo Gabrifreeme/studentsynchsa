@@ -464,6 +464,8 @@
         padding: 6px;
       }
     .acesi-tab-close { color: #ff9d00 !important; }
+#search-btn { display: none !important; }
+#editor-tab-bar { display: none !important; }
 </style>
 
     <style>
@@ -2670,7 +2672,9 @@
       <!-- Explorer Panel -->
       <div id="explorer-panel" class="panel">
         <div class="panel-header">EXPLORER</div>
-        <div style="padding: 6px 8px; border-bottom: 1px solid #333;">
+        <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #333; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
+<div id="open-editors-list" style="display: block; font-family: monospace; font-size: 11px; border-bottom: 1px solid #333; padding-bottom: 4px;"></div>
+<div style="padding: 6px 8px; border-bottom: 1px solid #333;">
           <input id="explorer-search" type="text" placeholder="Search files..." style="width: 100%; background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 8px; font-family: monospace; font-size: 11px; outline: none; box-sizing: border-box;" />
         </div>
         <div id="explorer" role="tree" aria-label="Explorer"></div>
@@ -5265,6 +5269,44 @@ window.showAceToast = function(message, type = 'success', duration = 3000) {
 window.openTabs = [];
 
 window.renderTabs = function() {
+    var list = document.getElementById('open-editors-list');
+    if (list) {
+        list.innerHTML = '';
+        window.openTabs.forEach(function(tab) {
+            var el = document.createElement('div');
+            el.style.padding = '4px 8px 4px 12px';
+            el.style.cursor = 'pointer';
+            el.style.color = '#ff9d00';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.fontSize = '12px';
+            el.style.fontFamily = 'monospace';
+            
+            var dot = document.createElement('span');
+            dot.textContent = tab.active ? '\u25CF ' : '\u00A0\u00A0\u00A0';
+            dot.style.color = '#ff9d00';
+            dot.style.marginRight = '4px';
+            dot.style.fontSize = '10px';
+            
+            var icon = document.createElement('span');
+            icon.textContent = '\uD83D\uDCC4';
+            icon.style.marginRight = '6px';
+            icon.style.opacity = '0.7';
+            
+            var name = document.createElement('span');
+            name.textContent = tab.name.split('/').pop();
+            
+            el.appendChild(dot);
+            el.appendChild(icon);
+            el.appendChild(name);
+            
+            el.onclick = function() {
+                window.switchToTab(tab.name);
+            };
+            list.appendChild(el);
+        });
+    }
+
     const bar = document.getElementById('editor-tab-bar');
     if (!bar) return;
     bar.innerHTML = '';
@@ -5622,6 +5664,138 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
         } catch(e) {}
     });
+});
+</script>
+
+
+
+
+
+
+<style>
+#acesi-goto-modal {
+  display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+  background: #111; border: 1px solid #ff9d00; padding: 15px; z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.8); font-family: monospace;
+}
+#acesi-goto-modal input {
+  background: #000; color: #ff9d00; border: 1px solid #ff9d00;
+  padding: 8px; width: 150px; font-family: monospace; outline: none;
+}
+#acesi-goto-modal button {
+  background: #ff9d00; color: #000; border: none; padding: 8px 12px;
+  font-family: monospace; cursor: pointer; font-weight: bold; margin-left: 8px;
+}
+</style>
+<div id="acesi-goto-modal">
+  <span style="color: #ff9d00; font-size: 12px; margin-right: 10px;">Go to line:</span>
+  <input type="text" id="acesi-goto-input" autocomplete="off" />
+  <button onclick="window._doGoto()">Go</button>
+</div>
+
+<script>
+window._doGoto = function() {
+    var input = document.getElementById('acesi-goto-input');
+    var lineNum = parseInt(input.value, 10);
+    var modal = document.getElementById('acesi-goto-modal');
+    modal.style.display = 'none';
+    if (isNaN(lineNum) || lineNum < 1) return;
+    
+    var ta = document.getElementById('code-editor');
+    if (!ta) return;
+    var lines = ta.value.split('\n');
+    if (lineNum > lines.length) lineNum = lines.length;
+
+    var pos = 0;
+    for (var i = 0; i < lineNum - 1; i++) pos += lines[i].length + 1;
+
+    ta.focus();
+    ta.setSelectionRange(pos, pos);
+    
+    var wrap = document.getElementById('code-editor-wrap');
+    if (wrap) {
+        var lineHeight = 21; 
+        wrap.scrollTop = (lineNum - 1) * lineHeight - (wrap.clientHeight / 2);
+    }
+    if (window.showAceToast) window.showAceToast('Jumped to line ' + lineNum, 'success', 1500);
+};
+
+document.addEventListener('keydown', function(e) {
+    var key = e.key.toLowerCase();
+    
+    // Close custom modal with Escape
+    if (e.key === 'Escape' && document.getElementById('acesi-goto-modal').style.display === 'block') {
+        document.getElementById('acesi-goto-modal').style.display = 'none';
+        return;
+    }
+
+    if (!e.ctrlKey && !e.altKey) return;
+
+    // Ctrl+S - Save
+    if (e.ctrlKey && key === 's' && !e.shiftKey) {
+        e.preventDefault();
+        var saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.click();
+        return;
+    }
+
+    // REMOVED Alt+W and Ctrl+F4 because they break the layout / close the app.
+
+    // Ctrl+F - Focus Explorer search
+    if (e.ctrlKey && key === 'f' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Use setTimeout to ensure the browser doesn't steal the focus back
+        setTimeout(function() {
+            var searchBox = document.getElementById('explorer-search');
+            if (searchBox) searchBox.focus();
+        }, 50);
+        return;
+    }
+
+    // Ctrl+B - Toggle Explorer panel
+    if (e.ctrlKey && key === 'b' && !e.shiftKey) {
+        e.preventDefault();
+        var explorer = document.getElementById('explorer-panel');
+        if (explorer) {
+            var isHidden = (explorer.style.display === 'none' || explorer.classList.contains('collapsed'));
+            if (isHidden) {
+                explorer.style.display = '';
+                explorer.classList.remove('collapsed');
+            } else {
+                explorer.style.display = 'none';
+            }
+        }
+        return;
+    }
+
+    // Ctrl+` - Toggle terminal
+    if (e.ctrlKey && e.key === '`' && !e.shiftKey) {
+        e.preventDefault();
+        var termPanel = document.getElementById('terminal-panel');
+        if (termPanel) {
+            termPanel.style.display = (termPanel.style.display === 'none' || !termPanel.style.display) ? 'flex' : 'none';
+        }
+        return;
+    }
+
+    // Ctrl+G - Go to line (Custom UI)
+    if (e.ctrlKey && key === 'g' && !e.shiftKey) {
+        e.preventDefault();
+        var modal = document.getElementById('acesi-goto-modal');
+        var input = document.getElementById('acesi-goto-input');
+        modal.style.display = 'block';
+        input.value = '';
+        input.focus();
+        
+        // Handle Enter key inside the input
+        input.onkeydown = function(ev) {
+            if (ev.key === 'Enter') {
+                window._doGoto();
+            }
+        };
+        return;
+    }
 });
 </script>
 </body>
