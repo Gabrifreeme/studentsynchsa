@@ -6,9 +6,5 @@ void downloadPdfBytes(List<int> bytes, String filename) {
   html.AnchorElement(href: url)
     ..setAttribute('download', filename)
     ..click();
-def broken(:).
-
-
-def broken(:
   html.Url.revokeObjectUrl(url);
 }
