@@ -2,6 +2,8 @@
 
 # -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
+from flask_socketio import SocketIO
+from winpty import PtyProcess
 from flask_cors import CORS
 _CURRENT_CONTEXT = {}
 import requests
@@ -62,6 +64,7 @@ except Exception:
     pass
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 import logging
 import sys
@@ -15252,7 +15255,47 @@ def api_check_syntax():
             except Exception:
                 pass
 
-app.run(host='127.0.0.1', port=5000, debug=False)
+
+# --- VS Code Style PTY Terminal ---
+import os
+
+terminal_process = None
+
+@socketio.on('terminal_input')
+def handle_terminal_input(data):
+    global terminal_process
+    if terminal_process and terminal_process.isalive():
+        terminal_process.write(data)
+
+@socketio.on('terminal_resize')
+def handle_terminal_resize(data):
+    global terminal_process
+    if terminal_process and terminal_process.isalive():
+        try:
+            terminal_process.setwinsize(int(data['rows']), int(data['cols']))
+        except Exception:
+            pass
+
+@socketio.on('connect')
+def handle_connect():
+    global terminal_process
+    if not terminal_process or not terminal_process.isalive():
+        # Spawn PowerShell on Windows
+        terminal_process = PtyProcess.spawn('powershell.exe')
+        
+        def read_output():
+            while terminal_process.isalive():
+                try:
+                    data = terminal_process.read(1024)
+                    if data:
+                        socketio.emit('terminal_output', data)
+                except EOFError:
+                    break
+                except Exception:
+                    break
+        
+        socketio.start_background_task(read_output)
+socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
 
 
 
