@@ -2665,6 +2665,9 @@
       <!-- Explorer Panel -->
       <div id="explorer-panel" class="panel">
         <div class="panel-header">EXPLORER</div>
+        <div style="padding: 6px 8px; border-bottom: 1px solid #333;">
+          <input id="explorer-search" type="text" placeholder="Search files..." style="width: 100%; background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 8px; font-family: monospace; font-size: 11px; outline: none; box-sizing: border-box;" />
+        </div>
         <div id="explorer" role="tree" aria-label="Explorer"></div>
         <div class="explorer-progress"></div>
       </div>
@@ -5473,6 +5476,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupDrag(leftResizer, chat, true);
     setupDrag(rightResizer, explorer, false); // Drag right resizer affects explorer width
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('explorer-search');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', function() {
+        var query = this.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('#explorer .tree-row');
+        
+        if (!query) {
+            // Restore all rows when search is cleared
+            rows.forEach(function(r) { r.style.display = ''; });
+            return;
+        }
+
+        rows.forEach(function(row) {
+            var label = row.querySelector('.label');
+            var text = (label ? label.textContent : '').toLowerCase();
+            // Show if this row matches OR a child/parent matches
+            if (text.indexOf(query) !== -1) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
 });
 </script>
 </body>
