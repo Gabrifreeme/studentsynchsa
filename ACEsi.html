@@ -3681,7 +3681,6 @@
         "
       ></div>
       <div
-      <input type="text" id="terminal-input" placeholder="Type a command and press Enter..." style="width: 100%; background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 8px; font-family: 'Roboto Mono', monospace; outline: none; margin-top: 5px; box-sizing: border-box;">
         style="
           display: flex;
           padding: 10px;
@@ -5656,6 +5655,9 @@ document.addEventListener('DOMContentLoaded', function() {
     termContainer.innerHTML = '';
     termContainer.style.padding = '0';
     termContainer.style.background = '#000';
+    termContainer.style.display = 'block';
+    termContainer.style.width = '100%';
+    termContainer.style.height = '100%';
 
     var term = new Terminal({
         cursorBlink: true,
@@ -5672,7 +5674,9 @@ document.addEventListener('DOMContentLoaded', function() {
     term.loadAddon(fitAddon);
 
     term.open(termContainer);
-    setTimeout(function() { try { fitAddon.fit(); } catch(e) {} }, 100);
+    termContainer.style.padding = '4px';
+    termContainer.style.textAlign = 'left';
+    setTimeout(function() { try { fitAddon.fit(); term.focus(); } catch(e) {} }, 500);
 
     // Connect to SocketIO
     var socket = io('http://127.0.0.1:5000');
