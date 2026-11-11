@@ -501,6 +501,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            position: relative;
         }
 
         #explorer-panel .panel-header {
@@ -526,11 +527,6 @@
             display: flex;
             align-items: center;
             gap: 2px;
-            opacity: 0;
-            transition: opacity 80ms linear;
-        }
-
-        #explorer-panel .panel-header:hover .explorer-actions {
             opacity: 1;
         }
 
@@ -554,6 +550,67 @@
         #explorer-panel .explorer-action:hover {
             background: #3c3c3c !important;
             color: #ffffff !important;
+        }
+
+        #explorer-panel .explorer-action svg {
+            display: block;
+        }
+
+        /* Indeterminate progress line while the tree is reloading */
+        #explorer-panel .explorer-progress {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #explorer-panel .explorer-progress::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40%;
+            background: #007fd4;
+            animation: explorer-progress 1s linear infinite;
+        }
+
+        #explorer-panel.loading .explorer-progress {
+            opacity: 1;
+        }
+
+        #explorer-panel.loading .explorer-action svg {
+            animation: explorer-spin 0.9s linear infinite;
+            transform-origin: 50% 50%;
+        }
+
+        #dev-toolbar #explorer-refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        @keyframes explorer-progress {
+            from {
+                left: -40%;
+            }
+
+            to {
+                left: 100%;
+            }
+        }
+
+        @keyframes explorer-spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         #explorer {
@@ -686,6 +743,30 @@
             white-space: nowrap;
             font-size: 13px;
             letter-spacing: 0;
+        }
+
+        @media (max-width: 768px) {
+
+            /* Keep the Explorer header and refresh action at VS Code size on phones */
+            #explorer-panel .panel-header {
+                padding: 0 6px 0 12px !important;
+                font-size: 11px !important;
+                height: 30px !important;
+                line-height: 22px !important;
+            }
+
+            #explorer-panel .explorer-action {
+                width: 22px !important;
+                height: 22px !important;
+                min-width: 22px !important;
+                min-height: 22px !important;
+                font-size: 0 !important;
+            }
+
+            #explorer-panel .explorer-action svg {
+                width: 14px;
+                height: 14px;
+            }
         }
     </style>
     <style>
@@ -1271,7 +1352,7 @@
             style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;"
             onclick="openSettings()">Settings</button>
         <button class="btn" title="Restart App" onclick="restartAcesi()">Restart</button>
-        <button class="btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
+        <button class="btn" id="explorer-refresh-btn" title="Refresh Explorer" onclick="loadExplorer()">Refresh</button>
     </div>
 
     <div id="portal-panel"
@@ -1411,6 +1492,7 @@
                 </span>
             </div>
             <div id="explorer" role="tree" aria-label="Explorer"></div>
+            <div class="explorer-progress"></div>
         </div>
     </div>
     <script>
@@ -1705,6 +1787,19 @@
         async function loadExplorer() {
             var explorerDiv = document.getElementById('explorer');
             if (!explorerDiv) return;
+            if (loadExplorer._busy) return;
+            loadExplorer._busy = true;
+
+            var panel = document.getElementById('explorer-panel');
+            var toolbarBtn = document.getElementById('explorer-refresh-btn');
+            var toolbarLabel = toolbarBtn ? toolbarBtn.textContent : 'Refresh';
+            var started = Date.now();
+
+            if (panel) panel.classList.add('loading');
+            if (toolbarBtn) {
+                toolbarBtn.disabled = true;
+                toolbarBtn.textContent = 'Refreshing...';
+            }
 
             try {
                 var response = await fetch('/api/files', { cache: 'no-store' });
@@ -1737,10 +1832,22 @@
 
                 window.ACE_EXPLORER_TREE = tree;
                 explorerRenderTree(tree);
-                console.log('Explorer: rendered ' + files.length + ' files');
+                explorerDiv.dataset.fileCount = String(files.length);
+                console.log('Explorer: refreshed, ' + files.length + ' files');
             } catch (e) {
                 console.error('Explorer error:', e);
                 explorerDiv.innerHTML = '<div style="padding:8px;color:#f48771;font-size:12px;">Unable to load files.</div>';
+            } finally {
+                var remaining = 450 - (Date.now() - started);
+                if (remaining > 0) {
+                    await new Promise(function (resolve) { setTimeout(resolve, remaining); });
+                }
+                if (panel) panel.classList.remove('loading');
+                if (toolbarBtn) {
+                    toolbarBtn.disabled = false;
+                    toolbarBtn.textContent = (toolbarLabel || 'Refresh').trim() || 'Refresh';
+                }
+                loadExplorer._busy = false;
             }
         }
 
