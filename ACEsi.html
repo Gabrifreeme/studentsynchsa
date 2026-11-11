@@ -3191,13 +3191,13 @@
                     codeEditor.value = d.formatted_code;
                     if (typeof updateLineNumbers === 'function') updateLineNumbers();
                     if (window.aceEditorRefresh) window.aceEditorRefresh();
-                    alert('Code formatted successfully.');
+                    if (window.showAceToast) window.showAceToast('Code formatted successfully.', 'success');
                   } else {
-                    alert('Format error: ' + ((d && d.error) || 'Unknown'));
+                    if (window.showAceToast) window.showAceToast('Format error: ' + ((d && d.error) || 'Unknown'), 'error', 5000);
                   }
                 })
                 .catch(function (e) {
-                  alert('Format failed: ' + _afixEscape(e.message));
+                  if (window.showAceToast) window.showAceToast('Format failed: ' + (e.message || 'Network Error'), 'error', 5000);
                 });
             };
 
@@ -5146,5 +5146,65 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 </script>
-  </body>
+  
+<!-- ACEsi Toast Notifications -->
+<div id="acesi-toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
+<style>
+.acesi-toast {
+  background: #000;
+  color: #ff9d00;
+  border: 1px solid #ff9d00;
+  padding: 10px 16px;
+  font-family: monospace;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 200px;
+}
+.acesi-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.acesi-toast.error {
+  color: #ff4d4d;
+  border-color: #ff4d4d;
+}
+.acesi-toast .toast-close {
+  margin-left: 12px;
+  cursor: pointer;
+  color: #666;
+  font-weight: bold;
+}
+.acesi-toast .toast-close:hover {
+  color: #fff;
+}
+</style>
+<script>
+window.showAceToast = function(message, type = 'success', duration = 3000) {
+  const container = document.getElementById('acesi-toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'acesi-toast ' + (type === 'error' ? 'error' : '');
+  toast.innerHTML = '<span>' + message + '</span><span class="toast-close">&times;</span>';
+  container.appendChild(toast);
+  
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  const closeToast = () => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  };
+  
+  toast.querySelector('.toast-close').onclick = closeToast;
+  if (duration > 0) {
+    setTimeout(closeToast, duration);
+  }
+};
+</script>
+</body>
 </html>
