@@ -3198,6 +3198,7 @@
                 .then((d) => {
                   if (d && d.ok) {
                     if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
+                    if (window.checkSyntax) window.checkSyntax(filename);
                   } else {
                     if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
@@ -3345,6 +3346,7 @@
                 .then((d) => {
                   if (d && d.ok) {
                     if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
+                    if (window.checkSyntax) window.checkSyntax(filename);
                   } else {
                     if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
@@ -4221,6 +4223,7 @@
                 .then((d) => {
                   if (d && d.ok) {
                     if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
+                    if (window.checkSyntax) window.checkSyntax(filename);
                   } else {
                     if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
@@ -4495,7 +4498,7 @@
             }
           })
           .then(function (d) {
-            if (window.showAceToast) window.showAceToast("Settings saved. Server is restarting to apply new API keys.",, 'success', 3000);
+            if (window.showAceToast) window.showAceToast("Settings saved. Server is restarting to apply new API keys.", 'success', 3000);
             checkModelStatus();
           })
           .catch(function (e) {
@@ -4957,6 +4960,7 @@
                 .then((d) => {
                   if (d && d.ok) {
                     if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
+                    if (window.checkSyntax) window.checkSyntax(filename);
                   } else {
                     if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
@@ -5506,6 +5510,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+</script>
+
+<script>
+window.checkSyntax = function(filename) {
+    var editor = document.getElementById('code-editor');
+    if (!editor || !filename) return;
+    var code = editor.value;
+    if (!code.trim()) return;
+
+    fetch('http://127.0.0.1:5000/api/check-syntax', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filename, code: code })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d && d.skipped) return;
+        if (d && !d.ok && d.errors) {
+            // Show the terminal panel
+            var panel = document.getElementById('terminal-panel');
+            if (panel) panel.style.display = 'flex';
+            
+            // Print errors in red
+            var output = document.getElementById('terminal-output');
+            if (output) {
+                var errDiv = document.createElement('div');
+                errDiv.style.color = '#ff4d4d';
+                errDiv.style.fontFamily = 'monospace';
+                errDiv.style.fontSize = '12px';
+                errDiv.style.whiteSpace = 'pre-wrap';
+                errDiv.style.padding = '8px';
+                errDiv.style.borderBottom = '1px solid #333';
+                errDiv.textContent = '> Syntax check failed for ' + filename + ':\n' + d.errors;
+                output.appendChild(errDiv);
+                output.scrollTop = output.scrollHeight;
+            }
+            
+            if (window.showAceToast) window.showAceToast('Syntax error found - see terminal', 'error', 5000);
+        } else if (d && d.ok) {
+            if (window.showAceToast) window.showAceToast('Syntax OK: ' + filename, 'success', 2000);
+        }
+    })
+    .catch(function(e) {
+        console.warn('Syntax check failed:', e);
+    });
+};
 </script>
 </body>
 </html>

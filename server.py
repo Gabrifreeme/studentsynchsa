@@ -15201,6 +15201,57 @@ def api_format():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+
+@app.route('/api/check-syntax', methods=['POST'])
+def api_check_syntax():
+    data = request.json or {}
+    filename = data.get('filename', '')
+    code = data.get('code', '')
+    if not filename or not code:
+        return jsonify({'ok': False, 'error': 'Missing filename or code'}), 400
+
+    import tempfile
+    import os
+
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ('.py', '.dart'):
+        return jsonify({'ok': True, 'skipped': True, 'message': 'No syntax checker for ' + ext})
+
+    tmp_path = None
+    try:
+        suffix = ext
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(code)
+
+        if ext == '.py':
+            result = subprocess.run(
+                [sys.executable, '-m', 'py_compile', tmp_path],
+                capture_output=True, text=True, timeout=15
+            )
+        else:
+            result = subprocess.run(
+                ['dart', 'analyze', tmp_path],
+                capture_output=True, text=True, timeout=30
+            )
+
+        if result.returncode == 0:
+            return jsonify({'ok': True, 'errors': ''})
+        else:
+            err = (result.stderr or '') + (result.stdout or '')
+            err = err.replace(tmp_path, filename)
+            return jsonify({'ok': False, 'errors': err.strip()})
+    except subprocess.TimeoutExpired:
+        return jsonify({'ok': False, 'errors': 'Syntax check timed out'}), 500
+    except Exception as e:
+        return jsonify({'ok': False, 'errors': str(e)}), 500
+    finally:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
 app.run(host='127.0.0.1', port=5000, debug=False)
 
 
