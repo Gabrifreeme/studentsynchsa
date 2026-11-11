@@ -5807,7 +5807,8 @@ def api_files():
     }
     if os.path.isdir(_IDE_ROOT):
         for root, dirs, names in os.walk(_IDE_ROOT):
-            dirs[:] = [d for d in dirs if d not in _IDE_EXCLUDE_DIRS]
+            # Hide dot folders (like .git, .cursor, .vscode) exactly like VS Code
+            dirs[:] = [d for d in dirs if d not in _IDE_EXCLUDE_DIRS and not d.startswith('.')]
             for name in names:
                 ext = os.path.splitext(name)[1].lower()
                 if ext in _IDE_EXTENSIONS or name.startswith('.'):
