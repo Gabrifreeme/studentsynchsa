@@ -2507,7 +2507,15 @@
             </button>
           </div>
         </div>
-        <div
+        
+<div id='editor-tab-bar' style='display:flex; background:#111; border-bottom:1px solid #ff9d00; overflow-x:auto; min-height:30px; align-items:flex-end; padding:0 5px;'></div>
+<style>
+.acesi-tab { background:#000; color:#ff9d00; border:1px solid #ff9d00; border-bottom:none; padding:2px 8px; margin-right:1px; font-family:monospace; font-size:11px; cursor:pointer; opacity:0.6; user-select:none; display:flex; align-items:center; border-radius:4px 4px 0 0; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #editor-tab-bar::-webkit-scrollbar { height: 4px; } #editor-tab-bar::-webkit-scrollbar-thumb { background: rgba(255, 157, 0, 0.3); border-radius: 2px; }
+.acesi-tab.active { opacity:1; background:#222; font-weight:bold; }
+.acesi-tab-close { margin-left:10px; color:#666; font-weight:bold; }
+.acesi-tab-close:hover { color:#ff4d4d; }
+</style>
+<div
           id="code-editor-wrap"
           style="
             display: flex;
@@ -2922,6 +2930,31 @@
           selected[i].classList.remove("selected");
         }
         row.classList.add("selected");
+
+        // --- ACEsi Tab Integration ---
+        if (window.openTabs) {
+            // If already open, save current tab's content and switch
+            var existing = window.openTabs.find(function(t) { return t.name === filePath; });
+            if (existing) {
+                var activeTab = window.openTabs.find(function(t) { return t.active; });
+                if (activeTab) {
+                    var ta = document.getElementById("code-editor");
+                    if (ta) activeTab.content = ta.value;
+                }
+                window.openTabs.forEach(function(t) { t.active = false; });
+                existing.active = true;
+                window.currentFile = filePath;
+                var ta2 = document.getElementById("code-editor");
+                if (ta2) {
+                    ta2.value = existing.content;
+                    if (typeof updateLineNumbers === "function") updateLineNumbers();
+                    if (window.aceEditorRefresh) window.aceEditorRefresh();
+                }
+                if (window.renderTabs) window.renderTabs();
+                return;
+            }
+        }
+        // ------------------------------
         window.currentFile = filePath;
 
         fetch("/api/file-content?path=" + encodeURIComponent(filePath))
@@ -2930,6 +2963,18 @@
             return res.text();
           })
           .then(function (fileData) {
+            // --- ACEsi Tab Creation ---
+            if (window.openTabs) {
+                var activeTab = window.openTabs.find(function(t) { return t.active; });
+                if (activeTab) {
+                    var taOld = document.getElementById("code-editor");
+                    if (taOld) activeTab.content = taOld.value;
+                }
+                window.openTabs.forEach(function(t) { t.active = false; });
+                window.openTabs.push({ name: filePath, content: fileData, active: true });
+                if (window.renderTabs) window.renderTabs();
+            }
+            // ---------------------------
             var editor = document.getElementById("code-editor");
             if (editor) editor.value = fileData;
             if (typeof updateLineNumbers === "function") updateLineNumbers();
@@ -4841,7 +4886,7 @@
           document.getElementById("search-input").focus();
         }
       };
-      window.loadFile = function (filename) {
+      window.loadFile_OLD = function (filename) {
         fetch("/api/file-content?path=" + encodeURIComponent(filename))
           .then((r) => r.text())
           .then((text) => {
@@ -5199,6 +5244,111 @@ window.showAceToast = function(message, type = 'success', duration = 3000) {
   if (duration > 0) {
     setTimeout(closeToast, duration);
   }
+};
+</script>
+
+<script>
+// ACEsi Editor Tabs Logic
+window.openTabs = [];
+
+window.renderTabs = function() {
+    const bar = document.getElementById('editor-tab-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    
+    window.openTabs.forEach(tab => {
+        const el = document.createElement('div');
+        el.className = 'acesi-tab' + (tab.active ? ' active' : '');
+        el.innerHTML = tab.name + '<span class="acesi-tab-close">&times;</span>';
+        
+        // Click to switch
+        el.onclick = (e) => {
+            if (e.target.classList.contains('acesi-tab-close')) {
+                e.stopPropagation();
+                // Close tab
+                const idx = window.openTabs.indexOf(tab);
+                window.openTabs.splice(idx, 1);
+                if (tab.active) {
+                    // If closing active tab, switch to another or clear editor
+                    if (window.openTabs.length > 0) {
+                        window.openTabs[window.openTabs.length - 1].active = true;
+                        window.switchToTab(window.openTabs[window.openTabs.length - 1].name);
+                    } else {
+                        const ta = document.getElementById('code-editor');
+                        if (ta) ta.value = '';
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                        window.currentFile = null;
+                    }
+                }
+                window.renderTabs();
+            } else {
+                // Switch tab
+                window.switchToTab(tab.name);
+            }
+        };
+        bar.appendChild(el);
+    });
+};
+
+window.switchToTab = function(filename) {
+    const activeTab = window.openTabs.find(t => t.active);
+    if (activeTab) {
+        const ta = document.getElementById('code-editor');
+        if (ta) activeTab.content = ta.value;
+    }
+    
+    window.openTabs.forEach(t => t.active = false);
+    const target = window.openTabs.find(t => t.name === filename);
+    if (!target) return;
+    
+    target.active = true;
+    window.currentFile = target.name;
+    
+    const ta = document.getElementById('code-editor');
+    if (ta) {
+        ta.value = target.content;
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+        if (window.aceEditorRefresh) window.aceEditorRefresh();
+    }
+    window.renderTabs();
+};
+
+window.loadFile = function(filename) {
+    const existing = window.openTabs.find(t => t.name === filename);
+    if (existing) {
+        window.switchToTab(filename);
+        return;
+    }
+    
+    fetch("/api/file-content?path=" + encodeURIComponent(filename))
+      .then((r) => r.text())
+      .then((text) => {
+        const activeTab = window.openTabs.find(t => t.active);
+        if (activeTab) {
+            const ta = document.getElementById('code-editor');
+            if (ta) activeTab.content = ta.value;
+        }
+        
+        window.openTabs.forEach(t => t.active = false);
+        window.openTabs.push({
+            name: filename,
+            content: text,
+            active: true
+        });
+        
+        window.currentFile = filename;
+        
+        const ta = document.getElementById('code-editor');
+        if (ta) {
+            ta.value = text;
+            if (typeof updateLineNumbers === 'function') updateLineNumbers();
+            if (window.aceEditorRefresh) window.aceEditorRefresh();
+        }
+        window.renderTabs();
+      })
+      .catch((e) => {
+        if (window.showAceToast) window.showAceToast('Load error: ' + e.message, 'error', 5000);
+      });
 };
 </script>
 </body>
