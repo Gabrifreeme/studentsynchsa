@@ -5839,6 +5839,7 @@ document.addEventListener('keydown', function(e) {
 </script>
 <script>
 window._aceFileIcon = function(name) {
+    if (!name) return '\uD83D\uDCC4';
     if (name.startsWith('.') && name.indexOf('.', 1) === -1) return '\uD83D\uDD12'; // Gear for dotfiles
     if (name.endsWith('.local') || name.endsWith('.env')) return '\uD83D\uDD11'; // Lock for local configs
     
@@ -5888,7 +5889,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // If the icon is a generic document emoji, try to upgrade it
             if (icon && (icon.textContent === '\uD83D\uDCC4' || icon.textContent === '📄')) {
                 var newIcon = null;
-                if (text.startsWith('.') && !text.includes('.', 1)) {
+                if (text && text.startsWith('.') && !text.includes('.', 1)) {
                     newIcon = '⚙️'; // Dotfile
                 } else if (text.endsWith('.gitignore') || text.endsWith('.env') || text.endsWith('.local')) {
                     newIcon = '🔒'; // Config/lock
