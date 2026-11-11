@@ -493,73 +493,17 @@
 
 
     <style>
-        /* ===== Explorer: VS Code / Material Icon Theme parity ===== */
+        /* ===== Explorer: ACEsi theme ===== */
         #explorer-panel {
-            background: #252526;
-            border: none;
-            border-left: 1px solid #1b1b1c;
-            margin: 0;
-            padding: 0;
+            background: #000000;
             overflow: hidden;
             position: relative;
-        }
-
-        #explorer-panel .panel-header {
-            background: #252526;
-            border-bottom: none;
-            color: #bbbbbb;
-            font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0;
-            line-height: 22px;
-            padding: 0 6px 0 12px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            text-transform: uppercase;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        #explorer-panel .explorer-actions {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            opacity: 1;
-        }
-
-        #explorer-panel .explorer-action {
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-            border: none;
-            border-radius: 3px;
-            background: transparent;
-            color: #cccccc;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 0;
-            line-height: 0;
-        }
-
-        #explorer-panel .explorer-action:hover {
-            background: #3c3c3c !important;
-            color: #ffffff !important;
-        }
-
-        #explorer-panel .explorer-action svg {
-            display: block;
         }
 
         /* Indeterminate progress line while the tree is reloading */
         #explorer-panel .explorer-progress {
             position: absolute;
-            top: 30px;
+            top: 0;
             left: 0;
             right: 0;
             height: 2px;
@@ -575,17 +519,12 @@
             top: 0;
             bottom: 0;
             width: 40%;
-            background: #007fd4;
+            background: #ff9d00;
             animation: explorer-progress 1s linear infinite;
         }
 
         #explorer-panel.loading .explorer-progress {
             opacity: 1;
-        }
-
-        #explorer-panel.loading .explorer-action svg {
-            animation: explorer-spin 0.9s linear infinite;
-            transform-origin: 50% 50%;
         }
 
         #dev-toolbar #explorer-refresh-btn:disabled {
@@ -603,24 +542,14 @@
             }
         }
 
-        @keyframes explorer-spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
         #explorer {
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
             padding: 0;
             margin: 0;
-            background: #252526;
-            color: #cccccc;
+            background: #000000;
+            color: #ff9d00;
             font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 13px;
             line-height: 22px;
@@ -639,13 +568,13 @@
         }
 
         #explorer::-webkit-scrollbar-thumb {
-            background: rgba(121, 121, 121, 0.4);
+            background: rgba(255, 157, 0, 0.35);
             border: 3px solid transparent;
             background-clip: padding-box;
         }
 
         #explorer::-webkit-scrollbar-thumb:hover {
-            background: rgba(100, 100, 100, 0.7);
+            background: rgba(255, 157, 0, 0.6);
             border: 3px solid transparent;
             background-clip: padding-box;
         }
@@ -661,17 +590,17 @@
             cursor: pointer;
             position: relative;
             border: 1px solid transparent;
-            color: #cccccc;
+            color: #ff9d00;
         }
 
         #explorer .tree-row:hover {
-            background: #2a2d2e;
+            background: rgba(255, 157, 0, 0.1);
         }
 
         #explorer .tree-row.selected {
-            background: #04395e;
-            color: #ffffff;
-            border-color: #007fd4;
+            background: rgba(255, 157, 0, 0.18);
+            color: #ff9d00;
+            border-color: #ff9d00;
         }
 
         #explorer .indent {
@@ -688,7 +617,7 @@
             bottom: 0;
             left: 0;
             width: 1px;
-            background: #585858;
+            background: rgba(255, 157, 0, 0.35);
             opacity: 0;
             transition: opacity 80ms linear;
         }
@@ -711,8 +640,8 @@
             content: "";
             width: 5px;
             height: 5px;
-            border-right: 1.4px solid #cccccc;
-            border-bottom: 1.4px solid #cccccc;
+            border-right: 1.4px solid currentColor;
+            border-bottom: 1.4px solid currentColor;
             transform: rotate(-45deg);
             transition: transform 100ms ease;
         }
@@ -745,28 +674,17 @@
             letter-spacing: 0;
         }
 
-        @media (max-width: 768px) {
+        /* ===== Code Editor header: centered title, actions below it ===== */
+        #code-panel .panel-header {
+            text-align: center;
+        }
 
-            /* Keep the Explorer header and refresh action at VS Code size on phones */
-            #explorer-panel .panel-header {
-                padding: 0 6px 0 12px !important;
-                font-size: 11px !important;
-                height: 30px !important;
-                line-height: 22px !important;
-            }
-
-            #explorer-panel .explorer-action {
-                width: 22px !important;
-                height: 22px !important;
-                min-width: 22px !important;
-                min-height: 22px !important;
-                font-size: 0 !important;
-            }
-
-            #explorer-panel .explorer-action svg {
-                width: 14px;
-                height: 14px;
-            }
+        #code-panel .panel-header>div {
+            float: none !important;
+            clear: both;
+            margin-left: 0 !important;
+            margin-top: 6px;
+            justify-content: center !important;
         }
     </style>
     <style>
@@ -1050,11 +968,11 @@
         }
 
         #model-spinner.status-ok {
-            border-color: #00ff00;
+            border-color: #00ff00 #00ff00 #00ff00 #007a00;
         }
 
         #model-spinner.status-dead {
-            border-color: #ff0000;
+            border-color: #ff0000 #ff0000 #ff0000 #7a0000;
         }
 
         /* Mobile model spinner */
@@ -1070,11 +988,11 @@
         }
 
         #mobile-model-spinner.status-ok {
-            border-color: #00ff00;
+            border-color: #00ff00 #00ff00 #00ff00 #007a00;
         }
 
         #mobile-model-spinner.status-dead {
-            border-color: #ff0000;
+            border-color: #ff0000 #ff0000 #ff0000 #7a0000;
         }
 
         @keyframes model-spin {
@@ -1479,18 +1397,7 @@
 
         <!-- Explorer Panel -->
         <div id="explorer-panel" class="panel">
-            <div class="panel-header">
-                <span>EXPLORER</span>
-                <span class="explorer-actions">
-                    <button class="explorer-action" title="Refresh Explorer" onclick="loadExplorer()" type="button">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                            stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M13.2 8a5.2 5.2 0 1 1-1.7-3.85" />
-                            <path d="M13 2.2v3.1H9.9" />
-                        </svg>
-                    </button>
-                </span>
-            </div>
+            <div class="panel-header">EXPLORER</div>
             <div id="explorer" role="tree" aria-label="Explorer"></div>
             <div class="explorer-progress"></div>
         </div>
