@@ -1,24 +1,19 @@
-"I'm working on a custom AI IDE (Flask backend, HTML/JS frontend). I have a side-by-side 'Auto Fix' modal in ACEsi.html.
+*** CRITICAL WARNING ***
+Do NOT break server.py. The previous edit broke the file with an IndentationError and it took 2 hours to fix. You MUST ensure your generated code has perfect Python indentation. 
 
-The Problem:
-The left panel (<textarea id="autofix-original">) is completely invisible. It shows solid dark-red blocks instead of text. Another AI diagnosed this as the "Transparent textarea + highlight-layer pattern" — meaning the code is being written to the textarea's .value, but CSS is hiding it (e.g., color: transparent or an overlay is covering it).
+I need to upgrade the Terminal in ACEsi.html so it acts exactly like the VS Code integrated terminal. 
 
-Current CSS on the textareas:
+THE PROBLEM:
+Right now, the Terminal panel only shows the output of `[EXEC]` commands. I want a real, interactive terminal.
 
-html
-<textarea id="autofix-original" readonly style="width:100%;flex:1;background:#000 !important;color:#ff9d00 !important;-webkit-text-fill-color:#ff9d00 !important;border:1px solid #ff9d00;padding:10px;font-family:'Roboto Mono',monospace;font-size:12px;resize:none;outline:none;overflow:auto;"></textarea>
-(Even with !important on the color and background, the red blocks persist).
+YOUR TASK:
+1. In server.py, create a new route `/api/terminal` that accepts a POST request with a `command` string. It must run the command using `subprocess` inside `_IDE_ROOT`, capture `stdout` and `stderr`, and return them as JSON.
+2. In ACEsi.html, update the Terminal panel to have an input box at the bottom.
+3. When I type a command and hit Enter, send it to `/api/terminal`, append the output to the terminal window, and keep the focus on the input box so I can type the next command.
+4. If the command produces an error, print it in red in the terminal window.
 
-The JavaScript:
-I have a function openAutoFix() that grabs the text from the main editor using CodeMirror's getValue() and assigns it to document.getElementById('autofix-original').value.
-
-What I need from you:
-
-Why is the text invisible despite color: #ff9d00 !important? Is there a global CSS rule in ACEsi.html overriding it?
-
-Give me the exact CSS or JavaScript snippet to force the text to be visible and kill the red background blocks once and for all.
-
-The right panel (id="autofix-code") shows green blocks and has the same issue.
-
-Assume I want to keep the text area looking like a standard black box with orange text. No fancy overlays."
-
+CRITICAL RULES:
+- Do NOT touch the Auto Fix route.
+- Do NOT touch the CodeMirror initialization.
+- Your Python code MUST have perfect indentation (4 spaces).
+Run the edit apply the fix and verify live it is working

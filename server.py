@@ -15176,6 +15176,31 @@ def restart_server():
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+@app.route('/api/terminal', methods=['POST'])
+def api_terminal():
+    data = request.json or {}
+    cmd = data.get('command', '')
+    if not cmd:
+        return jsonify({'ok': False, 'error': 'No command provided'}), 400
+    try:
+        result = subprocess.run(cmd, shell=True, cwd=_IDE_ROOT, capture_output=True, text=True, timeout=60)
+        return jsonify({'ok': True, 'stdout': result.stdout, 'stderr': result.stderr})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/format', methods=['POST'])
+def api_format():
+    data = request.json or {}
+    code = data.get('code', '')
+    if not code:
+        return jsonify({'ok': False, 'error': 'No code provided'}), 400
+    try:
+        import black
+        formatted = black.format_str(code, mode=black.Mode())
+        return jsonify({'ok': True, 'formatted_code': formatted})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 app.run(host='127.0.0.1', port=5000, debug=False)
 
 
