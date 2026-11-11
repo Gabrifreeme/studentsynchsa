@@ -2956,17 +2956,6 @@ def _last_edit_info():
             "files": [c["path"] for c in changed],
             "runtime": dict(runtime, pending_restart=pending),
         }
-    elif status.strip():
-        # The tree is dirty but nothing could be stated (e.g. only a mode bit or
-        # an unreadable path). Better a vague truth than an older commit.
-        value = {
-            "ok": True,
-            "source": "working-tree",
-            "phrase": "uncommitted changes in the working tree, not committed yet",
-            "detail": "Uncommitted:\n" + status.strip() + "\n" + _runtime_detail(runtime, []),
-            "files": [],
-            "runtime": dict(runtime, pending_restart=[]),
-        }
     elif commit_hash:
         subject = commit_msg if len(commit_msg) <= 70 else commit_msg[:67] + "..."
         commit_stats = _parse_numstat(_git_out(
@@ -3017,6 +3006,14 @@ def _last_edit_info():
             "files": list(commit_stats),
             "runtime": dict(runtime, pending_restart=pending),
         }
+        if changed:
+            # These are real edits, just older than HEAD. Keep them in the
+            # tooltip so "last change was commit X" never hides a dirty tree.
+            leftover = ", ".join(c["path"] for c in changed[:5])
+            if len(changed) > 5:
+                leftover += ", ..."
+            value["detail"] = (value["detail"] + "\n(still uncommitted, "
+                               "older than this commit: %s)" % leftover).strip()
     else:
         value = {"ok": False, "reason": "no git history available"}
 
@@ -7091,6 +7088,10 @@ def tool_git_commit(message, files=None):
                            "commit", "-m", str(message)], timeout=60)
     if "nothing to commit" in out2 or "no changes added" in out2:
         return True, "nothing to commit (working tree clean)"
+    if ok2:
+        # The greeting caches for a few seconds; a fresh commit must not be
+        # hidden behind the pre-commit description.
+        _LAST_EDIT_CACHE.update({"at": 0.0, "value": None})
     return ok2, out2
 
 
