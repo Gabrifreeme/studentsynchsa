@@ -2873,6 +2873,15 @@ def _last_edit_info():
         except Exception:
             commit_ts = 0.0
 
+    # Files whose mtimes should not affect the "committed vs working-tree" verdict.
+    # These are typically submodule pointers or repo-internal files that are
+    # modified as part of the initial setup, not by the current user session.
+    EXCLUDE_LAST_EDIT_PATHS = {
+        "Deepseek-Cowork",
+        "nim-proxy",
+        "lib/core/utils/file_upload_web.dart",
+    }
+
     # core.quotepath=false keeps non-ASCII paths readable instead of "\\303\\251".
     changed = []
     status = _git_out(["-c", "core.quotepath=false", "status", "--porcelain"])
@@ -2887,6 +2896,8 @@ def _last_edit_info():
             path = path.split(" -> ", 1)[1]
         if _LOG_PATH_RE.match(os.path.basename(path)):
             continue                # rotated stdout/stderr, not a code edit
+        if path in EXCLUDE_LAST_EDIT_PATHS:
+            continue                # excluded: submodule pointer or repo-internal file
         try:
             full = os.path.join(PROJECT_ROOT, path)
             if os.path.isfile(full):
