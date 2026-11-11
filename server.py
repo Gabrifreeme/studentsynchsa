@@ -5756,14 +5756,24 @@ _IDE_LIB = os.path.join(_IDE_ROOT, 'lib')
 
 
 def _ide_path(rel):
-    """Resolve an Explorer path inside the project root, or None if it escapes."""
+    """Resolve an Explorer path inside the project root, or None if it escapes.
+
+    /api/files returns paths relative to lib/ (e.g. "core/theme/app_theme.dart"),
+    while the editor also accepts project-relative paths. Resolve against the
+    project root first and fall back to lib/ when that is where the file lives.
+    """
     rel = (rel or '').strip().replace('\\', '/')
     if not rel or rel.startswith('/') or '..' in rel.split('/'):
         return None
-    full = os.path.realpath(os.path.join(_IDE_ROOT, rel))
     root = os.path.realpath(_IDE_ROOT)
+    full = os.path.realpath(os.path.join(root, rel))
     if full != root and not full.startswith(root + os.sep):
         return None
+    if not os.path.exists(full):
+        lib = os.path.realpath(_IDE_LIB)
+        lib_full = os.path.realpath(os.path.join(lib, rel))
+        if (lib_full == lib or lib_full.startswith(lib + os.sep)) and os.path.exists(lib_full):
+            return lib_full
     return full
 
 

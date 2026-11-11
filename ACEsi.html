@@ -431,21 +431,7 @@
             color: #888;
         }
 
-        /* Explorer tree icons - replace emoji with CSS */
-        .folder-icon {
-            color: #ff9d00;
-            margin-right: 6px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .file-icon {
-            color: #888;
-            margin-right: 6px;
-            font-size: 11px;
-        }
-
         /* Line numbers for Auto Fix diff panes */
-        .autofix-row {
         .autofix-row {
             display: flex;
             align-items: flex-start;
@@ -505,11 +491,201 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 
+
     <style>
-        /* Highlight files (leaf nodes) on hover in the Explorer, VS Code style */
-        #explorer div:not(:has(div)):hover {
-            background-color: #333 !important;
-            color: #fff !important;
+        /* ===== Explorer: VS Code / Material Icon Theme parity ===== */
+        #explorer-panel {
+            background: #252526;
+            border: none;
+            border-left: 1px solid #1b1b1c;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #explorer-panel .panel-header {
+            background: #252526;
+            border-bottom: none;
+            color: #bbbbbb;
+            font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: 22px;
+            padding: 0 6px 0 12px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-transform: uppercase;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #explorer-panel .explorer-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            opacity: 0;
+            transition: opacity 80ms linear;
+        }
+
+        #explorer-panel .panel-header:hover .explorer-actions {
+            opacity: 1;
+        }
+
+        #explorer-panel .explorer-action {
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: none;
+            border-radius: 3px;
+            background: transparent;
+            color: #cccccc;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0;
+            line-height: 0;
+        }
+
+        #explorer-panel .explorer-action:hover {
+            background: #3c3c3c !important;
+            color: #ffffff !important;
+        }
+
+        #explorer {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 0;
+            margin: 0;
+            background: #252526;
+            color: #cccccc;
+            font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 13px;
+            line-height: 22px;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: default;
+            outline: none;
+        }
+
+        #explorer::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        #explorer::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #explorer::-webkit-scrollbar-thumb {
+            background: rgba(121, 121, 121, 0.4);
+            border: 3px solid transparent;
+            background-clip: padding-box;
+        }
+
+        #explorer::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 100, 100, 0.7);
+            border: 3px solid transparent;
+            background-clip: padding-box;
+        }
+
+        #explorer .tree-row {
+            display: flex;
+            align-items: center;
+            height: 22px;
+            line-height: 22px;
+            padding: 0 8px;
+            box-sizing: border-box;
+            white-space: nowrap;
+            cursor: pointer;
+            position: relative;
+            border: 1px solid transparent;
+            color: #cccccc;
+        }
+
+        #explorer .tree-row:hover {
+            background: #2a2d2e;
+        }
+
+        #explorer .tree-row.selected {
+            background: #04395e;
+            color: #ffffff;
+            border-color: #007fd4;
+        }
+
+        #explorer .indent {
+            flex: 0 0 8px;
+            width: 8px;
+            align-self: stretch;
+            position: relative;
+        }
+
+        #explorer .indent::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 1px;
+            background: #585858;
+            opacity: 0;
+            transition: opacity 80ms linear;
+        }
+
+        #explorer:hover .indent::before {
+            opacity: 1;
+        }
+
+        #explorer .twistie {
+            flex: 0 0 16px;
+            width: 16px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #explorer .twistie::before {
+            content: "";
+            width: 5px;
+            height: 5px;
+            border-right: 1.4px solid #cccccc;
+            border-bottom: 1.4px solid #cccccc;
+            transform: rotate(-45deg);
+            transition: transform 100ms ease;
+        }
+
+        #explorer .tree-row.expanded > .twistie::before {
+            transform: rotate(45deg);
+        }
+
+        #explorer .twistie.empty::before {
+            display: none;
+        }
+
+        #explorer .icon {
+            flex: 0 0 16px;
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 16px 16px;
+        }
+
+        #explorer .label {
+            flex: 0 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 13px;
+            letter-spacing: 0;
         }
     </style>
     <style>
@@ -560,6 +736,7 @@
     <style>
         /* ===== Mobile responsiveness ===== */
         @media (max-width: 768px) {
+
             /* Stack the three panels vertically instead of side-by-side */
             #main-container {
                 flex-direction: column !important;
@@ -572,15 +749,8 @@
                is cramped or squashed. */
             #code-panel,
             #explorer-panel {
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-                min-height: 0 !important;
-                max-height: 0 !important;
-                overflow: hidden !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                border: none !important;
+                width: 100% !important;
+                min-height: 200px;
             }
 
             /* Chat panel takes full width and most of the screen */
@@ -608,7 +778,8 @@
             #chat-input {
                 min-height: 56px !important;
                 max-height: 300px !important;
-                font-size: 16px !important; /* prevents iOS zoom on focus */
+                font-size: 16px !important;
+                /* prevents iOS zoom on focus */
                 padding: 10px !important;
             }
 
@@ -621,7 +792,7 @@
             }
 
             /* Mic/speaker/upload button row */
-            #chat-input + button,
+            #chat-input+button,
             button[title="Mic"],
             button[title="Speaker"],
             button[title="Upload"] {
@@ -666,27 +837,60 @@
 
         /* Small tablets: give panels a bit more room but still stack below ~600px */
         @media (max-width: 600px) and (min-width: 480px) {
-            #chat-panel { min-height: 250px; }
-            #code-panel { min-height: 120px; }
-            #explorer-panel { min-height: 120px; }
+            #chat-panel {
+                min-height: 250px;
+            }
+
+            #code-panel {
+                min-height: 120px;
+            }
+
+            #explorer-panel {
+                width: 100% !important;
+                min-height: 200px;
+            }
         }
 
         /* Very small phones: panels even tighter */
         @media (max-width: 479px) {
-            #chat-panel { min-height: 200px; }
-            #code-panel { min-height: 100px; }
-            #explorer-panel { min-height: 100px; }
-            #code-editor { font-size: 13px !important; line-height: 20px !important; }
-            #line-numbers { font-size: 13px !important; line-height: 20px !important; }
+            #chat-panel {
+                min-height: 200px;
+            }
+
+            #code-panel {
+                min-height: 100px;
+            }
+
+            #explorer-panel {
+                min-height: 100px;
+            }
+
+            #code-editor {
+                font-size: 13px !important;
+                line-height: 20px !important;
+            }
+
+            #line-numbers {
+                font-size: 13px !important;
+                line-height: 20px !important;
+            }
         }
 
         /* Mobile model bar: show only on phones/tablets */
         @media (max-width: 768px) {
-            #mobile-model-bar { display: block !important; }
-            #current-model-indicator, #model-spinner { display: none !important; }
+            #mobile-model-bar {
+                display: block !important;
+            }
+
+            #current-model-indicator,
+            #model-spinner {
+                display: none !important;
+            }
+
             #mobile-model-indicator {
                 vertical-align: middle !important;
             }
+
             #mobile-model-spinner {
                 vertical-align: middle !important;
                 margin-top: 0 !important;
@@ -694,7 +898,9 @@
         }
 
         /* Hide mobile model bar on desktop */
-        #mobile-model-bar { display: none; }
+        #mobile-model-bar {
+            display: none;
+        }
 
         /* ===== Amber hover on all buttons ===== */
         button:hover {
@@ -716,10 +922,12 @@
             cursor: pointer;
             margin: 6px 0;
         }
+
         .collapsible-header:hover {
             background: #ff9d00;
             color: #000;
         }
+
         .collapsible-content {
             display: none;
             padding: 10px;
@@ -727,6 +935,7 @@
             border-top: none;
             background: #0a0a0a;
         }
+
         .collapsible-content.open {
             display: block;
         }
@@ -740,6 +949,7 @@
             color: #ff9d00 !important;
             border: 1px solid #ff9d00 !important;
         }
+
         #settings-panel button[data-tab]:hover {
             background: #ff9d00 !important;
             color: #000 !important;
@@ -757,12 +967,15 @@
             animation: model-spin 1s linear infinite;
             vertical-align: middle;
         }
+
         #model-spinner.status-ok {
             border-color: #00ff00;
         }
+
         #model-spinner.status-dead {
             border-color: #ff0000;
         }
+
         /* Mobile model spinner */
         #mobile-model-spinner {
             display: inline-block;
@@ -774,15 +987,23 @@
             animation: model-spin 1s linear infinite;
             vertical-align: middle;
         }
+
         #mobile-model-spinner.status-ok {
             border-color: #00ff00;
         }
+
         #mobile-model-spinner.status-dead {
             border-color: #ff0000;
         }
+
         @keyframes model-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -868,7 +1089,7 @@
             style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;margin:2px;">Close</button>
     </div>
 
-        <div id="settings-panel"
+    <div id="settings-panel"
         style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #ff9d00;padding:20px;z-index:10000;font-family:'Roboto Mono',monospace;color:#ff9d00;width:520px;max-height:85vh;overflow-y:auto;">
         <div style="margin-bottom:12px;">
             <button data-tab="settings-tab-ai" onclick="switchTab('settings-tab-ai')"
@@ -922,7 +1143,8 @@
                 <span style="font-size:10px;">▼</span>
             </div>
             <div class="collapsible-content" id="api-keys-collapse">
-                <div style="font-size:10px;color:#888;margin-bottom:6px;">Keys are saved to config.json on the server.</div>
+                <div style="font-size:10px;color:#888;margin-bottom:6px;">Keys are saved to config.json on the server.
+                </div>
                 <label style="display:block;margin-bottom:2px;font-size:10px;">Groq API Key</label>
                 <input type="text" id="settings-groq-key"
                     style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
@@ -931,7 +1153,8 @@
                 <input type="text" id="settings-openrouter-key"
                     style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
                     placeholder="Enter OpenRouter API Key">
-                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Ollama Host (default http://localhost:11434)</label>
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">Ollama Host (default
+                    http://localhost:11434)</label>
                 <input type="text" id="settings-ollama-host"
                     style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
                     placeholder="http://localhost:11434">
@@ -955,7 +1178,8 @@
                 <input type="text" id="settings-sambanova-key"
                     style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
                     placeholder="Enter SambaNova API Key">
-                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">HuggingFace API Key</label>
+                <label style="display:block;margin-top:4px;margin-bottom:2px;font-size:10px;">HuggingFace API
+                    Key</label>
                 <input type="text" id="settings-hf-key"
                     style="width:100%;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:6px;font-family:'Roboto Mono',monospace;font-size:10px;"
                     placeholder="Enter HF API Key">
@@ -1107,7 +1331,9 @@
                         style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">🔊</button>
                     <button onclick="document.getElementById('chat-file').click()" title="Upload"
                         style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer;">➕</button>
-                    <span id="mobile-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:1px 6px;border-radius:3px;margin-left:8px;">openai/gpt-oss-120b</span><span id="mobile-model-spinner" class="status-ok" title="Model status: OK"></span>
+                    <span id="mobile-model-indicator"
+                        style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:1px 6px;border-radius:3px;margin-left:8px;">openai/gpt-oss-120b</span><span
+                        id="mobile-model-spinner" class="status-ok" title="Model status: OK"></span>
                 </div>
 
                 <div id="spinner-right" class="spinner" style="width:20px;"></div>
@@ -1128,7 +1354,8 @@
                         style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;"
                         onclick="openAutoFix()">Auto Fix</button>
                     <button id="clear-btn" class="btn" title="Clear editor"
-                        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">🧹 Clear</button>
+                        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">🧹
+                        Clear</button>
                     <button id="copy-btn" class="btn" title="Copy to clipboard"
                         style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;margin-bottom:2px;">Copy</button>
                     <button id="paste-btn" class="btn" title="Paste from clipboard"
@@ -1152,7 +1379,8 @@
                         <button type="button"
                             onclick="window.find(document.getElementById('search-input').value, false, false, true, false, false, false);"
                             style="background:#ff9d00; color:#000; cursor:pointer;">Find</button>
-                        <button type="button" onclick="document.getElementById('search-input').value=''; document.getElementById('editor-search').style.display='none';"
+                        <button type="button"
+                            onclick="document.getElementById('search-input').value=''; document.getElementById('editor-search').style.display='none';"
                             style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:4px 8px;font-size:11px;cursor:pointer;">✕</button>
                     </div>
                 </div>
@@ -1170,136 +1398,25 @@
 
         <!-- Explorer Panel -->
         <div id="explorer-panel" class="panel">
-            <div class="panel-header">EXPLORER</div>
-            <div id="explorer">Loading...</div>
+            <div class="panel-header">
+                <span>EXPLORER</span>
+                <span class="explorer-actions">
+                    <button class="explorer-action" title="Refresh Explorer" onclick="loadExplorer()" type="button">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                            stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M13.2 8a5.2 5.2 0 1 1-1.7-3.85" />
+                            <path d="M13 2.2v3.1H9.9" />
+                        </svg>
+                    </button>
+                </span>
+            </div>
+            <div id="explorer" role="tree" aria-label="Explorer"></div>
         </div>
     </div>
     <script>
+        window.currentFile = null; // Track the currently opened file
         document.addEventListener("DOMContentLoaded", function () {
-            console.log("JS: Explorer script started");
-            window.currentFile = null; // Track the currently opened file
-
-            // Use the exact URL that we know is working from the curl command
-            fetch('/api/files')
-                .then(response => {
-                    if (!response.ok) throw new Error("HTTP error " + response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("JS: Data received", data);
-                    const explorerDiv = document.getElementById('explorer'); // Make sure this ID matches your HTML container // Make sure this ID matches your HTML container
-                    if (!explorerDiv) {
-                        console.error("Could not find the explorer container div!");
-                        return;
-                    }
-
-                    explorerDiv.innerHTML = ""; // Clear "Loading..."
-
-                    // Build a nested tree from the flat paths
-                    const tree = {};
-                    data.forEach(path => {
-                        const parts = path.split('/');
-                        let current = tree;
-                        parts.forEach((part, index) => {
-                            if (index === parts.length - 1) {
-                                current[part] = 'file:' + path; // It's a file
-                            } else {
-                                if (!current[part] || typeof current[part] === 'string') {
-                                    current[part] = {}; // It's a folder
-                                }
-                                current = current[part];
-                            }
-                        });
-
-                        // ResizeObserver to measure #code-editor-wrap and adjust CodeMirror size
-                        var resizeObserver = new ResizeObserver(function (entries) {
-                            for (var entry of entries) {
-                                var wrap = document.getElementById('code-editor-wrap');
-                                if (wrap) {
-                                    var wrapHeight = wrap.clientHeight;
-                                    cm.setSize('100%', wrapHeight + 'px');
-                                    cm.refresh();
-                                }
-                            }
-                        });
-                        resizeObserver.observe(document.getElementById('code-editor-wrap'));
-                    });
-
-                    // Render the tree recursively
-                    function renderTree(node, parentElement, indentLevel) {
-                        const keys = Object.keys(node).sort((a, b) => {
-                            // Folders first, then files
-                            const aIsFile = typeof node[a] === 'string';
-                            const bIsFile = typeof node[b] === 'string';
-                            if (!aIsFile && bIsFile) return -1;
-                            if (aIsFile && !bIsFile) return 1;
-                            return a.localeCompare(b);
-                        });
-
-                        keys.forEach(key => {
-                            const value = node[key];
-                            const div = document.createElement("div");
-                            div.style.padding = "3px";
-                            div.style.paddingLeft = (indentLevel * 12) + "px";
-                            div.style.cursor = "pointer";
-                            div.style.color = "#ff9d00";
-                            div.style.fontFamily = "monospace";
-
-                            if (typeof value === 'string') {
-                                // It's a file
-                                const filePath = value.replace('file:', '');
-                                div.innerHTML = '<span class="file-icon">▪</span> ' + key;
-                                div.onclick = function (event) {
-                                    event.stopPropagation();
-                                    // Your original file click logic goes here
-                                    console.log("Clicked file: " + filePath);
-                                    window.currentFile = filePath;
-                                    fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
-                                        .then(res => res.text())
-                                        .then(fileData => {
-                                            document.getElementById('code-editor').value = fileData;
-                                            if (typeof updateLineNumbers === 'function') updateLineNumbers();
-                                            if (window.aceEditorRefresh) window.aceEditorRefresh();
-                                            fetch('http://127.0.0.1:5000/api/context/file', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
-                                            }).catch(e => console.warn(e));
-                                        })
-                                        .catch(err => alert("Failed to load file: " + err.message));
-                                };
-                            } else {
-                                // It's a folder
-                                const folderDiv = document.createElement("div");
-                                folderDiv.innerHTML = '<span class="folder-icon">▶</span> ' + key;
-                                folderDiv.style.color = "#ff9d00";
-
-                                const childrenDiv = document.createElement("div");
-                                childrenDiv.style.display = "none"; // Collapsed by default
-
-                                folderDiv.onclick = function (e) {
-                                    e.stopPropagation();
-                                    childrenDiv.style.display = childrenDiv.style.display === "none" ? "block" : "none";
-                                    folderDiv.querySelector('.folder-icon').textContent = childrenDiv.style.display === 'none' ? '▶' : '▼';
-                                };
-
-                                renderTree(value, childrenDiv, indentLevel + 1);
-                                div.appendChild(folderDiv);
-                                div.appendChild(childrenDiv);
-                                parentElement.appendChild(div);
-                                return;
-                            }
-                            parentElement.appendChild(div);
-                        });
-                    }
-
-                    renderTree(tree, explorerDiv, 0);
-                })
-                .catch(error => {
-                    console.error("JS FETCH ERROR:", error);
-                    const explorerDiv = document.getElementById('explorer-content');
-                    if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
-                });
+            loadExplorer();
         });
 
 
@@ -1367,197 +1484,267 @@
         window.restartAcesi = restartAcesi;
 
         // --- Restore missing button event listeners ---
-        
-        // Load Explorer file list
-        async function loadExplorer() {
+
+        var EXPLORER_ICON_URIS = {
+            "dart": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHBhdGggZmlsbD0iIzRmYzNmNyIgZD0iTTE2LjgzIDJhMS4zIDEuMyAwIDAgMC0uOTE2LjM3N2wtLjAxMy4wMUw3LjMyMyA3LjM0bDguNTU2IDguNTV2LjAwNWwxMC4yODMgMTAuMjc3IDEuOTYtMy41MjktNy4wNjgtMTYuOTYtMy4yOTktMy4yOTdBMS4zIDEuMyAwIDAgMCAxNi44MjggMloiLz48cGF0aCBmaWxsPSIjMDE1NzliIiBkPSJtNy4zNDMgNy4zMi00Ljk1NSA4LjU2NS0uMDEuMDEzYTEuMjk3IDEuMjk3IDAgMCAwIC4wMDQgMS44MzVsLjAwNS4wMDUgNC4xMDYgNC4xMDcgMTYuMDY0IDYuMzE0IDMuNjMyLTIuMDE1LS4wOTgtLjA5OC0uMDI1LjAwMkwxNS45OTUgMTUuOTdoLS4wMTJ6Ii8+PHBhdGggZmlsbD0iIzAxNTc5YiIgZD0ibTcuMzIxIDcuMzI0IDguNzUzIDguNzU1aC4wMTNMMjYuMTYgMjYuMTU2bDMuODM1LS43M0wzMCAxNC4wODlsLTQuMDQ5LTMuOTY1YTYuNSA2LjUgMCAwIDAtMy42MTgtMS42MTJsLjAwMi0uMDQzTDcuMzIzIDcuMzI1WiIvPjxwYXRoIGZpbGw9IiM2NGI1ZjYiIGQ9Im03LjMzMiA3LjMzNSA4Ljc1OCA4Ljc1di4wMTNsMTAuMDc5IDEwLjA3MUwyNS40MzYgMzBIMTQuMDlsLTMuOTY3LTQuMDQ4YTYuNSA2LjUgMCAwIDEtMS42MTEtMy42MThsLS4wNDUuMDA0WiIvPjwvc3ZnPg==",
+            "file": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0ibTguNjY4IDZoMy42NjQxbC0zLjY2NDEtMy42Njh2My42NjhtLTQuNjY4LTQuNjY4aDUuMzMybDQgNHY4YzAgMC43MzgyOC0wLjU5Mzc1IDEuMzM1OS0xLjMzMiAxLjMzNTloLThjLTAuNzM4MjggMC0xLjMzMi0wLjU5NzY2LTEuMzMyLTEuMzM1OXYtMTAuNjY0YzAtMC43NDIxOSAwLjU5Mzc1LTEuMzM1OSAxLjMzMi0xLjMzNTltMy4zMzIgMS4zMzU5aC0zLjMzMnYxMC42NjRoOHYtNmgtNC42Njh6IiBmaWxsPSIjOTBhNGFlIiAvPjwvc3ZnPg==",
+            "folder": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIgZmlsbD0iIzkwYTRhZSIgLz48L3N2Zz4=",
+            "folder-class": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2VmNTM1MCIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmNkZDIiIGQ9Ik04IDZ2N2ExIDEgMCAwIDAgMSAxaDZhMSAxIDAgMCAwIDEtMVY2YTEgMSAwIDAgMC0xLTFIOWExIDEgMCAwIDAtMSAxbTcgN0g5di0yaDZ6bTAtM0g5VjhoNnoiLz48L3N2Zz4=",
+            "folder-class-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2VmNTM1MCIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmNkZDIiIGQ9Ik04IDZ2N2ExIDEgMCAwIDAgMSAxaDZhMSAxIDAgMCAwIDEtMVY2YTEgMSAwIDAgMC0xLTFIOWExIDEgMCAwIDAtMSAxbTcgN0g5di0yaDZ6bTAtM0g5VjhoNnoiLz48L3N2Zz4=",
+            "folder-components": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2MwY2EzMyIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmMGY0YzMiIGQ9Ik02IDEwaDR2NEg2em01IDBoNHY0aC00ek02IDVoNHY0SDZ6bTQuMTcyIDJMMTMgNC4xNzIgMTUuODI5IDcgMTMgOS44Mjl6Ii8+PC9zdmc+",
+            "folder-components-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2MwY2EzMyIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmMGY0YzMiIGQ9Ik02IDEwaDR2NEg2em01IDBoNHY0aC00ek02IDVoNHY0SDZ6bTQuMTcyIDJMMTMgNC4xNzIgMTUuODI5IDcgMTMgOS44Mjl6Ii8+PC9zdmc+",
+            "folder-constant": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzYwN2Q4YiIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNjZmQ4ZGMiIGQ9Ik04IDhoMnY2SDhabTMgMGgydjZoLTJ6bTMgMGgydjZoLTJ6Ii8+PC9zdmc+",
+            "folder-constant-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzYwN2Q4YiIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNjZmQ4ZGMiIGQ9Ik04IDhoMnY2SDhabTMgMGgydjZoLTJ6bTMgMGgydjZoLTJ6Ii8+PC9zdmc+",
+            "folder-controller": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2ZmYzEwNyIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmY5YzQiIGQ9Ik0xMS41IDEyLjA3NUExLjYgMS42IDAgMCAxIDkuODggMTAuNWExLjYyIDEuNjIgMCAxIDEgMS42MiAxLjU3NW0zLjQzOC0xLjEzOGE0IDQgMCAwIDAgLjAzMi0uNDM3IDQgNCAwIDAgMC0uMDMyLS40NWwuOTc2LS43MzRhLjIyMy4yMjMgMCAwIDAgLjA1Ni0uMjg4bC0uOTI3LTEuNTU2YS4yMy4yMyAwIDAgMC0uMjgyLS4xbC0xLjE1LjQ1YTMuNCAzLjQgMCAwIDAtLjc4My0uNDRsLS4xNzEtMS4xOTNBLjIzLjIzIDAgMCAwIDEyLjQyNSA2aC0xLjg1YS4yMy4yMyAwIDAgMC0uMjMyLjE4OWwtLjE3IDEuMTkzYTMuNCAzLjQgMCAwIDAtLjc4Mi40NGwtMS4xNTItLjQ1YS4yMy4yMyAwIDAgMC0uMjgyLjFsLS45MjUgMS41NTZhLjIyLjIyIDAgMCAwIC4wNTYuMjg4bC45NzUuNzM0YTQgNCAwIDAgMC0uMDMyLjQ1IDQgNCAwIDAgMCAuMDMyLjQzN2wtLjk3NS43NDZhLjIyLjIyIDAgMCAwLS4wNTYuMjg4bC45MjUgMS41NThhLjIzNS4yMzUgMCAwIDAgLjI4Mi4wOTlsMS4xNTItLjQ1NWEzLjIgMy4yIDAgMCAwIC43ODIuNDQ2bC4xNyAxLjE5MmEuMjMuMjMgMCAwIDAgLjIzMi4xODloMS44NWEuMjMuMjMgMCAwIDAgLjIzMi0uMTg5bC4xNy0xLjE5MmEzLjQgMy40IDAgMCAwIC43ODMtLjQ0NmwxLjE1MS40NTVhLjI0LjI0IDAgMCAwIC4yODMtLjFsLjkyNi0xLjU1N2EuMjIzLjIyMyAwIDAgMC0uMDU2LS4yODh6Ii8+PC9zdmc+",
+            "folder-controller-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2ZmYzEwNyIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmY5YzQiIGQ9Ik0xMS41IDEyLjA3NUExLjYgMS42IDAgMCAxIDkuODggMTAuNWExLjYyIDEuNjIgMCAxIDEgMS42MiAxLjU3NW0zLjQzOC0xLjEzOGE0IDQgMCAwIDAgLjAzMi0uNDM3IDQgNCAwIDAgMC0uMDMyLS40NWwuOTc2LS43MzRhLjIyMy4yMjMgMCAwIDAgLjA1Ni0uMjg4bC0uOTI3LTEuNTU2YS4yMy4yMyAwIDAgMC0uMjgyLS4xbC0xLjE1LjQ1YTMuNCAzLjQgMCAwIDAtLjc4My0uNDRsLS4xNzEtMS4xOTNBLjIzLjIzIDAgMCAwIDEyLjQyNSA2aC0xLjg1YS4yMy4yMyAwIDAgMC0uMjMyLjE4OWwtLjE3IDEuMTkzYTMuNCAzLjQgMCAwIDAtLjc4Mi40NGwtMS4xNTItLjQ1YS4yMy4yMyAwIDAgMC0uMjgyLjFsLS45MjUgMS41NTZhLjIyLjIyIDAgMCAwIC4wNTYuMjg4bC45NzUuNzM0YTQgNCAwIDAgMC0uMDMyLjQ1IDQgNCAwIDAgMCAuMDMyLjQzN2wtLjk3NS43NDZhLjIyLjIyIDAgMCAwLS4wNTYuMjg4bC45MjUgMS41NThhLjIzNS4yMzUgMCAwIDAgLjI4Mi4wOTlsMS4xNTItLjQ1NWEzLjIgMy4yIDAgMCAwIC43ODIuNDQ2bC4xNyAxLjE5MmEuMjMuMjMgMCAwIDAgLjIzMi4xODloMS44NWEuMjMuMjMgMCAwIDAgLjIzMi0uMTg5bC4xNy0xLjE5MmEzLjQgMy40IDAgMCAwIC43ODMtLjQ0NmwxLjE1MS40NTVhLjI0LjI0IDAgMCAwIC4yODMtLjFsLjkyNi0xLjU1N2EuMjIzLjIyMyAwIDAgMC0uMDU2LS4yODh6Ii8+PC9zdmc+",
+            "folder-core": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzE5NzZkMiIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNiYmRlZmIiIGQ9Ik05IDd2NWg1VjdabTQgNGgtM1Y4aDN6TTcgNmgxVjVhMSAxIDAgMCAwLTEgMW0yLTFoMXYxSDlabTIgMGgxdjFoLTF6bTIgMGgxdjFoLTF6bTIgMHYxaDFhMSAxIDAgMCAwLTEtMW0wIDJoMXYxaC0xem0wIDJoMXYxaC0xem0wIDJoMXYxaC0xem0wIDNhMSAxIDAgMCAwIDEtMWgtMXptLTItMWgxdjFoLTF6bS0yIDBoMXYxaC0xem0tMiAwaDF2MUg5Wm0tMSAxdi0xSDdhMSAxIDAgMCAwIDEgMW0tMS0zaDF2MUg3Wm0wLTJoMXYxSDdabTAtMmgxdjFIN1oiLz48L3N2Zz4=",
+            "folder-core-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzE5NzZkMiIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNiYmRlZmIiIGQ9Ik05IDd2NWg1VjdabTQgNGgtM1Y4aDN6TTcgNmgxVjVhMSAxIDAgMCAwLTEgMW0yLTFoMXYxSDlabTIgMGgxdjFoLTF6bTIgMGgxdjFoLTF6bTIgMHYxaDFhMSAxIDAgMCAwLTEtMW0wIDJoMXYxaC0xem0wIDJoMXYxaC0xem0wIDJoMXYxaC0xem0wIDNhMSAxIDAgMCAwIDEtMWgtMXptLTItMWgxdjFoLTF6bS0yIDBoMXYxaC0xem0tMiAwaDF2MUg5Wm0tMSAxdi0xSDdhMSAxIDAgMCAwIDEgMW0tMS0zaDF2MUg3Wm0wLTJoMXYxSDdabTAtMmgxdjFIN1oiLz48L3N2Zz4=",
+            "folder-database": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2ZmY2EyOCIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmVjYjMiIGQ9Ik0xMiA1YTQgMiAwIDAgMC00IDIgNCAyIDAgMCAwIDQgMiA0IDIgMCAwIDAgNC0yIDQgMiAwIDAgMC00LTJNOCA4djJjMCAxLjEwNSAxLjc5MSAyIDQgMnM0LS44OTUgNC0yVjhjMCAxLjEwNS0xLjc5MSAyLTQgMnMtNC0uODk1LTQtMm0wIDN2MmMwIDEuMTA1IDEuNzkxIDIgNCAyczQtLjg5NSA0LTJ2LTJjMCAxLjEwNS0xLjc5MSAyLTQgMnMtNC0uODk1LTQtMiIvPjwvc3ZnPg==",
+            "folder-database-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2ZmY2EyOCIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmZmVjYjMiIGQ9Ik0xMiA1YTQgMiAwIDAgMC00IDIgNCAyIDAgMCAwIDQgMiA0IDIgMCAwIDAgNC0yIDQgMiAwIDAgMC00LTJNOCA4djJjMCAxLjEwNSAxLjc5MSAyIDQgMnM0LS44OTUgNC0yVjhjMCAxLjEwNS0xLjc5MSAyLTQgMnMtNC0uODk1LTQtMm0wIDN2MmMwIDEuMTA1IDEuNzkxIDIgNCAyczQtLjg5NSA0LTJ2LTJjMCAxLjEwNS0xLjc5MSAyLTQgMnMtNC0uODk1LTQtMiIvPjwvc3ZnPg==",
+            "folder-lib": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2MwY2EzMyIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmMGY0YzMiIGQ9Ik0xMS41IDhhMS41IDEuNSAwIDAgMCAuMDAyLTNIMTEuNUExLjUgMS41IDAgMCAwIDEwIDYuNSAxLjUgMS41IDAgMCAwIDExLjUgOG0wIDEuOTg3QzEwLjM4NyA4Ljk0NyA4LjUyMyA3Ljk5NiA3IDh2NWMxLjU5NSAwIDMuNDI1IDEuMDAyIDQuNSAyIDEuMTEzLTEuMDM5IDIuOTc4LTIuMDAyIDQuNS0yVjhjLTEuNTIyLS4wMDMtMy4zODcuOTQ3LTQuNSAxLjk4NiIvPjwvc3ZnPg==",
+            "folder-lib-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2MwY2EzMyIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNmMGY0YzMiIGQ9Ik0xMS41IDhhMS41IDEuNSAwIDAgMCAuMDAyLTNIMTEuNUExLjUgMS41IDAgMCAwIDEwIDYuNSAxLjUgMS41IDAgMCAwIDExLjUgOG0wIDEuOTg3QzEwLjM4NyA4Ljk0NyA4LjUyMyA3Ljk5NiA3IDh2NWMxLjU5NSAwIDMuNDI1IDEuMDAyIDQuNSAyIDEuMTEzLTEuMDM5IDIuOTc4LTIuMDAyIDQuNS0yVjhjLTEuNTIyLS4wMDMtMy4zODcuOTQ3LTQuNSAxLjk4NiIvPjwvc3ZnPg==",
+            "folder-open": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIgZmlsbD0iIzkwYTRhZSIgLz48L3N2Zz4=",
+            "folder-root": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzkwYTRhZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjMiIGZpbGw9IiM5MGE0YWUiLz48L3N2Zz4=",
+            "folder-root-open": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzkwYTRhZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+",
+            "folder-routes": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzQzYTA0NyIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNjOGU2YzkiIGQ9Ik04LjcwNyA3LjI5MyAxMCA2SDZ2NGwxLjI5My0xLjI5MyAyLjQ1NSAyLjQ1NWEuODUuODUgMCAwIDEgLjI1Mi42MDhWMTRoMnYtMi4yM2EyLjg0IDIuODQgMCAwIDAtLjgzOC0yLjAyMlpNMTQuNjggNmwtMi44MDUgMi40NjUuMjg1LjI4NWEyLjggMi44IDAgMCAxIC43OCAxLjQ0NUwxNiA3LjUwNVoiLz48L3N2Zz4=",
+            "folder-routes-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzQzYTA0NyIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNjOGU2YzkiIGQ9Ik04LjcwNyA3LjI5MyAxMCA2SDZ2NGwxLjI5My0xLjI5MyAyLjQ1NSAyLjQ1NWEuODUuODUgMCAwIDEgLjI1Mi42MDhWMTRoMnYtMi4yM2EyLjg0IDIuODQgMCAwIDAtLjgzOC0yLjAyMlpNMTQuNjggNmwtMi44MDUgMi40NjUuMjg1LjI4NWEyLjggMi44IDAgMCAxIC43OCAxLjQ0NUwxNiA3LjUwNVoiLz48L3N2Zz4=",
+            "folder-theme": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzFlODhlNSIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNiYmRlZmIiIGQ9Ik0xMC45OTkgNUM4IDUgNiA3IDYgMTBhNSA1IDAgMCAwIDUgNWMuNDYgMCAxIDAgMS0xIDAtLjIxOC0uMjg0LS4zOTItLjQ4Mi0uNTlBMS4xOSAxLjE5IDAgMCAxIDExIDEyLjVjMC0uNS41LS41IDEtLjVoMmMyIDAgMi0yIDItMyAwLTItMi00LTUuMDAxLTRNOCAxMGExIDEgMCAxIDEgMS0xIDEgMSAwIDAgMS0xIDFtMy0yYTEgMSAwIDEgMSAxLTEgMSAxIDAgMCAxLTEgMW0zIDJhMSAxIDAgMSAxIDEtMSAxIDEgMCAwIDEtMSAxIi8+PC9zdmc+",
+            "folder-theme-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzFlODhlNSIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNiYmRlZmIiIGQ9Ik0xMC45OTkgNUM4IDUgNiA3IDYgMTBhNSA1IDAgMCAwIDUgNWMuNDYgMCAxIDAgMS0xIDAtLjIxOC0uMjg0LS4zOTItLjQ4Mi0uNTlBMS4xOSAxLjE5IDAgMCAxIDExIDEyLjVjMC0uNS41LS41IDEtLjVoMmMyIDAgMi0yIDItMyAwLTItMi00LTUuMDAxLTRNOCAxMGExIDEgMCAxIDEgMS0xIDEgMSAwIDAgMS0xIDFtMy0yYTEgMSAwIDEgMSAxLTEgMSAxIDAgMCAxLTEgMW0zIDJhMSAxIDAgMSAxIDEtMSAxIDEgMCAwIDEtMSAxIi8+PC9zdmc+",
+            "folder-ui": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2FiNDdiYyIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNlMWJlZTciIGQ9Ik04IDdoOHYzSDhabTAgNGgzdjNIOFptNCAwaDR2M2gtNHoiLz48L3N2Zz4=",
+            "folder-ui-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iI2FiNDdiYyIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNlMWJlZTciIGQ9Ik04IDdoOHYzSDhabTAgNGgzdjNIOFptNCAwaDR2M2gtNHoiLz48L3N2Zz4=",
+            "folder-utils": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzdjYjM0MiIgZD0ibTYuOTIyIDMuNzY4LS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDEyYTEgMSAwIDAgMCAxLTFWNWExIDEgMCAwIDAtMS0xSDcuNTYyYTEgMSAwIDAgMS0uNjQtLjIzMiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNkY2VkYzgiIGQ9Ik05LjUgNmEuNS41IDAgMCAwLS41LjV2NmEuNS41IDAgMCAwIC41LjVoNmEuNS41IDAgMCAwIC41LS41di02YS41LjUgMCAwIDAtLjUtLjV6TTEyIDdoMXYyaDJ2MWgtMnYyaC0xdi0yaC0yVjloMnpNNyA4djYuNWEuNS41IDAgMCAwIC41LjVIMTR2LTFIOFY4eiIvPjwvc3ZnPg==",
+            "folder-utils-open": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggaWQ9ImZvbGRlciIgZmlsbD0iIzdjYjM0MiIgZD0iTTE0LjQ4MyA2SDQuNzIxYTEgMSAwIDAgMC0uOTQ5LjY4NEwyIDEyVjVoMTJhMSAxIDAgMCAwLTEtMUg3LjU2MmExIDEgMCAwIDEtLjY0LS4yMzJsLS42NDQtLjUzNkExIDEgMCAwIDAgNS42MzggM0gyYTEgMSAwIDAgMC0xIDF2OGExIDEgMCAwIDAgMSAxaDExbDIuNDAzLTUuNjA2QTEgMSAwIDAgMCAxNC40ODMgNiIvPjxwYXRoIGlkPSJtb3RpdmUiIGZpbGw9IiNkY2VkYzgiIGQ9Ik05LjUgNmEuNS41IDAgMCAwLS41LjV2NmEuNS41IDAgMCAwIC41LjVoNmEuNS41IDAgMCAwIC41LS41di02YS41LjUgMCAwIDAtLjUtLjV6TTEyIDdoMXYyaDJ2MWgtMnYyaC0xdi0yaC0yVjloMnpNNyA4djYuNWEuNS41IDAgMCAwIC41LjVIMTR2LTFIOFY4eiIvPjwvc3ZnPg=="
+        };
+
+        var EXPLORER_FOLDER_ICONS = {
+            core: 'folder-core',
+            data: 'folder-database',
+            models: 'folder-class',
+            presentation: 'folder-ui',
+            services: 'folder-controller',
+            widgets: 'folder-components',
+            constants: 'folder-constant',
+            router: 'folder-routes',
+            theme: 'folder-theme',
+            utils: 'folder-utils'
+        };
+
+        var EXPLORER_FILE_ICONS = { dart: 'dart' };
+        var EXPLORER_ROOT_NAME = 'LipSyncStudent';
+        var EXPLORER_ROOT_ICON = 'folder-root';
+        var EXPLORER_LIB_ICON = 'folder-lib';
+
+        window.ACE_EXPLORER_EXPANDED = window.ACE_EXPLORER_EXPANDED || new Set();
+        window.ACE_EXPLORER_TREE = null;
+
+        function explorerLoadState() {
+            if (window.ACE_EXPLORER_STATE_READY) return;
+            window.ACE_EXPLORER_STATE_READY = true;
             try {
-                const response = await fetch('/api/files');
-                if (!response.ok) throw new Error("HTTP error " + response.status);
-                const data = await response.json();
-                console.log("Explorer data received", data);
-                const explorerDiv = document.getElementById('explorer');
-                if (!explorerDiv) {
-                    console.error("Could not find the explorer container div!");
+                var saved = JSON.parse(localStorage.getItem('ace.explorer.expanded') || '[]');
+                if (Array.isArray(saved) && saved.length) {
+                    saved.forEach(function (p) { window.ACE_EXPLORER_EXPANDED.add(p); });
                     return;
                 }
-                explorerDiv.innerHTML = ""; // Clear "Loading..."
-                // Build a nested tree from the flat paths
-                const tree = {};
-                data.forEach(path => {
-                    const parts = path.split('/');
-                    let current = tree;
-                    parts.forEach((part, index) => {
-                        if (index === parts.length - 1) {
-                            current[part] = 'file:' + path; // It's a file
+            } catch (e) { /* ignore corrupt state */ }
+            window.ACE_EXPLORER_EXPANDED.add(EXPLORER_ROOT_NAME);
+            window.ACE_EXPLORER_EXPANDED.add(EXPLORER_ROOT_NAME + '/lib');
+        }
+
+        function explorerSaveState() {
+            try {
+                localStorage.setItem('ace.explorer.expanded', JSON.stringify(Array.from(window.ACE_EXPLORER_EXPANDED)));
+            } catch (e) { /* storage may be unavailable */ }
+        }
+
+        function explorerIconUrl(name, fallback) {
+            return EXPLORER_ICON_URIS[name] || EXPLORER_ICON_URIS[fallback] || EXPLORER_ICON_URIS.file;
+        }
+
+        function explorerFolderIconUrl(iconName, expanded) {
+            return explorerIconUrl(iconName + (expanded ? '-open' : ''), expanded ? 'folder-open' : 'folder');
+        }
+
+        function explorerFileIconUrl(name) {
+            var dot = name.lastIndexOf('.');
+            var ext = dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+            return explorerIconUrl(EXPLORER_FILE_ICONS[ext] || 'file', 'file');
+        }
+
+        function explorerMakeRow(depth, kind, name, path, expanded, iconUrl) {
+            var row = document.createElement('div');
+            var isSelected = kind === 'file' && window.currentFile === path;
+            row.className = 'tree-row' + (expanded ? ' expanded' : '') + (isSelected ? ' selected' : '');
+            row.dataset.depth = String(depth);
+            row.dataset.kind = kind;
+            row.dataset.path = path;
+            row.dataset.name = name;
+            row.setAttribute('role', 'treeitem');
+            if (kind === 'folder') {
+                row.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            }
+            row.title = kind === 'file' ? path : name;
+
+            for (var i = 0; i < depth; i++) {
+                var guide = document.createElement('span');
+                guide.className = 'indent';
+                row.appendChild(guide);
+            }
+
+            var twistie = document.createElement('span');
+            twistie.className = 'twistie' + (kind === 'file' ? ' empty' : '');
+            row.appendChild(twistie);
+
+            var icon = document.createElement('span');
+            icon.className = 'icon';
+            icon.style.backgroundImage = 'url("' + iconUrl + '")';
+            row.appendChild(icon);
+
+            var label = document.createElement('span');
+            label.className = 'label';
+            label.textContent = name;
+            row.appendChild(label);
+
+            return row;
+        }
+
+        function explorerOpenFile(row, filePath) {
+            var selected = document.querySelectorAll('#explorer .tree-row.selected');
+            for (var i = 0; i < selected.length; i++) {
+                selected[i].classList.remove('selected');
+            }
+            row.classList.add('selected');
+            window.currentFile = filePath;
+
+            fetch('/api/file-content?path=' + encodeURIComponent(filePath))
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.text();
+                })
+                .then(function (fileData) {
+                    var editor = document.getElementById('code-editor');
+                    if (editor) editor.value = fileData;
+                    if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    if (window.aceEditorRefresh) window.aceEditorRefresh();
+                    fetch('/api/context/file', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
+                    }).catch(function (e) { console.warn(e); });
+                })
+                .catch(function (err) {
+                    alert('Failed to load file: ' + err.message);
+                });
+        }
+
+        function explorerRenderTree(tree) {
+            var explorerDiv = document.getElementById('explorer');
+            if (!explorerDiv) return;
+
+            var scrollTop = explorerDiv.scrollTop || 0;
+            var frag = document.createDocumentFragment();
+
+            function walk(node, depth, prefix) {
+                var folderNames = Array.from(node.folders.keys()).sort(function (a, b) {
+                    return a.localeCompare(b);
+                });
+                var fileList = node.files.slice().sort(function (a, b) {
+                    return a.name.localeCompare(b.name);
+                });
+
+                folderNames.forEach(function (name) {
+                    var fullPath = prefix ? prefix + '/' + name : name;
+                    var expanded = window.ACE_EXPLORER_EXPANDED.has(fullPath);
+                    var iconName = EXPLORER_FOLDER_ICONS[name] || (name === 'lib' ? EXPLORER_LIB_ICON : 'folder');
+                    var row = explorerMakeRow(depth, 'folder', name, fullPath, expanded,
+                        explorerFolderIconUrl(iconName, expanded));
+                    row.addEventListener('click', function () {
+                        if (window.ACE_EXPLORER_EXPANDED.has(fullPath)) {
+                            window.ACE_EXPLORER_EXPANDED.delete(fullPath);
                         } else {
-                            if (!current[part] || typeof current[part] === 'string') {
-                                current[part] = {}; // It's a folder
+                            window.ACE_EXPLORER_EXPANDED.add(fullPath);
+                        }
+                        explorerSaveState();
+                        explorerRenderTree(window.ACE_EXPLORER_TREE);
+                    });
+                    frag.appendChild(row);
+                    if (expanded) walk(node.folders.get(name), depth + 1, fullPath);
+                });
+
+                fileList.forEach(function (file) {
+                    var row = explorerMakeRow(depth, 'file', file.name, file.path, false,
+                        explorerFileIconUrl(file.name));
+                    row.addEventListener('click', function () {
+                        explorerOpenFile(row, file.path);
+                    });
+                    frag.appendChild(row);
+                });
+            }
+
+            var rootExpanded = window.ACE_EXPLORER_EXPANDED.has(tree.name);
+            var rootRow = explorerMakeRow(0, 'folder', tree.name, tree.name, rootExpanded,
+                explorerFolderIconUrl(EXPLORER_ROOT_ICON, rootExpanded));
+            rootRow.addEventListener('click', function () {
+                if (window.ACE_EXPLORER_EXPANDED.has(tree.name)) {
+                    window.ACE_EXPLORER_EXPANDED.delete(tree.name);
+                } else {
+                    window.ACE_EXPLORER_EXPANDED.add(tree.name);
+                }
+                explorerSaveState();
+                explorerRenderTree(window.ACE_EXPLORER_TREE);
+            });
+            frag.appendChild(rootRow);
+
+            if (rootExpanded) walk(tree, 1, tree.name);
+
+            explorerDiv.innerHTML = '';
+            explorerDiv.appendChild(frag);
+            explorerDiv.scrollTop = scrollTop;
+        }
+
+        async function loadExplorer() {
+            var explorerDiv = document.getElementById('explorer');
+            if (!explorerDiv) return;
+
+            try {
+                var response = await fetch('/api/files', { cache: 'no-store' });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                var files = await response.json();
+
+                // Mirror VS Code: <project root> -> lib -> contents
+                var tree = { name: EXPLORER_ROOT_NAME, folders: new Map(), files: [] };
+                var lib = { name: 'lib', folders: new Map(), files: [] };
+                tree.folders.set('lib', lib);
+
+                files.forEach(function (p) {
+                    var parts = String(p).split('/').filter(Boolean);
+                    var node = lib;
+                    parts.forEach(function (part, index) {
+                        if (index === parts.length - 1) {
+                            node.files.push({ name: part, path: p });
+                        } else {
+                            if (!node.folders.has(part)) {
+                                node.folders.set(part, { name: part, folders: new Map(), files: [] });
                             }
-                            current = current[part];
+                            node = node.folders.get(part);
                         }
                     });
                 });
-                // Render the tree recursively
-                function renderTree(node, parentElement, indentLevel) {
-                    const keys = Object.keys(node).sort((a, b) => {
-                        const aIsFile = typeof node[a] === 'string';
-                        const bIsFile = typeof node[b] === 'string';
-                        if (!aIsFile && bIsFile) return -1;
-                        if (aIsFile && !bIsFile) return 1;
-                        return a.localeCompare(b);
-                    });
-                    keys.forEach(key => {
-                        const value = node[key];
-                        const div = document.createElement('div');
-                        div.style.padding = '3px';
-                        div.style.paddingLeft = (indentLevel * 12) + 'px';
-                        div.style.cursor = 'pointer';
-                        div.style.color = '#ff9d00';
-                        div.style.fontFamily = 'monospace';
-                        if (typeof value === 'string') {
-                            const filePath = value.replace('file:', '');
-                            div.textContent = '\u2704 ' + key;
-                            div.onclick = function (event) {
-                                event.stopPropagation();
-                                console.log('Clicked file: ' + filePath);
-                                window.currentFile = filePath;
-                                fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
-                                    .then(res => res.text())
-                                    .then(fileData => {
-                                        document.getElementById('code-editor').value = fileData;
-                                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
-                                        if (window.aceEditorRefresh) window.aceEditorRefresh();
-                                        fetch('http://127.0.0.1:5000/api/context/file', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
-                                        }).catch(e => console.warn(e));
-                                    })
-                                    .catch(err => alert('Failed to load file: ' + err.message));
-                            };
-                        } else {
-                            const folderDiv = document.createElement('div');
-                            folderDiv.textContent = '\u263c ' + key;
-                            folderDiv.style.color = '#ff9d00';
-                            const childrenDiv = document.createElement('div');
-                            childrenDiv.style.display = 'none'; // Collapsed by default
-                            folderDiv.onclick = function (e) {
-                                e.stopPropagation();
-                                childrenDiv.style.display = childrenDiv.style.display === 'none' ? 'block' : 'none';
-                                folderDiv.textContent = (childrenDiv.style.display === 'none' ? '\u263c ' : '\u263d ') + key;
-                            };
-                            renderTree(value, childrenDiv, indentLevel + 1);
-                            div.appendChild(folderDiv);
-                            div.appendChild(childrenDiv);
-                            parentElement.appendChild(div);
-                            return;
-                        }
-                        parentElement.appendChild(div);
-                    });
+
+                if (!window.ACE_EXPLORER_STATE_READY) {
+                    explorerLoadState();
                 }
-                renderTree(tree, explorerDiv, 0);
+
+                window.ACE_EXPLORER_TREE = tree;
+                explorerRenderTree(tree);
+                console.log('Explorer: rendered ' + files.length + ' files');
             } catch (e) {
                 console.error('Explorer error:', e);
-                const explorerDiv = document.getElementById('explorer');
-                if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
+                explorerDiv.innerHTML = '<div style="padding:8px;color:#f48771;font-size:12px;">Unable to load files.</div>';
             }
         }
 
-        // Load Explorer file list
-        async function loadExplorer() {
-            try {
-                const response = await fetch('/api/files');
-                if (!response.ok) throw new Error("HTTP error " + response.status);
-                const data = await response.json();
-                console.log("Explorer data received", data);
-                const explorerDiv = document.getElementById('explorer');
-                if (!explorerDiv) {
-                    console.error("Could not find the explorer container div!");
-                    return;
-                }
-                explorerDiv.innerHTML = ""; // Clear "Loading..."
-                // Build a nested tree from the flat paths
-                const tree = {};
-                data.forEach(path => {
-                    const parts = path.split('/');
-                    let current = tree;
-                    parts.forEach((part, index) => {
-                        if (index === parts.length - 1) {
-                            current[part] = 'file:' + path; // It's a file
-                        } else {
-                            if (!current[part] || typeof current[part] === 'string') {
-                                current[part] = {}; // It's a folder
-                            }
-                            current = current[part];
-                        }
-                    });
-                });
-                // Render the tree recursively
-                function renderTree(node, parentElement, indentLevel) {
-                    const keys = Object.keys(node).sort((a, b) => {
-                        const aIsFile = typeof node[a] === 'string';
-                        const bIsFile = typeof node[b] === 'string';
-                        if (!aIsFile && bIsFile) return -1;
-                        if (aIsFile && !bIsFile) return 1;
-                        return a.localeCompare(b);
-                    });
-                    keys.forEach(key => {
-                        const value = node[key];
-                        const div = document.createElement('div');
-                        div.style.padding = '3px';
-                        div.style.paddingLeft = (indentLevel * 12) + 'px';
-                        div.style.cursor = 'pointer';
-                        div.style.color = '#ff9d00';
-                        div.style.fontFamily = 'monospace';
-                        if (typeof value === 'string') {
-                            const filePath = value.replace('file:', '');
-                            div.textContent = '\u2704 ' + key;
-                            div.onclick = function (event) {
-                                event.stopPropagation();
-                                console.log('Clicked file: ' + filePath);
-                                window.currentFile = filePath;
-                                fetch('http://127.0.0.1:5000/api/file-content?path=' + encodeURIComponent(filePath))
-                                    .then(res => res.text())
-                                    .then(fileData => {
-                                        document.getElementById('code-editor').value = fileData;
-                                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
-                                        if (window.aceEditorRefresh) window.aceEditorRefresh();
-                                        fetch('http://127.0.0.1:5000/api/context/file', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ path: filePath, content: fileData, append_to_chat: false })
-                                        }).catch(e => console.warn(e));
-                                    })
-                                    .catch(err => alert('Failed to load file: ' + err.message));
-                            };
-                        } else {
-                            const folderDiv = document.createElement('div');
-                            folderDiv.textContent = '\u263c ' + key;
-                            folderDiv.style.color = '#ff9d00';
-                            const childrenDiv = document.createElement('div');
-                            childrenDiv.style.display = 'none'; // Collapsed by default
-                            folderDiv.onclick = function (e) {
-                                e.stopPropagation();
-                                childrenDiv.style.display = childrenDiv.style.display === 'none' ? 'block' : 'none';
-                                folderDiv.textContent = (childrenDiv.style.display === 'none' ? '\u263c ' : '\u263d ') + key;
-                            };
-                            renderTree(value, childrenDiv, indentLevel + 1);
-                            div.appendChild(folderDiv);
-                            div.appendChild(childrenDiv);
-                            parentElement.appendChild(div);
-                            return;
-                        }
-                        parentElement.appendChild(div);
-                    });
-                }
-                renderTree(tree, explorerDiv, 0);
-            } catch (e) {
-                console.error('Explorer error:', e);
-                const explorerDiv = document.getElementById('explorer');
-                if (explorerDiv) explorerDiv.innerHTML = "Error loading files. Check F12 console.";
-            }
-        }
-document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function () {
             setTimeout(function () {
                 const codeEditor = document.getElementById('code-editor');
 
@@ -1718,7 +1905,9 @@ document.addEventListener('DOMContentLoaded', function () {
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
         <span style="flex:1;"></span>
         <span>Model:</span>
-        <span id="current-model-indicator" style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;">openai/gpt-oss-120b</span><span id="model-spinner" class="status-ok" title="Model status: OK"></span>
+        <span id="current-model-indicator"
+            style="background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:2px 8px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:11px;">openai/gpt-oss-120b</span><span
+            id="model-spinner" class="status-ok" title="Model status: OK"></span>
     </div>
 
     <!-- Auto Fix Modal -->
@@ -1868,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (lines.length && lines[lines.length - 1] === '') lines.pop();
                 lines.forEach(function (ln) {
                     var safe = _afixEscape(ln) + '\n';
-                    var row = function(lnNum, cssClass, content) {
+                    var row = function (lnNum, cssClass, content) {
                         return '<div class="autofix-row"><span class="autofix-ln">' + lnNum + '</span><span class="ln ' + cssClass + ' autofix-code">' + content + '</span></div>';
                     };
                     if (p.added) {
@@ -2257,16 +2446,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    
+
     <script>
         /* ===== Settings Tab Switching ===== */
         function switchTab(tabId) {
             // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(function(el) {
+            document.querySelectorAll('.tab-content').forEach(function (el) {
                 el.style.display = 'none';
             });
             // Remove active styling from all tab buttons
-            document.querySelectorAll('[data-tab]').forEach(function(btn) {
+            document.querySelectorAll('[data-tab]').forEach(function (btn) {
                 btn.style.background = '#111';
             });
             // Show selected tab
@@ -2332,7 +2521,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     models = ['gpt-4o', 'gpt-4o-mini'];
                     break;
             }
-            models.forEach(function(m) {
+            models.forEach(function (m) {
                 var o = document.createElement('option');
                 o.value = m;
                 o.textContent = m;
@@ -2419,7 +2608,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         alert('Save failed: ' + ((d && d.message) || 'unknown'));
                     }
                 })
-                .then(function(d) {
+                .then(function (d) {
                     alert('Settings saved. Server is restarting to apply new API keys.');
                     checkModelStatus();
                 })
@@ -2519,7 +2708,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 let html = '<div style="max-height:300px;overflow-y:auto;margin-bottom:8px;">';
                 if (!keys.length) html += '<div style="color:#888;font-size:11px;">No memories stored yet.</div>';
-                keys.forEach(function(k, i) {
+                keys.forEach(function (k, i) {
                     var v = mem[k] && mem[k].value ? mem[k].value : String(mem[k]);
                     var isFirst20 = i < 20;
                     var bg = isFirst20 ? '#002200' : '#0a0a0a';
@@ -2621,14 +2810,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 const r = await fetch('http://127.0.0.1:5000/memory/all');
                 const d = await r.json();
                 var mem = d.memory || {};
-                var skillKeys = Object.keys(mem).filter(function(k) { return k.startsWith('skills.'); }).sort((a, b) => {
+                var skillKeys = Object.keys(mem).filter(function (k) { return k.startsWith('skills.'); }).sort((a, b) => {
                     const sa = mem[a]?.sort_order ?? 0;
                     const sb = mem[b]?.sort_order ?? 0;
                     return sa - sb || a.localeCompare(b);
                 });
                 let html = '<div style="max-height:300px;overflow-y:auto;margin-bottom:8px;">';
                 if (!skillKeys.length) html += '<div style="color:#888;font-size:11px;">No skills stored yet.</div>';
-                skillKeys.forEach(function(k, i) {
+                skillKeys.forEach(function (k, i) {
                     var v = mem[k] && mem[k].value ? mem[k].value : String(mem[k]);
                     var isFirst20 = i < 20;
                     var bg = isFirst20 ? '#002200' : '#0a0a0a';
@@ -2878,38 +3067,37 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     </script>
 
-<script>
-window.splitVideoPrompt = function() {
-    var file = prompt("Enter the full path to your video file:\nExample: C:\\Users\\chris\\Videos\\test_video.mp4");
-    if (!file) return;
-    var time = prompt("Enter clip length in seconds (e.g., 60 for 1 minute):", "60");
-    if (!time) return;
-    
-    var baseName = file.substring(0, file.lastIndexOf('.')) || file;
-    var cmd = 'ffmpeg -i "' + file + '" -c copy -map 0 -segment_time 00:00:' + time + ' -f segment -reset_timestamps 1 "' + baseName + '_clip_%03d.mp4"';
-    
-    fetch('/api/system/exec', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({command: cmd})
-    }).then(r => r.json()).then(d => {
-        alert("Done! Check the folder for your clips.");
-    }).catch(e => alert("Error: " + e));
-};
+    <script>
+        window.splitVideoPrompt = function () {
+            var file = prompt("Enter the full path to your video file:\nExample: C:\\Users\\chris\\Videos\\test_video.mp4");
+            if (!file) return;
+            var time = prompt("Enter clip length in seconds (e.g., 60 for 1 minute):", "60");
+            if (!time) return;
 
-<script>
-// Show confirmation if server restarted
-if (sessionStorage.getItem('ace_restarting') === '1') {
-    sessionStorage.removeItem('ace_restarting');
-    var msg = document.createElement('div');
-    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00ff00;color:#000;padding:12px 24px;border-radius:6px;font-family:monospace;font-size:14px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
-    msg.textContent = '\u2705 ACEsis server restarted successfully!';
-    document.body.appendChild(msg);
-    setTimeout(function() { msg.remove(); }, 5000);
-}
-</script>
-</script>
+            var baseName = file.substring(0, file.lastIndexOf('.')) || file;
+            var cmd = 'ffmpeg -i "' + file + '" -c copy -map 0 -segment_time 00:00:' + time + ' -f segment -reset_timestamps 1 "' + baseName + '_clip_%03d.mp4"';
+
+            fetch('/api/system/exec', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd })
+            }).then(r => r.json()).then(d => {
+                alert("Done! Check the folder for your clips.");
+            }).catch(e => alert("Error: " + e));
+        };
+    </script>
+
+    <script>
+        // Show confirmation if server restarted
+        if (sessionStorage.getItem('ace_restarting') === '1') {
+            sessionStorage.removeItem('ace_restarting');
+            var msg = document.createElement('div');
+            msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00ff00;color:#000;padding:12px 24px;border-radius:6px;font-family:monospace;font-size:14px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+            msg.textContent = '\u2705 ACEsis server restarted successfully!';
+            document.body.appendChild(msg);
+            setTimeout(function () { msg.remove(); }, 5000);
+        }
+    </script>
 </body>
+
 </html>
-
-
