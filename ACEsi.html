@@ -1264,7 +1264,7 @@
         View DOM
       </button>
       <button
-        onclick="alert('Styles loaded')"
+        onclick="if (window.showAceToast) window.showAceToast('Styles loaded')"
         style="
           background: #000;
           color: #ff9d00;
@@ -1324,7 +1324,7 @@
       <div style="font-weight: bold; margin-bottom: 8px">Messily Tool</div>
       <button
         onclick="
-          addOutput('ðŸ§¹ Clear log');
+          addOutput('ðŸ§¹ Clear log', 'success', 3000);
           var cm = document.getElementById('chat-messages');
           if (cm) {
             cm.querySelectorAll('.tool-output').forEach(function (x) {
@@ -2335,7 +2335,7 @@
               🎤
             </button>
             <button
-              onclick="alert('Speaker: audio feedback on')"
+              onclick="if (window.showAceToast) window.showAceToast('Speaker: audio feedback on')"
               title="Speaker"
               style="
                 background: #000;
@@ -2568,8 +2568,7 @@
                       true,
                       false,
                       false,
-                      false,
-                    );
+                      false,, 'success', 3000);
                   }
                 "
               />
@@ -2734,7 +2733,7 @@
             window.location.reload();
           }, 8000);
         } catch (e) {
-          alert("Failed to send restart signal.");
+          if (window.showAceToast) window.showAceToast("Failed to send restart signal.", 'error', 5000);
         }
       }
 
@@ -2948,7 +2947,7 @@
             });
           })
           .catch(function (err) {
-            alert("Failed to load file: " + err.message);
+            if (window.showAceToast) window.showAceToast("Failed to load file: " + err.message, 'error', 5000);
           });
       }
 
@@ -3127,7 +3126,7 @@
             saveBtn.onclick = function () {
               const content = codeEditor ? codeEditor.value : "";
               if (!content.trim()) {
-                alert("Editor is empty.");
+                if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
                 return;
               }
               var filename = window.currentFile || "";
@@ -3149,13 +3148,13 @@
                 .then((r) => r.json())
                 .then((d) => {
                   if (d && d.ok) {
-                    alert("Saved: " + filename);
+                    if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
                   } else {
-                    alert("Save failed: " + ((d && d.error) || "unknown"));
+                    if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
                 })
                 .catch(function (e) {
-                  alert("Save failed: " + _afixEscape(e.message));
+                  if (window.showAceToast) window.showAceToast("Save failed: " + _afixEscape(e.message), 'error', 5000);
                 });
             };
 
@@ -3177,7 +3176,7 @@
             formatBtn.onclick = function () {
               const content = codeEditor ? codeEditor.value : '';
               if (!content.trim()) {
-                alert('Editor is empty.');
+                if (window.showAceToast) window.showAceToast('Editor is empty.', 'success', 3000);
                 return;
               }
               fetch('http://127.0.0.1:5000/api/format', {
@@ -3206,17 +3205,17 @@
             copyBtn.onclick = function () {
               const text = codeEditor ? codeEditor.value : "";
               if (!text) {
-                alert("No text to copy.");
+                if (window.showAceToast) window.showAceToast("No text to copy.", 'success', 3000);
                 return;
               }
               navigator.clipboard
                 .writeText(text)
                 .then(() => {
-                  alert("Copied to clipboard.");
+                  if (window.showAceToast) window.showAceToast("Copied to clipboard.", 'success', 3000);
                 })
                 .catch((e) => {
                   console.error("Copy failed", e);
-                  alert("Copy failed: " + e.message);
+                  if (window.showAceToast) window.showAceToast("Copy failed: " + e.message, 'error', 5000);
                 });
             };
 
@@ -3233,7 +3232,7 @@
                 }
               } catch (e) {
                 console.error("Paste failed", e);
-                alert("Paste failed: " + e.message);
+                if (window.showAceToast) window.showAceToast("Paste failed: " + e.message, 'error', 5000);
               }
             };
         }, 800); // Wait for CodeMirror to finish initializing
@@ -3245,7 +3244,7 @@
           "#run-panel input[type=checkbox]:checked",
         );
         if (checks.length === 0) {
-          alert("Select a command");
+          if (window.showAceToast) window.showAceToast("Select a command", 'success', 3000);
           return;
         }
 
@@ -3274,7 +3273,7 @@
             saveBtn.onclick = function () {
               const content = codeEditor ? codeEditor.value : "";
               if (!content.trim()) {
-                alert("Editor is empty.");
+                if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
                 return;
               }
               var filename = window.currentFile || "";
@@ -3296,13 +3295,13 @@
                 .then((r) => r.json())
                 .then((d) => {
                   if (d && d.ok) {
-                    alert("Saved: " + filename);
+                    if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
                   } else {
-                    alert("Save failed: " + ((d && d.error) || "unknown"));
+                    if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
                 })
                 .catch(function (e) {
-                  alert("Save failed: " + _afixEscape(e.message));
+                  if (window.showAceToast) window.showAceToast("Save failed: " + _afixEscape(e.message), 'error', 5000);
                 });
             };
 
@@ -3323,17 +3322,17 @@
             copyBtn.onclick = function () {
               const text = codeEditor ? codeEditor.value : "";
               if (!text) {
-                alert("No text to copy.");
+                if (window.showAceToast) window.showAceToast("No text to copy.", 'success', 3000);
                 return;
               }
               navigator.clipboard
                 .writeText(text)
                 .then(() => {
-                  alert("Copied to clipboard.");
+                  if (window.showAceToast) window.showAceToast("Copied to clipboard.", 'success', 3000);
                 })
                 .catch((e) => {
                   console.error("Copy failed", e);
-                  alert("Copy failed: " + e.message);
+                  if (window.showAceToast) window.showAceToast("Copy failed: " + e.message, 'error', 5000);
                 });
             };
 
@@ -3350,7 +3349,7 @@
                 }
               } catch (e) {
                 console.error("Paste failed", e);
-                alert("Paste failed: " + e.message);
+                if (window.showAceToast) window.showAceToast("Paste failed: " + e.message, 'error', 5000);
               }
             };
         }, 800); // Wait for CodeMirror to finish initializing
@@ -3873,7 +3872,7 @@
         }
         fixed = fixed || window._autofix.fixed || "";
         if (!fixed) {
-          alert("No fixed code to save.");
+          if (window.showAceToast) window.showAceToast("No fixed code to save.", 'success', 3000);
           return;
         }
         var filename = window.currentFile || "";
@@ -4150,7 +4149,7 @@
             saveBtn.onclick = function () {
               const content = codeEditor ? codeEditor.value : "";
               if (!content.trim()) {
-                alert("Editor is empty.");
+                if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
                 return;
               }
               var filename = window.currentFile || "";
@@ -4172,13 +4171,13 @@
                 .then((r) => r.json())
                 .then((d) => {
                   if (d && d.ok) {
-                    alert("Saved: " + filename);
+                    if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
                   } else {
-                    alert("Save failed: " + ((d && d.error) || "unknown"));
+                    if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
                 })
                 .catch(function (e) {
-                  alert("Save failed: " + _afixEscape(e.message));
+                  if (window.showAceToast) window.showAceToast("Save failed: " + _afixEscape(e.message), 'error', 5000);
                 });
             };
 
@@ -4199,17 +4198,17 @@
             copyBtn.onclick = function () {
               const text = codeEditor ? codeEditor.value : "";
               if (!text) {
-                alert("No text to copy.");
+                if (window.showAceToast) window.showAceToast("No text to copy.", 'success', 3000);
                 return;
               }
               navigator.clipboard
                 .writeText(text)
                 .then(() => {
-                  alert("Copied to clipboard.");
+                  if (window.showAceToast) window.showAceToast("Copied to clipboard.", 'success', 3000);
                 })
                 .catch((e) => {
                   console.error("Copy failed", e);
-                  alert("Copy failed: " + e.message);
+                  if (window.showAceToast) window.showAceToast("Copy failed: " + e.message, 'error', 5000);
                 });
             };
 
@@ -4226,7 +4225,7 @@
                 }
               } catch (e) {
                 console.error("Paste failed", e);
-                alert("Paste failed: " + e.message);
+                if (window.showAceToast) window.showAceToast("Paste failed: " + e.message, 'error', 5000);
               }
             };
         }, 800); // Wait for CodeMirror to finish initializing
@@ -4443,17 +4442,15 @@
                 return r.json();
               });
             } else {
-              alert("Save failed: " + ((d && d.message) || "unknown"));
+              if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.message) || "unknown"), 'error', 5000);
             }
           })
           .then(function (d) {
-            alert(
-              "Settings saved. Server is restarting to apply new API keys.",
-            );
+            if (window.showAceToast) window.showAceToast("Settings saved. Server is restarting to apply new API keys.",, 'success', 3000);
             checkModelStatus();
           })
           .catch(function (e) {
-            alert("Save failed: " + e.message);
+            if (window.showAceToast) window.showAceToast("Save failed: " + e.message, 'error', 5000);
           });
       }
 
@@ -4497,16 +4494,16 @@
           })
           .then(function (d) {
             if (d && d.ok) {
-              alert("System prompt saved.");
+              if (window.showAceToast) window.showAceToast("System prompt saved.", 'success', 3000);
               sayInChat(
                 "My system prompt has just been edited — I will use the new instructions from now on.",
               );
             } else {
-              alert("Save failed: " + ((d && d.message) || "unknown"));
+              if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.message) || "unknown"), 'error', 5000);
             }
           })
           .catch(function (e) {
-            alert("Save failed: " + e.message);
+            if (window.showAceToast) window.showAceToast("Save failed: " + e.message, 'error', 5000);
           });
       }
 
@@ -4520,11 +4517,11 @@
         if (confirm("Clear all chat history?")) {
           var container = document.getElementById("chat-messages");
           if (container) container.innerHTML = "";
-          alert("Chat history cleared.");
+          if (window.showAceToast) window.showAceToast("Chat history cleared.", 'success', 3000);
         }
       }
       function fetchNotifications() {
-        alert("Notifications feature: check your ntfy app for pushes.");
+        if (window.showAceToast) window.showAceToast("Notifications feature: check your ntfy app for pushes.", 'success', 3000);
       }
       function triggerPing() {
         fetch("http://127.0.0.1:5000/api/system/exec", {
@@ -4536,16 +4533,14 @@
             return r.json();
           })
           .then(function (d) {
-            alert("Ping sent: " + (d && d.ok ? "ok" : "failed"));
+            if (window.showAceToast) window.showAceToast("Ping sent: " + (d && d.ok ? "ok" : "failed"), 'error', 5000);
           })
           .catch(function (e) {
-            alert("Ping failed: " + e.message);
+            if (window.showAceToast) window.showAceToast("Ping failed: " + e.message, 'error', 5000);
           });
       }
       function connectGoogleDrive() {
-        alert(
-          "Google Drive integration: configure in settings and use the file picker.",
-        );
+        if (window.showAceToast) window.showAceToast("Google Drive integration: configure in settings and use the file picker.", 'success', 3000);
       }
 
       /* ===== Memory Manager ===== */
@@ -4620,7 +4615,7 @@
             html;
           document.body.appendChild(dlg);
         } catch (e) {
-          alert("Memory error: " + e.message);
+          if (window.showAceToast) window.showAceToast("Memory error: " + e.message, 'error', 5000);
         }
       }
 
@@ -4628,7 +4623,7 @@
         var k = document.getElementById("mem-key").value.trim();
         var v = document.getElementById("mem-val").value.trim();
         if (!k || !v) {
-          alert("Key and value required.");
+          if (window.showAceToast) window.showAceToast("Key and value required.", 'success', 3000);
           return;
         }
         try {
@@ -4644,7 +4639,7 @@
             'A new memory has just been added: "' + escapeHtml(k) + '".',
           );
         } catch (e) {
-          alert("Save failed: " + e.message);
+          if (window.showAceToast) window.showAceToast("Save failed: " + e.message, 'error', 5000);
         }
       }
 
@@ -4661,7 +4656,7 @@
             'A memory has just been deleted: "' + escapeHtml(key) + '".',
           );
         } catch (e) {
-          alert("Delete failed: " + e.message);
+          if (window.showAceToast) window.showAceToast("Delete failed: " + e.message, 'error', 5000);
         }
       }
 
@@ -4688,7 +4683,7 @@
           openMemoryManager();
           openSkillsManager();
         } catch (e) {
-          alert("Move failed: " + e.message);
+          if (window.showAceToast) window.showAceToast("Move failed: " + e.message, 'error', 5000);
         }
       }
 
@@ -4768,7 +4763,7 @@
             html;
           document.body.appendChild(dlg);
         } catch (e) {
-          alert("Skills error: " + e.message);
+          if (window.showAceToast) window.showAceToast("Skills error: " + e.message, 'error', 5000);
         }
       }
 
@@ -4776,7 +4771,7 @@
         var k = document.getElementById("skill-key").value.trim();
         var v = document.getElementById("skill-val").value.trim();
         if (!k || !v) {
-          alert("Key and value required.");
+          if (window.showAceToast) window.showAceToast("Key and value required.", 'success', 3000);
           return;
         }
         var fullKey = k.startsWith("skills.") ? k : "skills." + k;
@@ -4793,7 +4788,7 @@
             'A new skill has just been added: "' + escapeHtml(fullKey) + '".',
           );
         } catch (e) {
-          alert("Save failed: " + e.message);
+          if (window.showAceToast) window.showAceToast("Save failed: " + e.message, 'error', 5000);
         }
       }
 
@@ -4860,12 +4855,12 @@
       window.saveFile = function () {
         var ta = document.getElementById("code-editor");
         if (!ta) {
-          alert("No editor found.");
+          if (window.showAceToast) window.showAceToast("No editor found.", 'success', 3000);
           return;
         }
         const text = ta.value;
         if (!text.trim()) {
-          alert("Editor is empty.");
+          if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
           return;
         }
         fetch("/api/save_file", {
@@ -4890,7 +4885,7 @@
             saveBtn.onclick = function () {
               const content = codeEditor ? codeEditor.value : "";
               if (!content.trim()) {
-                alert("Editor is empty.");
+                if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
                 return;
               }
               var filename = window.currentFile || "";
@@ -4912,13 +4907,13 @@
                 .then((r) => r.json())
                 .then((d) => {
                   if (d && d.ok) {
-                    alert("Saved: " + filename);
+                    if (window.showAceToast) window.showAceToast("Saved: " + filename, 'success', 3000);
                   } else {
-                    alert("Save failed: " + ((d && d.error) || "unknown"));
+                    if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.error) || "unknown"), 'error', 5000);
                   }
                 })
                 .catch(function (e) {
-                  alert("Save failed: " + _afixEscape(e.message));
+                  if (window.showAceToast) window.showAceToast("Save failed: " + _afixEscape(e.message), 'error', 5000);
                 });
             };
 
@@ -4939,17 +4934,17 @@
             copyBtn.onclick = function () {
               const text = codeEditor ? codeEditor.value : "";
               if (!text) {
-                alert("No text to copy.");
+                if (window.showAceToast) window.showAceToast("No text to copy.", 'success', 3000);
                 return;
               }
               navigator.clipboard
                 .writeText(text)
                 .then(() => {
-                  alert("Copied to clipboard.");
+                  if (window.showAceToast) window.showAceToast("Copied to clipboard.", 'success', 3000);
                 })
                 .catch((e) => {
                   console.error("Copy failed", e);
-                  alert("Copy failed: " + e.message);
+                  if (window.showAceToast) window.showAceToast("Copy failed: " + e.message, 'error', 5000);
                 });
             };
 
@@ -4966,7 +4961,7 @@
                 }
               } catch (e) {
                 console.error("Paste failed", e);
-                alert("Paste failed: " + e.message);
+                if (window.showAceToast) window.showAceToast("Paste failed: " + e.message, 'error', 5000);
               }
             };
         }, 1000);
@@ -5001,11 +4996,11 @@
               navigator.clipboard
                 .writeText(codeEditor.value)
                 .then(() => {
-                  alert("Copied to clipboard.");
+                  if (window.showAceToast) window.showAceToast("Copied to clipboard.", 'success', 3000);
                 })
                 .catch((e) => {
                   console.error("Copy failed", e);
-                  alert("Copy failed: " + e.message);
+                  if (window.showAceToast) window.showAceToast("Copy failed: " + e.message, 'error', 5000);
                 });
             }
           } else if (text === "Paste") {
@@ -5022,14 +5017,14 @@
               })
               .catch((e) => {
                 console.error("Paste failed", e);
-                alert("Paste failed: " + e.message);
+                if (window.showAceToast) window.showAceToast("Paste failed: " + e.message, 'error', 5000);
               });
           } else if (text === "Save") {
             var codeEditor = document.getElementById("code-editor");
             if (codeEditor) {
               const content = codeEditor.value;
               if (!content.trim()) {
-                alert("Editor is empty.");
+                if (window.showAceToast) window.showAceToast("Editor is empty.", 'success', 3000);
                 return;
               }
               fetch("/api/save-file", {
@@ -5094,9 +5089,9 @@
         })
           .then((r) => r.json())
           .then((d) => {
-            alert("Done! Check the folder for your clips.");
+            if (window.showAceToast) window.showAceToast("Done! Check the folder for your clips.", 'success', 3000);
           })
-          .catch((e) => alert("Error: " + e));
+          .catch((e) => { if (window.showAceToast) window.showAceToast("Error: " + e, 'error', 5000); });
       };
     </script>
 
