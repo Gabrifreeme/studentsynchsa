@@ -1,5 +1,6 @@
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lipsyncstudent/core/router/app_router.dart';
@@ -13,7 +14,10 @@ import 'package:lipsyncstudent/services/sync_service.dart';
 void main() async {
   // Enable WebView remote debugging for Android
   WidgetsFlutterBinding.ensureInitialized();
-  await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+  // Only set WebView debugging on mobile platforms
+  if (!kIsWeb) {
+    await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+  }
   
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
