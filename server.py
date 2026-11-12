@@ -15282,11 +15282,39 @@ terminal_process = None
 @socketio.on('terminal_input')
 def handle_terminal_input(data):
     global terminal_process
-    if terminal_process and terminal_process.isalive():
+    if data == '\x03':
+        # Ctrl+C - kill the PTY
+        if terminal_process:
+            try:
+                terminal_process.terminate(force=True)
+            except Exception:
+                pass
+            terminal_process = None
+        return
+    # Respawn PTY if dead (from Ctrl+C or crash)
+    if not terminal_process or not terminal_process.isalive():
         try:
-            terminal_process.write(data)
+            os.environ['TERM'] = 'xterm-256color'
+            terminal_process = PtyProcess.spawn('powershell.exe -NoLogo -NoProfile')
+            try: terminal_process.setwinsize(24, 80)
+            except: pass
+            def read_output_r():
+                while terminal_process and terminal_process.isalive():
+                    try:
+                        d = terminal_process.read(1024)
+                        if d:
+                            import re as _re
+                            clean = _re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', '', d)
+                            socketio.emit('terminal_output', clean)
+                    except Exception:
+                        break
+            socketio.start_background_task(read_output_r)
         except Exception:
             pass
+    try:
+        terminal_process.write(data)
+    except Exception:
+        pass
 @socketio.on('terminal_resize')
 def handle_terminal_resize(data):
     global terminal_process
