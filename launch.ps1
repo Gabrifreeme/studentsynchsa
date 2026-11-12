@@ -1,5 +1,5 @@
 ﻿# Start the Flask server in the background
-Start-Process powershell -ArgumentList '-WindowStyle', 'Hidden', '-Command', 'cd C:\Users\chris\LipSyncStudent; python server.py'
+Start-Process powershell -ArgumentList '-WindowStyle', 'Hidden', '-Command', 'cd C:\Users\chris\LipSyncStudent; python server.py *> server.log'
 
 # Wait 6 seconds for the server to fully boot
 Start-Sleep -Seconds 6

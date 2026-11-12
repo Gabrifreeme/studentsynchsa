@@ -11274,6 +11274,14 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
 
 
     term.open(termContainer);
+    // Allow right-click for paste
+    termContainer.addEventListener('contextmenu', function(e) { e.stopPropagation(); });
+    // Auto-scroll to bottom on new output
+    var originalWrite = term.write.bind(term);
+    term.write = function(data) {
+        originalWrite(data);
+        term.scrollToBottom();
+    };
 
     setTimeout(function() {
 
@@ -11323,6 +11331,7 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
 
     socket.on('terminal_output', function(data) {
 
+        console.log('RAW IN:', JSON.stringify(data));
         term.write(data);
 
     });
@@ -11380,9 +11389,7 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
     // Send keystrokes to backend
 
     term.onData(function(data) {
-
         socket.emit('terminal_input', data);
-
     });
 
 

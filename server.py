@@ -63,6 +63,9 @@ try:
 except Exception:
     pass
 
+
+
+
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -15274,11 +15277,7 @@ def handle_terminal_input(data):
     global terminal_process
     if terminal_process and terminal_process.isalive():
         try:
-            # Force carriage return to be a real byte, not escaped string
-            if data == '\\r' or data == '\\r\\n':
-                terminal_process.write('\r')
-            else:
-                terminal_process.write(data)
+            terminal_process.write(data)
         except Exception:
             pass
 @socketio.on('terminal_resize')
@@ -15308,7 +15307,7 @@ def handle_connect():
         terminal_process = None
     # Spawn fresh PowerShell
     os.environ['TERM'] = 'xterm-256color'
-    terminal_process = PtyProcess.spawn('cmd.exe')
+    terminal_process = PtyProcess.spawn('powershell.exe -NoLogo -NoProfile')
     # Force initial dimensions
     try:
         terminal_process.setwinsize(24, 80)
@@ -15319,10 +15318,11 @@ def handle_connect():
             try:
                 data = terminal_process.read(1024)
                 if data:
-                    # STRIP ANSI CURSOR CODES TO FIX FLOATING TEXT
+                    # Strip ALL ANSI escape sequences
                     import re
-                    data = re.sub(r'\x1b\[[0-9;]*[CH]', '', data)
-                    socketio.emit('terminal_output', data)
+                    clean_data = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', '', data)
+                    # Replace all CR and LF with empty space to stop cursor jumping
+                    socketio.emit('terminal_output', clean_data)
             except EOFError:
                 break
             except Exception:
