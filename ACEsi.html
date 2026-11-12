@@ -9549,11 +9549,11 @@
 
           html +=
 
-            '<input id="skill-key" type="text" placeholder="e.g. skills.cooking" style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+            '<div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;"><span style="color: #888; font-family: monospace;">skills.</span><input id="skill-key" type="text" placeholder="e.g. cooking" style="flex:1;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
 
           html +=
 
-            '<input id="skill-val" type="text" placeholder="What Chris knows/can do" style="flex:2;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
+            '<input id="skill-val" type="text" placeholder="What ACEsi can do" style="flex:2;background:#111;color:#ff9d00;border:1px solid #ff9d00;padding:4px;font-size:11px;">';
 
           html +=
 
@@ -9614,6 +9614,18 @@
         }
 
         var fullKey = k.startsWith("skills.") ? k : "skills." + k;
+
+        // Duplicate check
+        try {
+          var checkResp = await fetch("http://127.0.0.1:5000/memory/get?key=" + encodeURIComponent(fullKey));
+          if (checkResp.ok) {
+            var checkData = await checkResp.json();
+            if (checkData && checkData.value !== undefined && checkData.value !== null) {
+              if (window.showAceToast) window.showAceToast("Skill already exists: " + fullKey, 'error', 4000);
+              return;
+            }
+          }
+        } catch(e) { /* ignore check errors */ }
 
         try {
 
