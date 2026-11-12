@@ -2,10 +2,12 @@ import 'dart:convert';
 
 class ChatMessage {
   final String id;
-  final String room;      // 'general' | 'province' | 'university'
-  final String sender;    // 'You' or a name
+  final String room;
+  final String sender;
   final String text;
   final DateTime timestamp;
+  final String? fileData;    // base64-encoded file bytes
+  final String? mimeType;    // e.g., 'image/png'
 
   ChatMessage({
     required this.id,
@@ -13,6 +15,8 @@ class ChatMessage {
     required this.sender,
     required this.text,
     required this.timestamp,
+    this.fileData,
+    this.mimeType,
   });
 
   Map<String, dynamic> toMap() => {
@@ -21,6 +25,8 @@ class ChatMessage {
         'sender': sender,
         'text': text,
         'timestamp': timestamp.toIso8601String(),
+        if (fileData != null) 'fileData': fileData,
+        if (mimeType != null) 'mimeType': mimeType,
       };
 
   factory ChatMessage.fromMap(Map<String, dynamic> map) => ChatMessage(
@@ -29,6 +35,8 @@ class ChatMessage {
         sender: map['sender'] as String,
         text: map['text'] as String,
         timestamp: DateTime.parse(map['timestamp'] as String),
+        fileData: map['fileData'] as String?,
+        mimeType: map['mimeType'] as String?,
       );
 
   String toJson() => jsonEncode(toMap());

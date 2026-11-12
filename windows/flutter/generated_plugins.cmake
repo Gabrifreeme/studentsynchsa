@@ -4,8 +4,10 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
+  emoji_picker_flutter
   flutter_inappwebview_windows
   fullscreen_window
+  record_windows
   url_launcher_windows
   webview_win_floating
 )
