@@ -491,6 +491,7 @@ _CURRENT_CONTEXT = []
 _CURRENT_CONTEXT_LOCK = _ctx_threading.Lock()
 
 @app.route('/api/context/file', methods=['POST', 'OPTIONS'])
+@require_token
 def api_context_file_set():
     if request.method == 'OPTIONS':
         return '', 200
@@ -533,6 +534,7 @@ def api_context_file_set():
     return jsonify({'ok': True, 'path': path, 'pinned_count': len(_CURRENT_CONTEXT)})
 
 @app.route('/api/context/clear', methods=['POST'])
+@require_token
 def api_context_clear():
     with _CURRENT_CONTEXT_LOCK:
         _CURRENT_CONTEXT.clear()
@@ -3193,6 +3195,7 @@ def _last_edit_info():
 
 
 @app.route('/api/last_edit')
+@require_token
 def last_edit():
     """What the last real change to this project was - feeds the greeting."""
     return jsonify(_last_edit_info())
@@ -5296,6 +5299,7 @@ def _youtube_reply(user_message):
 
 
 @app.route('/chat', methods=['POST'])
+@require_token
 def chat():
     data = request.json
     user_message = data.get('message', '')
@@ -5785,6 +5789,7 @@ def _strip_code_fences(text):
 
 
 @app.route('/api/autofix', methods=['POST', 'OPTIONS'])
+@require_token
 def autofix():
     if request.method == 'OPTIONS':
         return jsonify({}), 200
@@ -5825,6 +5830,7 @@ def autofix():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 @app.route('/history', methods=['GET'])
+@require_token
 def history():
     limit = min(int(request.args.get('limit', 100)), 500)
     conn = sqlite3.connect('ace_memory.db')
@@ -5836,6 +5842,7 @@ def history():
     return jsonify({"messages": messages})
 
 @app.route('/run', methods=['POST'])
+@require_token
 def run_command():
     command = (request.json or {}).get('command', '')
     try:
@@ -5894,6 +5901,7 @@ def _resolve_run_device(command):
     return command
 
 @app.route('/files', methods=['GET'])
+@require_token
 def list_files():
     try:
         files = os.listdir('C:\\Users\\chris\\StudentSyncSA')
@@ -5933,6 +5941,7 @@ def _ide_path(rel):
 
 
 @app.route('/api/files', methods=['GET'])
+@require_token
 def api_files():
     files = []
     _IDE_EXCLUDE_DIRS = {
@@ -5962,6 +5971,7 @@ def api_files():
 
 
 @app.route('/api/file-content', methods=['GET'])
+@require_token
 def api_file_content():
     full = _ide_path(request.args.get('path'))
     if not full or not os.path.isfile(full):
@@ -5974,6 +5984,7 @@ def api_file_content():
 
 
 @app.route('/api/system/exec', methods=['POST'])
+@require_token
 def api_system_exec():
     data = request.get_json(silent=True) or {}
     cmd = data.get('command', '').strip()
@@ -6005,6 +6016,7 @@ def api_system_exec():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 @app.route('/api/save-file', methods=['POST'])
+@require_token
 def api_save_file():
     # ACEsi.html posts form-encoded data; accept JSON too for other clients.
     data = request.get_json(silent=True) or {}
@@ -6049,6 +6061,7 @@ def strip_code_fences(code):
     return code
 
 @app.route('/read', methods=['POST'])
+@require_token
 def read_file():
     data = request.json
     path = data.get('path', '')
@@ -6060,6 +6073,7 @@ def read_file():
         return jsonify({'error': str(e)})
 
 @app.route('/write', methods=['POST'])
+@require_token
 def write_file():
     data = request.json
     path = data.get('path', '')
@@ -6137,6 +6151,7 @@ def _open_external(rp):
 
 
 @app.route('/file/open', methods=['POST'])
+@require_token
 def file_open():
     """Open a saved file in the OS default viewer so the user can verify it."""
     data = request.json or {}
@@ -6153,6 +6168,7 @@ def file_open():
     return jsonify({'ok': True, 'path': os.path.relpath(rp, PROJECT_ROOT)})
 
 @app.route('/userfile/open', methods=['POST'])
+@require_token
 def userfile_open():
     """Open a file from anywhere on Chris's PC in its default application (for
     editing, viewing externally, etc.). Called when he clicks a file in a popup."""
@@ -10961,6 +10977,7 @@ def _context_overlay(ctx_name):
 
 
 @app.route('/context', methods=['GET'])
+@require_token
 def context_endpoint():
     st = _kill_state()
     return jsonify({
@@ -13298,31 +13315,39 @@ def _cdp_json(result):
 
 @app.route('/cdp/connect', methods=['GET'])
 @app.route('/cdp/connect', methods=['POST'])
+@require_token
+@require_token
 def cdp_route_connect():
     return _cdp_json(d.connect_cmd())
 
 @app.route('/cdp/evaluate', methods=['POST'])
+@require_token
 def cdp_route_evaluate():
     expr = (request.json or {}).get("expr") if request.is_json else request.form.get("expr")
     return _cdp_json(d.evaluate_js(expr))
 
 @app.route('/cdp/console', methods=['GET'])
+@require_token
 def cdp_route_console():
     return _cdp_json(d.get_console_logs())
 
 @app.route('/cdp/dom', methods=['GET'])
+@require_token
 def cdp_route_dom():
     return _cdp_json(d.get_dom_state())
 
 @app.route('/cdp/network', methods=['GET'])
+@require_token
 def cdp_route_network():
     return _cdp_json(d.get_network_requests())
 
 @app.route('/cdp/status', methods=['GET'])
+@require_token
 def cdp_route_status():
     return jsonify({"ok": True, "result": d.status()})
 
 @app.route('/screenshot/latest', methods=['GET'])
+@require_token
 def screenshot_latest():
     """Serve the most recent in-memory screenshot (the popup image). No PNG
     buffered -> tell the caller there is nothing to show yet."""
@@ -13331,6 +13356,7 @@ def screenshot_latest():
     return Response(_LAST_SHOT["png"], mimetype="image/png")
 
 @app.route('/screenshot/save', methods=['POST'])
+@require_token
 def screenshot_save():
     """Write the buffered screenshot to ui_screenshots/ (Chris clicked Save in
     the popup). Returns the real on-disk path so nothing is ever fabricated."""
@@ -13348,6 +13374,7 @@ def screenshot_save():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route('/opencode', methods=['POST'])
+@require_token
 def opencode():
     try:
         data = request.json or {}
@@ -13373,6 +13400,7 @@ def opencode():
         return jsonify({"reply": f"Error: {str(e)}"})
 
 @app.route('/opencode/status', methods=['GET'])
+@require_token
 def opencode_status():
     with _AGENT_LOCK:
         return jsonify({
@@ -13390,6 +13418,7 @@ def opencode_status():
         })
 
 @app.route('/opencode/heal', methods=['POST', 'GET'])
+@require_token
 def opencode_heal():
     """Self-healing: feed the last run's failures back to ACEsi and let it fix them."""
     with _AGENT_LOCK:
@@ -13417,6 +13446,7 @@ def opencode_heal():
     return jsonify({"reply": "Heal started — fixing %d failing step(s)." % len(failed)})
 
 @app.route('/opencode/stop', methods=['POST'])
+@require_token
 def opencode_stop():
     with _AGENT_LOCK:
         _AGENT["abort"] = True
@@ -13426,6 +13456,7 @@ def opencode_stop():
     return jsonify({"ok": True})
 
 @app.route('/dispatcher/run', methods=['POST'])
+@require_token
 def dispatcher_run():
     """Run ace_dispatcher TaskRunner for robust multi-subtask execution.
 
@@ -13457,6 +13488,7 @@ def dispatcher_run():
     return jsonify(result)
 
 @app.route('/auto_fix_stream', methods=['GET'])
+@require_token
 def auto_fix_stream():
     file_path = request.args.get('file_path')
     error_text = request.args.get('error_text')
@@ -13569,10 +13601,12 @@ def auto_fix_stream():
 
 # ===== Memory endpoints =====
 @app.route('/memory/all', methods=['GET'])
+@require_token
 def memory_all():
     return jsonify({"memory": get_memories()})
 
 @app.route('/memory/set', methods=['POST'])
+@require_token
 def memory_set():
     data = request.json or {}
     key = data.get('key', '').strip()
@@ -13583,6 +13617,7 @@ def memory_set():
     return jsonify({"ok": True, "key": key})
 
 @app.route('/memory/bulk', methods=['POST'])
+@require_token
 def memory_bulk():
     items = (request.json or {}).get('items')
     if not isinstance(items, dict):
@@ -13592,12 +13627,14 @@ def memory_bulk():
     return jsonify({"count": len(items)})
 
 @app.route('/memory/forget', methods=['POST'])
+@require_token
 def memory_forget():
     key = (request.json or {}).get('key', '')
     forget_memory(key)
     return jsonify({"ok": True})
 
 @app.route('/memory/reorder', methods=['POST'])
+@require_token
 def memory_reorder():
     """Swap sort_order between two keys to reorder them."""
     data = request.json or {}
@@ -13624,10 +13661,12 @@ def memory_reorder():
 
 # ===== Journal endpoints =====
 @app.route('/journal', methods=['GET'])
+@require_token
 def journal_get():
     return jsonify({"entries": get_journal(int(request.args.get('limit', 10)))})
 
 @app.route('/journal', methods=['POST'])
+@require_token
 def journal_post():
     entry = (request.json or {}).get('entry', '').strip()
     if not entry:
@@ -13637,6 +13676,7 @@ def journal_post():
 
 # ===== Summary endpoints =====
 @app.route('/summary', methods=['GET'])
+@require_token
 def summary_get():
     return jsonify({
         "summary": build_summary_text(),
@@ -13647,6 +13687,7 @@ def summary_get():
     })
 
 @app.route('/summary/config', methods=['POST'])
+@require_token
 def summary_config():
     data = request.json or {}
     time = data.get('time', '07:00')
@@ -13656,6 +13697,7 @@ def summary_config():
     return jsonify({"ok": True, "config": {"time": time, "enabled": enabled}})
 
 @app.route('/summary/now', methods=['POST'])
+@require_token
 def summary_now():
     text = build_summary_text()
     ok = send_ntfy("ACEsi — Daily summary", text)
@@ -13663,10 +13705,12 @@ def summary_now():
 
 # ===== Notification endpoints =====
 @app.route('/notify/topic', methods=['GET'])
+@require_token
 def notify_topic():
     return jsonify({"topic": NTFY_TOPIC})
 
 @app.route('/notify', methods=['POST'])
+@require_token
 def notify_post():
     data = request.json or {}
     title = data.get('title', 'ACEsi')
@@ -13770,6 +13814,7 @@ def provider_health(probe=True):
 
 
 @app.route('/health/providers', methods=['GET'])
+@require_token
 def health_providers():
     """So a test can be preceded by a quota check instead of a mid-run surprise.
 
@@ -13783,16 +13828,19 @@ def health_providers():
 
 
 @app.route('/kill/status', methods=['GET'])
+@require_token
 def kill_status():
     return jsonify(_kill_state())
 
 @app.route('/kill', methods=['POST'])
+@require_token
 def kill_now():
     reason = (request.json or {}).get('reason', 'Web UI force stop')
     _kill_arm(reason=reason, source='web')
     return jsonify({"armed": True, "message": _KILL_CONFIRM})
 
 @app.route('/kill/resume', methods=['POST'])
+@require_token
 def kill_resume_web():
     data = request.json or {}
     unword = (data.get('password') or '').strip()
@@ -13810,10 +13858,12 @@ def _norm_priority(raw):
     return max(1, min(5, p))
 
 @app.route('/tasks', methods=['GET'])
+@require_token
 def tasks_get():
     return jsonify({"tasks": read_items('tasks.json', 'tasks')})
 
 @app.route('/tasks', methods=['POST'])
+@require_token
 def tasks_post():
     data = request.json or {}
     title = (data.get('title') or '').strip()
@@ -13834,6 +13884,7 @@ def tasks_post():
     return jsonify({"ok": True})
 
 @app.route('/tasks/<tid>/status', methods=['POST'])
+@require_token
 def tasks_status(tid):
     status = (request.json or {}).get('status', 'pending')
     def update(items):
@@ -13846,6 +13897,7 @@ def tasks_status(tid):
     return jsonify({"ok": True})
 
 @app.route('/tasks/<tid>', methods=['DELETE'])
+@require_token
 def tasks_delete(tid):
     mutate_items('tasks.json', 'tasks', lambda items: [t for t in items if t['id'] != tid])
     return jsonify({"ok": True})
@@ -13990,12 +14042,14 @@ def job_watch():
 
 
 @app.route('/jobs', methods=['GET'])
+@require_token
 def jobs_get():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     return jsonify({"jobs": _jobs_read()})
 
 @app.route('/jobs', methods=['POST'])
+@require_token
 def jobs_post():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
@@ -14015,6 +14069,7 @@ def jobs_post():
     return jsonify({"ok": True, "id": jid})
 
 @app.route('/jobs/<jid>', methods=['DELETE'])
+@require_token
 def jobs_delete(jid):
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
@@ -14022,6 +14077,7 @@ def jobs_delete(jid):
     return jsonify({"ok": True})
 
 @app.route('/jobs/<jid>/run', methods=['POST'])
+@require_token
 def jobs_run_now(jid):
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
@@ -14032,12 +14088,14 @@ def jobs_run_now(jid):
 
 # ===== Playbook + audit log =====
 @app.route('/playbook', methods=['GET'])
+@require_token
 def playbook_get():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
     return jsonify({"playbook": _playbook_read()})
 
 @app.route('/playbook', methods=['DELETE'])
+@require_token
 def playbook_clear():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
@@ -14045,6 +14103,7 @@ def playbook_clear():
     return jsonify({"ok": True})
 
 @app.route('/audit/tail', methods=['GET'])
+@require_token
 def audit_tail():
     if _kill_armed():
         return jsonify({"error": "E-STOP is armed"}), 403
@@ -14057,10 +14116,12 @@ def audit_tail():
 
 # ===== Calendar events =====
 @app.route('/events', methods=['GET'])
+@require_token
 def events_get():
     return jsonify({"events": read_items('events.json', 'events')})
 
 @app.route('/events', methods=['POST'])
+@require_token
 def events_post():
     data = request.json or {}
     title = (data.get('title') or '').strip()
@@ -14079,12 +14140,14 @@ def events_post():
     return jsonify({"ok": True})
 
 @app.route('/events/<eid>', methods=['DELETE'])
+@require_token
 def events_delete(eid):
     mutate_items('events.json', 'events', lambda items: [e for e in items if e['id'] != eid])
     return jsonify({"ok": True})
 
 # ===== Timers =====
 @app.route('/timers', methods=['GET'])
+@require_token
 def timers_get():
     now = time.time()
     timers = read_items('timers.json', 'timers')
@@ -14097,6 +14160,7 @@ def timers_get():
     return jsonify({"timers": out})
 
 @app.route('/timers', methods=['POST'])
+@require_token
 def timers_post():
     data = request.json or {}
     try:
@@ -14120,16 +14184,19 @@ def timers_post():
     return jsonify({"ok": True})
 
 @app.route('/timers/<tid>', methods=['DELETE'])
+@require_token
 def timers_delete(tid):
     mutate_items('timers.json', 'timers', lambda items: [t for t in items if t['id'] != tid])
     return jsonify({"ok": True})
 
 # ===== Alarms =====
 @app.route('/alarms', methods=['GET'])
+@require_token
 def alarms_get():
     return jsonify({"alarms": read_items('alarms.json', 'alarms')})
 
 @app.route('/alarms', methods=['POST'])
+@require_token
 def alarms_post():
     data = request.json or {}
     time_str = (data.get('time') or '').strip()
@@ -14150,6 +14217,7 @@ def alarms_post():
     return jsonify({"ok": True})
 
 @app.route('/alarms/<aid>/toggle', methods=['POST'])
+@require_token
 def alarms_toggle(aid):
     def toggle(items):
         for a in items:
@@ -14161,16 +14229,19 @@ def alarms_toggle(aid):
     return jsonify({"ok": True})
 
 @app.route('/alarms/<aid>', methods=['DELETE'])
+@require_token
 def alarms_delete(aid):
     mutate_items('alarms.json', 'alarms', lambda items: [a for a in items if a['id'] != aid])
     return jsonify({"ok": True})
 
 # ===== Work sessions =====
 @app.route('/sessions', methods=['GET'])
+@require_token
 def sessions_get():
     return jsonify({"sessions": read_items('sessions.json', 'sessions')})
 
 @app.route('/sessions/start', methods=['POST'])
+@require_token
 def sessions_start():
     sessions = read_items('sessions.json', 'sessions')
     if any(s.get('ended_at') is None for s in sessions):
@@ -14192,6 +14263,7 @@ def sessions_start():
     return jsonify({"ok": True})
 
 @app.route('/sessions/end', methods=['POST'])
+@require_token
 def sessions_end():
     ended = datetime.now()
     def close_session(items):
@@ -14209,6 +14281,7 @@ def sessions_end():
 
 # ===== Notifications (delivered to the browser via /notifications/pending) =====
 @app.route('/notifications/pending', methods=['GET'])
+@require_token
 def notifications_pending():
     try:
         after = float(request.args.get('after', 0))
@@ -14222,6 +14295,7 @@ def notifications_pending():
 
 # ===== Email watch: poll now, and manage the rules that trigger a PHONE push =====
 @app.route('/email/check', methods=['POST', 'GET'])
+@require_token
 def email_check():
     """Poll Gmail/Yahoo immediately and ntfy-push anything matching a rule."""
     data = request.json or {} if request.method == 'POST' else {}
@@ -14233,6 +14307,7 @@ def email_check():
 
 
 @app.route('/preferences', methods=['GET'])
+@require_token
 def preferences_get():
     res = list_preferences()
     prefs = res["preferences"]
@@ -14241,6 +14316,7 @@ def preferences_get():
 
 
 @app.route('/preferences', methods=['POST'])
+@require_token
 def preferences_set():
     """Store a standing preference. Body: {key, value}."""
     d = request.json or {}
@@ -14253,6 +14329,7 @@ def preferences_set():
 
 
 @app.route('/preferences/<path:key>', methods=['DELETE'])
+@require_token
 def preferences_delete(key):
     res = forget_preference(key)
     if not res.get("ok"):
@@ -14261,12 +14338,14 @@ def preferences_delete(key):
 
 
 @app.route('/email/rules', methods=['GET'])
+@require_token
 def email_rules_get():
     return jsonify({"rules": _load_email_rules(),
                     "accounts": sorted(_load_email_accounts().keys())})
 
 
 @app.route('/email/rules', methods=['POST'])
+@require_token
 def email_rules_set():
     """Create/replace a watch rule. Body: {from|subject|body, account, name}."""
     d = request.json or {}
@@ -14287,6 +14366,7 @@ def email_rules_set():
 
 
 @app.route('/email/test-push', methods=['POST', 'GET'])
+@require_token
 def email_test_push():
     """Send one ntfy push so Chris can confirm the phone actually receives them."""
     ok = send_ntfy("ACEsi — Email alerts on",
@@ -14296,6 +14376,7 @@ def email_test_push():
 
 
 @app.route('/whatsapp/send', methods=['POST'])
+@require_token
 def whatsapp_send():
     """Prepare a WhatsApp message for a contact.
 
@@ -14340,6 +14421,7 @@ def whatsapp_send():
 
 
 @app.route('/security/test-alert', methods=['POST'])
+@require_token
 def security_test_alert():
     """Fire a test security alert through the same ntfy channel real alerts use."""
     ok = send_ntfy("ACEsi — Security test",
@@ -14433,6 +14515,7 @@ def drive_request(method, url, **kwargs):
 
 
 @app.route('/drive/status', methods=['GET'])
+@require_token
 def drive_status():
     cred = load_drive_credentials()
     if not cred:
@@ -14452,6 +14535,7 @@ def drive_status():
 
 
 @app.route('/drive/auth', methods=['GET'])
+@require_token
 def drive_auth():
     cred = load_drive_credentials()
     if not cred:
@@ -14469,6 +14553,7 @@ def drive_auth():
 
 
 @app.route('/drive/callback', methods=['GET'])
+@require_token
 def drive_callback():
     error = request.args.get('error')
     if error:
@@ -14499,6 +14584,7 @@ def drive_callback():
 
 
 @app.route('/drive/list', methods=['GET'])
+@require_token
 def drive_list():
     parent = request.args.get('parent', 'root')
     r, err = drive_request('GET', DRIVE_API + '/files', params={
@@ -14513,6 +14599,7 @@ def drive_list():
 
 
 @app.route('/drive/download', methods=['GET'])
+@require_token
 def drive_download():
     fid = request.args.get('id')
     if not fid:
@@ -14524,6 +14611,7 @@ def drive_download():
 
 
 @app.route('/drive/upload', methods=['POST'])
+@require_token
 def drive_upload():
     try:
         body = request.get_json(force=True)
@@ -14564,6 +14652,7 @@ def drive_upload():
 
 # ===== Live counts =====
 @app.route('/devices', methods=['GET'])
+@require_token
 def devices():
     try:
         r = _run(['adb', 'devices'], capture_output=True, text=True, timeout=10)
@@ -14574,6 +14663,7 @@ def devices():
         return jsonify({"count": 0, "devices": []})
 
 @app.route('/agents', methods=['GET'])
+@require_token
 def agents():
     try:
         r = _run(['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV', '/NH'],
@@ -14665,6 +14755,7 @@ def portal_redirect():
 # ===== ACEsi general-purpose task routes =====
 
 @app.route('/context', methods=['GET'])
+@require_token
 def context_get():
     """Return the current active Context (or list all if names param)."""
     if ace_context:
@@ -14673,6 +14764,7 @@ def context_get():
 
 
 @app.route('/context', methods=['POST'])
+@require_token
 def context_set():
     """Switch the active Context: {'name': '...'}."""
     name = (request.json or {}).get("name", "")
@@ -14684,6 +14776,7 @@ def context_set():
 
 
 @app.route('/run_task', methods=['POST'])
+@require_token
 def run_task():
     """Execute a scripted step-list task (general-purpose executor).
     Body: {"steps": [{"tool": "ui_tap", "args": {"x": 540, "y": 1200}}, ...],
@@ -14702,6 +14795,7 @@ def run_task():
 
 
 @app.route('/autonomous', methods=['POST'])
+@require_token
 def autonomous():
     """Run a task in autonomous model-driven mode.
     Body: {"prompt": "navigate to the ITS portal and confirm the login button",
@@ -14752,6 +14846,7 @@ def _load_saved_task(name):
 
 
 @app.route('/task/<name>', methods=['POST'])
+@require_token
 def run_saved_task(name):
     """Execute a saved step-list task from tasks_lib/<name>.json."""
     from ace_task import run_task_steps
@@ -14767,6 +14862,7 @@ def run_saved_task(name):
 
 
 @app.route('/task/<name>', methods=['GET'])
+@require_token
 def get_saved_task(name):
     """Retrieve a saved task definition (step list + metadata)."""
     task_def = _load_saved_task(name)
@@ -14776,6 +14872,7 @@ def get_saved_task(name):
 
 
 @app.route('/tasks/lib', methods=['GET'])
+@require_token
 def list_saved_tasks():
     """List all saved tasks in tasks_lib/."""
     if not os.path.isdir(TASKS_DIR):
@@ -14833,6 +14930,7 @@ except Exception as e:
 
 # ===== Task Queue API Endpoints =====
 @app.route('/queue/add', methods=['POST'])
+@require_token
 def queue_add():
     data = request.json or {}
     tasks = data.get('tasks', [])
@@ -14843,36 +14941,43 @@ def queue_add():
     return jsonify({"status": "added", "queue_length": len(q["queue"]), "queue": q})
 
 @app.route('/queue/status', methods=['GET'])
+@require_token
 def queue_status():
     q = _queue_status()
     return jsonify(q)
 
 @app.route('/queue/clear', methods=['POST'])
+@require_token
 def queue_clear():
     q = _queue_clear()
     return jsonify({"status": "cleared", "queue": q})
 
 @app.route('/queue/stop', methods=['POST'])
+@require_token
 def queue_stop():
     q = _queue_stop()
     return jsonify({"status": "stopped", "queue": q})
 
 @app.route('/queue/resume', methods=['POST'])
+@require_token
 def queue_resume():
     q = _queue_resume()
     return jsonify({"status": "resumed", "queue": q})
 
 @app.route('/queue/skip', methods=['POST'])
+@require_token
 def queue_skip():
     q = _queue_skip_current()
     return jsonify({"status": "skipped", "queue": q})
 
 @app.route('/queue/retry', methods=['POST'])
+@require_token
 def queue_retry():
     q = _queue_retry_current()
     return jsonify({"status": "retry", "queue": q})
 
 @app.route('/queue/run', methods=['POST'])
+@require_token
 def queue_run():
     """Run the next task in the queue (or all if run_all=true)."""
     data = request.json or {}
@@ -14894,12 +14999,14 @@ def queue_run():
 
 # ===== Memory / Profile API =====
 @app.route('/memory/conversations/date/<date>', methods=['GET'])
+@require_token
 def memory_conversations_by_date(date):
     """Get all conversations for a specific date (YYYY-MM-DD)."""
     limit = int(request.args.get('limit', 50))
     return jsonify(get_conversations_by_date(date, limit))
 
 @app.route('/memory/conversations/search', methods=['GET'])
+@require_token
 def memory_conversations_search():
     """Search conversations by keyword."""
     keyword = request.args.get('q', '')
@@ -14910,6 +15017,7 @@ def memory_conversations_search():
     return jsonify(get_conversations_by_topic(keyword, limit, days))
 
 @app.route('/memory/conversations/range', methods=['GET'])
+@require_token
 def memory_conversations_range():
     """Get conversations in an ID range."""
     start = int(request.args.get('start', 0))
@@ -14919,12 +15027,14 @@ def memory_conversations_range():
     return jsonify(get_conversation_range(start, end))
 
 @app.route('/memory/conversations/dates', methods=['GET'])
+@require_token
 def memory_conversations_dates():
     """Get list of dates with conversation counts."""
     days = int(request.args.get('days', 90))
     return jsonify(get_dates_with_conversations(days))
 
 @app.route('/memory/session/summarize', methods=['POST'])
+@require_token
 def memory_session_summarize():
     """Summarize a conversation session."""
     data = request.json or {}
@@ -14933,6 +15043,7 @@ def memory_session_summarize():
     return jsonify({"summary": summary})
 
 @app.route('/memory/session/save', methods=['POST'])
+@require_token
 def memory_session_save():
     """Save a session summary."""
     data = request.json or {}
@@ -14945,11 +15056,13 @@ def memory_session_save():
     return jsonify({"saved": True, "key": key})
 
 @app.route('/profile', methods=['GET'])
+@require_token
 def profile_get():
     """Get the built profile of Chris."""
     return jsonify(get_profile())
 
 @app.route('/profile/refresh', methods=['POST'])
+@require_token
 def profile_refresh():
     """Force rebuild the profile from conversation history."""
     fresh = extract_profile_traits()
@@ -14960,6 +15073,7 @@ def profile_refresh():
     return jsonify({"refreshed": True, "profile": fresh})
 
 @app.route('/memory/conversations/recent', methods=['GET'])
+@require_token
 def memory_conversations_recent():
     """Get recent conversation turns."""
     limit = int(request.args.get('limit', 20))
@@ -14967,6 +15081,7 @@ def memory_conversations_recent():
 
 
 @app.route('/conversations', methods=['GET'])
+@require_token
 def conversations_list():
     """Recent conversation turns WITH timestamps, oldest first.
 
@@ -15202,6 +15317,7 @@ for _h in logging.getLogger('werkzeug').handlers:
         _h.stream = sys.stdout
 
 @app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
+@require_token
 def api_settings():
     from flask import request, jsonify
     import json
@@ -15277,6 +15393,7 @@ if __name__ == '__main__':
     _hb.start()
     
 @app.route('/run_stream', methods=['GET'])
+@require_token
 def run_stream():
     import subprocess
     cmd = request.args.get('cmd', '')
@@ -15303,6 +15420,7 @@ def run_stream():
 
 
 @app.route('/restart', methods=['POST'])
+@require_token
 def restart_server():
     """Restart from the UI without killing unrelated Python programs.
 
@@ -15340,6 +15458,7 @@ def restart_server():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route('/api/terminal', methods=['POST'])
+@require_token
 def api_terminal():
     data = request.json or {}
     cmd = data.get('command', '')
@@ -15352,6 +15471,7 @@ def api_terminal():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/format', methods=['POST'])
+@require_token
 def api_format():
     data = request.json or {}
     code = data.get('code', '')
@@ -15366,6 +15486,7 @@ def api_format():
 
 
 @app.route('/api/check-syntax', methods=['POST'])
+@require_token
 def api_check_syntax():
     data = request.json or {}
     filename = data.get('filename', '')
