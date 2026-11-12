@@ -114,6 +114,7 @@ class _AiRecommendationsScreenState
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
+          centerTitle: true,
           title: const Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
