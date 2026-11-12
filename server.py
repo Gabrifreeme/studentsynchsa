@@ -15122,7 +15122,7 @@ if __name__ == '__main__':
             # Animate 10 frames within the 5s interval for smooth wave
             for _ in range(10):
                 idx = (idx + 1) % len(frames)
-                sys.stdout.write('\r' + frames[idx])
+                sys.stdout.write('\b' + frames[idx])
                 sys.stdout.flush()
                 _t.sleep(0.5)  # 0.1s would be 50 frames, 0.5s is 10 frames for simplicity
     _hb = threading.Thread(target=_hb_func, daemon=True)
