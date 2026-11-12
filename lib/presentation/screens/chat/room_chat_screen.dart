@@ -8,9 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
 import 'package:lipsyncstudent/data/datasources/local/chat_storage.dart';
 import 'package:lipsyncstudent/data/models/chat_message.dart';
+import 'package:lipsyncstudent/services/chat_service.dart';
 import 'package:lipsyncstudent/services/file_saver.dart';
 import 'package:record/record.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 class RoomChatScreen extends StatefulWidget {
@@ -32,13 +32,37 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
   bool _loading = true;
   bool _showEmojiPicker = false;
   bool _isRecording = false;
-  String? _recordingPath;
   DateTime? _recordingStart;
+
+  ChatConnectionState _connState = ChatConnectionState.disconnected;
+  StreamSubscription<ChatMessage>? _msgSub;
+  StreamSubscription<ChatEvent>? _statusSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _bindChat();
+  }
+
+  Future<void> _bindChat() async {
+    _msgSub = ChatService.instance.messages.listen((m) async {
+      if (m.room != widget.room) return;
+      final refreshed = await ChatStorage.getMessages(widget.room);
+      if (!mounted) return;
+      setState(() => _messages = refreshed);
+      _scrollToBottom();
+    });
+    _statusSub = ChatService.instance.status.listen((e) {
+      if (!mounted) return;
+      setState(() => _connState = e.state);
+    });
+    try {
+      await ChatService.instance.connect(widget.room);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _connState = ChatConnectionState.error);
+    }
   }
 
   Future<void> _load() async {
@@ -64,22 +88,19 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-    final message = ChatMessage(
-      id: const Uuid().v4(),
-      room: widget.room,
-      sender: 'You',
-      text: text.trim(),
-      timestamp: DateTime.now(),
-    );
-    await ChatStorage.addMessage(message);
-    _controller.clear();
-    if (!mounted) return;
-    setState(() {
-      _messages = [..._messages, message];
-      _showEmojiPicker = false;
-    });
-    _scrollToBottom();
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    try {
+      await ChatService.instance.send(room: widget.room, body: trimmed);
+      _controller.clear();
+      if (!mounted) return;
+      setState(() => _showEmojiPicker = false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Send failed: $e'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   Future<void> _send() async {
@@ -96,7 +117,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
       final bytes = await file.xFile.readAsBytes();
       String? base64Data;
       String? mimeType;
-      if (bytes != null) {
+      if (bytes.isNotEmpty) {
         base64Data = base64Encode(bytes);
         final ext = fileName.split('.').last.toLowerCase();
         mimeType = ext == 'png' ? 'image/png'
@@ -109,7 +130,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
         id: const Uuid().v4(),
         room: widget.room,
         sender: 'You',
-        text: '[FILE] ' + fileName,
+        text: '[FILE] $fileName',
         timestamp: DateTime.now(),
         fileData: base64Data,
         mimeType: mimeType,
@@ -151,7 +172,18 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
         final duration = _recordingStart != null
             ? DateTime.now().difference(_recordingStart!)
             : Duration.zero;
-        await _sendMessage('[AUDIO] Voice message ${duration.inSeconds}s at $path');
+        final audioMsg = ChatMessage(
+          id: const Uuid().v4(),
+          room: widget.room,
+          sender: ChatService.instance.currentDisplayName ?? 'You',
+          text: '[AUDIO] Voice message ${duration.inSeconds}s at $path',
+          timestamp: DateTime.now(),
+        );
+        await ChatStorage.addMessage(audioMsg);
+        if (mounted) {
+          setState(() => _messages = [..._messages, audioMsg]);
+          _scrollToBottom();
+        }
         _recordingStart = null;
       }
     } else {
@@ -183,9 +215,33 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
   void dispose() {
     _controller.dispose();
     _scroll.dispose();
+    _msgSub?.cancel();
+    _statusSub?.cancel();
     _inputFocus.dispose();
     _recorder.dispose();
     super.dispose();
+  }
+
+  Widget _buildStatusPill() {
+    final (label, color) = switch (_connState) {
+      ChatConnectionState.connected => ('LIVE', AppColors.primary),
+      ChatConnectionState.connecting => ('LINK', AppColors.textMuted),
+      ChatConnectionState.reconnecting => ('RETRY', AppColors.textMuted),
+      ChatConnectionState.disconnected => ('OFF', AppColors.error),
+      ChatConnectionState.error => ('ERR', AppColors.error),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(border: Border.all(color: color, width: 1)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(color: color, fontSize: 10, letterSpacing: 1, fontFamily: 'monospace')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -195,7 +251,14 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
-          title: Text(widget.roomName),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: Text(widget.roomName, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 8),
+              _buildStatusPill(),
+            ],
+          ),
           centerTitle: true,
           backgroundColor: Colors.black,
           elevation: 0,
@@ -219,7 +282,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                             itemCount: _messages.length,
                             itemBuilder: (ctx, i) {
                               final m = _messages[i];
-                              final isMe = m.sender == 'You';
+                              final isMe = m.sender == (ChatService.instance.currentDisplayName ?? 'You');
                               return Align(
                                 alignment: isMe
                                     ? Alignment.centerRight

@@ -59,6 +59,9 @@ class ChatService {
   bool get isConnected => _socket?.connected ?? false;
   String? get currentRoom => _currentRoom;
 
+  String? _currentDisplayName;
+  String? get currentDisplayName => _currentDisplayName;
+
   ChatConnectionState _lastState = ChatConnectionState.disconnected;
   ChatConnectionState get lastState => _lastState;
 
@@ -123,6 +126,8 @@ class ChatService {
       socket.on('chat_joined', (data) async {
         try {
           final map = (data as Map).cast<String, dynamic>();
+          final dn = map['display_name'];
+          if (dn is String) _currentDisplayName = dn;
           final recent = (map['recent'] as List?) ?? const [];
           for (final raw in recent) {
             final m = _fromServerJson((raw as Map).cast<String, dynamic>());
