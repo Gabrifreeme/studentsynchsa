@@ -288,8 +288,13 @@ class _DashboardShellState extends State<DashboardShell>
             ),
         ],
       ),
-      bottomNavigationBar: BottomAppBar(
-        color: AppColors.surface,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF000000),
+          border: Border(top: BorderSide(color: Color(0xFFFF9D00), width: 1)),
+        ),
+        child: BottomAppBar(
+        color: Color(0xFF000000),
         elevation: 0,
         child: Row(
           children: [
@@ -318,6 +323,7 @@ class _DashboardShellState extends State<DashboardShell>
             )),
           ],
         ),
+      ),
       ),
     );
   }
