@@ -21,6 +21,11 @@ import threading
 import sys
 from datetime import datetime, timedelta
 from urllib.parse import quote_plus
+import secrets
+import hashlib as _chat_hashlib
+import functools
+from flask import g
+from flask_socketio import emit as _sio_emit, join_room as _sio_join, leave_room as _sio_leave, disconnect as _sio_disconnect
 import devtools_service as d  # Chrome DevTools Protocol bridge (ITS WebView / local Chrome)
 
 # The server normally runs with stdout redirected to a file. Two things then go
@@ -254,10 +259,146 @@ def init_db():
     # night?". Git knows the current diff, but only this table knows *when*
     # each individual save happened.
     c.execute('CREATE TABLE IF NOT EXISTS change_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, path TEXT, line INTEGER, added INTEGER, removed INTEGER, source TEXT, note TEXT)')
+    # Chat Phase 2 tables (cross-device chat)
+    c.execute('CREATE TABLE IF NOT EXISTS chat_users (user_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, last_seen TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS chat_rooms (room_id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, created_at TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id TEXT NOT NULL, user_id TEXT NOT NULL, display_name TEXT NOT NULL, body TEXT NOT NULL, attachment_json TEXT, created_at TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS chat_reads (room_id TEXT NOT NULL, user_id TEXT NOT NULL, last_read_id INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (room_id, user_id))')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_room_created ON chat_messages(room_id, created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages(user_id)')
     conn.commit()
     conn.close()
 
 init_db()
+
+# --- CHAT AUTH BEGIN ---
+# Token-based identity for cross-device chat + gated routes.
+# Loopback (127.0.0.1 / ::1 / localhost) always passes -- preserves local dev UX.
+# Raw tokens are never stored; only sha256 hashes in chat_users.token_hash.
+def _is_loopback(addr):
+    if not addr:
+        return False
+    return addr in ("127.0.0.1", "::1", "localhost") or addr.startswith("127.")
+
+def _chat_hash(tok):
+    return _chat_hashlib.sha256(tok.encode("utf-8")).hexdigest()
+
+def _now_iso():
+    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+def _chat_conn():
+    conn = sqlite3.connect("ace_memory.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def _issue_token(display_name):
+    display_name = (display_name or "").strip()
+    if not display_name or len(display_name) > 64:
+        return None, "display_name required (1-64 chars)"
+    user_id = uuid.uuid4().hex
+    raw_tok = secrets.token_urlsafe(32)
+    th = _chat_hash(raw_tok)
+    now = _now_iso()
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM chat_users WHERE display_name=?", (display_name,))
+        if cur.fetchone():
+            return None, "display_name already registered; revoke first or pick another"
+        cur.execute(
+            "INSERT INTO chat_users (user_id, display_name, token_hash, created_at, last_seen) VALUES (?,?,?,?,?)",
+            (user_id, display_name, th, now, now),
+        )
+        conn.commit()
+    except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
+        return None, "issue failed: %s" % e
+    finally:
+        conn.close()
+    return {"user_id": user_id, "display_name": display_name, "token": raw_tok}, None
+
+def _lookup_token(raw_tok):
+    if not raw_tok:
+        return None
+    th = _chat_hash(raw_tok)
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, display_name FROM chat_users WHERE token_hash=?", (th,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        cur.execute("UPDATE chat_users SET last_seen=? WHERE user_id=?", (_now_iso(), row["user_id"]))
+        conn.commit()
+        return {"user_id": row["user_id"], "display_name": row["display_name"]}
+    finally:
+        conn.close()
+
+def _extract_token(req):
+    tok = req.headers.get("X-ACEsi-Token")
+    if tok:
+        return tok.strip()
+    auth = req.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
+
+def require_token(fn):
+    @functools.wraps(fn)
+    def _wrap(*args, **kwargs):
+        if _is_loopback(request.remote_addr):
+            g.chat_user = {"user_id": "loopback", "display_name": "loopback"}
+            return fn(*args, **kwargs)
+        ident = _lookup_token(_extract_token(request))
+        if not ident:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        g.chat_user = ident
+        return fn(*args, **kwargs)
+    return _wrap
+
+@app.route("/api/auth/issue", methods=["POST", "OPTIONS"])
+def api_auth_issue():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    data = request.get_json(silent=True) or {}
+    payload, err = _issue_token(data.get("display_name"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True, **payload})
+
+@app.route("/api/auth/revoke", methods=["POST"])
+def api_auth_revoke():
+    if not _is_loopback(request.remote_addr):
+        return jsonify({"ok": False, "error": "loopback only"}), 403
+    data = request.get_json(silent=True) or {}
+    uid = (data.get("user_id") or "").strip()
+    if not uid:
+        return jsonify({"ok": False, "error": "user_id required"}), 400
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM chat_users WHERE user_id=?", (uid,))
+        n = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "deleted": n})
+
+def _chat_boot_report():
+    try:
+        conn = _chat_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) AS n FROM chat_users"); u = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM chat_rooms"); r = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM chat_messages"); m = cur.fetchone()["n"]
+        conn.close()
+        print("[chat] init ok users=%d rooms=%d messages=%d" % (u, r, m))
+    except Exception as e:
+        print("[chat] init report failed: %s" % e)
+
+_chat_boot_report()
+# --- CHAT AUTH END ---
 
 OCR_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ocr.ps1')
 
