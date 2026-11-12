@@ -242,7 +242,11 @@ class _ChatBubble extends StatelessWidget {
                           height: 1.5,
                         ),
                         children: [
-                          TextSpan(text: message.text + ' '),
+                          ...(message.text.contains('⭐ ')
+                            ? [TextSpan(text: message.text.split('⭐ ')[0]), 
+                               WidgetSpan(alignment: PlaceholderAlignment.middle, child: StarAvatar(size: 16)),
+                               TextSpan(text: ' ' + message.text.split('⭐ ')[1])]
+                            : [TextSpan(text: message.text + ' ')]),
                           WidgetSpan(
                             alignment: PlaceholderAlignment.middle,
                             child: StarAvatar(size: 16),
