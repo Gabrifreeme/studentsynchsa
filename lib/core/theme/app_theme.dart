@@ -9,9 +9,9 @@ class AppColors {
   static const starGold = Color(0xFFFF9D00);
 
   static const background = Color(0xFF000000);
-  static const surface = Color(0xFF111111);
+  static const surface = Color(0xFF000000);
   static const surfaceLight = Color(0xFF1A1A1A);
-  static const card = Color(0xFF111111);
+  static const card = Color(0xFF000000);
 
   static const textPrimary = Color(0xFFFF9D00);
   static const textSecondary = Color(0xFFB3B3B3);
