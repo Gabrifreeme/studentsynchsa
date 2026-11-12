@@ -19,7 +19,7 @@ class _AiRecommendationsScreenState
     _ChatMessage(
       text:
           "Hi there! I'm ACEsi\n\n"
-          "First things first — complete your profile so I can give you the best recommendations for your needs!",
+          "⭐ First things first — complete your profile so I can give you the best recommendations for your needs!",
       isUser: false,
     ),
   ];
@@ -41,11 +41,11 @@ class _AiRecommendationsScreenState
           profile.personal.firstName.isNotEmpty &&
           profile.grade12Subjects.isNotEmpty;
       final greeting = isProfileComplete
-          ? "Hi there $name! I'm Star ⭐\n\n"
+          ? "Hi there $name! I'm ACEsi\n\n"
                 "I can help you find the right university/bursary that fits your needs and style. "
                 "I can do more than that — wherever you see me, just tap/click on me and ask away."
-          : "Hi there $name! I'm Star ⭐\n\n"
-                "First things first — complete your profile so I can give you the best recommendations for your needs!";
+          : "Hi there $name! I'm ACEsi\n\n"
+                "⭐ First things first — complete your profile so I can give you the best recommendations for your needs!";
       if (_messages.isNotEmpty && !_messages.first.text.contains(name)) {
         setState(() {
           _messages[0] = _ChatMessage(text: greeting, isUser: false);
@@ -57,10 +57,10 @@ class _AiRecommendationsScreenState
   Future<void> _sendMessage(String text) async {
     final profile = ref.read(profileProvider).valueOrNull;
     final userMsg = _ChatMessage(text: text, isUser: true);
-    final starMsg = _ChatMessage(text: '', isUser: false);
+    final acesiMsg = _ChatMessage(text: '', isUser: false);
     setState(() {
       _messages.add(userMsg);
-      _messages.add(starMsg);
+      _messages.add(acesiMsg);
       _loading = true;
     });
     _scrollDown();
@@ -71,7 +71,7 @@ class _AiRecommendationsScreenState
 
     await AiService.askStream(
       prompt:
-          'You are Star, a friendly South African university advisor. '
+          'You are ACEsi, a friendly South African university advisor. '
           'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
           '$contextInfo\nStudent asks: $text',
       onToken: (token) {
@@ -109,13 +109,15 @@ class _AiRecommendationsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           title: const Row(
             mainAxisSize: MainAxisSize.min,
-            children: [StarAvatar(size: 28), SizedBox(width: 8), Text('Star')],
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [StarAvatar(size: 28), SizedBox(width: 6), Text('ACEsi'), SizedBox(width: 6), StarAvatar(size: 28)],
           ),
         ),
         body: Column(
@@ -159,7 +161,7 @@ class _AiRecommendationsScreenState
                               }
                             },
                       decoration: const InputDecoration(
-                        hintText: 'Ask Star anything...',
+                        hintText: 'Ask ACEsi anything...',
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 16,
@@ -214,7 +216,7 @@ class _ChatBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser) ...[
-            const StarAvatar(size: 28),
+            const SizedBox(width: 0), // removed left star
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -231,16 +233,33 @@ class _ChatBubble extends StatelessWidget {
                   bottomRight: Radius.circular(message.isUser ? 4 : 16),
                 ),
               ),
-              child: Text(
-                message.text,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
+              child: (message.text.contains('ACEsi') && !message.isUser)
+                  ? RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          height: 1.5,
+                        ),
+                        children: [
+                          TextSpan(text: message.text + ' '),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: StarAvatar(size: 16),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      message.text,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
               ),
             ),
-          ),
           if (message.isUser) const SizedBox(width: 8),
         ],
       ),
