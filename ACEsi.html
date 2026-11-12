@@ -7299,7 +7299,7 @@
 
     <span style="color: #ff9d00; font-weight: bold; font-family: monospace;">ACEsi Terminal</span>
 
-        <span id="terminal-paste-btn" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace; margin-right: 15px;">Paste</span><span id="terminal-close-btn" onclick="window.closeAceTerminal()" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace;">X Close</span>
+        <span id="terminal-min-btn" onclick="window.toggleMinimize()" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace; margin-right: 15px;" title="Minimize">–</span><span id="terminal-close-btn" onclick="window.closeAceTerminal()" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace;">X Close</span>
 
   </div>
 
@@ -11187,25 +11187,7 @@ window.checkSyntax = function(filename) {
 
 <script>
 
-window.openAceTerminal = function() {
 
-    var panel = document.getElementById('terminal-panel');
-
-    if (panel) { panel.style.display = 'flex'; }
-
-    if (window.term) { try { window.term.dispose(); } catch(e) {} window.term = null; }
-
-    requestAnimationFrame(function() {
-
-        requestAnimationFrame(function() {
-
-            window.initAceTerminalFn();
-
-        });
-
-    });
-
-};
 
 window.initAceTerminalFn = function() {    var termContainer = document.getElementById('terminal-output');
 
@@ -12227,6 +12209,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1500);
 });
 </script>
+
+<script>
+
+</script>
+
+
+<script>
+window.toggleMinimize = function() {
+    var p = document.getElementById('terminal-panel');
+    if (!p) return;
+    
+    // Check current height
+    var currentHeight = parseInt(p.style.height || '300px');
+    
+    if (currentHeight <= 40) {
+        // Expand
+        p.style.setProperty('height', '300px', 'important');
+        p.style.setProperty('min-height', '300px', 'important');
+        p.style.setProperty('max-height', '300px', 'important');
+        p.style.setProperty('display', 'flex', 'important');
+    } else {
+        // Shrink
+        p.style.setProperty('height', '35px', 'important');
+        p.style.setProperty('min-height', '35px', 'important');
+        p.style.setProperty('max-height', '35px', 'important');
+    }
+};
+
+window.openAceTerminal = function() {
+    var p = document.getElementById('terminal-panel');
+    if (p) {
+        p.style.setProperty('display', 'flex', 'important');
+        p.style.setProperty('height', '300px', 'important');
+        p.style.setProperty('min-height', '300px', 'important');
+        p.style.setProperty('max-height', '300px', 'important');
+        p.removeAttribute('hidden');
+    }
+    if (!window.term && window.initAceTerminalFn) {
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { window.initAceTerminalFn(); });
+        });
+    } else if (window.term) {
+        setTimeout(function() { try { window.term.focus(); } catch(e) {} }, 100);
+    }
+};
+
+window.closeAceTerminal = function() {
+    var p = document.getElementById('terminal-panel');
+    if (p) { p.style.setProperty('display', 'none', 'important'); }
+};
+</script>
+
 </body>
 
 </html>
