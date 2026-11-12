@@ -19,7 +19,7 @@ import time
 import tempfile
 import threading
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
 import secrets
 import hashlib as _chat_hashlib
@@ -284,7 +284,7 @@ def _chat_hash(tok):
     return _chat_hashlib.sha256(tok.encode("utf-8")).hexdigest()
 
 def _now_iso():
-    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 def _chat_conn():
     conn = sqlite3.connect("ace_memory.db")
@@ -15504,6 +15504,249 @@ def handle_connect():
             except Exception:
                 break
     socketio.start_background_task(read_output)
+
+
+# --- CHAT NAMESPACE BEGIN ---
+# Phase 2a: cross-device chat over flask-socketio namespace '/chat'.
+# Message shape (wire + storage): {id, room_id, user_id, display_name, body,
+# attachment_json, created_at}. body is a plain string. attachment_json is
+# null or a JSON string (matches LipSyncStudent Hive model from commit 3700dab).
+_chat_sessions = {}
+_chat_lock = threading.Lock()
+
+_CHAT_BASE_ROOMS = [
+    ("general", "General Chat", "general"),
+    ("province:gauteng", "Gauteng", "province"),
+    ("province:western-cape", "Western Cape", "province"),
+    ("province:kwazulu-natal", "KwaZulu-Natal", "province"),
+]
+
+def _chat_seed_rooms():
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        now = _now_iso()
+        for rid, name, kind in _CHAT_BASE_ROOMS:
+            cur.execute(
+                "INSERT OR IGNORE INTO chat_rooms (room_id, name, kind, created_at) VALUES (?,?,?,?)",
+                (rid, name, kind, now),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+def _chat_ensure_room(room_id):
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM chat_rooms WHERE room_id=?", (room_id,))
+        if cur.fetchone():
+            return True
+        if room_id.startswith("university:"):
+            slug = room_id.split(":", 1)[1].replace("-", " ").title()
+            name = "University: " + slug
+            kind = "university"
+        else:
+            return False
+        cur.execute(
+            "INSERT INTO chat_rooms (room_id, name, kind, created_at) VALUES (?,?,?,?)",
+            (room_id, name, kind, _now_iso()),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+def _chat_resolve_identity(payload, remote_addr):
+    tok = (payload or {}).get("token")
+    if tok:
+        ident = _lookup_token(tok)
+        if ident:
+            return ident
+        return None
+    if _is_loopback(remote_addr):
+        return {"user_id": "loopback_guest", "display_name": "Guest"}
+    return None
+
+def _chat_recent(room_id, limit=50, before_id=None):
+    limit = max(1, min(int(limit or 50), 200))
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        if before_id:
+            cur.execute(
+                "SELECT id, room_id, user_id, display_name, body, attachment_json, created_at "
+                "FROM chat_messages WHERE room_id=? AND id<? ORDER BY id DESC LIMIT ?",
+                (room_id, int(before_id), limit),
+            )
+        else:
+            cur.execute(
+                "SELECT id, room_id, user_id, display_name, body, attachment_json, created_at "
+                "FROM chat_messages WHERE room_id=? ORDER BY id DESC LIMIT ?",
+                (room_id, limit),
+            )
+        rows = cur.fetchall()
+        out = [dict(r) for r in rows]
+        out.reverse()
+        return out
+    finally:
+        conn.close()
+
+def _chat_insert_message(room_id, user_id, display_name, body, attachment_json):
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        now = _now_iso()
+        cur.execute(
+            "INSERT INTO chat_messages (room_id, user_id, display_name, body, attachment_json, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (room_id, user_id, display_name, body, attachment_json, now),
+        )
+        new_id = cur.lastrowid
+        conn.commit()
+        return {
+            "id": new_id,
+            "room_id": room_id,
+            "user_id": user_id,
+            "display_name": display_name,
+            "body": body,
+            "attachment_json": attachment_json,
+            "created_at": now,
+        }
+    finally:
+        conn.close()
+
+@socketio.on("chat_connect", namespace="/chat")
+def _on_chat_connect(payload):
+    payload = payload or {}
+    room_id = (payload.get("room_id") or "").strip()
+    if not room_id:
+        _sio_emit("chat_error", {"error": "room_id required"}, to=request.sid, namespace="/chat")
+        return
+    ident = _chat_resolve_identity(payload, request.remote_addr)
+    if not ident:
+        _sio_emit("chat_error", {"error": "unauthorized"}, to=request.sid, namespace="/chat")
+        _sio_disconnect(namespace="/chat")
+        return
+    if not _chat_ensure_room(room_id):
+        _sio_emit("chat_error", {"error": "unknown room"}, to=request.sid, namespace="/chat")
+        return
+    _sio_join(room_id, namespace="/chat")
+    with _chat_lock:
+        _chat_sessions[request.sid] = {
+            "user_id": ident["user_id"],
+            "display_name": ident["display_name"],
+            "room_id": room_id,
+        }
+    recent = _chat_recent(room_id, limit=50)
+    _sio_emit(
+        "chat_joined",
+        {
+            "user_id": ident["user_id"],
+            "display_name": ident["display_name"],
+            "room_id": room_id,
+            "recent": recent,
+        },
+        to=request.sid,
+        namespace="/chat",
+    )
+
+@socketio.on("chat_send", namespace="/chat")
+def _on_chat_send(payload):
+    with _chat_lock:
+        sess = _chat_sessions.get(request.sid)
+    if not sess:
+        _sio_emit("chat_error", {"error": "not connected; send chat_connect first"}, to=request.sid, namespace="/chat")
+        return
+    payload = payload or {}
+    body = payload.get("body")
+    if not isinstance(body, str):
+        body = "" if body is None else str(body)
+    body = body.strip()
+    att = payload.get("attachment_json")
+    if att is not None and not isinstance(att, str):
+        att = json.dumps(att)
+    if not body and not att:
+        _sio_emit("chat_error", {"error": "empty message"}, to=request.sid, namespace="/chat")
+        return
+    if len(body) > 4000:
+        _sio_emit("chat_error", {"error": "body too long (max 4000)"}, to=request.sid, namespace="/chat")
+        return
+    row = _chat_insert_message(
+        sess["room_id"], sess["user_id"], sess["display_name"], body, att
+    )
+    _sio_emit("chat_message", row, room=sess["room_id"], namespace="/chat")
+
+@socketio.on("chat_typing", namespace="/chat")
+def _on_chat_typing(payload):
+    with _chat_lock:
+        sess = _chat_sessions.get(request.sid)
+    if not sess:
+        return
+    typing = bool((payload or {}).get("typing"))
+    _sio_emit(
+        "chat_typing",
+        {"user_id": sess["user_id"], "display_name": sess["display_name"], "typing": typing},
+        room=sess["room_id"],
+        include_self=False,
+        namespace="/chat",
+    )
+
+@socketio.on("disconnect", namespace="/chat")
+def _on_chat_disconnect():
+    with _chat_lock:
+        sess = _chat_sessions.pop(request.sid, None)
+    if sess:
+        try:
+            _sio_leave(sess["room_id"], namespace="/chat")
+        except Exception:
+            pass
+
+@app.route("/api/chat/history", methods=["GET", "OPTIONS"])
+def api_chat_history():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    room_id = (request.args.get("room_id") or "").strip()
+    if not room_id:
+        return jsonify({"ok": False, "error": "room_id required"}), 400
+    limit = request.args.get("limit", "50")
+    before_id = request.args.get("before_id")
+    try:
+        limit = int(limit)
+    except Exception:
+        return jsonify({"ok": False, "error": "limit must be int"}), 400
+    msgs = _chat_recent(room_id, limit=limit, before_id=before_id)
+    return jsonify({"ok": True, "room_id": room_id, "messages": msgs})
+
+@app.route("/api/chat/rooms", methods=["GET", "OPTIONS"])
+def api_chat_rooms():
+    if request.method == "OPTIONS":
+        return ("", 204)
+    conn = _chat_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT room_id, name, kind, created_at FROM chat_rooms ORDER BY kind, name")
+        rows = [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "rooms": rows})
+
+_chat_seed_rooms()
+
+def _chat_boot_report2():
+    try:
+        conn = _chat_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) AS n FROM chat_rooms"); r = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM chat_users"); u = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM chat_messages"); m = cur.fetchone()["n"]
+        conn.close()
+        print("[chat] patch_02 ok rooms=%d users=%d messages=%d" % (r, u, m))
+    except Exception as e:
+        print("[chat] patch_02 report failed: %s" % e)
+
+_chat_boot_report2()
+# --- CHAT NAMESPACE END ---
 
 if __name__ == '__main__':
     socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
