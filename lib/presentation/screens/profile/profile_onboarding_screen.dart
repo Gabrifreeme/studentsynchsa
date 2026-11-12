@@ -123,7 +123,7 @@ class _ProfileOnboardingScreenState
 
   final _formKeys = List.generate(3, (_) => GlobalKey<FormState>());
   static const _greetingText =
-      "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
+      "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
 // ignore: unused_field
 static const List<String> _countryList = [

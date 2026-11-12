@@ -18,7 +18,7 @@ class _AiRecommendationsScreenState
   final List<_ChatMessage> _messages = [
     _ChatMessage(
       text:
-          "Hi there! I'm Star ⭐\n\n"
+          "Hi there! I'm ACEsi\n\n"
           "First things first — complete your profile so I can give you the best recommendations for your needs!",
       isUser: false,
     ),
