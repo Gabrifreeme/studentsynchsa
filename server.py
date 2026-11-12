@@ -15031,9 +15031,17 @@ class SimpleLogger:
                     elif status.startswith(('4', '5')):
                         msg_text = msg_text.rstrip() + ' ❌\n'
 
+            # 1. Write CLEAN text to the console (no ANSI colors)
             self.original.write(msg_text)
             if hasattr(self, 'queue') and self.queue:
+                # 2. Check if this is a heartbeat frame
+                stripped = msg_text.strip()
+                if stripped and stripped[-1] in ('_', '/', '|', '\\'):
+                    # Add ANSI green tick ONLY to the queue (frontend)
+                    msg_text = msg_text.rstrip() + ' \x1b[32m\u2705\x1b[0m'
                 self.queue.put(msg_text)
+        except Exception:
+            pass
         except Exception:
             pass
 
@@ -15041,7 +15049,6 @@ class SimpleLogger:
         if hasattr(self, 'original'):
             self.original.flush()
 
-sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 
 
@@ -15122,7 +15129,7 @@ if __name__ == '__main__':
             # Animate 10 frames within the 5s interval for smooth wave
             for _ in range(10):
                 idx = (idx + 1) % len(frames)
-                sys.stdout.write('\b' + frames[idx])
+                _LOG_QUEUE.put('\r\x1b[33m[SERVER] ' + frames[idx] + ' \x1b[32m\u2705\x1b[0m')
                 sys.stdout.flush()
                 _t.sleep(0.5)  # 0.1s would be 50 frames, 0.5s is 10 frames for simplicity
     _hb = threading.Thread(target=_hb_func, daemon=True)
