@@ -7299,17 +7299,15 @@
 
     <span style="color: #ff9d00; font-weight: bold; font-family: monospace;">ACEsi Terminal</span>
 
-        <span id="terminal-close-btn" onclick="window.closeAceTerminal()" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace;">X Close</span>
+        <span id="terminal-paste-btn" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace; margin-right: 15px;">Paste</span><span id="terminal-close-btn" onclick="window.closeAceTerminal()" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: monospace;">X Close</span>
 
   </div>
 
   <div id="terminal-output" style="flex: 1; overflow: hidden; padding: 0; margin: 0; background: #000; display: block; width: 100%; height: 100%;"></div>
+    <div style="display: flex; padding: 4px; background: #111; border-top: 1px solid #333;">
+        <input type="text" id="terminal-cmd-input" placeholder="Type command or Ctrl+V here, press Enter to run..." autocomplete="off" style="flex: 1; padding: 8px; background: #111; color: #ff9d00; border: 1px solid #ff9d00; outline: none; font-family: monospace; font-size: 12px;">
+    </div>
 
-  <div style="display: flex; padding: 4px; background: #111; border-top: 1px solid #333;">
-
-    <input type="text" id="terminal-input" placeholder="Type a command..." style="flex: 1; padding: 8px; background: #111; color: #ff9d00; border: none; outline: none; font-family: monospace; font-size: 12px;">
-
-  </div>
 
 </div>
 
@@ -11331,7 +11329,6 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
 
     socket.on('terminal_output', function(data) {
 
-        console.log('RAW IN:', JSON.stringify(data));
         term.write(data);
 
     });
@@ -11389,19 +11386,28 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
     // Send keystrokes to backend
 
     var _buf = '';
+    termContainer.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text');
+        if (text) {
+            _buf += text;
+            term.write(text);
+        }
+    });
+    window._aceBuf = '';
     term.onData(function(data) {
         if (data === '\r') {
-            if (_buf.length > 0) {
-                socket.emit('terminal_input', _buf);
-                _buf = '';
+            if (window._aceBuf.length > 0) {
+                socket.emit('terminal_input', window._aceBuf);
+                window._aceBuf = '';
             }
         } else if (data === '\x7f' || data === '\x08') {
-            if (_buf.length > 0) {
-                _buf = _buf.slice(0, -1);
+            if (window._aceBuf.length > 0) {
+                window._aceBuf = window._aceBuf.slice(0, -1);
                 term.write('\b \b');
             }
         } else {
-            _buf += data;
+            window._aceBuf += data;
             term.write(data);
         }
     });
@@ -12176,6 +12182,51 @@ window.toggleAceTerminal = function() {
 };
 </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        var btn = document.getElementById('terminal-paste-btn');
+        if (btn && !btn._pasteWired) {
+            btn._pasteWired = true;
+            btn.addEventListener('click', function() {
+                var ta = document.createElement('textarea');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                try { document.execCommand('paste'); } catch(e) { console.warn('paste execCommand failed:', e); }
+                var text = ta.value;
+                document.body.removeChild(ta);
+                if (text && window.term) {
+                    if (typeof window._aceBuf !== 'undefined') { window._aceBuf += text; }
+                    window.term.write(text);
+                }
+            });
+        }
+    }, 1000);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        var cmdInput = document.getElementById('terminal-cmd-input');
+        if (!cmdInput) { console.warn('cmd-input not found'); return; }
+        cmdInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var cmd = cmdInput.value;
+                if (!cmd.trim()) return;
+                if (window.term && window.termSocket) {
+                    window.term.write(cmd + '\r\n');
+                    window.termSocket.emit('terminal_input', cmd);
+                }
+                cmdInput.value = '';
+            }
+        });
+        console.log('Command input wired');
+    }, 1500);
+});
+</script>
 </body>
 
 </html>
