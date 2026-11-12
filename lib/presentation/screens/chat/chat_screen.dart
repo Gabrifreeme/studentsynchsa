@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
+import 'package:lipsyncstudent/presentation/screens/chat/room_chat_screen.dart';
 import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -7,15 +8,16 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(title: const Text('Community Chat')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             AppCard(
-              onTap: () => _showComingSoon(context),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomChatScreen(room: 'general', roomName: 'General Chat'))),
               child: const ListTile(
                 leading: Icon(Icons.chat_rounded, color: AppColors.primary),
                 title: Text('General Chat',
@@ -28,7 +30,7 @@ class ChatScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             AppCard(
-              onTap: () => _showComingSoon(context),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomChatScreen(room: 'province', roomName: 'Province-based'))),
               child: const ListTile(
                 leading:
                     Icon(Icons.map_rounded, color: AppColors.success),
@@ -42,7 +44,7 @@ class ChatScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             AppCard(
-              onTap: () => _showComingSoon(context),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomChatScreen(room: 'university', roomName: 'University Interest Groups'))),
               child: const ListTile(
                 leading:
                     Icon(Icons.school_rounded, color: AppColors.warning),
@@ -73,7 +75,7 @@ class ChatScreen extends StatelessWidget {
           ],
         ),
         content: const Text(
-          'Community chat is coming in the next update! Star is working on it.',
+          'Community chat is coming in the next update! ACEsi is working on it.',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
