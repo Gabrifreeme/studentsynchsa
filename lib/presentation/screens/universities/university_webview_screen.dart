@@ -1,5 +1,7 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:lipsyncstudent/services/autofill_script.dart' as star;
@@ -57,6 +59,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
         final initialUrl = 'https://apply.ufs.ac.za/Application/Start';
     _currentUrl = initialUrl;
 
+    if (!kIsWeb) {
     _controller = WebViewController();
     // Single UA, set once. The UA does not affect UFS markup (the portal
     // returns the same HTML for desktop and mobile agents), so this only
@@ -170,6 +173,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
       ),
     );
     _acesiController.loadRequest(Uri.parse('http://127.0.0.1:5000'));
+    }
   }
 
   @override
@@ -447,7 +451,79 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
   }
 
   @override
+  Widget _buildWebFallback(BuildContext context) {
+    final url = widget.url;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.universityName),
+        backgroundColor: Colors.blue,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.public, size: 64, color: Colors.blue),
+              const SizedBox(height: 24),
+              Text(
+                'Portal: ' + widget.universityName,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'WebView does not work in a browser. Open the portal in a new Chrome tab, then use the Autofill button there.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.open_in_browser),
+                label: const Text('Open Portal in Chrome'),
+                onPressed: () async {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.copy_all),
+                label: const Text('Copy Autofill Script'),
+                onPressed: () async {
+                  final json = _profileJson;
+                  if (json == null || json.isEmpty) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('No profile loaded'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
+                  final script = star.buildAutofillScript(json);
+                  await Clipboard.setData(ClipboardData(text: script));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Autofill script copied! Paste it in F12 Console on the UFS portal.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 5),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget build(BuildContext context) {
+    if (kIsWeb) { return _buildWebFallback(context); }
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.universityName),
