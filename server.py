@@ -15265,6 +15265,7 @@ def api_check_syntax():
 
 # --- VS Code Style PTY Terminal ---
 import os
+import threading
 
 terminal_process = None
 
@@ -15272,38 +15273,64 @@ terminal_process = None
 def handle_terminal_input(data):
     global terminal_process
     if terminal_process and terminal_process.isalive():
-        terminal_process.write(data)
-
+        try:
+            # Force carriage return to be a real byte, not escaped string
+            if data == '\\r' or data == '\\r\\n':
+                terminal_process.write('\r')
+            else:
+                terminal_process.write(data)
+        except Exception:
+            pass
 @socketio.on('terminal_resize')
 def handle_terminal_resize(data):
     global terminal_process
     if terminal_process and terminal_process.isalive():
         try:
-            terminal_process.setwinsize(int(data['rows']), int(data['cols']))
+            # winpty setwinsize is (cols, rows) on some versions, (rows, cols) on others.
+            # We will try both to prevent the exception that breaks the stream.
+            print(f'BACKEND RESIZE: rows={data.get("rows")}, cols={data.get("cols")}')
+            terminal_process.setwinsize(int(data['cols']), int(data['rows']))
         except Exception:
-            pass
+            try:
+                terminal_process.setwinsize(int(data['rows']), int(data['cols']))
+            except Exception:
+                pass
 
 @socketio.on('connect')
 def handle_connect():
     global terminal_process
-    if not terminal_process or not terminal_process.isalive():
-        # Spawn PowerShell on Windows
-        terminal_process = PtyProcess.spawn('powershell.exe')
-        
-        def read_output():
-            while terminal_process.isalive():
-                try:
-                    data = terminal_process.read(1024)
-                    if data:
-                        socketio.emit('terminal_output', data)
-                except EOFError:
-                    break
-                except Exception:
-                    break
-        
-        socketio.start_background_task(read_output)
-socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    # Kill old PTY if any (prevents ghost buffers on reopen)
+    if terminal_process:
+        try:
+            terminal_process.terminate(force=True)
+        except Exception:
+            pass
+        terminal_process = None
+    # Spawn fresh PowerShell
+    os.environ['TERM'] = 'xterm-256color'
+    terminal_process = PtyProcess.spawn('cmd.exe')
+    # Force initial dimensions
+    try:
+        terminal_process.setwinsize(24, 80)
+    except Exception:
+        pass
+    def read_output():
+        while terminal_process and terminal_process.isalive():
+            try:
+                data = terminal_process.read(1024)
+                if data:
+                    # STRIP ANSI CURSOR CODES TO FIX FLOATING TEXT
+                    import re
+                    data = re.sub(r'\x1b\[[0-9;]*[CH]', '', data)
+                    socketio.emit('terminal_output', data)
+            except EOFError:
+                break
+            except Exception:
+                break
+    socketio.start_background_task(read_output)
 
+if __name__ == '__main__':
+    socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
 
 
 

@@ -467,6 +467,26 @@
 #search-btn { display: none !important; }
 #editor-tab-bar { display: none !important; }
 #terminal-output { display: block !important; width: 100% !important; height: 100% !important; padding: 0 !important; margin: 0 !important; text-align: left !important; } .xterm-screen { margin: 0 !important; left: 0 !important; } .xterm-rows { margin: 0 !important; }
+
+/* FORCE TERMINAL PANEL HEIGHT - THE REAL FIX */
+#terminal-panel {
+    height: 300px !important;
+    min-height: 300px !important;
+    max-height: 300px !important;
+    flex: 0 0 300px !important;
+}
+#terminal-output {
+    height: 100% !important;
+    min-height: 260px !important;
+    flex: 1 1 auto !important;
+}
+#terminal-output .xterm,
+#terminal-output .xterm-viewport,
+#terminal-output .xterm-screen {
+    height: 100% !important;
+    min-height: 260px !important;
+}
+
 </style>
 
     <style>
@@ -2054,9 +2074,7 @@
       <button
         class="btn"
         title="Open Terminal"
-        onclick="
-          document.getElementById('terminal-panel').style.display = 'flex'
-        "
+        onclick="window.openAceTerminal()"
         style="
           background: #000;
           color: #ff9d00;
@@ -5572,8 +5590,17 @@ window.checkSyntax = function(filename) {
 </script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    var termContainer = document.getElementById('terminal-output');
+window.openAceTerminal = function() {
+    var panel = document.getElementById('terminal-panel');
+    if (panel) { panel.style.display = 'flex'; }
+    if (window.term) { try { window.term.dispose(); } catch(e) {} window.term = null; }
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            window.initAceTerminalFn();
+        });
+    });
+};
+window.initAceTerminalFn = function() {    var termContainer = document.getElementById('terminal-output');
     if (!termContainer) {
         console.warn('Terminal container not found');
         return;
@@ -5589,6 +5616,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var term = new Terminal({
         cursorBlink: true,
+        rows: 24,
+        cols: 80,
+        scrollback: 2000,
         fontSize: 12,
         fontFamily: 'Consolas, monospace',
         theme: {
@@ -5599,18 +5629,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     var fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon); window.termFitAddon = fitAddon; window.term = term; window.termFitAddon = fitAddon; window.term = term; window.termFitAddon = fitAddon;
+    term.loadAddon(fitAddon); window.termFitAddon = fitAddon; window.term = term;
 
     term.open(termContainer);
-    termContainer.style.padding = '4px';
+    setTimeout(function() {
+        var xterm = termContainer.querySelector('.xterm');
+        var screen = termContainer.querySelector('.xterm-screen');
+        var rows = termContainer.querySelector('.xterm-rows');
+        if (xterm) { xterm.style.position = 'absolute'; xterm.style.top = '0'; xterm.style.left = '0'; xterm.style.padding = '0'; xterm.style.margin = '0'; }
+        if (screen) { screen.style.position = 'absolute'; screen.style.top = '0'; screen.style.left = '0'; screen.style.textAlign = 'left'; }
+        if (rows) { rows.style.textAlign = 'left'; }
+        term.refresh(0, term.rows - 1);
+    }, 150);
+    // REMOVED by Claude fix: padding set via CSS instead
     termContainer.style.textAlign = 'left';
-    setTimeout(function() { try { fitAddon.fit(); term.focus(); } catch(e) {} }, 500);
+    setTimeout(function() { try { if (termContainer.offsetHeight > 0) { fitAddon.fit(); socket.emit('terminal_resize', { rows: term.rows, cols: term.cols }); } term.focus(); } catch(e) {} }, 100);
 
     // Connect to SocketIO
     var socket = io('http://127.0.0.1:5000');
 
     socket.on('connect', function() {
         term.writeln('\x1b[33mACEsi Terminal connected.\x1b[0m');
+        try { fitAddon.fit(); } catch(e) {}
         var dims = { rows: term.rows, cols: term.cols };
         socket.emit('terminal_resize', dims);
     });
@@ -5655,7 +5695,7 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
         } catch(e) {}
     });
-});
+};
 </script>
 
 
@@ -5677,6 +5717,79 @@ document.addEventListener('DOMContentLoaded', function() {
   background: #ff9d00; color: #000; border: none; padding: 8px 12px;
   font-family: monospace; cursor: pointer; font-weight: bold; margin-left: 8px;
 }
+
+/* CLAUDE FIX: XTERM ANCHOR */
+#terminal-output {
+    display: block !important;
+    text-align: left !important;
+    padding: 4px !important;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+#terminal-output .xterm {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+}
+#terminal-output .xterm-viewport,
+#terminal-output .xterm-screen {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+}
+#terminal-output .xterm-screen canvas {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+}
+#terminal-output .xterm-rows {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    text-align: left !important;
+    margin: 0 !important;
+}
+
+
+/* ARENA FIX: xterm.js 5.3.0 phantom offset kill switch */
+#terminal-panel {
+  display: block !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+}
+
+#terminal-panel .xterm,
+#terminal-panel .xterm-screen,
+#terminal-panel .xterm-rows,
+#terminal-panel .xterm-rows > div,
+#terminal-panel .xterm-rows span {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  text-align: left !important;
+  text-indent: 0 !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  direction: ltr !important;
+  transform: none !important;
+}
+
+#terminal-panel .xterm { position: relative !important; }
+#terminal-panel .xterm-screen { position: relative !important; left: 0 !important; top: 0 !important; }
+#terminal-panel .xterm-viewport { position: absolute !important; left: 0 !important; top: 0 !important; right: 0 !important; }
+
 </style>
 <div id="acesi-goto-modal">
   <span style="color: #ff9d00; font-size: 12px; margin-right: 10px;">Go to line:</span>
