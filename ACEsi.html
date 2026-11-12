@@ -11280,7 +11280,7 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
     socket.on('terminal_output', function(data) {
         // Detect heartbeat frames and add a green tick
         if (/\[SERVER\]\s*[\/_|\\]/.test(data)) {
-            data = data.replace(/(\[SERVER\]\s*[\/_|\\])/, '$1 \x1b[32m\u2705\x1b[0m');
+            data = data.replace(/(\[SERVER\])\s*([\/_|\\])/, '$1 $2 \x1b[32m\u2705\x1b[0m');
         }
         term.write(data);
     });
