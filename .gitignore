@@ -123,3 +123,4 @@ test_*.py
 flask_boot.log
 flask_boot.log.err
 check_*.py
+config.json

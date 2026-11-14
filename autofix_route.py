@@ -1,4 +1,4 @@
-"""Legacy /api/autofix route - NOT registered by server.py.
+﻿"""Legacy /api/autofix route - NOT registered by server.py.
 
 The live endpoint is `autofix()` in server.py. This module is kept for
 reference only. It used to carry a hardcoded Groq key, which is exactly the
@@ -8,7 +8,7 @@ shipping a secret.
 
 Set the key in the gitignored .env:
 
-    GROQ_API_KEY=gsk_...
+    GROQ_API_KEY=<your-groq-key>
 """
 
 import os
