@@ -10402,7 +10402,7 @@ _REDUCED_TOOL_ORDER = [
 # Never shed these: without them a network or navigation task cannot be done at
 # all, so losing them would turn a working reduced schema into a useless one.
 _REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
-                      "cdp_network_requests", "cdp_get_response_body"}
+                      "cdp_network_requests", "cdp_get_response_body", "cdp_console_logs", "cdp_dom_state", "cdp_status"}
 
 # The toolset a reduced browser task is actually required to carry. These are
 # protected from budget shedding for the same reason: a schema that silently
