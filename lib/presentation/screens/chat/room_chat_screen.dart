@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
@@ -224,7 +224,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
 
   Widget _buildStatusPill() {
     final (label, color) = switch (_connState) {
-      ChatConnectionState.connected => ('LIVE', AppColors.primary),
+      ChatConnectionState.connected => ('LIVE', AppColors.success),
       ChatConnectionState.connecting => ('LINK', AppColors.textMuted),
       ChatConnectionState.reconnecting => ('RETRY', AppColors.textMuted),
       ChatConnectionState.disconnected => ('OFF', AppColors.error),
@@ -401,7 +401,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                           const Padding(
                             padding: EdgeInsets.only(bottom: 6),
                             child: Text(
-                              '🔴 Recording... Tap mic to stop.',
+                              'ðŸ”´ Recording... Tap mic to stop.',
                               style: TextStyle(color: AppColors.error, fontSize: 12),
                             ),
                           ),

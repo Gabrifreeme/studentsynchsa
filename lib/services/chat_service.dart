@@ -1,4 +1,4 @@
-// chat_service.dart
+﻿// chat_service.dart
 // Phase 2a: cross-device chat over socket_io_client 3.x, namespace /chat.
 // Server is authoritative: send() does NOT optimistically render. The server
 // echoes chat_message, which we persist via ChatStorage and emit on the stream.
@@ -110,7 +110,7 @@ class ChatService {
       final socket = io.io(
         _serverBaseUrl + "/chat",
         io.OptionBuilder()
-            .setTransports(['websocket'])
+
             .disableAutoConnect()
             .setPath('/socket.io')
             .build(),
