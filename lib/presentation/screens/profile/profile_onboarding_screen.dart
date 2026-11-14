@@ -25,6 +25,10 @@ class _ProfileOnboardingScreenState
     with SingleTickerProviderStateMixin {
   final _pageController = PageController();
   int _currentPage = 0;
+  // Set to true to re-enable the floating Star help bubble (bottom-right)
+  // Star help bubble visibility. Starts hidden, set to true when we know
+  // the profile is incomplete (first-time user needs help).
+  bool _showStarTip = false;
   bool _showGreeting = true;
   int _visibleChars = 0;
   late AnimationController _floatCtrl;
@@ -54,7 +58,6 @@ class _ProfileOnboardingScreenState
   final _streetAddr3Ctrl = TextEditingController();
   String _streetProvince = '';
   final _streetPostalCodeCtrl = TextEditingController();
-  final _streetPostalCodeConfirmCtrl = TextEditingController();
   bool _postalDifferent = false;
   final _postalAddr1Ctrl = TextEditingController();
   final _postalAddr2Ctrl = TextEditingController();
@@ -2597,13 +2600,22 @@ static const List<String> _countryList = [
         '📂 _loadExistingProfile: retry result = ${profile?.personal.idNumber}',
       );
     }
-    if (profile == null) return;
+    if (profile == null) {
+      // No profile yet - first-time user, show help and welcome
+      setState(() {
+        _showStarTip = true;
+      });
+      return;
+    }
     final p = profile;
     setState(() {
       _applyProfile(p);
       // Skip the welcome screen for returning users with completed profiles
       if (p.onboardingComplete) {
         _showGreeting = false;
+        _showStarTip = false;  // returning user knows the flow - hide help
+      } else {
+        _showStarTip = true;  // first-time user - show help bubble
       }
     });
     // If profile is complete, skip the welcome (page 0) and land on page 1
@@ -2849,7 +2861,6 @@ static const List<String> _countryList = [
     _streetAddr2Ctrl.dispose();
     _streetAddr3Ctrl.dispose();
     _streetPostalCodeCtrl.dispose();
-    _streetPostalCodeConfirmCtrl.dispose();
     _postalAddr1Ctrl.dispose();
     _postalAddr2Ctrl.dispose();
     _postalAddr3Ctrl.dispose();
@@ -3322,36 +3333,37 @@ static const List<String> _countryList = [
                 _buildBottomButtons(),
               ],
             ),
-            // Floating Star avatar
-            Positioned(
-              right: 16,
-              bottom: 100,
-              child: GestureDetector(
-                onTap: _showStarHelp,
-                child: AnimatedBuilder(
-                  animation: _floatAnim,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _floatAnim.value),
-                      child: child,
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.starGold.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
+            // Floating Star avatar (disabled - set _showStarTip = true to re-enable)
+            if (_showStarTip)
+              Positioned(
+                right: 16,
+                bottom: 100,
+                child: GestureDetector(
+                  onTap: _showStarHelp,
+                  child: AnimatedBuilder(
+                    animation: _floatAnim,
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: Offset(0, _floatAnim.value),
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.starGold.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const StarAvatar(size: 48, pulse: true),
                     ),
-                    child: const StarAvatar(size: 48, pulse: true),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -3934,21 +3946,6 @@ static const List<String> _countryList = [
               },
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _streetPostalCodeConfirmCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Confirm Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
-              ),
-              validator: (v) {
-                if (v?.trim().isEmpty == true) return 'Required';
-                if (v!.trim() != _streetPostalCodeCtrl.text.trim()) {
-                  return 'Postal codes do not match';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text(
