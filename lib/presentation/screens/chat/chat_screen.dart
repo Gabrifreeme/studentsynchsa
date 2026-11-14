@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
 import 'package:lipsyncstudent/presentation/screens/chat/room_chat_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/chat/university_picker_screen.dart';
 import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
@@ -63,7 +64,7 @@ class ChatScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             AppCard(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomChatScreen(room: 'university', roomName: 'University Interest Groups'))),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UniversityPickerScreen())),
               child: const ListTile(
                 leading:
                     Icon(Icons.school_rounded, color: AppColors.warning),
