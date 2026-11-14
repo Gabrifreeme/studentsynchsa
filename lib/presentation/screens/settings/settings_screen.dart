@@ -12,10 +12,15 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Settings')),
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          title: const Text('Settings'),
+          backgroundColor: Colors.black,
+          elevation: 0,
+        ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -79,7 +84,7 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _AboutRow('Version', '1.0.0'),
                   _AboutRow('Made for', 'South African Students'),
-                  _AboutRow('ACEsi', 'Star ⭐'),
+                  _AboutRow('AI Assistant', 'ACEsi'),
                 ],
               ),
             ),
