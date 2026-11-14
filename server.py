@@ -113,7 +113,7 @@ _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "deepseek/deepseek-chat-v2:free"
+OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
 OPENROUTER_FALLBACKS = [
     "poolside/laguna-s-2.1",
     "nvidia/nemotron-3-super-120b-a12b",
@@ -123,7 +123,7 @@ GROQ_FALLBACKS = [
     "qwen/qwen3.8-27b",
 ]
 
-OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731:free"
+OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
 
 # Free cloud providers (large context, no card). Keys load from env or a
 # gitignored local file (.ace_keys.local) — set below, after DATA_DIR exists.
@@ -15874,6 +15874,113 @@ def _chat_boot_report2():
 
 _chat_boot_report2()
 # --- CHAT NAMESPACE END ---
+
+
+# --- AI CHAT ROUTE ---
+_AI_SYSTEM_PROMPT = (
+    "You are ACEsi, a friendly South African university advisor for high school students. " 
+    "Be warm, encouraging, and practical. Answer in 2-3 sentences per point. " 
+    "Focus on South African universities, APS scores, NSFAS and other funding, " 
+    "application deadlines, and career paths. If asked about something outside that, " 
+    "gently steer back to helping with university applications and studies. " 
+    "Never invent deadlines, fees, or requirements -- if uncertain, tell the student to " 
+    "verify on the university website."
+)
+
+def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
+                        system_prompt=None):
+    """Yield tokens from an OpenAI-compatible streaming endpoint."""
+    import requests as _req
+    headers = {
+        "Authorization": "Bearer " + (api_key or ""),
+        "Content-Type": "application/json",
+    }
+    if headers_extra:
+        headers.update(headers_extra)
+    _messages = []
+    if system_prompt:
+        _messages.append({"role": "system", "content": system_prompt})
+    _messages.append({"role": "user", "content": prompt})
+    payload = {
+        "model": model,
+        "messages": _messages,
+        "stream": True,
+        "max_tokens": 800,
+    }
+    url = endpoint.rstrip("/") + "/chat/completions"
+    with _req.post(url, headers=headers, json=payload, stream=True, timeout=60) as r:
+        if r.status_code != 200:
+            body = ""
+            try:
+                body = r.text[:200]
+            except Exception:
+                pass
+            raise RuntimeError("HTTP %d %s" % (r.status_code, body))
+        got_any = False
+        for line in r.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            if not line.startswith("data:"):
+                continue
+            chunk = line[5:].strip()
+            if chunk == "[DONE]":
+                break
+            try:
+                obj = json.loads(chunk)
+                delta = obj.get("choices", [{}])[0].get("delta", {})
+                tok = delta.get("content")
+                if tok:
+                    got_any = True
+                    yield tok
+            except Exception:
+                continue
+        if not got_any:
+            raise RuntimeError("provider returned no tokens")
+
+@app.route("/api/ai/chat", methods=["POST", "OPTIONS"])
+def api_ai_chat():
+    """Stream ACEsi responses. Tries OpenRouter first, falls back to Groq on any error."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"ok": False, "error": "prompt required"}), 400
+    if len(prompt) > 8000:
+        return jsonify({"ok": False, "error": "prompt too long (max 8000)"}), 400
+
+    def generate():
+        # To re-enable OpenRouter when credits are topped up, add it back as a
+        # provider (see git history patch_07) and restore the fallback loop.
+        name = "Groq"
+        endpoint = GROQ_ENDPOINT
+        key = GROQ_API_KEY
+        model = GROQ_MODEL
+        extra = None
+        if not key:
+            yield "data: " + json.dumps({"error": name + ": no API key configured"}) + "\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        try:
+            for tok in _ai_stream_provider(endpoint, key, model, prompt, extra,
+                                            system_prompt=_AI_SYSTEM_PROMPT):
+                yield "data: " + json.dumps({"token": tok}) + "\n\n"
+            yield "data: " + json.dumps({"provider": name}) + "\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            print("[ai/chat] provider %s failed: %s" % (name, e))
+            yield "data: " + json.dumps({"error": name + ": " + str(e)}) + "\n\n"
+            yield "data: [DONE]\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+# --- AI CHAT ROUTE END ---
 
 if __name__ == '__main__':
     socketio.run(app, host='127.0.0.1', port=5000, debug=False, allow_unsafe_werkzeug=True)
