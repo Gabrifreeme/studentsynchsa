@@ -60,7 +60,7 @@ class PrivacyScreen extends StatelessWidget {
               title: 'Data Security Measures',
               children: [
                 'Local Storage: Your profile and application data are stored in encrypted local storage (Hive) on your device. No cloud storage is used unless you explicitly enable sync.',
-                'No External Servers: LipSyncStudent does not maintain a central database of user profiles. Your data stays with you.',
+                'No Central Database: LipSyncStudent does not store your profile on any server. Your data stays on your device. When you chat with ACEsi, your message and profile context are sent to a secure AI provider to generate a response.',
                 'Encryption: Any data transmitted during application submissions uses HTTPS/TLS encryption. Future cloud sync features will use end-to-end encryption.',
                 'Authentication: The app uses anonymous local authentication. No passwords or biometric data are transmitted or stored externally.',
                 'Regular Audits: We review our data practices regularly to ensure compliance with POPIA and evolving privacy best practices.',
@@ -116,7 +116,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.toggle_on_outlined,
               title: 'Consent & Granular Controls',
               children: [
-                'LipSyncStudent uses a simple, transparent consent model. You are not asked to consent to data collection upfront — the app works entirely offline by default.',
+                'LipSyncStudent uses a simple, transparent consent model. Your data (profile, applications, saved items) stays on your device. The only external request the app makes is to ACEsi\'s secure AI service when you chat with it.',
                 'Granular consent options will be introduced when cloud features (sync, backup) are added. At that point, you will be able to choose:',
                 '• Essential: local-only storage required for the app to function',
                 '• Sync & Backup: encrypt your data to the cloud for cross-device access',
@@ -193,7 +193,7 @@ class PrivacyScreen extends StatelessWidget {
                         ),
                         _PrincipleRow(
                           'On-device recommender',
-                          'The Star AI runs locally via Ollama. No prompts or responses leave your machine. University/bursary matching uses local data only.',
+                          'ACEsi uses a secure cloud AI service to generate advice. Your profile context is sent with each message to produce a response. Prompts are not stored on our servers. University/bursary matching uses your local profile data.',
                         ),
                         _PrincipleRow(
                           'Ephemeral sessions',
@@ -216,7 +216,7 @@ class PrivacyScreen extends StatelessWidget {
               icon: Icons.article_outlined,
               title: 'Data Processing Agreements',
               children: [
-                'LipSyncStudent does not share your data with third-party processors. All data is stored locally on your device.',
+                'LipSyncStudent does not share your data for advertising, analytics, or marketing. Your profile data is stored locally. When you use ACEsi, your message and profile context are sent to a secure AI provider (Groq) to generate a response. No data is retained after the response is delivered.',
                 'When you submit an application to a university or bursary, data is sent directly to that institution\'s systems. Each institution acts as an independent data controller under POPIA.',
                 'If future features introduce third-party services (e.g., cloud backup providers), we will publish Data Processing Agreements (DPAs) here and notify you before any data leaves your device.',
               ],

@@ -31,7 +31,7 @@ class AiService {
           } else {
             final responseBytes = _extractBytes(raw);
             if (responseBytes == null || responseBytes.isEmpty) {
-              onToken('Star AI error: empty response');
+              onToken('ACEsi error: empty response');
               completer.complete();
               return;
             }
@@ -40,7 +40,7 @@ class AiService {
           _parseAndEmit(text, onToken);
           completer.complete();
         } catch (e) {
-          onToken('Star AI error: $e');
+          onToken('ACEsi error: $e');
           if (!completer.isCompleted) completer.complete();
         }
       });
@@ -52,7 +52,7 @@ class AiService {
       request.send(body);
       await completer.future.timeout(const Duration(seconds: 90));
     } catch (e) {
-      onToken('Star AI error: $e');
+      onToken('ACEsi error: $e');
     }
   }
 

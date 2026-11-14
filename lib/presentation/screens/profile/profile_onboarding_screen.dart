@@ -3372,10 +3372,10 @@ static const List<String> _countryList = [
 
   void _showStarHelp() {
     final tips = [
-      'Tell Star about yourself! Your name, ID, and contact info help universities reach you.',
-      'Your school and grade info help Star recommend the right programmes.',
-      'Add your Grade 12 (or Grade 11) subjects and marks so Star can calculate your APS score.',
-      'Pick your interests and career goals — Star will find the best match for you!',
+      'Tell ACEsi about yourself! Your name, ID, and contact info help universities reach you.',
+      'Your school and grade info help ACEsi recommend the right programmes.',
+      'Add your Grade 12 (or Grade 11) subjects and marks so ACEsi can calculate your APS score.',
+      'Pick your interests and career goals — ACEsi will find the best match for you!',
     ];
     showDialog(
       context: context,
@@ -3386,7 +3386,7 @@ static const List<String> _countryList = [
           children: [
             StarAvatar(size: 28),
             SizedBox(width: 8),
-            Text('Star says:', style: TextStyle(color: AppColors.starGold)),
+            Text('ACEsi says:', style: TextStyle(color: AppColors.starGold)),
           ],
         ),
         content: Text(
