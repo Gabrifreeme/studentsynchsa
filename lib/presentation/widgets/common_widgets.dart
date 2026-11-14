@@ -310,7 +310,7 @@ class AcesiDropdown<T> extends StatelessWidget {
       icon: icon ?? const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
       borderRadius: borderRadius ?? BorderRadius.zero,
       style: style ??
-          const TextStyle(color: AppColors.primary, fontSize: 14, fontFamily: 'monospace'),
+          const TextStyle(color: AppColors.primary, fontSize: 14),
       decoration: effectiveDecoration,
       items: items.map((item) {
         return DropdownMenuItem<T>(
@@ -343,11 +343,12 @@ class _AcesiHoverItemState extends State<_AcesiHoverItem> {
       cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        color: _hovering
-            ? AppColors.primary.withValues(alpha: 0.25)
-            : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: _hovering
+              ? AppColors.primary.withValues(alpha: 0.25)
+              : Colors.transparent,
+        ),
         child: DefaultTextStyle.merge(
           style: const TextStyle(color: AppColors.primary, fontSize: 14),
           child: widget.child,

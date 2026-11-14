@@ -3406,12 +3406,7 @@ static const List<String> _countryList = [
                     'Are you a SA Citizen in possession of a valid SA ID/Birth Certificate? *',
                 prefixIcon: Icon(Icons.flag_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
+              items: const [                DropdownMenuItem(
                   value: 'SA Citizen',
                   child: Text('SA Citizen'),
                 ),
@@ -3426,7 +3421,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _isSACitizen = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -3568,12 +3563,7 @@ static const List<String> _countryList = [
                 labelText: 'Gender *',
                 prefixIcon: Icon(Icons.wc_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Male', child: Text('Male')),
+              items: const [                DropdownMenuItem(value: 'Male', child: Text('Male')),
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
                 DropdownMenuItem(
@@ -3583,7 +3573,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             InkWell(
@@ -3631,12 +3621,7 @@ static const List<String> _countryList = [
                 labelText: 'Title *',
                 prefixIcon: Icon(Icons.badge_outlined, size: 20),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Mr', child: Text('Mr')),
+              items: const [                DropdownMenuItem(value: 'Mr', child: Text('Mr')),
                 DropdownMenuItem(value: 'Ms', child: Text('Ms')),
                 DropdownMenuItem(value: 'Mx', child: Text('Mx')),
                 DropdownMenuItem(value: 'Dr', child: Text('Dr')),
@@ -3644,7 +3629,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _title = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -3688,19 +3673,14 @@ static const List<String> _countryList = [
                 labelText: 'Marital status *',
                 prefixIcon: Icon(Icons.favorite_outline),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Single', child: Text('Single')),
+              items: const [                DropdownMenuItem(value: 'Single', child: Text('Single')),
                 DropdownMenuItem(value: 'Married', child: Text('Married')),
                 DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
                 DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
               ],
               onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -3734,12 +3714,7 @@ static const List<String> _countryList = [
                 labelText: 'Ethnic group *',
                 prefixIcon: Icon(Icons.people_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'African', child: Text('African')),
+              items: const [                DropdownMenuItem(value: 'African', child: Text('African')),
                 DropdownMenuItem(value: 'Coloured', child: Text('Coloured')),
                 DropdownMenuItem(
                   value: 'Indian/Asian',
@@ -3754,7 +3729,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _ethnicGroup = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             AcesiDropdown<String>(
@@ -3763,12 +3738,7 @@ static const List<String> _countryList = [
                 labelText: 'Are you Employed?',
                 prefixIcon: Icon(Icons.work_outline),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
+              items: const [                DropdownMenuItem(
                   value: 'Unemployed',
                   child: Text('Unemployed'),
                 ),
@@ -3830,12 +3800,7 @@ static const List<String> _countryList = [
                 labelText: 'Is a bursary required?',
                 prefixIcon: Icon(Icons.monetization_on_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+              items: const [                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
                 DropdownMenuItem(value: 'Unsure', child: Text('Unsure')),
               ],
@@ -4082,17 +4047,12 @@ static const List<String> _countryList = [
                 labelText: 'Do you have a South African Cell Phone Number? *',
                 prefixIcon: Icon(Icons.phone_android_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+              items: const [                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _hasSACellphone = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -4165,17 +4125,12 @@ static const List<String> _countryList = [
                 labelText: 'Do you want to apply for residence? *',
                 prefixIcon: Icon(Icons.bed_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+              items: const [                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _wantsResidence = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 28),
             Container(
@@ -4262,12 +4217,7 @@ static const List<String> _countryList = [
                     'Are you applying for Undergraduate or Postgraduate? *',
                 prefixIcon: Icon(Icons.school_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
+              items: const [                DropdownMenuItem(
                   value: 'Undergraduate',
                   child: Text('Undergraduate'),
                 ),
@@ -4278,7 +4228,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _applicationLevel = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Upgrading
@@ -4288,17 +4238,12 @@ static const List<String> _countryList = [
                 labelText: 'Are you Upgrading? *',
                 prefixIcon: Icon(Icons.refresh_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+              items: const [                DropdownMenuItem(value: 'Yes', child: Text('Yes')),
                 DropdownMenuItem(value: 'No', child: Text('No')),
               ],
               onChanged: (v) => setState(() => _isUpgrading = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Matric Type
@@ -4308,12 +4253,7 @@ static const List<String> _countryList = [
                 labelText: 'Matric type *',
                 prefixIcon: Icon(Icons.public_outlined),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '--- Please select ---',
-                  child: Text('--- Please select ---'),
-                ),
-                DropdownMenuItem(
+              items: const [                DropdownMenuItem(
                   value: 'South African',
                   child: Text('South African'),
                 ),
@@ -4324,7 +4264,7 @@ static const List<String> _countryList = [
               ],
               onChanged: (v) => setState(() => _matricType = v ?? ''),
               validator: (v) =>
-                  v == null || v == '--- Please select ---' ? 'Required' : null,
+                  v == null ? 'Required' : null,
             ),
             const SizedBox(height: 14),
             // Examination Number
