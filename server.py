@@ -1941,7 +1941,7 @@ def _email_watch_loop():
         time.sleep(_EMAIL_POLL_TICK)
 
 
-if get_config("email_watch_enabled", "1") != "0":
+if get_config("email_watch_enabled", "0") != "0":
     threading.Thread(target=_email_watch_loop, daemon=True).start()
 
 
@@ -2103,7 +2103,8 @@ def _ntfy_inbox_loop():
         time.sleep(_NTFY_BACKOFF)
 
 
-threading.Thread(target=_ntfy_inbox_loop, daemon=True).start()
+if get_config("ntfy_inbox_enabled", "0") != "0":
+    threading.Thread(target=_ntfy_inbox_loop, daemon=True).start()
 
 # ===== Daily summary builder =====
 def build_summary_text():
