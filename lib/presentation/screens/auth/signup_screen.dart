@@ -54,15 +54,37 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     }
   }
 
+  Future<void> _signUpWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      final error = await ref.read(authProvider.notifier).signInWithGoogle();
+      if (error != null && error != 'cancelled' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        );
+      } else if (mounted) {
+        final authState = ref.read(authProvider).valueOrNull;
+        if (authState?.profile?.onboardingComplete == true) {
+          context.go('/dashboard');
+        } else {
+          context.go('/onboarding');
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final cardWidth = size.width > 400 ? 380.0 : size.width * 0.92;
     final isShort = size.height < 700;
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -179,6 +201,49 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                     const SizedBox(height: 16),
                     Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('or', style: TextStyle(color: AppColors.textMuted)),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    SizedBox(height: isShort ? 8 : 14),
+                    SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: _loading ? null : _signUpWithGoogle,
+                        icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
+                        label: const Text('Sign up with Google'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimary,
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Apple sign up requires Apple Developer Program - coming soon'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.apple_rounded, size: 24),
+                        label: const Text('Sign up with Apple'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textMuted,
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
@@ -186,7 +251,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           style: TextStyle(color: AppColors.textSecondary),
                         ),
                         GestureDetector(
-                          onTap: () => context.pop(),
+                          onTap: () => context.push('/login'),
                           child: const Text(
                             'Sign In',
                             style: TextStyle(

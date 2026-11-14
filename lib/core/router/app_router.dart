@@ -9,6 +9,7 @@ import 'package:lipsyncstudent/presentation/screens/ai_recommendations/ai_recomm
 import 'package:lipsyncstudent/presentation/screens/applications/application_tracker_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/aps/aps_calculator_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/auth/signup_screen.dart';
+import 'package:lipsyncstudent/presentation/screens/auth/login_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/chat/chat_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/funding/funding_detail_screen.dart';
@@ -68,17 +69,13 @@ final appRouter = GoRouter(
       final container = ProviderScope.containerOf(context, listen: false);
       final auth = container.read(authProvider);
       final authState = auth.valueOrNull;
-      final loc = state.matchedLocation;
 
       if (authState == null || !authState.authenticated) {
         // Should never happen now â€” autoLogin creates anonymous profile
         return '/dashboard';
       }
 
-      // Always go to dashboard, no login/signup gate
-      if (loc == '/signup') {
-        return '/dashboard';
-      }
+      // Signup/login are now reachable (previously blocked for auto-anon)
     } catch (_) {}
     return null;
   },
@@ -87,6 +84,11 @@ final appRouter = GoRouter(
       path: '/signup',
       name: 'signup',
       builder: (context, state) => const SignupScreen(),
+    ),
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
       path: '/onboarding',

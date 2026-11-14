@@ -90,9 +90,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final cardWidth = size.width > 400 ? 380.0 : size.width * 0.92;
     final isShort = size.height < 700;
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -115,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Powered by ${'Star'}',
+                      'Powered by ACEsi',
                       style: const TextStyle(
                         color: AppColors.starGold,
                         fontSize: 14,
