@@ -3399,7 +3399,7 @@ static const List<String> _countryList = [
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _isSACitizen.isEmpty ? null : _isSACitizen,
               decoration: const InputDecoration(
                 labelText:
@@ -3562,7 +3562,7 @@ static const List<String> _countryList = [
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _gender.isEmpty ? null : _gender,
               decoration: const InputDecoration(
                 labelText: 'Gender *',
@@ -3625,7 +3625,7 @@ static const List<String> _countryList = [
               ),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _title.isEmpty ? null : _title,
               decoration: const InputDecoration(
                 labelText: 'Title *',
@@ -3682,7 +3682,7 @@ static const List<String> _countryList = [
               ),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
               decoration: const InputDecoration(
                 labelText: 'Marital status *',
@@ -3728,7 +3728,7 @@ static const List<String> _countryList = [
               },
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _ethnicGroup.isEmpty ? null : _ethnicGroup,
               decoration: const InputDecoration(
                 labelText: 'Ethnic group *',
@@ -3757,7 +3757,7 @@ static const List<String> _countryList = [
                   v == null || v == '--- Please select ---' ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _isEmployed.isEmpty ? null : _isEmployed,
               decoration: const InputDecoration(
                 labelText: 'Are you Employed?',
@@ -3824,7 +3824,7 @@ static const List<String> _countryList = [
               },
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
               decoration: const InputDecoration(
                 labelText: 'Is a bursary required?',
@@ -3897,7 +3897,7 @@ static const List<String> _countryList = [
               ),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _streetProvince.isEmpty ? null : _streetProvince,
               decoration: const InputDecoration(
                 labelText: 'Street Address Line 4 (Province Name) *',
@@ -4008,7 +4008,7 @@ static const List<String> _countryList = [
                 ),
               ),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
+              AcesiDropdown<String>(
                 initialValue: _postalProvince.isEmpty ? null : _postalProvince,
                 decoration: const InputDecoration(
                   labelText: 'Postal Address Line 4 (Province) *',
@@ -4076,7 +4076,7 @@ static const List<String> _countryList = [
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _hasSACellphone.isEmpty ? null : _hasSACellphone,
               decoration: const InputDecoration(
                 labelText: 'Do you have a South African Cell Phone Number? *',
@@ -4159,7 +4159,7 @@ static const List<String> _countryList = [
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _wantsResidence.isEmpty ? null : _wantsResidence,
               decoration: const InputDecoration(
                 labelText: 'Do you want to apply for residence? *',
@@ -4253,7 +4253,7 @@ static const List<String> _countryList = [
             ),
             const SizedBox(height: 14),
             // Undergraduate / Postgraduate
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _applicationLevel.isEmpty
                   ? null
                   : _applicationLevel,
@@ -4282,7 +4282,7 @@ static const List<String> _countryList = [
             ),
             const SizedBox(height: 14),
             // Upgrading
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _isUpgrading.isEmpty ? null : _isUpgrading,
               decoration: const InputDecoration(
                 labelText: 'Are you Upgrading? *',
@@ -4302,7 +4302,7 @@ static const List<String> _countryList = [
             ),
             const SizedBox(height: 14),
             // Matric Type
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _matricType.isEmpty ? null : _matricType,
               decoration: const InputDecoration(
                 labelText: 'Matric type *',
@@ -4440,7 +4440,7 @@ static const List<String> _countryList = [
               },
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _subjectResult.isEmpty ? null : _subjectResult,
               decoration: const InputDecoration(
                 labelText: 'Result',
@@ -4473,7 +4473,7 @@ static const List<String> _countryList = [
               onChanged: (v) => setState(() => _subjectResult = v ?? ''),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _subjectSymbol.isEmpty ? null : _subjectSymbol,
               decoration: const InputDecoration(
                 labelText: 'Symbol *',
@@ -4589,7 +4589,7 @@ static const List<String> _countryList = [
             const SizedBox(height: 20),
 
             // Academic Year
-            DropdownButtonFormField<String>(
+            AcesiDropdown<String>(
               initialValue: _academicYear == 0
                   ? null
                   : _academicYear.toString(),

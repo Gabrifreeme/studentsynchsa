@@ -247,3 +247,114 @@ class SyncStatusBadge extends StatelessWidget {
     );
   }
 }
+
+
+class AcesiDropdown<T> extends StatelessWidget {
+  final T? initialValue;
+  final String? labelText;
+  final IconData? prefixIcon;
+  final InputDecoration? decoration;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+  final String? Function(T?)? validator;
+  final bool isExpanded;
+  final Widget? icon;
+  final Color? dropdownColor;
+  final TextStyle? style;
+  final BorderRadius? borderRadius;
+
+  const AcesiDropdown({
+    super.key,
+    this.initialValue,
+    this.labelText,
+    this.prefixIcon,
+    this.decoration,
+    required this.items,
+    this.onChanged,
+    this.validator,
+    this.isExpanded = true,
+    this.icon,
+    this.dropdownColor,
+    this.style,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveDecoration = decoration ??
+        InputDecoration(
+          labelText: labelText,
+          labelStyle: const TextStyle(color: AppColors.textMuted),
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: AppColors.primary)
+              : null,
+          border: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide(color: AppColors.primary, width: 1),
+          ),
+          enabledBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide(color: AppColors.primary, width: 1),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.zero,
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+        );
+
+    return DropdownButtonFormField<T>(
+      initialValue: initialValue,
+      isExpanded: isExpanded,
+      dropdownColor: dropdownColor ?? Colors.black,
+      iconEnabledColor: AppColors.primary,
+      icon: icon ?? const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      style: style ??
+          const TextStyle(color: AppColors.primary, fontSize: 14, fontFamily: 'monospace'),
+      decoration: effectiveDecoration,
+      items: items.map((item) {
+        return DropdownMenuItem<T>(
+          value: item.value,
+          child: _AcesiHoverItem(child: item.child),
+        );
+      }).toList(),
+      onChanged: onChanged,
+      validator: validator,
+    );
+  }
+}
+
+class _AcesiHoverItem extends StatefulWidget {
+  final Widget child;
+  const _AcesiHoverItem({required this.child});
+
+  @override
+  State<_AcesiHoverItem> createState() => _AcesiHoverItemState();
+}
+
+class _AcesiHoverItemState extends State<_AcesiHoverItem> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 80),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        color: _hovering
+            ? AppColors.primary.withValues(alpha: 0.25)
+            : Colors.transparent,
+        child: DefaultTextStyle.merge(
+          style: const TextStyle(color: AppColors.primary, fontSize: 14),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+
