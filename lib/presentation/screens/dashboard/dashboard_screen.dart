@@ -376,7 +376,7 @@ class _ProgressTile extends StatelessWidget {
                     value,
                     style: const TextStyle(
                       color: AppColors.primaryLight,
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
