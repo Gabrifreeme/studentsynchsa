@@ -18,7 +18,8 @@ import 'package:lipsyncstudent/presentation/screens/share_video_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/notifications/notifications_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/settings/privacy_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/settings/settings_screen.dart';
-import 'package:lipsyncstudent/presentation/screens/universities/application_helper_screen.dart';
+
+import 'package:lipsyncstudent/presentation/screens/about/about_us_screen.dart';import 'package:lipsyncstudent/presentation/screens/universities/application_helper_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/universities/universities_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/universities/university_detail_screen.dart';
 import 'package:lipsyncstudent/presentation/screens/universities/university_webview_screen.dart';
@@ -207,6 +208,11 @@ final appRouter = GoRouter(
       path: '/settings',
       name: 'settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/about-us',
+      name: 'about-us',
+      builder: (context, state) => const AboutUsScreen(),
     ),
     GoRoute(
       path: '/privacy',

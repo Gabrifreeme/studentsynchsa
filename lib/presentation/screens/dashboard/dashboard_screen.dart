@@ -174,6 +174,13 @@ class DashboardScreen extends ConsumerWidget {
           value: 'Chat with other students',
           onTap: () => context.push('/chat'),
         ),
+        const SizedBox(height: 8),
+        _ProgressTile(
+          icon: Icons.info_outline_rounded,
+          label: 'About Us',
+          value: 'About LipSyncStudent & ACEsi',
+          onTap: () => context.push('/about-us'),
+        ),
       ],
     );
   }
