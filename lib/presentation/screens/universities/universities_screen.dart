@@ -51,9 +51,10 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   Widget build(BuildContext context) {
     final universitiesAsync = ref.watch(universitiesProvider);
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: universitiesAsync.when(
             data: (universities) {
@@ -92,7 +93,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         Text(
                           'All ${universities.length} SA public universities',
                           style: const TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.primary,
                             fontSize: 14,
                           ),
                         ),
@@ -175,7 +176,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                                       : FontWeight.w500,
                                   color: selected
                                       ? Colors.white
-                                      : AppColors.textSecondary,
+                                      : AppColors.primary,
                                 ),
                               ),
                               selected: selected,
@@ -203,7 +204,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         ? const Center(
                             child: Text(
                               'No universities found',
-                              style: TextStyle(color: AppColors.textMuted),
+                              style: TextStyle(color: AppColors.primary),
                             ),
                           )
                         : ListView.builder(
@@ -364,7 +365,7 @@ class _UniversityCardState extends State<_UniversityCard> {
                     Text(
                       uni.province,
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
+                        color: AppColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -387,7 +388,7 @@ class _UniversityCardState extends State<_UniversityCard> {
                       uni.requiresNbt ? 'NBT Required' : 'No NBT',
                       uni.requiresNbt
                           ? Colors.red.shade400
-                          : Colors.grey.shade400,
+                          : AppColors.primary,
                     ),
                   ],
                 ),

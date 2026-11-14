@@ -320,13 +320,13 @@ class _DashboardShellState extends State<DashboardShell>
             )),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.exit_to_app),
+              icon: const Icon(Icons.exit_to_app, color: AppColors.primary),
               onPressed: () => context.push('/signup'),
               tooltip: 'Exit',
             ),
             const SizedBox(width: 4),
             const Text('Exit', style: TextStyle(
-              color: AppColors.textSecondary,
+              color: AppColors.primary,
               fontSize: 12,
             )),
           ],
