@@ -80,9 +80,9 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             profile?.contact.email ?? '',
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: AppColors.primary.withValues(alpha: 0.6),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -269,9 +269,9 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style: const TextStyle(
+                        style:  TextStyle(
                           fontSize: 13,
-                          color: AppColors.textSecondary,
+                          color: AppColors.primary.withValues(alpha: 0.6),
                           height: 1.4,
                         ),
                         children: [
@@ -319,7 +319,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                         'I have read and consent to the privacy policy',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: AppColors.primary.withValues(alpha: 0.6),
                         ),
                       ),
                     ),
@@ -375,8 +375,9 @@ class _ProgressTile extends StatelessWidget {
                   Text(
                     value,
                     style: const TextStyle(
-                      color: AppColors.textSecondary,
+                      color: AppColors.primaryLight,
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
