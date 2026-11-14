@@ -79,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _AboutRow('Version', '1.0.0'),
                   _AboutRow('Made for', 'South African Students'),
-                  _AboutRow('AI Assistant', 'Star ⭐'),
+                  _AboutRow('ACEsi', 'Star ⭐'),
                 ],
               ),
             ),
