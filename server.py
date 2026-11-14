@@ -3861,6 +3861,60 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
         % (question, body))
 
 
+def _bug_evidence_reply(evidence):
+    """Honest report for a bug report when no model is left to write it.
+
+    Groq's free tier exhausts its 8000 tokens-per-minute before the answer
+    round, and the OpenRouter slugs are retired or unfunded, so _final_answer
+    used to show Chris a raw bulleted dump of tool output. Read the CDP
+    results and state only what they contained.
+    """
+    by_tool = {}
+    for e in (evidence or []):
+        by_tool.setdefault(str(e.get("tool") or ""), []).append(
+            str(e.get("content") or ""))
+
+    if not by_tool:
+        return ("I couldn't inspect the page: no CDP tool returned anything. "
+                "Check that the debug Chrome is still on port 9230, then ask again.")
+
+    lines = []
+    dom = "\n".join(by_tool.get("cdp_dom_state", []))
+    nav = " ".join(by_tool.get("cdp_navigate", []))
+    nav_url = re.search(r"navigated to (\S+)", nav)
+    if nav_url:
+        lines.append("Inspected %s." % nav_url.group(1))
+    elif dom:
+        lines.append("Inspected %s." % _bug_dom_digest(dom))
+    else:
+        lines.append("Connected to the debug browser.")
+
+    console = "\n".join(by_tool.get("cdp_console_logs", []))
+    if console:
+        lines.append("Console: %s." % _bug_console_digest(console))
+
+    net = "\n".join(by_tool.get("cdp_network_requests", []))
+    if net:
+        statuses = re.findall(
+            r"\b(GET|POST|PUT|PATCH|DELETE|OPTIONS)\s+(\d{3})\s+(\S+)", net)
+        failed = [s for s in statuses if s[1][0] in "45"]
+        if failed:
+            lines.append("Failed requests: %s."
+                         % "; ".join("%s %s" % (s[1], s[2]) for s in failed[:4]))
+        elif statuses:
+            lines.append("Network: %d request(s) seen, none returned 4xx/5xx "
+                         "(last: %s %s)." % (len(statuses), statuses[-1][1],
+                                             statuses[-1][2][:100]))
+        else:
+            lines.append("Network: no HTTP status codes in the captured requests.")
+    else:
+        lines.append("Network: not read.")
+
+    lines.append("That is what the page did. I could not write the fix summary: "
+                 "every model provider is rate-limited or out of credit right now.")
+    return "\n".join(lines)
+
+
 def _final_answer(llm_messages, names, last_screen, active, user_message,
                   chat_one=None):
     """The reply to show the user when the loop ends with work done.
@@ -3887,6 +3941,8 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
             prompt += "\nLast screen seen:\n%s" % last_screen[:3000]
         schema = None
     else:
+        if _bug_re.search(user_message or ""):
+            return _bug_evidence_reply(evidence)
         return _evidence_fallback(evidence, names)
 
     if chat_one is not None and active:
@@ -3904,6 +3960,8 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
             if text:
                 return text
 
+    if _bug_re.search(user_message or ""):
+        return _bug_evidence_reply(evidence)
     return _evidence_fallback(evidence, names)
 
 
@@ -4143,6 +4201,42 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         allowed_names = {n for n in allowed_names if not n.startswith("cdp_")}
         if _dropped_cdp:
             print("[cdp-strip] device task: removed %s" % _dropped_cdp)
+    # Bug-report override: if this looks like a bug report AND a debug
+    # Chrome is up, ensure diagnostic CDP tools are in the schema and take the
+    # three cheap observations now, in code.
+    _bug_obs = ""
+    if _bug_re.search((user_message or "").lower()) and _cdp_target_live():
+        allowed_names = allowed_names | {"cdp_connect", "cdp_console_logs",
+                                          "cdp_network_requests", "cdp_dom_state",
+                                          "cdp_evaluate", "cdp_navigate",
+                                          "cdp_get_response_body", "cdp_status"}
+        # The observation has to travel in the REDUCED system prompt: for Groq
+        # reduced_messages() throws away llm_messages[0], so injecting there
+        # looked like it worked while the model never saw a byte of it.
+        try:
+            _ok_c, _res_c = _call_tool("cdp_connect", {})
+            if _ok_c:
+                _, _res_logs = _call_tool("cdp_console_logs", {})
+                _, _res_dom = _call_tool("cdp_dom_state", {})
+                _bug_obs = (
+                    "[OBSERVED - already done in code, do NOT call cdp_connect, "
+                    "cdp_console_logs or cdp_dom_state again]\n"
+                    "page: %s\n"
+                    "console: %s"
+                    % (_bug_dom_digest(_res_dom),
+                       _bug_console_digest(_res_logs)))
+            else:
+                print("[bugre] cdp_connect failed: %s" % str(_res_c)[:200])
+        except Exception as _e:
+            print("[bugre] pre-inspection failed: %s" % _e)
+
+    def _reduced_msgs(_msgs):
+        """reduced_messages() plus the bug-report observation, if any."""
+        if not _bug_obs:
+            return reduced_messages(_msgs, active_domain, ctx_overlay)
+        return reduced_messages(_msgs, active_domain,
+                                ctx_overlay + "\n" + _bug_obs,
+                                context_budget=400 + len(_bug_obs))
     _gaps = ace_dispatcher.find_gaps(user_message, allowed_names)
     if _gaps.has_gaps:
         with _AGENT_LOCK:
@@ -4317,7 +4411,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                    else OPENROUTER_REDUCED_BUDGET)
                         _base = _reduced_tool_pool(active_domain,
                                                    net_domain_schema or full_domain_schema)
-                        msgs = reduced_messages(llm_messages, active_domain, ctx_overlay)
+                        msgs = _reduced_msgs(llm_messages)
                         schema = build_reduced_schema(
                             _base, want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
@@ -4357,8 +4451,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                                net_domain_schema or full_domain_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET)
-                        or_msgs = reduced_messages(llm_messages, active_domain,
-                                                   ctx_overlay)
+                        or_msgs = _reduced_msgs(llm_messages)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                         OPENROUTER_API_KEY, model, or_msgs,
                                         tools_schema=or_schema, tool_choice=tc)
@@ -4412,8 +4505,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             or active[0].startswith("OpenRouter")):
                         _budget = (GROQ_REDUCED_BUDGET if active[0] == "Groq"
                                    else OPENROUTER_REDUCED_BUDGET)
-                        fwd_msgs = reduced_messages(llm_messages, active_domain,
-                                                    ctx_overlay)
+                        fwd_msgs = _reduced_msgs(llm_messages)
                         fwd_schema = build_reduced_schema(
                             _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
@@ -9916,6 +10008,55 @@ def _needs_model_driven_ui(user_message):
     return bool(_CDP_MODEL_TASK_RE.search(user_message or ""))
 
 
+# BUG-REPORT INTENT: phrases that mean 'something is broken, look at it'.
+# Used in _chat_dispatch to route bug reports to the ui domain so the cdp_*
+# diagnostic tools stay in the model's schema.
+_bug_re = re.compile(
+    r"\b(won\'?t|wont|can\'?t|cannot|isn\'?t|doesn\'?t|"
+    r"not\s+(?:working|sending|loading|connecting|responding|opening|closing|saving|running|starting|displaying|showing|rendering|logging)|"
+    r"broken|breaks|broke|fails?|failed|failing|"
+    r"crash(?:es|ed)?|stuck|hangs?|hung|freezes?|frozen|"
+    r"no\s+(?:response|reply|error)|"
+    r"error(?:s)?\s+(?:in|on|with|at|when|sending))\b",
+    re.IGNORECASE,
+)
+
+
+def _bug_console_digest(text, limit=8, max_chars=600):
+    """Only the lines that could be the bug: error-level output, not the
+    Flutter/DDC bootstrap noise that fills a debug build's console."""
+    lines = [l.strip() for l in str(text or "").splitlines() if l.strip()]
+    bad = [l for l in lines
+           if re.search(r"\b(error|exception|uncaught|traceback|failed|failing|"
+                        r"refused|denied|cannot|undefined is not|[45]\d\d)\b",
+                        l, re.IGNORECASE)]
+    if bad:
+        return " | ".join(bad[:limit])[:max_chars]
+    return "no error-level lines (%d lines of framework noise)" % len(lines)
+
+
+def _bug_dom_digest(text):
+    """The page identity only - cdp_dom_state returns a whole HTML document."""
+    t = str(text or "")
+    url = re.search(r'"url"\s*:\s*"([^"]+)"', t)
+    title = re.search(r'"title"\s*:\s*"([^"]+)"', t)
+    if url:
+        return "%s (%s)" % ((title.group(1) if title else "?"), url.group(1))
+    return t.replace("\n", " ")[:200]
+
+
+def _cdp_target_live(port=9230, timeout=0.5):
+    """True if a DevTools server answers on the given local port."""
+    import urllib.request as _ur
+    for host in ("127.0.0.1", "[::1]"):
+        try:
+            _ur.urlopen(f"http://{host}:{port}/json/version", timeout=timeout)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def _explicit_cdp_intent(m):
     """True when the message explicitly names DevTools / CDP / F12. These are
     on-device browser inspections, so they belong to the 'ui' domain where the
@@ -10593,6 +10734,39 @@ _REDUCED_SYS = (
     "A form must be submitted before its POST appears: fill the fields with cdp_evaluate, click "
     "submit with cdp_evaluate, then read cdp_network_requests.\n"
     "Never invent a result. If a tool fails, report what it actually returned."
+    "\n"
+    "BUG REPORTS (mandatory, overrides everything above when the user reports something broken):\n"
+    "A bug report is never answered from memory, never with a list of things to try, and "
+    "never with a question - you look first, then you report what you saw.\n"
+    "If the system note contains an [OBSERVED] block, those three calls are already done: "
+    "do NOT call cdp_connect, cdp_console_logs or cdp_dom_state again, just use the page "
+    "line in it. Without an [OBSERVED] block, call cdp_connect, then cdp_console_logs, "
+    "then cdp_dom_state first.\n"
+    "ACEsi's own UI is http://127.0.0.1:5000/ and its chat POSTs to /chat; the Flutter app "
+    "is http://localhost:9999. If the page you observed is not the app being complained "
+    "about, call cdp_navigate ONCE to the right page before judging anything.\n"
+    "Then call cdp_network_requests ONCE and, when a request looks wrong, "
+    "cdp_get_response_body for that one request. Stop calling tools after that: Groq's "
+    "free tier allows about 8000 tokens per minute and extra rounds starve the final "
+    "answer.\n"
+    "REPRODUCE THE ACTION. A button, a send or a login only produces a request when you "
+    "actually use it: type and click on the page with cdp_evaluate, then read "
+    "cdp_network_requests for the request it caused. A capture taken without doing the "
+    "action proves nothing - never report 'the request was never made' unless you tried "
+    "it yourself and it still never appeared. When the action is the chat itself, type a "
+    "short harmless word like 'ping', never a bug report, so the page's own request does "
+    "not start a second investigation.\n"
+    "NEVER say 'no errors were observed', 'appears to be functioning normally' or 'looks "
+    "fine' unless you performed the reported action yourself and watched it succeed. An "
+    "empty console proves nothing about an action you never tried.\n"
+    "Reply in 2-4 short lines: (1) the URL you inspected and what you did there, (2) the "
+    "concrete error, status code or exception you actually read, quoted, (3) the fix, "
+    "naming the file or function to change. Never paste tool output, JSON, log lines or "
+    "bulleted result dumps."
+    "\n"
+    "AFTER A TOOL RETURNS: read the actual values in the result and report THEM - "
+    "the real status codes, error strings, URLs, console lines. Never describe what "
+    "should happen or what to do next; only state what you actually observed."
 )
 
 
@@ -15326,9 +15500,10 @@ def api_settings():
     if request.method == 'OPTIONS':
         return '', 200
     if request.method == 'POST':
-        data = request.get_json()
-        with open('config.json', 'w') as f:
-            json.dump(data, f, indent=2)
+        data = request.get_json() or {}
+        # Persist the system prompt to the DB — read by prompt assembly via get_config('system_prompt').
+        if data.get('system_prompt') is not None:
+            set_config('system_prompt', str(data['system_prompt']))
         # Persist API keys to .ace_keys.local so they take effect on server restart.
         # server.py reads these via _load_local_keys() at startup.
         key_map = {
@@ -15355,11 +15530,27 @@ def api_settings():
             json.dump(existing, f, indent=2)
         return jsonify({"ok": True, "message": "Settings saved", "restart": True})
     if request.method == 'GET':
+        keys_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.ace_keys.local')
+        k = {}
         try:
-            with open('config.json', 'r') as f:
-                return jsonify(json.load(f))
-        except:
-            return jsonify({})
+            with open(keys_file, 'r', encoding='utf-8') as f:
+                k = json.load(f) or {}
+        except Exception:
+            pass
+        return jsonify({
+            'system_prompt':  get_config('system_prompt', ''),
+            'model':          get_config('model', ''),
+            'groq_key':       k.get('groq', ''),
+            'gemini_key':     k.get('gemini', ''),
+            'openrouter_key': k.get('openrouter', ''),
+            'cerebras_key':   k.get('cerebras', ''),
+            'hf_key':         k.get('huggingface', ''),
+            'mistral_key':    k.get('mistral', ''),
+            'cloudflare_key': k.get('cloudflare', ''),
+            'nvidia_key':     k.get('nvidia', ''),
+            'sambanova_key':  k.get('sambanova', ''),
+            'github_key':     k.get('github', ''),
+        })
 
 if __name__ == '__main__':
     _boot_banner()

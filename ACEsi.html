@@ -7284,6 +7284,12 @@
 
 
     <div id="terminal-panel" style="display: none; flex-direction: column; height: 300px; min-height: 300px; max-height: 300px; background: #000; border-top: 1px solid #ff9d00; position: relative;">
+    <!-- Terminal title bar: one row, horizontally centred in the window -->
+    <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #333; flex: 0 0 auto; box-sizing: border-box;">
+      <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
+      <span id="terminal-min-btn" onclick="window.toggleMinimize()" title="Minimize" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">&ndash;</span>
+      <span id="terminal-close-btn" onclick="window.closeAceTerminal()" title="Close" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">X Close</span>
+    </div>
 
         
 
