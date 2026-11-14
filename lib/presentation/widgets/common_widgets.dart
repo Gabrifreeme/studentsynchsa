@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
 
 class GradientBackground extends StatelessWidget {
@@ -137,7 +137,7 @@ class SectionHeader extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
             fontSize: 11,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.5,
