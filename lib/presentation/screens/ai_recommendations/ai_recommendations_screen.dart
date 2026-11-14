@@ -64,8 +64,9 @@ class _AiRecommendationsScreenState
     _scrollDown();
 
     final contextInfo = profile != null
-        ? 'The student is ${profile.personal.firstName}, studying ${profile.grade12Subjects.map((s) => s.subject).join(", ")}, APS: ${profile.apsScore}, interested in ${profile.careerInterests.join(", ")}.'
+        ? _buildProfileContext(profile)
         : '';
+
 
     await AiService.askStream(
       prompt:
@@ -105,6 +106,44 @@ class _AiRecommendationsScreenState
     super.dispose();
   }
 
+  String _buildProfileContext(StudentProfile p) {
+    final symbolList = p.results.subjects.map((s) => '${s.subject} (${s.symbol})').where((s) => s.trim().isNotEmpty && !s.startsWith(' (')).join(', ');
+    final aps = _computeApsFromSymbols(p.results.subjects);
+    final interests = p.careerInterests.join(', ');
+    final buffer = StringBuffer();
+    buffer.write('STUDENT PROFILE (do not ask the student for this info again):\n');
+    buffer.write('- Name: ${p.personal.firstName}\n');
+    if (symbolList.isNotEmpty) buffer.write('- Grade 12 subjects + symbols: $symbolList\n');
+    if (aps > 0) buffer.write('- Computed APS (best 6, excluding Life Orientation): $aps\n');
+    if (p.address.province.isNotEmpty) buffer.write('- Province: ${p.address.province}\n');
+    if (interests.isNotEmpty) buffer.write('- Career interests: $interests\n');
+    if (p.status.bursaryRequired.isNotEmpty) buffer.write('- Needs funding: ${p.status.bursaryRequired}\n');
+    return buffer.toString();
+  }
+
+  int _computeApsFromSymbols(List<SubjectDetail> subjects) {
+    final points = <int>[];
+    for (final s in subjects) {
+      final sym = s.symbol.toUpperCase().trim();
+      int p = 0;
+      switch (sym) {
+        case 'A': p = 7; break;
+        case 'B': p = 6; break;
+        case 'C': p = 5; break;
+        case 'D': p = 4; break;
+        case 'E': p = 3; break;
+        case 'F': p = 2; break;
+        case 'G': p = 1; break;
+      }
+      if (p > 0 && !s.subject.toLowerCase().contains('life orientation')) {
+        points.add(p);
+      }
+    }
+    points.sort((a, b) => b.compareTo(a));
+    final best = points.take(6).toList();
+    return best.fold(0, (a, b) => a + b);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<StudentProfile?>>(profileProvider, (_, next) {
@@ -134,6 +173,9 @@ class _AiRecommendationsScreenState
                 padding: const EdgeInsets.all(16),
                 itemCount: _messages.length,
                 itemBuilder: (context, i) {
+                  if (i == 0 && _messages.length > 1 && !_messages[0].isUser) {
+                    return const SizedBox.shrink();
+                  }
                   final msg = _messages[i];
                   return _ChatBubble(message: msg);
                 },
