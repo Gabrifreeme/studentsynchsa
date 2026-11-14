@@ -4,6 +4,7 @@ import 'package:lipsyncstudent/core/theme/app_theme.dart';
 import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
 import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 import 'package:lipsyncstudent/services/ai_service.dart';
+import 'package:lipsyncstudent/domain/models/student_profile.dart';
 
 class AiRecommendationsScreen extends ConsumerStatefulWidget {
   const AiRecommendationsScreen({super.key});
@@ -27,32 +28,29 @@ class _AiRecommendationsScreenState
   final _scrollCtrl = ScrollController();
   bool _loading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final profile = ref.read(profileProvider).valueOrNull;
-      final name = profile?.personal.firstName.isNotEmpty == true
-          ? profile!.personal.firstName
-          : 'there';
-      final isProfileComplete =
-          profile != null &&
-          profile.personal.firstName.isNotEmpty &&
-          profile.grade12Subjects.isNotEmpty;
-      final greeting = isProfileComplete
-          ? "Hi there $name! I'm ACEsi\n\n"
-                "I can help you find the right university/bursary that fits your needs and style. "
-                "I can do more than that — wherever you see me, just tap/click on me and ask away."
-          : "Hi there $name! I'm ACEsi\n\n"
-                "⭐ First things first — complete your profile so I can give you the best recommendations for your needs!";
-      if (_messages.isNotEmpty && !_messages.first.text.contains(name)) {
-        setState(() {
-          _messages[0] = _ChatMessage(text: greeting, isUser: false);
-        });
+  void _maybeSetGreeting(StudentProfile? profile) {
+    debugPrint('[AI_GREETING] profile=${profile == null ? "null" : "loaded"} firstName=${profile?.personal.firstName} subjectsLen=${profile?.grade12Subjects.length}');
+    if (profile == null) return;
+    if (profile.personal.firstName.isEmpty) return;
+    final name = profile.personal.firstName;
+    final isProfileComplete = profile.results.subjects.isNotEmpty;
+    final greeting = isProfileComplete
+        ? "Hi there $name! I'm ACEsi\n\n"
+              "I can help you find the right university/bursary that fits your needs and style. "
+              "I can do more than that - wherever you see me, just tap/click on me and ask away."
+        : "Hi there $name! I'm ACEsi\n\n"
+              "First things first - complete your profile so I can give you the best recommendations for your needs!";
+    final currentGreeting = _messages.isNotEmpty ? _messages[0].text : '';
+    if (currentGreeting == greeting) return;
+    setState(() {
+      if (_messages.isNotEmpty) {
+        _messages[0] = _ChatMessage(text: greeting, isUser: false);
+      } else {
+        _messages.add(_ChatMessage(text: greeting, isUser: false));
       }
     });
   }
+
 
   Future<void> _sendMessage(String text) async {
     final profile = ref.read(profileProvider).valueOrNull;
@@ -109,6 +107,13 @@ class _AiRecommendationsScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<StudentProfile?>>(profileProvider, (_, next) {
+      _maybeSetGreeting(next.valueOrNull);
+    });
+    final loadedProfile = ref.watch(profileProvider).valueOrNull;
+    if (loadedProfile != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetGreeting(loadedProfile));
+    }
     return Container(
       color: Colors.black,
       child: Scaffold(

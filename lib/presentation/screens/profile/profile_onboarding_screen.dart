@@ -2907,6 +2907,28 @@ static const List<String> _countryList = [
     }
   }
 
+  int _computeApsFromSymbols() {
+    int total = 0;
+    for (final s in _resultsSubjects) {
+      final sym = s.symbol.toUpperCase().trim();
+      int points = 0;
+      switch (sym) {
+        case 'A': points = 7; break;
+        case 'B': points = 6; break;
+        case 'C': points = 5; break;
+        case 'D': points = 4; break;
+        case 'E': points = 3; break;
+        case 'F': points = 2; break;
+        case 'G': points = 1; break;
+      }
+      final subject = s.subject.toLowerCase();
+      if (points > 0 && !subject.contains('life orientation')) {
+        total += points;
+      }
+    }
+    return total;
+  }
+
   Future<void> _saveProfile() async {
     setState(() => _saving = true);
     try {
@@ -4492,6 +4514,27 @@ static const List<String> _countryList = [
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primaryLight,
                 side: const BorderSide(color: AppColors.border),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border.all(color: AppColors.primary, width: 1),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Your APS Score',
+                    style: TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    '${_computeApsFromSymbols()}',
+                    style: const TextStyle(color: AppColors.primary, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 32),
