@@ -108,7 +108,7 @@ class ChatService {
       _emitStatus(ChatConnectionState.connecting);
 
       final socket = io.io(
-        _serverBaseUrl,
+        _serverBaseUrl + "/chat",
         io.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()

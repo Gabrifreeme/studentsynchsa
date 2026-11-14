@@ -15637,9 +15637,15 @@ _chat_lock = threading.Lock()
 
 _CHAT_BASE_ROOMS = [
     ("general", "General Chat", "general"),
+    ("province:eastern-cape", "Eastern Cape", "province"),
+    ("province:free-state", "Free State", "province"),
     ("province:gauteng", "Gauteng", "province"),
-    ("province:western-cape", "Western Cape", "province"),
     ("province:kwazulu-natal", "KwaZulu-Natal", "province"),
+    ("province:limpopo", "Limpopo", "province"),
+    ("province:mpumalanga", "Mpumalanga", "province"),
+    ("province:northern-cape", "Northern Cape", "province"),
+    ("province:north-west", "North West", "province"),
+    ("province:western-cape", "Western Cape", "province"),
 ]
 
 def _chat_seed_rooms():

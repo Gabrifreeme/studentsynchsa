@@ -246,6 +246,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isConnected = _connState == ChatConnectionState.connected;
     return Container(
       color: Colors.black,
       child: Scaffold(
@@ -407,7 +408,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                         Row(
                           children: [
                             IconButton(
-                              onPressed: _pickFile,
+                              onPressed: isConnected ? _pickFile : null,
                               icon: const Icon(Icons.attach_file, color: AppColors.primary),
                               tooltip: 'Attach file',
                             ),
@@ -423,10 +424,11 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                               child: TextField(
                                 controller: _controller,
                                 focusNode: _inputFocus,
+                                enabled: isConnected,
                                 style: const TextStyle(
                                     color: AppColors.primary, fontSize: 14),
-                                decoration: const InputDecoration(
-                                  hintText: 'Type a message...',
+                                decoration: InputDecoration(
+                                  hintText: isConnected ? 'Type a message...' : 'Connecting...',
                                   hintStyle: TextStyle(color: AppColors.textMuted),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.zero,
@@ -447,7 +449,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                             ),
                             const SizedBox(width: 4),
                             IconButton(
-                              onPressed: _toggleRecording,
+                              onPressed: isConnected ? _toggleRecording : null,
                               icon: Icon(
                                 _isRecording ? Icons.stop_circle : Icons.mic,
                                 color: _isRecording ? AppColors.error : AppColors.primary,
@@ -456,7 +458,7 @@ class _RoomChatScreenState extends State<RoomChatScreen> {
                             ),
                             const SizedBox(width: 4),
                             IconButton(
-                              onPressed: _send,
+                              onPressed: isConnected ? _send : null,
                               icon: const Icon(Icons.send, color: AppColors.primary),
                               style: IconButton.styleFrom(
                                 backgroundColor: AppColors.surface,

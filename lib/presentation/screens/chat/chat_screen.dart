@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
 import 'package:lipsyncstudent/presentation/screens/chat/room_chat_screen.dart';
 import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lipsyncstudent/presentation/providers/profile_provider.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends ConsumerWidget {
   const ChatScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       color: Colors.black,
       child: Scaffold(
@@ -30,7 +32,24 @@ class ChatScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             AppCard(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomChatScreen(room: 'province', roomName: 'Province-based'))),
+              onTap: () {
+                final profile = ref.read(profileProvider).valueOrNull;
+                final raw = profile?.address.province.trim() ?? '';
+                if (raw.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Set your province in Profile first'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+                final slug = _slugifyProvince(raw);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => RoomChatScreen(
+                  room: 'province:$slug',
+                  roomName: raw,
+                )));
+              },
               child: const ListTile(
                 leading:
                     Icon(Icons.map_rounded, color: AppColors.success),
@@ -62,29 +81,10 @@ class ChatScreen extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Row(
-          children: [
-            StarAvatar(size: 24),
-            SizedBox(width: 8),
-            Text('Coming Soon', style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: const Text(
-          'Community chat is coming in the next update! ACEsi is working on it.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Okay'),
-          ),
-        ],
-      ),
-    );
+  static String _slugifyProvince(String raw) {
+    final lower = raw.toLowerCase();
+    final re = RegExp(r'[^a-z0-9]+');
+    final dashed = lower.replaceAll(re, '-');
+    return dashed.replaceAll(RegExp(r'^-+|-+$'), '');
   }
 }
