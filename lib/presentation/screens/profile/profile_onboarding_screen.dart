@@ -2601,7 +2601,13 @@ static const List<String> _countryList = [
     final p = profile;
     setState(() {
       _applyProfile(p);
+      // Skip the welcome screen for returning users with completed profiles
+      if (p.onboardingComplete) {
+        _showGreeting = false;
+      }
     });
+    // If profile is complete, skip the welcome (page 0) and land on page 1
+    // so the returning user can review/edit. First-timers keep the welcome.
   }
 
   void _applyProfile(StudentProfile p) {
