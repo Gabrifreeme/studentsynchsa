@@ -54,9 +54,10 @@ class _FundingListScreenState extends State<FundingListScreen> {
       return true;
     }).toList();
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +75,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                     const SizedBox(height: 4),
                     Text('${bursaries.length} programmes available',
                         style: const TextStyle(
-                            color: AppColors.textSecondary,
+                            color: AppColors.primary,
                             fontSize: 14)),
                   ],
                 ),
@@ -136,7 +137,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                                     : FontWeight.w500,
                                 color: selected
                                     ? Colors.white
-                                    : AppColors.textSecondary)),
+                                    : AppColors.primary)),
                         selected: selected,
                         selectedColor: AppColors.primary,
                         backgroundColor: AppColors.surface,
@@ -159,7 +160,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                 child: filtered.isEmpty
                     ? const Center(
                         child: Text('No programmes found',
-                            style: TextStyle(color: AppColors.textMuted)))
+                            style: TextStyle(color: AppColors.primary)))
                     : ListView.builder(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -323,7 +324,7 @@ class _FundingCardState extends State<_FundingCard>
                           Text(
                             b.provider,
                             style: const TextStyle(
-                              color: AppColors.textSecondary,
+                              color: AppColors.primary,
                               fontSize: 12,
                             ),
                           ),
@@ -332,7 +333,7 @@ class _FundingCardState extends State<_FundingCard>
                     ),
                     IconButton(
                       icon: const Icon(Icons.open_in_new,
-                          size: 18, color: AppColors.textMuted),
+                          size: 18, color: AppColors.primary),
                       onPressed: widget.onOpenLink,
                       splashRadius: 20,
                       padding: EdgeInsets.zero,
@@ -343,7 +344,7 @@ class _FundingCardState extends State<_FundingCard>
                       icon: Icon(
                         widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
                         size: 20,
-                        color: widget.isSaved ? AppColors.primaryLight : AppColors.textMuted,
+                        color: widget.isSaved ? AppColors.primaryLight : AppColors.primary,
                       ),
                       onPressed: widget.onSave,
                       splashRadius: 20,
@@ -374,7 +375,7 @@ class _FundingCardState extends State<_FundingCard>
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppColors.textMuted,
+                    color: AppColors.primary,
                     fontSize: 12,
                     height: 1.4,
                   ),
