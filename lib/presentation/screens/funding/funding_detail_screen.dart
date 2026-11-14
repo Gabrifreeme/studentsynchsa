@@ -20,9 +20,10 @@ class FundingDetailScreen extends StatelessWidget {
       );
     }
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(title: Text(bursary.name)),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

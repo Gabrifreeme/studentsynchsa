@@ -3290,9 +3290,10 @@ static const List<String> _countryList = [
       );
     }
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           title: const Text('Complete Your Profile'),
           leading: IconButton(

@@ -31,9 +31,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           title: const Text('Notifications'),
           actions: [

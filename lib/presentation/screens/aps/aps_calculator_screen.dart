@@ -46,9 +46,10 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(title: const Text('APS Calculator')),
         body: Column(
           children: [

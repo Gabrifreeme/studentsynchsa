@@ -20,9 +20,10 @@ class _ApplicationTrackerScreenState
   Widget build(BuildContext context) {
     final appsAsync = ref.watch(applicationsProvider);
 
-    return GradientBackground(
+    return Container(
+      color: Colors.black,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         appBar: AppBar(
           title: const Text('My Applications'),
           actions: [
