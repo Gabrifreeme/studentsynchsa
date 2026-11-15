@@ -3522,6 +3522,16 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     _prov_token_audit(name, model, msgs, tools_schema, max_tokens,
                       note=("reduced" if name in REDUCED_MODE_PROVIDERS
                             or name.startswith("OpenRouter") else "full"))
+    # One line that answers the only question worth asking when the model ignores
+    # Chris's instructions: was his saved prompt actually in the request?
+    try:
+        _sys_blob = "\n".join(str(m.get("content") or "")
+                              for m in msgs if m.get("role") == "system")
+        print("[prompt] %s/%s: %d chars system, tools=%d, Chris's saved prompt=%s"
+              % (name, model, len(_sys_blob), len(tools_schema or []),
+                 "yes" if "[CHRIS'S SYSTEM PROMPT" in _sys_blob else "no"))
+    except Exception:
+        pass
     spent = getattr(_PROV_TLS, "spent", 0.0)
     attempt = 0
     shrunk = False
@@ -4205,7 +4215,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Chrome is up, ensure diagnostic CDP tools are in the schema and take the
     # three cheap observations now, in code.
     _bug_obs = ""
-    if _bug_re.search((user_message or "").lower()) and _cdp_target_live():
+    _bug_mode = bool(_bug_re.search((user_message or "").lower())) and _cdp_target_live()
+    if _bug_mode:
         allowed_names = allowed_names | {"cdp_connect", "cdp_console_logs",
                                           "cdp_network_requests", "cdp_dom_state",
                                           "cdp_evaluate", "cdp_navigate",
@@ -4237,6 +4248,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         return reduced_messages(_msgs, active_domain,
                                 ctx_overlay + "\n" + _bug_obs,
                                 context_budget=400 + len(_bug_obs))
+    if _bug_mode:
+        print("[bugre] domain=%s allowed=%d cdp=%d obs=%d chars"
+              % (active_domain, len(allowed_names),
+                 sum(1 for n in allowed_names if n.startswith("cdp_")),
+                 len(_bug_obs)))
     _gaps = ace_dispatcher.find_gaps(user_message, allowed_names)
     if _gaps.has_gaps:
         with _AGENT_LOCK:
@@ -4365,6 +4381,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         time_budget = 600
     else:
         time_budget = 300 if _nav_task(user_message) else 240
+    # Bug-report mode: cap rounds so the model cannot burn the Groq TPM budget
+    # on repeated identical calls. 4 rounds = connect, inspect, read network,
+    # summarize. If it needs more, the tail summary runs instead of a 429.
+    if _bug_mode:
+        max_rounds = min(max_rounds, 4)
+        time_budget = 180
+        print("[bug-mode] capped rounds=%d time=%ds" % (max_rounds, time_budget))
     try:
         for rnd in range(max_rounds):
             # Hard time budget: on these slow CPUs a stuck model otherwise burns
@@ -4409,13 +4432,27 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # 7000 ITPM cap and a ~151-token balance).
                         _budget = (GROQ_REDUCED_BUDGET if _pname == "Groq"
                                    else OPENROUTER_REDUCED_BUDGET)
-                        _base = _reduced_tool_pool(active_domain,
-                                                   net_domain_schema or full_domain_schema)
+                        _base = (_bug_tool_pool() if _bug_mode
+                                 else _reduced_tool_pool(active_domain,
+                                                         net_domain_schema or full_domain_schema))
                         msgs = _reduced_msgs(llm_messages)
                         schema = build_reduced_schema(
                             _base, want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, msgs, _base))
+                        if _bug_obs:
+                            # The prompt names specific cdp_* tools; if the schema
+                            # dropped one the provider rejects the whole round with
+                            # "attempted to call tool X which was not in
+                            # request.tools". build_reduced_schema already logs the
+                            # surviving names, so only flag the mismatch here.
+                            _missing = [n for n in ("cdp_connect", "cdp_console_logs",
+                                                    "cdp_dom_state")
+                                        if n not in {t["function"]["name"]
+                                                     for t in schema}]
+                            if _missing:
+                                print("[bugre] ⚠ schema is missing %s the prompt names"
+                                      % _missing)
                         tc2 = tc
                     else:
                         schema = full_domain_schema
@@ -4507,7 +4544,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                    else OPENROUTER_REDUCED_BUDGET)
                         fwd_msgs = _reduced_msgs(llm_messages)
                         fwd_schema = build_reduced_schema(
-                            _reduced_tool_pool(active_domain, fwd_schema),
+                            _bug_tool_pool() if _bug_mode
+                            else _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
@@ -5796,10 +5834,8 @@ def chat():
             "Plain video-split requests are handled before you are called, so don't duplicate that work."
         )
         # Append the user-saved system prompt from Settings if present.
-        _saved_sys_prompt = get_config("system_prompt", "")
-        if _saved_sys_prompt and str(_saved_sys_prompt).strip():
-            system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
-        # Append the user-saved system prompt from Settings if present.
+        # (This was appended twice - the same block appeared back to back, which
+        # wasted tokens and repeated every rule to the model.)
         _saved_sys_prompt = get_config("system_prompt", "")
         if _saved_sys_prompt and str(_saved_sys_prompt).strip():
             system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
@@ -10016,7 +10052,18 @@ _bug_re = re.compile(
     r"not\s+(?:working|sending|loading|connecting|responding|opening|closing|saving|running|starting|displaying|showing|rendering|logging)|"
     r"broken|breaks|broke|fails?|failed|failing|"
     r"crash(?:es|ed)?|stuck|hangs?|hung|freezes?|frozen|"
-    r"no\s+(?:response|reply|error)|"
+    # Chris opens reports with a plain "bug:" far more often than any of the
+    # symptom verbs above, and "the list is empty" / "shows nothing" / "wrong
+    # data" are the same report without a verb at all. Missing those meant the
+    # report never got the CDP tools, so the model answered from guesswork.
+    # \bbug\b cannot match "debug": there is no word boundary inside it.
+    r"bug(?:s|gy|ged)?|glitch(?:y|es|ed)?|"
+    r"(?:is|are|was|were|stays?|remains?)\s+(?:empty|blank)|"
+    r"empty\s+(?:list|table|screen|page|state|dropdown|dashboard)|"
+    r"missing\s+(?:data|records?|rows?|entries)|"
+    r"shows?\s+(?:nothing|blank|empty)|nothing\s+(?:shows|loads|appears|happens)|"
+    r"wrong\s+(?:data|value|result|screen|page|number|answer|total)|wrong|"
+    r"no\s+(?:response|reply|error|data|records?|results?)|"
     r"error(?:s)?\s+(?:in|on|with|at|when|sending))\b",
     re.IGNORECASE,
 )
@@ -10654,6 +10701,24 @@ def _reduced_tool_pool(active_domain, fallback_schema):
     return fallback_schema
 
 
+def _bug_tool_pool():
+    """The pool for a bug report against the live page: CDP plus escape hatches.
+
+    A bug report classifies as 'general' as often as not, and the general pool
+    carries only three of the eight cdp_* tools. The prompt names all eight
+    (connect, console, network, dom, response body), so the model calls one the
+    schema does not have and Groq rejects the entire round with
+      "attempted to call tool 'cdp_console_logs' which was not in request.tools".
+    That is a guaranteed dead round, and it is what the last three test runs did.
+    The ui_* tools are excluded on purpose: a web page bug is not a phone task,
+    and every ui_* entry is schema budget spent on a tool that cannot help.
+    """
+    keep = {"run_command", "read_file"}
+    return [t for t in TOOLS_SCHEMA
+            if t["function"]["name"].startswith("cdp_")
+            or t["function"]["name"] in keep]
+
+
 def build_reduced_schema(base_schema, want_files=False, budget=None,
                          want_device=False, drop_cdp=False):
     """Task-shaped tool subset with one-sentence descriptions, ordered so the
@@ -10706,8 +10771,9 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
             if nm not in protected:
                 tools.pop(i)
             i -= 1
-    print("🪶 reduced schema: %d -> %d tools, ~%d tokens"
-          % (len(base_schema or []), len(tools), _estimate_tokens(tools)))
+    print("🪶 reduced schema: %d -> %d tools, ~%d tokens, budget=%s, drop_cdp=%s: %s"
+          % (len(base_schema or []), len(tools), _estimate_tokens(tools),
+             budget, drop_cdp, [t["function"]["name"] for t in tools]))
     return tools
 
 
@@ -10968,10 +11034,58 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
     out = [{"role": "system", "content": _DEVICE_SYS if _device else _REDUCED_SYS}]
     if domain:
         out[0]["content"] += "\nActive task domain: %s." % domain
+    # Chris's saved prompt (Settings -> System Prompt) used to be appended only to
+    # llm_messages[0], which this function throws away. So on every reduced-mode
+    # provider (Groq/gpt-oss) the one block he actually wrote was never sent, and
+    # the hand-written _REDUCED_SYS silently replaced it. It is appended HERE for
+    # that reason - this is the prompt that ships.
+    _saved = _saved_system_prompt()
+    if _saved and not _device:
+        # Line-preserving, not _clip(): _clip collapses every newline, which
+        # turns a numbered instruction list into one run-on paragraph and makes
+        # the model treat steps as prose. The prompt is ~735 chars, well under
+        # the limit, so this normally ships verbatim.
+        _saved_body = _saved if len(_saved) <= 1200 else _saved[:1200] + " [...]"
+        out[0]["content"] += (
+            "\n\n[CHRIS'S SYSTEM PROMPT - OBEY THESE FIRST]\n" + _saved_body
+        )
+        if "[OBSERVED]" in (overlay or "") or "[OBSERVED]" in out[0]["content"]:
+            # The pre-flight block above has already run the diagnosis. Chris's
+            # prompt says "diagnose, do not guess" and opens with a numbered
+            # inspect-first list; without this note the model re-runs those steps
+            # it has just been handed the answers to, burning the token budget.
+            out[0]["content"] += (
+                "\n\n[RECONCILIATION] The [OBSERVED] block above was collected "
+                "BEFORE this turn by connecting to the live page and reading its "
+                "console and DOM. Any step in the prompt above that says to "
+                "inspect, connect, or gather evidence is ALREADY DONE - do not "
+                "repeat it. Actually performing the failing action (navigate, "
+                "click, submit) is NOT done: do that yourself, then fix."
+            )
     if overlay:
         out[0]["content"] += "\n" + _clip(overlay, context_budget)
     out.extend(keep)
     return out
+
+
+# Reading the DB on every round of every tool loop is wasteful and the value
+# almost never changes, so hold it for a few seconds. /api/settings writes the
+# DB, and a stale read for a few seconds after a save is harmless.
+_SAVED_PROMPT_CACHE = {"at": 0.0, "text": ""}
+
+
+def _saved_system_prompt():
+    """Chris's Settings -> System Prompt, or "" if unset."""
+    now = time.time()
+    if now - _SAVED_PROMPT_CACHE["at"] < 5:
+        return _SAVED_PROMPT_CACHE["text"]
+    try:
+        _SAVED_PROMPT_CACHE["text"] = str(get_config("system_prompt", "") or "").strip()
+    except Exception as e:
+        print(f"[prompt] could not read saved prompt: {e}")
+        _SAVED_PROMPT_CACHE["text"] = ""
+    _SAVED_PROMPT_CACHE["at"] = now
+    return _SAVED_PROMPT_CACHE["text"]
 
 
 def _first_user_text(messages):
