@@ -3480,6 +3480,22 @@ def _prov_log_summary(providers):
         pass
 
 
+# Running prompt-cache totals for this process: how many input tokens were
+# billed at the 50% cached rate instead of full price. Cached tokens also do not
+# count toward Groq's TPM/TPD, so this is a direct measure of extra headroom on
+# the cap that keeps stopping long tool loops.
+_CACHE_TOTALS = {"calls": 0, "prompt": 0, "cached": 0}
+
+
+def _cache_record(prompt_tokens, cached_tokens):
+    try:
+        _CACHE_TOTALS["calls"] += 1
+        _CACHE_TOTALS["prompt"] += int(prompt_tokens or 0)
+        _CACHE_TOTALS["cached"] += int(cached_tokens or 0)
+    except Exception:
+        pass
+
+
 def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
               tools_schema=None, tool_choice="auto"):
     if not api_key:
@@ -3566,7 +3582,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
 
         if r.status_code == 200:
             try:
-                choice = r.json()["choices"][0]
+                _body = r.json()
+                choice = _body["choices"][0]
             except Exception as e:
                 _prov_record(name, model, 200, "200 but the body had no choices: %s" % e)
                 return None
@@ -3594,6 +3611,24 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                     # whenever no other provider is available to fall back to.
                     tcs.append((nm, _normalize_tool_args(nm, args)))
             finish = choice.get("finish_reason") or "stop"
+            # PROMPT-CACHE READOUT. Groq caches the system prompt and the tool
+            # definitions automatically for openai/gpt-oss-120b: 50% off cached
+            # input, and cached tokens do NOT count toward TPM/TPD. Nothing in
+            # this file ever looked at the usage block, so "is the cache
+            # actually working?" was unanswerable - and on this account the
+            # daily token cap is the limit that actually bites. Anthropic-style
+            # cache_control is NOT used here: Groq has no manual cache control
+            # and would at best ignore the field. This line is the whole
+            # implementation - caching needs no code, only observation.
+            _u = _body.get("usage") or {}
+            _cached = (_u.get("prompt_tokens_details") or {}).get("cached_tokens")
+            if _cached is not None:
+                _pt = _u.get("prompt_tokens") or 0
+                _pct = (100.0 * _cached / _pt) if _pt else 0.0
+                print("[cache] %s/%s: prompt=%s cached=%s (%.0f%%), completion=%s"
+                      % (name, model, _pt, _cached, _pct,
+                         _u.get("completion_tokens")))
+                _cache_record(_pt, _cached)
             if attempt > 1:
                 print("✅ %s recovered on attempt %d (max_tokens=%d)"
                       % (name, attempt, max_tokens))
