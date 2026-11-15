@@ -159,9 +159,14 @@ def _cdp_url_fragment():
     return _env("ACE_CDP_URL_FRAGMENT", "")
 
 
-def _select_target(targets):
+def _select_target(targets, fragment=None):
     """Pick the best CDP target: prefer a 'page' whose url/title matches the
     configured fragment, else the first page, else any debuggable target.
+
+    `fragment` overrides the configured one for this connect. A bug report is
+    ABOUT one page, and with two tabs open (the app under test and ACEsi's own
+    UI) "the first page target" is a coin toss - a live run diagnosed ACEsi
+    instead of the dashboard it was asked about.
 
     NOTE: this is deliberately an explicit loop and NOT a list comprehension.
     The comprehension form of this exact function miscompiles and silently
@@ -170,7 +175,7 @@ def _select_target(targets):
     whole time). Reproduced on CPython 3.11 and 3.14. Do not "simplify" this
     back into `[t for t in targets if ...]`.
     """
-    frag = _cdp_url_fragment().lower() if _cdp_url_fragment() else ""
+    frag = (fragment or _cdp_url_fragment() or "").lower()
     pages = []
     for t in targets:
         if t.get("type") == "page" and t.get("webSocketDebuggerUrl"):
@@ -263,7 +268,7 @@ def _ensure_local_browser():
     return False
 
 
-def _discover_target():
+def _discover_target(fragment=None):
     # 1) explicit ws URL override
     ws = _env("ACE_CDP_BROWSER_WS")
     if ws:
@@ -273,16 +278,20 @@ def _discover_target():
     #      port can never shadow the phone's WebView.
     tgt = _discover_device_webview()
     if tgt:
-        return tgt
+        # A connect that names a page is a desktop-browser connect; the phone's
+        # WebView is a different target and must not shadow it.
+        _u = ((tgt.get("url") or "") + " " + (tgt.get("title") or "")).lower()
+        if not fragment or any(f and f in _u for f in fragment.lower().split("|")):
+            return tgt
     # 1b) auto-launch a local headless Chrome (with --remote-allow-origins=*) if none
     #      is already serving on the devtools port. Skipped when the user explicitly
     #      targets a device (ACE_DEVICE_SERIAL set) so device WebViews stay inspectable.
     _ensure_local_browser()
     # 2) local Chrome devtools (desktop) on scanned ports
-    return _discover_local_target()
+    return _discover_local_target(fragment=fragment)
 
 
-def _discover_local_target(attempts=4, delay=1.0):
+def _discover_local_target(attempts=4, delay=1.0, fragment=None):
     """Scan the local devtools ports for a usable target, retrying briefly.
 
     Chrome can start accepting connections on the debugging port one or two
@@ -306,7 +315,7 @@ def _discover_local_target(attempts=4, delay=1.0):
         for port in ports:
             targets = _list_targets(port)
             if targets:
-                sel = _select_target(targets)
+                sel = _select_target(targets, fragment)
                 if sel:
                     return sel
         if attempt < attempts - 1:
@@ -532,7 +541,7 @@ def _json_val(a):
     return a.get("description", a.get("value", ""))
 
 
-def _get_session(force=False):
+def _get_session(force=False, fragment=None):
     global _session, _LAST_CONNECT_ERROR
     _LAST_CONNECT_ERROR = ""
     with _session_lock:
@@ -556,7 +565,7 @@ def _get_session(force=False):
             except Exception:
                 pass
             _session = None
-        tgt = _discover_target()
+        tgt = _discover_target(fragment=fragment)
         if not tgt:
             return None
         ws_url = tgt["webSocketDebuggerUrl"]
@@ -986,8 +995,8 @@ def _same_page(href, url):
     return bool(a) and bool(b) and (a == b or a.startswith(b) or b.startswith(a))
 
 
-def connect_cmd():
-    s = _get_session(force=True)
+def connect_cmd(fragment=None):
+    s = _get_session(force=True, fragment=fragment)
     if not s:
         detail = (" Last WebSocket error: %s" % _LAST_CONNECT_ERROR
                   if _LAST_CONNECT_ERROR else "")
