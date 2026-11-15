@@ -3027,7 +3027,6 @@ def _last_edit_info():
     # These are typically submodule pointers or repo-internal files that are
     # modified as part of the initial setup, not by the current user session.
     EXCLUDE_LAST_EDIT_PATHS = {
-        "Deepseek-Cowork",
         "nim-proxy",
         "lib/core/utils/file_upload_web.dart",
     }
@@ -3496,6 +3495,45 @@ def _cache_record(prompt_tokens, cached_tokens):
         pass
 
 
+def _nullable_optional(tools_schema):
+    """Let optional parameters be null.
+
+    openai/gpt-oss-120b emits null for optional arguments it does not want to
+    set, and Groq rejects the whole round when a null meets "type": "string":
+        parameters for tool cdp_network_requests did not match schema:
+        errors: [/filter_status: expected string, but got null]
+    That ended a live bug-report run with no answer at all. A type union is
+    accepted by Groq (verified with tool_choice="required") and is plain JSON
+    Schema, so the client side stays valid too.
+    """
+    out = []
+    for t in (tools_schema or []):
+        fn = (t or {}).get("function") or {}
+        params = fn.get("parameters") or {}
+        props = params.get("properties") or {}
+        required = set(params.get("required") or [])
+        if not props:
+            out.append(t)
+            continue
+        new_props = {}
+        for pname, spec in props.items():
+            if pname in required or not isinstance(spec, dict):
+                new_props[pname] = spec
+                continue
+            ty = spec.get("type")
+            if isinstance(ty, str):
+                spec = dict(spec)
+                spec["type"] = [ty, "null"]
+            elif isinstance(ty, list) and "null" not in ty:
+                spec = dict(spec)
+                spec["type"] = list(ty) + ["null"]
+            new_props[pname] = spec
+        nfn = dict(fn)
+        nfn["parameters"] = dict(params, properties=new_props)
+        out.append({"type": t.get("type", "function"), "function": nfn})
+    return out
+
+
 def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
               tools_schema=None, tool_choice="auto"):
     if not api_key:
@@ -3514,6 +3552,15 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
     # tools advertised, the model has nothing to call and must write its answer.
     if tool_choice == "none":
         tools_schema = []
+    else:
+        # gpt-oss emits null for optional arguments it does not want to set, and
+        # Groq then rejects the ENTIRE round:
+        #   "parameters for tool cdp_network_requests did not match schema:
+        #    errors: [/filter_status: expected string, but got null]"
+        # That killed a live bug-report run outright. Declaring optional params
+        # as nullable is accepted by Groq (verified) and by JSON Schema, and
+        # every tool already treats None as "not set".
+        tools_schema = _nullable_optional(tools_schema)
     # gpt-oss-class models are REASONING models: they spend many completion tokens
     # thinking before any content token. 200 max_tokens leaves content empty and
     # the server then echoes reasoning fragments as the "reply". Give cloud
@@ -3900,15 +3947,38 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
         "Question: %s\n\n"
         "Below is a slice of the tool results collected during this run.\n\n"
         "%s\n\n"
-        "Answer the question in a SINGLE SHORT SENTENCE using ONLY these results. "
-        "No preamble, no listing of results, no bullet points.\n"
-        "If these results do not contain the answer, reply with just: \"I couldn't "
-        "find that.\" Do NOT guess and do NOT answer from memory.\n"
-        "Never list tool names as findings - \"web_search\" is not a result."
-        % (question, body))
+        "Write a concise 2-sentence summary of what the page does and does not do, "
+        "based ONLY on these results. State what you observed, and if a relevant "
+        "detail (e.g. a %s request with status 4xx/5xx) is not present, say so "
+        "explicitly. Do NOT guess and do NOT answer from memory. Do NOT list tool "
+        "names as findings - \"web_search\" is not a result. Never claim a result "
+        "that is not in the evidence below." % (question, body, "GET or POST"))
 
 
-def _bug_evidence_reply(evidence, note=""):
+_BUG_STOPWORDS = {
+    "about", "please", "records", "record", "there", "their", "these", "those",
+    "which", "where", "while", "should", "would", "could", "still", "shows",
+    "showing", "empty", "wrong", "doesnt", "doesn", "isnt", "isn", "because",
+    "even", "though", "when", "open", "opens", "page", "screen", "list",
+    "find", "why", "what", "with", "from", "that", "this", "have", "has",
+    "data", "loads", "load", "loads", "being", "after", "before", "every",
+}
+
+
+def _bug_subject(user_message):
+    """The most specific noun in the report, e.g. "attendance".
+
+    Used for one honest negative: if the page's captured requests contain no
+    URL mentioning it, the page never asks the backend for that data - which is
+    the actual answer to "why is this list empty" far more often than a failed
+    request is.
+    """
+    words = re.findall(r"[a-zA-Z]{5,}", str(user_message or "").lower())
+    words = [w for w in words if w not in _BUG_STOPWORDS]
+    return max(words, key=len) if words else ""
+
+
+def _bug_evidence_reply(evidence, note="", obs="", question=""):
     """Honest report for a bug report when no model is left to write it.
 
     Groq's free tier exhausts its 8000 tokens-per-minute before the answer
@@ -3927,7 +3997,19 @@ def _bug_evidence_reply(evidence, note=""):
         by_tool.setdefault(str(e.get("tool") or ""), []).append(
             str(e.get("content") or ""))
 
-    if not by_tool:
+    # The pre-flight (run in code, before the model is called) already opened
+    # and read the page. Its result only lives in the system prompt, so when the
+    # model then reconnects to a different tab - or returns nothing at all -
+    # this report said "No page inspection completed" about a page that HAD been
+    # inspected. Fall back to the pre-flight reading.
+    _obs_page = re.search(r"^page: (.+)$", str(obs or ""), re.MULTILINE)
+    _obs_console = re.search(r"^console: (.+)$", str(obs or ""), re.MULTILINE)
+    _obs_net = re.search(r"^network: (.+)$", str(obs or ""), re.MULTILINE)
+    _obs_page = _obs_page.group(1).strip() if _obs_page else ""
+    _obs_console = _obs_console.group(1).strip() if _obs_console else ""
+    _obs_net = _obs_net.group(1).strip() if _obs_net else ""
+
+    if not by_tool and not _obs_page:
         return ("I couldn't inspect the page: no CDP tool returned anything. "
                 "Check that the debug Chrome is still on port 9230, then ask again."
                 + (("\n" + note) if note else ""))
@@ -3946,14 +4028,20 @@ def _bug_evidence_reply(evidence, note=""):
         # inspection even though nothing had connected - the run that produced
         # it never got a single cdp_connect through.
         lines.append("Could not open the page: %s." % nav.strip()[:200])
+    elif _obs_page:
+        lines.append("Inspected %s." % _obs_page)
     else:
         lines.append("No page inspection completed.")
 
     console = "\n".join(by_tool.get("cdp_console_logs", []))
     if console:
         lines.append("Console: %s." % _bug_console_digest(console))
+    elif _obs_console:
+        lines.append("Console: %s." % _obs_console)
 
     net = "\n".join(by_tool.get("cdp_network_requests", []))
+    if not net:
+        net = _obs_net
     if net:
         statuses = re.findall(
             r"\b(GET|POST|PUT|PATCH|DELETE|OPTIONS)\s+(\d{3})\s+(\S+)", net)
@@ -3965,8 +4053,20 @@ def _bug_evidence_reply(evidence, note=""):
             lines.append("Network: %d request(s) seen, none returned 4xx/5xx "
                          "(last: %s %s)." % (len(statuses), statuses[-1][1],
                                              statuses[-1][2][:100]))
+        elif re.search(r"none captured|no requests captured", net, re.I):
+            lines.append("Network: %s." % net.strip()[:200])
         else:
             lines.append("Network: no HTTP status codes in the captured requests.")
+        # The honest negative that actually answers "why is this list empty":
+        # the page never asks the backend for that data. Only claimed when the
+        # capture is big enough to be representative, so a 3-request tail from a
+        # half-finished load cannot produce a false "it never asks".
+        _subj = _bug_subject(question)
+        if _subj and len(statuses) >= 30:
+            if not any(_subj in u.lower() for _m, _s, u in statuses):
+                lines.append("No request on this page mentions %r: the page never "
+                             "asks for that data, which is why the list stays "
+                             "empty." % _subj)
     else:
         lines.append("Network: not read.")
 
@@ -3982,7 +4082,22 @@ _TOOL_META_RE = re.compile(
     re.IGNORECASE)
 
 
-def _bug_answer_is_useless(text):
+def _key_nouns(text):
+    """Extract capitalised or important nouns from user text.
+
+    These are the concepts the user actually wants to know about. If the model's
+    answer does not mention any of them, it is not an answer to the question.
+    """
+    import re as _re
+    # words 4+ chars that are not common stopwords
+    stop = {"about", "please", "then", "than", "just", "only", "very", "such",
+            "both", "many", "some", "most", "no", "any", "one", "two", "three",
+            "first", "last", "next", "old", "new", "big", "small", "high", "low"}
+    words = _re.findall(r"[a-zA-Z]{4,}", str(text or "").lower())
+    return {w for w in words if w not in stop}
+
+
+def _bug_answer_is_useless(text, user_message=""):
     """A bug report answered by talking about the toolset, or in one word.
 
     Live runs against a page that had just been read successfully produced
@@ -3990,6 +4105,8 @@ def _bug_answer_is_useless(text):
     both would otherwise reach Chris as the answer to "why is this broken".
     The bar is deliberately low (8 words) because an honest empty diagnosis is
     longer than that ("No console errors, and the chat panel renders fine").
+    If the answer mentions none of the question's key nouns, it is also
+    useless: the model has not addressed what was asked.
     """
     t = str(text or "").strip()
     if not t:
@@ -4000,6 +4117,12 @@ def _bug_answer_is_useless(text):
             r"\b(error|exception|console|request|status|page|dom|http|load)\b",
             t, re.IGNORECASE):
         return True
+    # If the answer does not mention any of the question's key nouns, it
+    # is not an answer to the question either.
+    if user_message:
+        key = _key_nouns(user_message)
+        if not key.intersection(_key_nouns(t)):
+            return True
     return False
 
 
@@ -4021,7 +4144,7 @@ def _no_summary_note(active):
 
 
 def _final_answer(llm_messages, names, last_screen, active, user_message,
-                  chat_one=None):
+                  chat_one=None, bug_obs=""):
     """The reply to show the user when the loop ends with work done.
 
     Replaces the block that produced
@@ -4047,7 +4170,8 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
         schema = None
     else:
         if _bug_re.search(user_message or ""):
-            return _bug_evidence_reply(evidence, _no_summary_note(active))
+            return _bug_evidence_reply(evidence, _no_summary_note(active),
+                                       obs=bug_obs, question=user_message)
         return _evidence_fallback(evidence, names)
 
     if chat_one is not None and active:
@@ -4068,11 +4192,13 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
                     return _bug_evidence_reply(
                         evidence,
                         "I could not write the fix summary: the model answered "
-                        "%r instead of describing the page." % text[:60])
+                        "%r instead of describing the page." % text[:60],
+                        obs=bug_obs, question=user_message)
                 return text
 
     if _bug_re.search(user_message or ""):
-        return _bug_evidence_reply(evidence, _no_summary_note(active))
+        return _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
+                                   question=user_message)
     return _evidence_fallback(evidence, names)
 
 
@@ -4337,37 +4463,97 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         # reduced_messages() throws away llm_messages[0], so injecting there
         # looked like it worked while the model never saw a byte of it.
         try:
-            _ok_c, _res_c = _call_tool("cdp_connect", {})
+            # Attach to the page the report is ABOUT. cdp_connect's default is
+            # "the first page target", and with the app under test plus ACEsi's
+            # own UI open that is a coin toss.
+            _target = _bug_pick_page_url(user_message)
+            _frag = re.sub(r"^https?://", "", _target).split("#")[0].rstrip("/")
+            _ok_c, _res_c = _call_tool("cdp_connect", {"target": _frag})
             if _ok_c:
-                # Open the page the report is ABOUT before reading anything.
-                # cdp_connect attaches to whatever tab is current, and after an
-                # earlier failed navigation that tab is
-                # "chrome-error://chromewebdata/" - so the pre-flight was
-                # reporting the console of Chrome's own error page. A URL in the
-                # message wins; otherwise the app under test.
+                # Read BEFORE navigating. cdp_connect attaches to whatever tab
+                # is current, so a navigate-first pre-flight reloaded the page
+                # under test every time - and when the dev server was down that
+                # turned a rendered dashboard into ERR_CONNECTION_REFUSED. The
+                # bug state is the thing being diagnosed, so it is read first
+                # and only replaced when the report is about another page.
                 _nav_note = ""
-                _url_m = re.search(r"https?://[^\s)\]>\"'<,]+", user_message or "")
-                _nav_url = (_url_m.group(0).rstrip(".,;:")
-                            if _url_m else _BUG_DEFAULT_URL)
-                if _nav_url:
+                _, _res_dom0 = _call_tool("cdp_dom_state", {})
+                _cur_url = _bug_dom_url(_res_dom0)
+                _, _res_logs0 = _call_tool("cdp_console_logs", {})
+                _, _res_net0 = _call_tool("cdp_network_requests", {"limit": 100})
+                _navigated = False
+                if _target and not _bug_url_same(_cur_url, _target):
                     _ok_n, _res_n = _call_tool(
                         "cdp_navigate",
-                        {"url": _nav_url, "wait": True, "wait_for": "load"})
+                        {"url": _target, "wait": True, "wait_for": "load"})
+                    _navigated = bool(_ok_n)
                     if _ok_n:
-                        _nav_note = "navigated: %s\n" % _nav_url
+                        _nav_note = "navigated: %s\n" % _target
                     else:
                         _nav_note = ("navigate to %s FAILED: %s\n"
-                                     % (_nav_url, str(_res_n)[:180]))
+                                     % (_target, str(_res_n)[:180]))
+                        # The page already open is still the best evidence there
+                        # is. Say that the navigation failed and that the report
+                        # describes what was on screen, not a fresh load.
+                        if _cur_url and not _cur_url.startswith("chrome-error://"):
+                            _nav_note += ("inspected the page already open at %s "
+                                          "(not reloaded)\n" % _cur_url)
+                elif not _bug_net_digest(_res_net0).startswith("none captured"):
+                    _nav_note = "already on %s (not reloaded)\n" % _cur_url
+                elif _bug_url_reachable(_target):
+                    # The tab was loaded before ACEsi attached, so no request of
+                    # its own was recorded - and "no attendance request" is then
+                    # a false finding, not a diagnosis. Reload once to record
+                    # what the page actually asks for; the pre-reload console is
+                    # kept above so the original state is not lost.
+                    _call_tool("cdp_evaluate", {"expr": "location.reload()"})
+                    # A reload returns immediately; the app then pulls in
+                    # hundreds of JS modules over several seconds. Reading once
+                    # after a fixed sleep caught 3 of ~1500 requests, so wait
+                    # until the request count stops growing.
+                    _prev = -1
+                    _stable = 0
+                    for _ in range(20):
+                        time.sleep(1)
+                        _cur = len(re.findall(
+                            r"\b(?:GET|POST|PUT|PATCH|DELETE|OPTIONS)\s+\d{3}\s+",
+                            str(_call_tool("cdp_network_requests", {"limit": 2000})[1])))
+                        if _cur == _prev:
+                            _stable += 1
+                            if _stable >= 2:
+                                break
+                        else:
+                            _stable = 0
+                        _prev = _cur
+                    _navigated = True
+                    _nav_note = ("reloaded %s to capture its requests; the console "
+                                 "lines above are from before the reload\n" % _target)
+                elif _cur_url:
+                    _nav_note = ("already on %s, which does not answer, so it was "
+                                 "not reloaded\n" % _cur_url)
                 _, _res_logs = _call_tool("cdp_console_logs", {})
-                _, _res_dom = _call_tool("cdp_dom_state", {})
+                # Filtered to failures: the useful question for "the list is
+                # empty" is which request failed, not a dump of every request.
+                _, _res_net = _call_tool("cdp_network_requests", {"limit": 100})
+                _res_dom = _call_tool("cdp_dom_state", {})[1] if _navigated else _res_dom0
                 _bug_obs = (
-                    "[OBSERVED - already done in code, do NOT call cdp_connect, "
-                    "cdp_console_logs or cdp_dom_state again]\n"
+                    "[OBSERVED - already done in code: the page was opened and "
+                    "read before you were called. cdp_connect and cdp_navigate are "
+                    "not available, and re-pointing the tab or reloading the page "
+                    "would destroy this evidence.]\n"
+                    "Answer from the lines below only. Cite what they show, and do "
+                    "not guess at a cause.\n"
+                    "page under test: %s\n"
+                    % _target
                     + _nav_note +
                     "page: %s\n"
-                    "console: %s"
+                    "console before: %s\n"
+                    "console: %s\n"
+                    "network: %s"
                     % (_bug_dom_digest(_res_dom),
-                       _bug_console_digest(_res_logs)))
+                       _bug_console_digest(_res_logs0),
+                       _bug_console_digest(_res_logs),
+                       _bug_net_digest(_res_net)))
             else:
                 print("[bugre] cdp_connect failed: %s" % str(_res_c)[:200])
         except Exception as _e:
@@ -4564,7 +4750,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # 7000 ITPM cap and a ~151-token balance).
                         _budget = (GROQ_REDUCED_BUDGET if _pname == "Groq"
                                    else OPENROUTER_REDUCED_BUDGET)
-                        _base = (_bug_tool_pool() if _bug_intent
+                        _base = (_bug_tool_pool(pre_inspected=bool(_bug_obs))
+                                 if _bug_intent
                                  else _reduced_tool_pool(active_domain,
                                                          net_domain_schema or full_domain_schema))
                         msgs = _reduced_msgs(llm_messages)
@@ -4578,7 +4765,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             # "attempted to call tool X which was not in
                             # request.tools". build_reduced_schema already logs the
                             # surviving names, so only flag the mismatch here.
-                            _missing = [n for n in ("cdp_connect", "cdp_console_logs",
+                            # cdp_connect/cdp_navigate are deliberately absent once
+                            # the pre-flight has read the page.
+                            _missing = [n for n in ("cdp_console_logs",
+                                                    "cdp_network_requests",
                                                     "cdp_dom_state")
                                         if n not in {t["function"]["name"]
                                                      for t in schema}]
@@ -4676,7 +4866,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                    else OPENROUTER_REDUCED_BUDGET)
                         fwd_msgs = _reduced_msgs(llm_messages)
                         fwd_schema = build_reduced_schema(
-                            _bug_tool_pool() if _bug_intent
+                            _bug_tool_pool(pre_inspected=bool(_bug_obs))
+                            if _bug_intent
                             else _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
@@ -5255,22 +5446,26 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         _auto_open_web_image_fallback(last_text, llm_messages, user_message)
         if _auto_opened or (names and _is_ungrounded(last_text)):
             summary = _final_answer(llm_messages, names, last_screen, active,
-                                    user_message, chat_one=_chat_one)
+                                    user_message, chat_one=_chat_one,
+                                    bug_obs=_bug_obs)
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = summary
             return summary
         clean = _sanitize_reply(last_text)
         if clean is None:
             clean = _final_answer(llm_messages, names, last_screen, active,
-                                  user_message, chat_one=_chat_one)
+                                  user_message, chat_one=_chat_one,
+                                  bug_obs=_bug_obs)
         # A bug report answered with tool meta or a single word is not an
         # answer. This is the path the live "There are 9 CDP tools available."
         # reply took: no FINAL marker, no grounded call, straight to Chris.
-        if _bug_re.search(user_message or "") and _bug_answer_is_useless(clean):
+        if _bug_re.search(user_message or "") and _bug_answer_is_useless(clean, user_message):
             clean = _bug_evidence_reply(
                 _collect_tool_evidence(llm_messages),
                 "I could not write the fix summary: the model answered %r "
-                "instead of describing the page." % str(clean)[:60])
+                "instead of describing the page." % str(clean)[:60],
+                obs=_bug_obs,
+                question=user_message)
         with _AGENT_LOCK:
             _AGENT["last_reply"] = clean
         return clean
@@ -5312,16 +5507,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     _auto_open_user_file()
 
     summary = _final_answer(llm_messages, names, last_screen, active,
-                            user_message, chat_one=_chat_one)
+                            user_message, chat_one=_chat_one, bug_obs=_bug_obs)
     summary = _normalize_reply(summary)
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
         summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
-    if _bug_re.search(user_message or "") and _bug_answer_is_useless(summary):
+    if _bug_re.search(user_message or "") and _bug_answer_is_useless(summary, user_message):
         summary = _bug_evidence_reply(
             _collect_tool_evidence(llm_messages),
             "I could not write the fix summary: the model answered %r instead "
-            "of describing the page." % str(summary)[:60])
+            "of describing the page." % str(summary)[:60],
+            obs=_bug_obs,
+            question=user_message)
     with _AGENT_LOCK:
         _AGENT["last_reply"] = summary
     return summary
@@ -8557,9 +8754,11 @@ def tool_restart(what="cdp"):
 
 # ---- CDP (Chrome DevTools Protocol) tools: inspect the ITS WebView / local Chrome ----
 
-def tool_cdp_connect():
-    ok, msg = d.connect_cmd()
-    return ok, msg
+def tool_cdp_connect(target=""):
+    """Connect to a CDP target. `target` is a URL/title fragment: with more than
+    one tab open, "the first page" is a coin toss, so a caller that knows which
+    page it wants can say so (e.g. "localhost:9999")."""
+    return d.connect_cmd(fragment=(target or "").strip() or None)
 
 def tool_cdp_navigate(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
     if not url:
@@ -9217,7 +9416,7 @@ TOOLS = {
     "ui_expect": (tool_ui_expect, ("expected",)),
     "ui_test_run": (tool_ui_test_run, ("steps", "name")),
     "restart": (tool_restart, ("what",)),
-    "cdp_connect": (tool_cdp_connect, ()),
+    "cdp_connect": (tool_cdp_connect, ("target",)),
     "cdp_navigate": (tool_cdp_navigate, ("url",)),
     "cdp_evaluate": (tool_cdp_evaluate, ("expr",)),
     "cdp_console_logs": (tool_cdp_console_logs, ()),
@@ -9408,7 +9607,9 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {"what": {"type": "string"}}, "required": []}}},
     {"type": "function", "function": {"name": "cdp_connect",
         "description": "Connect to a Chrome DevTools target (ITS WebView on an Android device, or a local Chrome launched with --remote-allow-origins=*). Run this first before the other cdp_* tools.",
-        "parameters": {"type": "object", "properties": {}, "required": []}}},
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "title": "target", "description": "Optional URL or title fragment of the tab to attach to, e.g. 'localhost:9999'. Several tabs are usually open; without this the first page target is used."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "cdp_navigate",
         "description": "Navigate the connected Chrome/WebView page to a URL via CDP and wait for the page. Use this INSTEAD of evaluate_js('location.href=...') so the Network panel records a real Document request. Args: url (REQUIRED, http(s)://...; a bare host gets https://), wait (default true; false returns immediately without waiting), wait_for ('load' = readyState complete, default; 'network_idle' = also wait until no request is in flight and nothing has hit the wire for idle_ms - USE THIS when the page has background polling and the request you care about may be a late XHR), timeout (default 30s, caps the wait), idle_ms (default 500). After navigating, call cdp_dom_state to read the page or cdp_network_requests to read status codes.",
         "parameters": {"type": "object", "properties": {
@@ -10214,9 +10415,35 @@ _bug_re = re.compile(
 )
 
 
-# The page a bug report is assumed to be about when the message names no URL.
-# The Flutter app under test; override with ACESI_BUG_URL.
+# The page a bug report is assumed to be about when the message names no URL
+# and the debug browser has no page open. The Flutter app under test; override
+# with ACESI_BUG_URL (the dev-server port changes between runs: 9999, 9000).
 _BUG_DEFAULT_URL = os.environ.get("ACESI_BUG_URL", "http://localhost:9999")
+_BUG_CANDIDATE_URLS = [_BUG_DEFAULT_URL, "http://localhost:9000"]
+
+
+def _bug_url_reachable(url, timeout=2.0):
+    """True if something answers an HTTP GET at `url`.
+
+    Used to choose between the app under test and a stale tab left over from an
+    earlier `flutter run`: the dev-server port moves between runs, and a tab on
+    a dead port shows whatever it rendered before the server stopped.
+    """
+    import urllib.request as _ur
+    try:
+        req = _ur.Request(url, headers={"User-Agent": "ACEsi-diag"})
+        with _ur.urlopen(req, timeout=timeout) as r:
+            return 200 <= int(getattr(r, "status", 200)) < 400
+    except Exception:
+        return False
+
+
+def _bug_live_url():
+    """The first candidate URL that actually answers."""
+    for u in _BUG_CANDIDATE_URLS:
+        if _bug_url_reachable(u):
+            return u
+    return _BUG_DEFAULT_URL
 
 
 def _bug_console_digest(text, limit=8, max_chars=600):
@@ -10232,8 +10459,126 @@ def _bug_console_digest(text, limit=8, max_chars=600):
     return "no error-level lines (%d lines of framework noise)" % len(lines)
 
 
+def _bug_pick_page_url(user_message, port=9230, own_origin="http://127.0.0.1:5000/"):
+    """Which page a bug report is about.
+
+    A URL in the message wins. Otherwise it is the one page open in the debug
+    browser that is not ACEsi's own UI: with the app under test (localhost:9999
+    / :9000) and ACEsi (127.0.0.1:5000) both open, "the first page target" is a
+    coin toss, and a live run diagnosed ACEsi's own console instead of the
+    dashboard it was asked about.
+    """
+    m = re.search(r"https?://[^\s)\]>\"'<,]+", user_message or "")
+    if m:
+        return m.group(0).rstrip(".,;:")
+    try:
+        targets = d._list_targets(port) or []
+    except Exception:
+        targets = []
+    candidates = []
+    for t in targets:
+        if t.get("type") != "page":
+            continue
+        u = str(t.get("url") or "")
+        if not u.startswith("http"):
+            continue
+        if _bug_url_same(u, own_origin):
+            continue
+        candidates.append(u)
+    # A tab left over from an earlier `flutter run` stays open on a port that is
+    # no longer served, so "an open tab" is not the same as "the app is up".
+    # Prefer a tab that answers; otherwise use whichever candidate port is live.
+    for u in candidates:
+        if _bug_url_reachable(u):
+            print("[bugre] page under test: %s (of %d open pages)"
+                  % (u, len(candidates)))
+            return u
+    _live = _bug_live_url()
+    print("[bugre] no reachable page tab - using the live app at %s" % _live)
+    return _live
+
+
+def _bug_net_digest(text, limit=6):
+    """Failed requests if there are any, otherwise a short summary.
+
+    "No requests captured" and "no attendance request" are different facts: the
+    former means ACEsi attached after the page had already loaded (nothing was
+    in flight to record), which is not evidence that the app never asks for the
+    data. Saying which one it is keeps the diagnosis honest.
+    """
+    pairs = re.findall(r"\b(GET|POST|PUT|PATCH|DELETE|OPTIONS)\s+(\d{3})\s+(\S+)",
+                       str(text or ""))
+    if not pairs:
+        return ("none captured - the page was already loaded when ACEsi attached, "
+                "so its initial requests were not recorded (a reload captures them)")
+    bad = [p for p in pairs if p[1][0] in "45"]
+    if bad:
+        return " | ".join("%s %s %s" % (m, s, u[:80]) for m, s, u in bad[-limit:])
+    hosts = []
+    for _m, _s, _u in pairs:
+        h = re.sub(r"^(https?://[^/]+).*$", r"\1", _u)
+        if h and h not in hosts:
+            hosts.append(h)
+    return ("%d request(s), all 2xx; hosts: %s"
+            % (len(pairs), ", ".join(hosts[:4])))
+
+
+def _bug_dom_url(text):
+    """The raw URL cdp_dom_state reported, or '' if it reported none."""
+    m = re.search(r'"url"\s*:\s*"([^"]+)"', str(text or ""))
+    return m.group(1) if m else ""
+
+
+def _bug_url_same(a, b):
+    """True when two URLs address the same page.
+
+    Fragment and query are ignored: Flutter routes with '#/dashboard', so
+    comparing the raw strings said "already open" was false and the pre-flight
+    navigated - which on a stopped dev server replaced a fully rendered page
+    with ERR_CONNECTION_REFUSED and destroyed the very state being diagnosed.
+    A fragment-only difference is the same document.
+    """
+    from urllib.parse import urlsplit
+
+    def key(u):
+        try:
+            p = urlsplit(str(u or "").strip())
+        except Exception:
+            return None
+        if not p.scheme or not p.netloc:
+            return None
+        host = (p.hostname or "").lower()
+        # localhost and 127.0.0.1 are the same machine and, for a local dev
+        # server bound to both, the same app.
+        if host in ("localhost", "127.0.0.1", "::1"):
+            host = "localhost"
+        port = p.port or (443 if p.scheme == "https" else 80)
+        return (p.scheme.lower(), host, port, (p.path or "/").rstrip("/") or "/")
+
+    ka, kb = key(a), key(b)
+    return bool(ka and kb and ka == kb)
+
+
+def _bug_dom_text(html, limit=400):
+    """Visible text of the page, whitespace collapsed.
+
+    The title and URL alone cannot answer "the attendance list is empty": the
+    real page here is LipSyncStudent and has no attendance list at all, but a
+    title-only digest let the model assume the list existed and invent a cause
+    for it. The text is what the model needs to check the premise.
+    """
+    t = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", str(html or ""))
+    t = re.sub(r"(?s)<[^>]+>", " ", t)
+    t = (t.replace("&nbsp;", " ").replace("&amp;", "&")
+         .replace("&lt;", "<").replace("&gt;", ">").replace("&#39;", "'")
+         .replace("&quot;", '"'))
+    t = re.sub(r"\s+", " ", t).strip()
+    return t[:limit]
+
+
 def _bug_dom_digest(text):
-    """The page identity only - cdp_dom_state returns a whole HTML document."""
+    """Page identity plus what it visibly shows - cdp_dom_state returns a whole
+    HTML document, and only a slice of it is useful as evidence."""
     t = str(text or "")
     url = re.search(r'"url"\s*:\s*"([^"]+)"', t)
     title = re.search(r'"title"\s*:\s*"([^"]+)"', t)
@@ -10245,7 +10590,20 @@ def _bug_dom_digest(text):
             # screen as if it were the app under test.
             return ("NOT THE APP - the browser is on Chrome's error page "
                     "(chrome-error://chromewebdata/); nothing loaded")
-        return "%s (%s)" % ((title.group(1) if title else "?"), _u)
+        _head = "%s (%s)" % ((title.group(1) if title else "?"), _u)
+        _html = ""
+        try:
+            import json as _json
+            _html = (_json.loads(t) or {}).get("html") or ""
+        except Exception:
+            _m = re.search(r'"html"\s*:\s*"((?:[^"\\]|\\.)*)"', t)
+            if _m:
+                try:
+                    _html = _m.group(1).encode().decode("unicode_escape")
+                except Exception:
+                    _html = _m.group(1)
+        _txt = _bug_dom_text(_html)
+        return "%s :: text: %s" % (_head, _txt) if _txt else _head
     return t.replace("\n", " ")[:200]
 
 
@@ -10858,7 +11216,7 @@ def _reduced_tool_pool(active_domain, fallback_schema):
     return fallback_schema
 
 
-def _bug_tool_pool():
+def _bug_tool_pool(pre_inspected=False):
     """The pool for a bug report against the live page: CDP plus escape hatches.
 
     A bug report classifies as 'general' as often as not, and the general pool
@@ -10869,11 +11227,20 @@ def _bug_tool_pool():
     That is a guaranteed dead round, and it is what the last three test runs did.
     The ui_* tools are excluded on purpose: a web page bug is not a phone task,
     and every ui_* entry is schema budget spent on a tool that cannot help.
+
+    `pre_inspected` drops cdp_connect and cdp_navigate. The page has already
+    been attached to and read, and those two are the tools that destroy the
+    evidence: a live run reloaded the dashboard and then pointed the tab at
+    ACEsi's own UI, so the console it finally read belonged to the wrong page.
+    Telling the model not to do that is advisory; leaving the tools out of the
+    schema is binding.
     """
     keep = {"run_command", "read_file"}
+    drop = {"cdp_connect", "cdp_navigate"} if pre_inspected else set()
     return [t for t in TOOLS_SCHEMA
-            if t["function"]["name"].startswith("cdp_")
-            or t["function"]["name"] in keep]
+            if (t["function"]["name"].startswith("cdp_")
+                or t["function"]["name"] in keep)
+            and t["function"]["name"] not in drop]
 
 
 def build_reduced_schema(base_schema, want_files=False, budget=None,
