@@ -3545,7 +3545,9 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                               for m in msgs if m.get("role") == "system")
         print("[prompt] %s/%s: %d chars system, tools=%d, Chris's saved prompt=%s"
               % (name, model, len(_sys_blob), len(tools_schema or []),
-                 "yes" if "[CHRIS'S SYSTEM PROMPT" in _sys_blob else "no"))
+                 "reduced" if "[CHRIS'S SYSTEM PROMPT" in _sys_blob
+                 else "full" if "[USER SYSTEM PROMPT" in _sys_blob
+                 else "no"))
     except Exception:
         pass
     spent = getattr(_PROV_TLS, "spent", 0.0)
@@ -3906,13 +3908,19 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
         % (question, body))
 
 
-def _bug_evidence_reply(evidence):
+def _bug_evidence_reply(evidence, note=""):
     """Honest report for a bug report when no model is left to write it.
 
     Groq's free tier exhausts its 8000 tokens-per-minute before the answer
     round, and the OpenRouter slugs are retired or unfunded, so _final_answer
     used to show Chris a raw bulleted dump of tool output. Read the CDP
     results and state only what they contained.
+
+    `note` says WHY there is no model-written summary. The old text asserted
+    "every model provider is rate-limited or out of credit" unconditionally,
+    which was false when the provider had answered 200 five times in a row and
+    the real reason was that the final round returned no text. A diagnostic
+    that invents its own cause is worse than a short one.
     """
     by_tool = {}
     for e in (evidence or []):
@@ -3921,7 +3929,8 @@ def _bug_evidence_reply(evidence):
 
     if not by_tool:
         return ("I couldn't inspect the page: no CDP tool returned anything. "
-                "Check that the debug Chrome is still on port 9230, then ask again.")
+                "Check that the debug Chrome is still on port 9230, then ask again."
+                + (("\n" + note) if note else ""))
 
     lines = []
     dom = "\n".join(by_tool.get("cdp_dom_state", []))
@@ -3931,8 +3940,14 @@ def _bug_evidence_reply(evidence):
         lines.append("Inspected %s." % nav_url.group(1))
     elif dom:
         lines.append("Inspected %s." % _bug_dom_digest(dom))
+    elif nav.strip():
+        # Navigation was ATTEMPTED and failed. The old code printed
+        # "Connected to the debug browser." here, which read as a successful
+        # inspection even though nothing had connected - the run that produced
+        # it never got a single cdp_connect through.
+        lines.append("Could not open the page: %s." % nav.strip()[:200])
     else:
-        lines.append("Connected to the debug browser.")
+        lines.append("No page inspection completed.")
 
     console = "\n".join(by_tool.get("cdp_console_logs", []))
     if console:
@@ -3955,9 +3970,54 @@ def _bug_evidence_reply(evidence):
     else:
         lines.append("Network: not read.")
 
-    lines.append("That is what the page did. I could not write the fix summary: "
-                 "every model provider is rate-limited or out of credit right now.")
+    lines.append("That is what the page did. " + (
+        note or "I could not write the fix summary: the model returned no text."))
     return "\n".join(lines)
+
+
+_TOOL_META_RE = re.compile(
+    r"\b(?:cdp|ui)_[a-z_]+\b"
+    r"|\btools?\s+(?:are|is)\s+available\b"
+    r"|\b(?:i\s+(?:have|have access to|can use)|there\s+are)\b[^.]{0,40}\btools?\b",
+    re.IGNORECASE)
+
+
+def _bug_answer_is_useless(text):
+    """A bug report answered by talking about the toolset, or in one word.
+
+    Live runs against a page that had just been read successfully produced
+    "pong" and "There are 9 CDP tools available." Neither is a diagnosis, and
+    both would otherwise reach Chris as the answer to "why is this broken".
+    The bar is deliberately low (8 words) because an honest empty diagnosis is
+    longer than that ("No console errors, and the chat panel renders fine").
+    """
+    t = str(text or "").strip()
+    if not t:
+        return True
+    if len(t.split()) < 8:
+        return True
+    if _TOOL_META_RE.search(t) and not re.search(
+            r"\b(error|exception|console|request|status|page|dom|http|load)\b",
+            t, re.IGNORECASE):
+        return True
+    return False
+
+
+def _no_summary_note(active):
+    """Why the model-written summary is missing, from evidence rather than a guess."""
+    try:
+        errs = _prov_errors()
+    except Exception:
+        errs = []
+    if errs:
+        return ("I could not write the fix summary: provider calls failed (%s)."
+                % ", ".join("%s %s" % (e.get("provider"), e.get("status"))
+                            for e in errs[:3]))
+    if active is None:
+        return ("I could not write the fix summary: the tool rounds ended with no "
+                "model session left to summarize them.")
+    return ("I could not write the fix summary: the model returned no text on the "
+            "final round (the provider answered normally).")
 
 
 def _final_answer(llm_messages, names, last_screen, active, user_message,
@@ -3987,7 +4047,7 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
         schema = None
     else:
         if _bug_re.search(user_message or ""):
-            return _bug_evidence_reply(evidence)
+            return _bug_evidence_reply(evidence, _no_summary_note(active))
         return _evidence_fallback(evidence, names)
 
     if chat_one is not None and active:
@@ -4003,10 +4063,16 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
             # through to the evidence fallback instead of showing it to Chris.
             text = _sanitize_reply(text) if text else None
             if text:
+                if (_bug_re.search(user_message or "")
+                        and _bug_answer_is_useless(text)):
+                    return _bug_evidence_reply(
+                        evidence,
+                        "I could not write the fix summary: the model answered "
+                        "%r instead of describing the page." % text[:60])
                 return text
 
     if _bug_re.search(user_message or ""):
-        return _bug_evidence_reply(evidence)
+        return _bug_evidence_reply(evidence, _no_summary_note(active))
     return _evidence_fallback(evidence, names)
 
 
@@ -4250,23 +4316,54 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Chrome is up, ensure diagnostic CDP tools are in the schema and take the
     # three cheap observations now, in code.
     _bug_obs = ""
-    _bug_mode = bool(_bug_re.search((user_message or "").lower())) and _cdp_target_live()
-    if _bug_mode:
+    _bug_intent = bool(_bug_re.search((user_message or "").lower()))
+    _cdp_live = _cdp_target_live() if _bug_intent else False
+    _bug_mode = _bug_intent and _cdp_live
+    if _bug_intent and not _cdp_live:
+        # No DevTools on 9230, so there is nothing to pre-inspect. Say so in the
+        # log AND still offer the CDP tools below: the model can then call
+        # cdp_connect once and report that it cannot reach the browser, which is
+        # an honest answer, instead of being told to connect with no tool to do
+        # it with (that produced four empty rounds and a fabricated report).
+        print("[bugre] CDP not live on 9230 - offering the CDP tools but no "
+              "pre-inspection this turn")
+    if _bug_intent:
         allowed_names = allowed_names | {"cdp_connect", "cdp_console_logs",
                                           "cdp_network_requests", "cdp_dom_state",
                                           "cdp_evaluate", "cdp_navigate",
                                           "cdp_get_response_body", "cdp_status"}
+    if _bug_mode:
         # The observation has to travel in the REDUCED system prompt: for Groq
         # reduced_messages() throws away llm_messages[0], so injecting there
         # looked like it worked while the model never saw a byte of it.
         try:
             _ok_c, _res_c = _call_tool("cdp_connect", {})
             if _ok_c:
+                # Open the page the report is ABOUT before reading anything.
+                # cdp_connect attaches to whatever tab is current, and after an
+                # earlier failed navigation that tab is
+                # "chrome-error://chromewebdata/" - so the pre-flight was
+                # reporting the console of Chrome's own error page. A URL in the
+                # message wins; otherwise the app under test.
+                _nav_note = ""
+                _url_m = re.search(r"https?://[^\s)\]>\"'<,]+", user_message or "")
+                _nav_url = (_url_m.group(0).rstrip(".,;:")
+                            if _url_m else _BUG_DEFAULT_URL)
+                if _nav_url:
+                    _ok_n, _res_n = _call_tool(
+                        "cdp_navigate",
+                        {"url": _nav_url, "wait": True, "wait_for": "load"})
+                    if _ok_n:
+                        _nav_note = "navigated: %s\n" % _nav_url
+                    else:
+                        _nav_note = ("navigate to %s FAILED: %s\n"
+                                     % (_nav_url, str(_res_n)[:180]))
                 _, _res_logs = _call_tool("cdp_console_logs", {})
                 _, _res_dom = _call_tool("cdp_dom_state", {})
                 _bug_obs = (
                     "[OBSERVED - already done in code, do NOT call cdp_connect, "
                     "cdp_console_logs or cdp_dom_state again]\n"
+                    + _nav_note +
                     "page: %s\n"
                     "console: %s"
                     % (_bug_dom_digest(_res_dom),
@@ -4467,7 +4564,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # 7000 ITPM cap and a ~151-token balance).
                         _budget = (GROQ_REDUCED_BUDGET if _pname == "Groq"
                                    else OPENROUTER_REDUCED_BUDGET)
-                        _base = (_bug_tool_pool() if _bug_mode
+                        _base = (_bug_tool_pool() if _bug_intent
                                  else _reduced_tool_pool(active_domain,
                                                          net_domain_schema or full_domain_schema))
                         msgs = _reduced_msgs(llm_messages)
@@ -4579,7 +4676,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                    else OPENROUTER_REDUCED_BUDGET)
                         fwd_msgs = _reduced_msgs(llm_messages)
                         fwd_schema = build_reduced_schema(
-                            _bug_tool_pool() if _bug_mode
+                            _bug_tool_pool() if _bug_intent
                             else _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
@@ -5166,6 +5263,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         if clean is None:
             clean = _final_answer(llm_messages, names, last_screen, active,
                                   user_message, chat_one=_chat_one)
+        # A bug report answered with tool meta or a single word is not an
+        # answer. This is the path the live "There are 9 CDP tools available."
+        # reply took: no FINAL marker, no grounded call, straight to Chris.
+        if _bug_re.search(user_message or "") and _bug_answer_is_useless(clean):
+            clean = _bug_evidence_reply(
+                _collect_tool_evidence(llm_messages),
+                "I could not write the fix summary: the model answered %r "
+                "instead of describing the page." % str(clean)[:60])
         with _AGENT_LOCK:
             _AGENT["last_reply"] = clean
         return clean
@@ -5212,6 +5317,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
         summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
+    if _bug_re.search(user_message or "") and _bug_answer_is_useless(summary):
+        summary = _bug_evidence_reply(
+            _collect_tool_evidence(llm_messages),
+            "I could not write the fix summary: the model answered %r instead "
+            "of describing the page." % str(summary)[:60])
     with _AGENT_LOCK:
         _AGENT["last_reply"] = summary
     return summary
@@ -10104,6 +10214,11 @@ _bug_re = re.compile(
 )
 
 
+# The page a bug report is assumed to be about when the message names no URL.
+# The Flutter app under test; override with ACESI_BUG_URL.
+_BUG_DEFAULT_URL = os.environ.get("ACESI_BUG_URL", "http://localhost:9999")
+
+
 def _bug_console_digest(text, limit=8, max_chars=600):
     """Only the lines that could be the bug: error-level output, not the
     Flutter/DDC bootstrap noise that fills a debug build's console."""
@@ -10123,7 +10238,14 @@ def _bug_dom_digest(text):
     url = re.search(r'"url"\s*:\s*"([^"]+)"', t)
     title = re.search(r'"title"\s*:\s*"([^"]+)"', t)
     if url:
-        return "%s (%s)" % ((title.group(1) if title else "?"), url.group(1))
+        _u = url.group(1)
+        if _u.startswith("chrome-error://"):
+            # Chrome's own error page. Saying "page: localhost (chrome-error://
+            # chromewebdata/)" invited the model to diagnose Chrome's error
+            # screen as if it were the app under test.
+            return ("NOT THE APP - the browser is on Chrome's error page "
+                    "(chrome-error://chromewebdata/); nothing loaded")
+        return "%s (%s)" % ((title.group(1) if title else "?"), _u)
     return t.replace("\n", " ")[:200]
 
 
