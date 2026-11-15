@@ -3311,13 +3311,6 @@ def _chat_providers(domain=""):
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
         ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
         ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-        ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-        ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
-                ("NVIDIA", NVIDIA_ENDPOINT, NVIDIA_API_KEY, NVIDIA_MODEL),
-                ("SambaNova", SAMBANOVA_ENDPOINT, SAMBANOVA_API_KEY, SAMBANOVA_MODEL),
-                ("GitHub", GITHUB_ENDPOINT, GITHUB_API_KEY, GITHUB_MODEL),
-        ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
-        ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL),
     ]
 
 
@@ -3540,6 +3533,14 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
         _prov_record(name, model, "nokey", "no API key configured for this provider")
         return None
     headers = {"Content-Type": "application/json"}
+    # Gemini's OpenAI-compat layer is strict about function_response shape:
+    # a tool message without a perfect pairing to the assistant's tool_calls
+    # gets rejected with 'function_response.name: Name cannot be empty'. The
+    # pre-flight already puts everything the model needs into the system prompt,
+    # so strip tool machinery from the history entirely for Gemini.
+    if name == "Gemini":
+        msgs = [m for m in (msgs or [])
+                if m.get("role") != "tool" and not m.get("tool_calls")]
     if api_key != "local":
         headers["Authorization"] = f"Bearer {api_key}"
     # Use a compact schema for Ollama: on this 2012-CPU box prefill is ~10 tok/s,
@@ -4725,7 +4726,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 got = None
                 tc = "required" if (_ui_task(user_message) and not names) else "auto"
                 # FORCE GROQ ONLY - Local models removed
-                providers = [("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL)]
+                providers = _chat_providers(active_domain)
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
@@ -5333,7 +5334,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                 elif isinstance(result, dict):
                                     s["view"] = result
                     llm_messages.append({"role": "tool", "tool_call_id": tcid,
-                                         "name": name, "content": str(result)[:4000]})
+                                         "name": run_name, "content": str(result)[:4000]})
                 # Detect unproductive re-querying: a research tool (web_search /
                 # webfetch / curl) called 3+ times with different arguments looks
                 # like a stall. BUT in a multi-part request ("search X, fetch Y,
@@ -10999,7 +11000,7 @@ _REDUCED_SCHEMA_FLOOR = 1200
 # Providers that get the reduced payload. Groq and OpenRouter are on free tiers
 # that reject the full prompt outright; Cerebras and FreeLLM are reached with the
 # full one and fall back reactively via the 413 handler in _chat_one.
-REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter"}
+REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter", "Gemini"}
 _REDUCED_ENV = os.environ.get("ACE_REDUCED_MODE", "")
 if _REDUCED_ENV:
     REDUCED_MODE_PROVIDERS = {p.strip() for p in _REDUCED_ENV.split(",") if p.strip()}
@@ -11236,7 +11237,7 @@ def _bug_tool_pool(pre_inspected=False):
     schema is binding.
     """
     keep = {"run_command", "read_file"}
-    drop = {"cdp_connect", "cdp_navigate"} if pre_inspected else set()
+    drop = {"cdp_navigate"} if pre_inspected else set()
     return [t for t in TOOLS_SCHEMA
             if (t["function"]["name"].startswith("cdp_")
                 or t["function"]["name"] in keep)
