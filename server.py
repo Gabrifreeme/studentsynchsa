@@ -5954,7 +5954,7 @@ def chat():
         if not os.path.isabs(file_path):
             # Try Documents folder first, then project directory
             doc_base = os.path.join(os.path.expanduser('~'), 'Documents')
-            proj_base = 'C:\\Users\\chris\\StudentSyncSA'
+            proj_base = 'C:\\Users\\chris\\LipSyncStudent'
             doc_path = os.path.join(doc_base, file_path)
             proj_path = os.path.join(proj_base, file_path)
             if os.path.exists(doc_path):

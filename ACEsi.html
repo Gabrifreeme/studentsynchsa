@@ -12333,9 +12333,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    window.socket = io();
+    if (!window.socket) {
+        window.socket = io();
+    }
     window.socket.on('ai_action', function(data) {
-      console.log("Real-time AI Action:", data);
+      console.log("Real-time AI Action (Global):", data);
       var statusBar = document.getElementById("ai-status-bar");
       if (statusBar) {
         var actionText = "ACEsi: " + data.tool;
