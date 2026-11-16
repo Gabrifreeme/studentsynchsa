@@ -8163,13 +8163,24 @@
           }
         });
       }
-      async function sendMessage() {
+      var currentAbortController = null;
+
+async function sendMessage() {
+        var sendBtn = document.querySelector('button[onclick="sendMessage()"]');
+
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+            if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
+            return;
+        }
 
         const input = document.getElementById("chat-input");
-
         const text = input.value.trim();
-
         if (!text) return;
+
+        currentAbortController = new AbortController();
+        if (sendBtn) { sendBtn.textContent = "Stop"; sendBtn.style.background = "#ff0000"; }
 
 
 
@@ -8222,6 +8233,8 @@
         input.value = "";
 
         chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
+        currentAbortController = null;
 
 
 
@@ -8229,6 +8242,15 @@
 
           var statusBar = document.getElementById("ai-status-bar");
 if (statusBar) { statusBar.textContent = "ACEsi is planning..."; statusBar.style.display = "block"; }
+          var sendBtn = document.querySelector('button[onclick="sendMessage()"]');
+          if (currentAbortController) {
+              currentAbortController.abort();
+              currentAbortController = null;
+              if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
+              return;
+          }
+          currentAbortController = new AbortController();
+          if (sendBtn) { sendBtn.textContent = "Stop"; sendBtn.style.background = "#ff0000"; }
 const res = await fetch("/chat", {
 
             method: "POST",
@@ -8237,6 +8259,7 @@ const res = await fetch("/chat", {
 
             body: JSON.stringify({ message: text }),
 
+            signal: currentAbortController.signal
           });
 
           const data = await res.json();
@@ -10954,7 +10977,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Ensure flex properties are set
 
-    chat.style.flex = '0 0 35%';
+    chat.style.flex = '0 0 40%';
 
     editorContainer.style.flex = '1';
 
