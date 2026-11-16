@@ -7420,6 +7420,7 @@
 
       /* ===== AutoFix diff view v2 ===== */
 
+
       window._autofix = { original: "", fixed: "" };
 
 
@@ -7657,6 +7658,18 @@
 
 
       function openAutoFix() {
+        // Apply diff colors
+        var leftEl = document.getElementById("autofix-original");
+        var rightEl = document.getElementById("autofix-code");
+        if (leftEl) {
+            leftEl.style.background = "rgba(255, 0, 0, 0.1)";
+            leftEl.style.borderRight = "2px solid #ff4444";
+        }
+        if (rightEl) {
+            rightEl.style.background = "rgba(0, 255, 0, 0.05)";
+            rightEl.style.borderLeft = "2px solid #44ff44";
+        }
+
 
         var el = document.getElementById("code-editor");
 
