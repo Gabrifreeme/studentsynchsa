@@ -16171,6 +16171,10 @@ def api_settings():
         # Persist the system prompt to the DB — read by prompt assembly via get_config('system_prompt').
         if data.get('system_prompt') is not None:
             set_config('system_prompt', str(data['system_prompt']))
+        if data.get('model') is not None:
+            set_config('model', str(data['model']))
+        if data.get('provider') is not None:
+            set_config('provider', str(data['provider']))
         # Persist API keys to .ace_keys.local so they take effect on server restart.
         # server.py reads these via _load_local_keys() at startup.
         key_map = {
@@ -16304,11 +16308,18 @@ def restart_server():
             "Start-Sleep -Seconds 2; & '%s'" % safe,
         ]
         try:
-            subprocess.Popen(cmd, cwd=root,
-                             creationflags=subprocess.CREATE_NO_WINDOW)
-            return jsonify({"status": "restarting", "via": "restart_server.ps1"})
+            # Spawn a detached PowerShell process that waits, kills this specific PID, and starts a new server
+            current_pid = os.getpid()
+            cmd_str = f"Start-Sleep -Seconds 2; Stop-Process -Id {current_pid} -Force -ErrorAction SilentlyContinue; Start-Process python -ArgumentList 'server.py' -WorkingDirectory '{root}'"
+            
+            subprocess.Popen(
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", cmd_str],
+                cwd=root,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            return jsonify({"status": "restarting", "via": "detached powershell"})
         except Exception as e:
-            print("[restart] ps1 failed (%s), falling back to .bat" % e)
+            print("[restart] detached spawn failed (%s)" % e)
     try:
         subprocess.Popen("restart_server.bat", shell=True,
                          creationflags=subprocess.CREATE_NEW_CONSOLE)
