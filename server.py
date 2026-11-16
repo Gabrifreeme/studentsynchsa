@@ -141,7 +141,6 @@ _LAST_TOKEN_USAGE = 0
 _DAILY_TOKEN_LIMIT = 200000
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-120b"
-_LAST_TOKEN_USAGE = 0
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
 # form and then reads the network panel instead of submitting, which prompting
 # did not fix. This is a config key, not a constant, so the model can be
@@ -5779,6 +5778,7 @@ def _youtube_reply(user_message):
 @app.route('/chat', methods=['POST'])
 @require_token
 def chat():
+    global _LAST_TOKEN_USAGE
     data = request.json
     user_message = data.get('message', '')
     requested_model = data.get('model', '')
@@ -6232,6 +6232,8 @@ def chat():
             if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
                 add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
+            _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
+            _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
             return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
         # Every provider failed. Say WHICH and WHY instead of the old opaque
         # "no models available", which made a rate limit indistinguishable from
