@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 
 <html lang="en">
 
@@ -141,6 +141,80 @@
         background: #000;
 
       }
+
+
+
+      /* Explorer header: "EXPLORER" on the left, problem count on the right */
+
+      #explorer-panel .panel-header {
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: space-between;
+
+        gap: 8px;
+
+      }
+
+      .explorer-badge {
+
+        display: none;
+
+        min-width: 18px;
+
+        padding: 0 6px;
+
+        border-radius: 9px;
+
+        font-family: monospace;
+
+        font-size: 11px;
+
+        font-weight: bold;
+
+        line-height: 18px;
+
+        text-align: center;
+
+        color: #fff;
+
+        background: #c62828;
+
+        cursor: pointer;
+
+        user-select: none;
+
+      }
+
+      #explorer .tree-row .problem-pill {
+
+        margin-left: auto;
+
+        padding: 0 5px;
+
+        border-radius: 8px;
+
+        font-family: monospace;
+
+        font-size: 10px;
+
+        font-weight: bold;
+
+        line-height: 14px;
+
+        color: #fff;
+
+        background: #c62828;
+
+      }
+
+      #explorer .tree-row .problem-pill[data-sev="warning"] { background: #b8860b; }
+
+      #explorer .tree-row .problem-pill[data-sev="info"] { background: #1f6feb; }
+
+      #explorer .tree-row.has-problems > .label { color: #ff7b72; }
 
 
 
@@ -5391,7 +5465,7 @@
 
       <div id="explorer-panel" class="panel">
 
-        <div class="panel-header">EXPLORER</div>
+        <div class="panel-header"><span>EXPLORER</span><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
 
         <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #333; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
 
@@ -5413,11 +5487,32 @@
 
     <script>
 
+  window.socket = io();
+  var currentAbortController = null;
+
       window.currentFile = null; // Track the currently opened file
 
       document.addEventListener("DOMContentLoaded", function () {
 
         loadExplorer();
+
+      });
+
+
+
+      document.addEventListener("DOMContentLoaded", function () {
+
+        var badge = document.getElementById("explorer-problems");
+
+        if (badge) {
+
+          badge.addEventListener("click", function () {
+
+            window.loadExplorerProblems(true);
+
+          });
+
+        }
 
       });
 
@@ -5898,7 +5993,7 @@
 
 
 
-      function explorerMakeRow(depth, kind, name, path, expanded, iconUrl) {
+      function explorerMakeRow(depth, kind, name, path, expanded, iconUrl, problems) {
 
         var row = document.createElement("div");
 
@@ -5969,6 +6064,10 @@
         label.textContent = name;
 
         row.appendChild(label);
+
+
+
+        explorerAttachProblemPill(row, problems);
 
 
 
@@ -6126,6 +6225,198 @@
 
 
 
+      /* ===== Explorer problem badge ===== */
+
+      function explorerProblemInfo(path) {
+
+        var raw = (window.ACE_PROBLEMS || {})[path];
+
+        if (!raw) return null;
+
+        var error = raw.error || 0;
+
+        var warning = raw.warning || 0;
+
+        var info = raw.info || 0;
+
+        var total = error + warning + info;
+
+        if (!total) return null;
+
+        return { error: error, warning: warning, info: info, total: total };
+
+      }
+
+      function explorerProblemSeverity(problems) {
+
+        return problems.error ? "error" : problems.warning ? "warning" : "info";
+
+      }
+
+      function explorerSubtreeProblems(node) {
+
+        var sum = { error: 0, warning: 0, info: 0, total: 0 };
+
+        (node.files || []).forEach(function (file) {
+
+          var p = explorerProblemInfo(file.path);
+
+          if (!p) return;
+
+          sum.error += p.error;
+
+          sum.warning += p.warning;
+
+          sum.info += p.info;
+
+          sum.total += p.total;
+
+        });
+
+        if (node.folders) {
+
+          node.folders.forEach(function (child) {
+
+            var c = explorerSubtreeProblems(child);
+
+            sum.error += c.error;
+
+            sum.warning += c.warning;
+
+            sum.info += c.info;
+
+            sum.total += c.total;
+
+          });
+
+        }
+
+        return sum;
+
+      }
+
+      function explorerAttachProblemPill(row, problems) {
+
+        if (!problems || !problems.total) return;
+
+        row.classList.add("has-problems");
+
+        var pill = document.createElement("span");
+
+        pill.className = "problem-pill";
+
+        pill.textContent = String(problems.total);
+
+        pill.dataset.sev = explorerProblemSeverity(problems);
+
+        pill.title =
+
+          problems.error + " error(s), " + problems.warning +
+
+          " warning(s), " + problems.info + " info";
+
+        row.appendChild(pill);
+
+      }
+
+      function explorerUpdateProblemBadge(data) {
+
+        var badge = document.getElementById("explorer-problems");
+
+        if (!badge) return;
+
+        var counts = data.counts || {};
+
+        var total = data.total || 0;
+
+        if (!total) {
+
+          badge.style.display = "none";
+
+          badge.textContent = "";
+
+          badge.removeAttribute("data-sev");
+
+          badge.title = data.running
+
+            ? "Scanning for problems..."
+
+            : "No problems detected - click to re-scan";
+
+          return;
+
+        }
+
+        badge.textContent = String(total);
+
+        badge.dataset.sev = counts.error
+
+          ? "error"
+
+          : counts.warning
+
+            ? "warning"
+
+            : "info";
+
+        badge.style.display = "inline-block";
+
+        badge.title =
+
+          (counts.error || 0) + " error(s), " + (counts.warning || 0) +
+
+          " warning(s), " + (counts.info || 0) + " info - click to re-scan";
+
+      }
+
+      window.loadExplorerProblems = async function (force) {
+
+        clearTimeout(window._aceProblemsTimer);
+
+        try {
+
+          var response = await fetch(
+
+            "/api/problems" + (force ? "?refresh=1" : ""),
+
+            { cache: "no-store" },
+
+          );
+
+          if (!response.ok) throw new Error("HTTP " + response.status);
+
+          var data = await response.json();
+
+          window.ACE_PROBLEMS = data.files || {};
+
+          explorerUpdateProblemBadge(data);
+
+          if (window.ACE_EXPLORER_TREE) {
+
+            explorerRenderTree(window.ACE_EXPLORER_TREE);
+
+          }
+
+          if (data.running) {
+
+            window._aceProblemsTimer = setTimeout(function () {
+
+              window.loadExplorerProblems(false);
+
+            }, 3500);
+
+          }
+
+          return data;
+
+        } catch (e) {
+
+          console.warn("Problems: " + e.message);
+
+        }
+
+      };
+
       function explorerRenderTree(tree) {
 
         var explorerDiv = document.getElementById("explorer");
@@ -6186,6 +6477,8 @@
 
               explorerFolderIconUrl(iconName, expanded),
 
+              explorerSubtreeProblems(node.folders.get(name)),
+
             );
 
             row.addEventListener("click", function () {
@@ -6230,6 +6523,8 @@
 
               explorerFileIconUrl(file.name),
 
+              explorerProblemInfo(file.path),
+
             );
 
             row.addEventListener("click", function () {
@@ -6261,6 +6556,8 @@
           rootExpanded,
 
           explorerFolderIconUrl(EXPLORER_ROOT_ICON, rootExpanded),
+
+          explorerSubtreeProblems(tree),
 
         );
 
@@ -6413,6 +6710,14 @@
           explorerDiv.dataset.fileCount = String(files.length);
 
           console.log("Explorer: refreshed, " + files.length + " files");
+
+
+
+          if (typeof window.loadExplorerProblems === "function") {
+
+            window.loadExplorerProblems(true);
+
+          }
 
         } catch (e) {
 
@@ -7419,6 +7724,7 @@
       })();
 
       /* ===== AutoFix diff view v2 ===== */
+
 
 
       window._autofix = { original: "", fixed: "" };
@@ -11246,7 +11552,8 @@ window.checkSyntax = function(filename) {
 
 
 
-window.initAceTerminalFn = function() {    var termContainer = document.getElementById('terminal-output');
+window.initAceTerminalFn = function() {
+    var termContainer = document.getElementById('terminal-output');
 
     if (!termContainer) {
 
@@ -11256,234 +11563,23 @@ window.initAceTerminalFn = function() {    var termContainer = document.getEleme
 
     }
 
+    // The plain-DOM terminal is rendered by the DOMContentLoaded handler
+    // further down; this function only focuses it when the panel is opened.
 
+    var termInput = document.getElementById('term-input');
 
-    // Replace the content with an xterm container
+    if (termInput) {
 
-    termContainer.innerHTML = '';
-
-    termContainer.style.padding = '0';
-
-    termContainer.style.background = '#000';
-
-    termContainer.style.display = 'block';
-
-    termContainer.style.width = '100%';
-
-    termContainer.style.height = '100%';
-
-
-
-    var term = new Terminal({
-
-        scrollback: 2000,
-
-        cursorBlink: true,
-
-        rows: 24,
-
-        cols: 80,
-
-        scrollback: 2000,
-
-        fontSize: 12,
-
-        fontFamily: 'Consolas, monospace',
-
-        theme: {
-
-            background: '#000000',
-
-            foreground: '#ff9d00',
-
-            cursor: '#ff9d00',
-
-            selection: '#333333'
-
-        }
-
-    });
-
-    var fitAddon = new FitAddon.FitAddon();
-
-    term.loadAddon(fitAddon); window.termFitAddon = fitAddon; window.term = term;
-
-
-
-    term.open(termContainer);
-    // Allow right-click for paste
-    termContainer.addEventListener('contextmenu', function(e) { e.stopPropagation(); });
-    // Auto-scroll to bottom on new output
-    var originalWrite = term.write.bind(term);
-    term.write = function(data) {
-        originalWrite(data);
-        term.scrollToBottom();
-    };
-
-    setTimeout(function() {
-
-        var xterm = termContainer.querySelector('.xterm');
-
-        var screen = termContainer.querySelector('.xterm-screen');
-
-        var rows = termContainer.querySelector('.xterm-rows');
-
-        if (xterm) { xterm.style.position = 'absolute'; xterm.style.top = '0'; xterm.style.left = '0'; xterm.style.padding = '0'; xterm.style.margin = '0'; }
-
-        if (screen) { screen.style.position = 'absolute'; screen.style.top = '0'; screen.style.left = '0'; screen.style.textAlign = 'left'; }
-
-        if (rows) { rows.style.textAlign = 'left'; }
-
-        term.refresh(0, term.rows - 1);
-
-    }, 150);
-
-    // REMOVED by Claude fix: padding set via CSS instead
-
-    termContainer.style.textAlign = 'left';
-
-    setTimeout(function() { try { if (termContainer.offsetHeight > 0) { fitAddon.fit(); if (window.socket) window.socket.emit('terminal_resize', { rows: term.rows, cols: term.cols }); } term.focus(); } catch(e) {} }, 100);
-
-
-
-    // Socket init moved to global scope
-
-
-
-    window.socket.on('connect', function() {
-
-        term.writeln('\x1b[33mACEsi Terminal connected.\x1b[0m');
-
-        try { fitAddon.fit(); } catch(e) {}
-
-        var dims = { rows: term.rows, cols: term.cols };
-
-        socket.emit('terminal_resize', dims);
-
-    });
-
-
-
-    socket.on('terminal_output', function(data) {
-        if (window._blockOutput) { return; }
-        if (window._blockOutput) { return; }
-        // Detect heartbeat frames and add a green tick
-        if (/\[SERVER\]\s*[\/_|\\]/.test(data)) {
-            data = data.replace(/(\[SERVER\])\s*([\/_|\\])/, '$1 $2 \x1b[32m\u2705\x1b[0m');
-        }
-        term.write(data);
-    });
-
-
-
-    // Force fit on any resize
-
-    if (window.ResizeObserver) {
-
-        var resizeObs = new ResizeObserver(function() {
-
-            if (window.termFitAddon) {
-
-                try { window.termFitAddon.fit(); } catch(e) {}
-
-            }
-
-        });
-
-        resizeObs.observe(termContainer);
+        setTimeout(function() { termInput.focus(); }, 50);
 
     }
-
-
-
-    // Force fit on any resize
-
-    if (window.ResizeObserver) {
-
-        var resizeObs = new ResizeObserver(function() {
-
-            if (window.termFitAddon) {
-
-                try { window.termFitAddon.fit(); } catch(e) {}
-
-            }
-
-        });
-
-        resizeObs.observe(termContainer);
-
-    }
-
-
-
-    socket.on('disconnect', function() {
-
-        term.writeln('\x1b[31mDisconnected.\x1b[0m');
-
-    });
-
-
-
-    // Send keystrokes to backend
-
-    var _buf = '';
-    termContainer.addEventListener('paste', function(e) {
-        e.preventDefault();
-        var text = (e.clipboardData || window.clipboardData).getData('text');
-        if (text) {
-            _buf += text;
-            term.write(text);
-        }
-    });
-    window._aceBuf = '';
-    term.onData(function(data) {
-        // Handle Ctrl+C explicitly
-        if (data === '\x03') {
-            socket.emit('terminal_input', '\x03');
-            term.write('^C\r\n');
-            window._aceBuf = '';
-            // Mute incoming logs for 2 seconds to let things settle
-            window._blockOutput = true;
-            // Print the prompt once
-            term.write('C:\\Users\\chris\\LipSyncStudent> ');
-            window._blockOutput = true;
-            return;
-        }
-        if (data === '\r') {
-            window._blockOutput = false;
-            if (window.term) { window.term.options.scrollback = 2000; }
-            if (window._aceBuf.length > 0) {
-                socket.emit('terminal_input', window._aceBuf);
-                window._aceBuf = '';
-            }
-        } else if (data === '\x7f' || data === '\x08') {
-            if (window._aceBuf.length > 0) {
-                window._aceBuf = window._aceBuf.slice(0, -1);
-                term.write('\b \b');
-            }
-        } else {
-            window._aceBuf += data;
-            term.write(data);
-        }
-    });
-
-
-
-    // Handle resize
-
-    window.addEventListener('resize', function() {
-
-        try {
-
-            fitAddon.fit();
-
-            socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
-
-        } catch(e) {}
-
-    });
 
 };
+
+
+
+
+
 
 </script>
 
@@ -12463,11 +12559,48 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateTokenDisplay, 5000);
 });
 </script>
-</body>
 
-</html>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var termOutput = document.getElementById("terminal-output");
+    if (termOutput) {
+        termOutput.innerHTML = '<div id="term-history" style="white-space: pre-wrap; font-family: monospace; color: #ff9d00; padding: 10px; height: 100%; overflow-y: auto;"></div><div style="display:flex; padding: 0 10px;"><span style="color:#ff9d00; font-family: monospace;">PS C:\\Users\\chris\\LipSyncStudent&gt;&nbsp;</span><input id="term-input" type="text" style="flex:1; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off"></div>';
+        
+        var termInput = document.getElementById("term-input");
+        var termHistory = document.getElementById("term-history");
+
+        termInput.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                var cmd = termInput.value.trim();
+                if (!cmd) return;
+                termInput.value = "";
+                
+                termHistory.innerHTML += '<div>PS C:\\Users\\chris\\LipSyncStudent&gt; ' + cmd + '</div>';
+                termHistory.scrollTop = termHistory.scrollHeight;
+
+                fetch('/api/system/exec', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    var out = data.stdout || "";
+                    if (data.stderr) out += "\n" + data.stderr;
+                    if (!out) out = "[No output]";
+                    termHistory.innerHTML += '<div style="white-space: pre-wrap;">' + out + '</div>';
+                    termHistory.scrollTop = termHistory.scrollHeight;
+                })
+                .catch(err => {
+                    termHistory.innerHTML += '<div style="color:red;">Error: ' + err.message + '</div>';
+                });
+            }
+        });
+
+        setTimeout(function() { termInput.focus(); }, 500);
+     }   
+  });
 </script>
 </body>
 
 </html>
-
