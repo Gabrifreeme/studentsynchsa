@@ -137,6 +137,8 @@ def _load_local_keys():
         return {}
     return {}
 
+_LAST_TOKEN_USAGE = 0
+_DAILY_TOKEN_LIMIT = 1000000
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-120b"
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
@@ -3679,6 +3681,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                       % (name, model, _pt, _cached, _pct,
                          _u.get("completion_tokens")))
                 _cache_record(_pt, _cached)
+            global _LAST_TOKEN_USAGE
+            _LAST_TOKEN_USAGE = (_u.get("prompt_tokens") or 0) + (_u.get("completion_tokens") or 0)
             if attempt > 1:
                 print("✅ %s recovered on attempt %d (max_tokens=%d)"
                       % (name, attempt, max_tokens))
@@ -5990,8 +5994,9 @@ def chat():
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
             LAST_FILE_PATH = file_path
+            socketio.emit('ai_action', {'tool': 'read_file', 'path': file_path})
             # If the user said "open", physically launch the file (default viewer)
-            if is_open:
+            if False:
                 os.startfile(file_path)
                 print(f"🖥️ Opened file in default viewer: {file_path}")
             # Include file content in the message sent to LLM
@@ -6411,6 +6416,16 @@ def _ide_path(rel):
             return lib_full
     return full
 
+
+@app.route('/api/ai/usage', methods=['GET'])
+@require_token
+def api_ai_usage():
+    return jsonify({
+        'ok': True,
+        'model': GROQ_MODEL,
+        'last_total_tokens': _LAST_TOKEN_USAGE,
+        'limit': _DAILY_TOKEN_LIMIT
+    })
 
 @app.route('/api/files', methods=['GET'])
 @require_token
@@ -10115,7 +10130,7 @@ NET_TOOLS_SCHEMA = [
         "description": "Current weather for a city. Args: city.",
         "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": []}}},
     {"type": "function", "function": {"name": "read_file",
-        "description": "Read a file's contents (path relative to DATA_DIR). Args: path.",
+        "description": "Read a file's contents. The 'path' argument MUST be exactly the file path (e.g. 'src/main.tsx' or 'lib/main.tsx'). Do NOT include any other words from the user's message in the path.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "write_file",
         "description": "Write/overwrite a file (path relative to DATA_DIR). Args: path, content.",
@@ -13689,6 +13704,9 @@ def run_agent(user_message):
                         print("⛔ %s skipped, user aborted" % name, flush=True)
                         break
                     tcid = "call_%d_%d" % (i, j)
+                    # Broadcast tool action to frontend for real-time UI
+                    _act_path = args.get('path') or args.get('file') or args.get('filename') or ''
+                    socketio.emit('ai_action', {'tool': name, 'path': _act_path})
                     if name not in TOOLS:
                         sid = _agent_next_id()
                         with _AGENT_LOCK:
