@@ -6232,7 +6232,7 @@ def chat():
             if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
                 add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
-            _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
+            # Token usage updated by llm_reply
             _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
             return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
         # Every provider failed. Say WHICH and WHY instead of the old opaque
