@@ -6356,9 +6356,7 @@
 
           };
 
-          var lib = { name: "lib", folders: new Map(), files: [] };
-
-          tree.folders.set("lib", lib);
+          var lib = tree;
 
 
 
@@ -8150,10 +8148,13 @@
           // Try to highlight and open the file in the Explorer
           if (data.path) {
             var cleanPath = data.path.replace(/\\/g, '/');
+        if (cleanPath.startsWith('C:/Users/chris/LipSyncStudent/')) {
+            cleanPath = cleanPath.replace('C:/Users/chris/LipSyncStudent/', '');
+        }
             var rows = document.querySelectorAll('#explorer .tree-row');
             for (var i = 0; i < rows.length; i++) {
                 var label = rows[i].querySelector('.label');
-                if (label && label.textContent.trim() === cleanPath.split('/').pop()) {
+                if (label && label.textContent.trim() === cleanPath.split(/[\\/]/).pop()) {
                     // We found the row, simulate a click
                     rows[i].click();
                     break;
@@ -12337,7 +12338,8 @@ document.addEventListener('DOMContentLoaded', function() {
         window.socket = io();
     }
     window.socket.on('ai_action', function(data) {
-      console.log("Real-time AI Action (Global):", data);
+      console.log("Raw data:", JSON.stringify(data));
+      if (!data) return;
       var statusBar = document.getElementById("ai-status-bar");
       if (statusBar) {
         var actionText = "ACEsi: " + data.tool;
@@ -12346,18 +12348,50 @@ document.addEventListener('DOMContentLoaded', function() {
         statusBar.style.display = "block";
       }
       if (data.path) {
-        var cleanPath = data.path.replace(/\\/g, '/');
-        var rows = document.querySelectorAll('#explorer .tree-row');
-        for (var i = 0; i < rows.length; i++) {
-            var label = rows[i].querySelector('.label');
-            if (label && label.textContent.trim() === cleanPath.split('/').pop()) {
-                rows[i].click();
-                break;
-            }
+
+        var finalPath = data.path.replace(/\\/g, "/");
+
+        // Remove the absolute root prefix
+
+        var prefix = "C:/Users/chris/LipSyncStudent/";
+
+        if (finalPath.indexOf(prefix) === 0) {
+
+          finalPath = finalPath.substring(prefix.length);
+
         }
+
+        console.log("Loading file:", finalPath);
+
+        fetch("/api/file-content?path=" + encodeURIComponent(finalPath))
+
+          .then(function(r) { return r.text(); })
+
+          .then(function(text) {
+
+            console.log("File content received, length:", text.length);
+
+            if (window.loadFile) {
+
+                window.loadFile(finalPath);
+
+            } else {
+
+                console.error("loadFile not found!");
+
+            }
+          });
+
       }
+
     });
+
   });
+
+</script>
+</body>
+
+</html>
 </script>
 </body>
 

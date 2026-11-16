@@ -5962,6 +5962,15 @@ def chat():
             elif os.path.exists(proj_path):
                 file_path = proj_path
             else:
+                # Try to find the file anywhere in the project if the user just gave a filename
+                found = False
+                for root, dirs, files in os.walk(proj_base):
+                    if file_path in files:
+                        file_path = os.path.join(root, file_path)
+                        found = True
+                        break
+                if not found:
+                    pass
                 # Try common extensions against both bases
                 for ext in COMMON_EXTS:
                     if os.path.exists(doc_path + ext):
