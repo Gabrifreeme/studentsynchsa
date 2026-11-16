@@ -87,7 +87,7 @@ handler.setFormatter(logging.Formatter('%(message)s'))
 werkzeug_logger.addHandler(handler)
 werkzeug_logger.propagate = False
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Load provider keys from a gitignored .env without requiring python-dotenv.
 # Real environment variables always win, so this is only a local convenience.
