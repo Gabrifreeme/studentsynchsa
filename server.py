@@ -138,9 +138,10 @@ def _load_local_keys():
     return {}
 
 _LAST_TOKEN_USAGE = 0
-_DAILY_TOKEN_LIMIT = 1000000
+_DAILY_TOKEN_LIMIT = 200000
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-120b"
+_LAST_TOKEN_USAGE = 0
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
 # form and then reads the network panel instead of submitting, which prompting
 # did not fix. This is a config key, not a constant, so the model can be
@@ -3681,8 +3682,7 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
                       % (name, model, _pt, _cached, _pct,
                          _u.get("completion_tokens")))
                 _cache_record(_pt, _cached)
-            global _LAST_TOKEN_USAGE
-            _LAST_TOKEN_USAGE = (_u.get("prompt_tokens") or 0) + (_u.get("completion_tokens") or 0)
+            _LAST_TOKEN_USAGE = _u.get("total_tokens", 0)
             if attempt > 1:
                 print("✅ %s recovered on attempt %d (max_tokens=%d)"
                       % (name, attempt, max_tokens))
@@ -6435,6 +6435,7 @@ def api_ai_usage():
         'last_total_tokens': _LAST_TOKEN_USAGE,
         'limit': _DAILY_TOKEN_LIMIT
     })
+
 
 @app.route('/api/files', methods=['GET'])
 @require_token
@@ -9403,9 +9404,16 @@ def tool_list_email_rules():
     return True, "\n".join(lines)
 
 
+def tool_trigger_auto_fix(path):
+    if _kill_armed():
+        return False, "E-STOP is armed — no file tools."
+    socketio.emit('ai_action', {'tool': 'trigger_auto_fix', 'path': path})
+    return True, "Auto Fix triggered for %s" % path
+
 TOOLS = {
     "list_files": (tool_list_files, ("path",)),
     "read_file": (tool_read_file, ("path",)),
+    "trigger_auto_fix": (tool_trigger_auto_fix, ("path",)),
     "list_user_files": (tool_list_user_files, ("path",)),
     "read_user_file": (tool_read_user_file, ("path",)),
     "open_user_file": (tool_open_user_file, ("path",)),
@@ -9475,6 +9483,9 @@ TOOLS = {
 TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "list_files",
         "description": "List files/dirs in a directory. Args: path (dir to list).",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "trigger_auto_fix",
+        "description": "Open the Auto Fix UI for a file so the user can review and apply fixes.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "read_file",
         "description": "Read a file's contents. Args: path.",
@@ -11019,7 +11030,7 @@ OPENROUTER_REDUCED_BUDGET = 3000
 # producing a schema that can no longer finish the task. Below this floor the
 # budget stops being a target, and the total lands where the required set puts
 # it (~1900-2200). That is still ~3x under Groq's measured 7000 ITPM cap.
-_REDUCED_SCHEMA_FLOOR = 1200
+_REDUCED_SCHEMA_FLOOR = 3500
 
 # Providers that get the reduced payload. Groq and OpenRouter are on free tiers
 # that reject the full prompt outright; Cerebras and FreeLLM are reached with the
@@ -14005,6 +14016,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
     tools_schema = _fit_schema_to_budget(messages, tools_schema, max_tokens)
 
     def one(name, endpoint, api_key, model):
+        global _LAST_TOKEN_USAGE
         if not api_key:
             return None
         # Free tiers cap INPUT TOKENS PER MINUTE (Groq ITPM = 7000). A multi-turn

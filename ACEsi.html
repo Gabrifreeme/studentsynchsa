@@ -12362,15 +12362,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log("File content received, length:", text.length);
 
-            if (window.loadFile) {
-
-                window.loadFile(finalPath);
-
-            } else {
-
-                console.error("loadFile not found!");
-
+            // 1. Expand the tree to the file's folder
+            if (window.ACE_EXPLORER_EXPANDED && window.ACE_EXPLORER_TREE) {
+                var parts = finalPath.split("/");
+                var currentPath = "";
+                for (var i = 0; i < parts.length - 1; i++) {
+                    currentPath = currentPath ? currentPath + "/" + parts[i] : parts[i];
+                    window.ACE_EXPLORER_EXPANDED.add(currentPath);
+                }
+                if (typeof explorerRenderTree === "function") {
+                    explorerRenderTree(window.ACE_EXPLORER_TREE);
+                }
             }
+
+            // 2. Load the file in the editor
+            if (window.loadFile) {
+                window.loadFile(finalPath);
+            }
+
+            // 3. Highlight the row in the explorer
+            setTimeout(function() {
+                var rows = document.querySelectorAll("#explorer .tree-row");
+                for (var i = 0; i < rows.length; i++) {
+                    var label = rows[i].querySelector(".label");
+                    if (label && label.textContent.trim() === finalPath.split("/").pop()) {
+                        rows[i].classList.add("selected");
+                        break;
+                    }
+                }
+                // Trigger Auto Fix automatically if the file looks broken
+                if (window.openAutoFix) {
+                    window.openAutoFix();
+                }
+            }, 300);
           });
 
       }
