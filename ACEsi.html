@@ -4860,7 +4860,33 @@
 
           <div id="line-numbers">1</div>
 
-          <div id="ai-status-bar" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); padding: 8px 16px; font-size: 14px; font-weight: bold; color: #000; background: #ff9d00; border-radius: 4px; z-index: 9999; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.5);">ACEsi is thinking...</div>
+          <div
+            id="ai-status-bar"
+            style="
+              position: absolute;
+              top: 10px;
+              left: 50%;
+              transform: translateX(-50%);
+              min-width: 380px;
+              max-width: 70%;
+              padding: 8px 12px;
+              font-family: &quot;Roboto Mono&quot;, monospace;
+              font-size: 11px;
+              font-weight: normal;
+              color: #ff9d00;
+              background: #0a0a0a;
+              border: 1px solid #ff9d00;
+              border-radius: 4px;
+              z-index: 9999;
+              display: none;
+              box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+              white-space: pre-wrap;
+              line-height: 1.6;
+            "
+          >
+            <div id="live-history" style="color: #a06a00"></div>
+            <div id="live-line"></div>
+          </div>
 
           <div id="editor-area">
 
@@ -8873,13 +8899,7 @@
       
       if (window.socket) {
         window.socket.on('ai_action', function(data) {
-          var statusBar = document.getElementById("ai-status-bar");
-          if (statusBar) {
-            var actionText = "ACEsi: " + data.tool;
-            if (data.path) actionText += " (" + data.path + ")";
-            statusBar.textContent = actionText;
-            statusBar.style.display = "block";
-          }
+          if (window.pushLiveActivity) window.pushLiveActivity(data.tool, data.path);
 
           // Try to highlight and open the file in the Explorer
           if (data.path) {
@@ -8899,6 +8919,177 @@
           }
         });
       }
+      /* ===== Live tool activity readout =====
+         The server already records every tool call as a work-step in
+         /opencode/status. Poll that while a chat is in flight and turn the
+         terse step text ("grep . — auth") into a sentence, so the old static
+         "thinking" flash becomes a live activity readout. */
+      (function () {
+        var FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        var frame = 0;
+        var frameTimer = null, pollTimer = null, endTimer = null;
+        var running = false, current = "", historyLines = [], lastSteps = [];
+
+        function el(id) { return document.getElementById(id); }
+
+        function shortPath(p) {
+          p = String(p || "").replace(/\\/g, "/");
+          var root = "C:/Users/chris/LipSyncStudent/";
+          var i = p.indexOf(root);
+          return i >= 0 ? p.slice(i + root.length) : p;
+        }
+
+        function split(text) {
+          var t = String(text || "").trim();
+          var i = t.indexOf(" ");
+          return {
+            tool: i < 0 ? t : t.slice(0, i),
+            arg: (i < 0 ? "" : t.slice(i + 1)).replace(/^`|`$/g, "").trim()
+          };
+        }
+
+        function phrase(text, done) {
+          var p = split(text), tool = p.tool, a = p.arg;
+          var needle = a;
+          if (tool === "grep" && a.indexOf("—") >= 0) needle = a.split("—").pop().trim();
+
+          if (tool === "grep")
+            return done ? "searched for *" + needle + "*." : "Searching files matching *" + needle + "*...";
+          if (tool === "list_files" || tool === "list_user_files")
+            return done ? "listed " + (a || "files") + "." : "Listing files in " + (a || "the project") + "...";
+          if (tool === "read_file" || tool === "read_user_file" ||
+              tool === "view_user_file" || tool === "open_user_file")
+            return done ? "read " + shortPath(a) + "." : "Reading " + shortPath(a) + "...";
+          if (tool === "edit_file")
+            return done ? "updated " + shortPath(a) + "." : "Editing " + shortPath(a) + "...";
+          if (tool === "write_file")
+            return done ? "wrote " + shortPath(a) + "." : "Writing " + shortPath(a) + "...";
+          if (tool === "run_command")
+            return done ? "ran " + a + "." : "Running " + a + "...";
+          if (tool === "web_search")
+            return done ? "searched the web." : "Searching the web for " + a + "...";
+          if (tool === "webfetch")
+            return done ? "fetched " + a + "." : "Fetching " + a + "...";
+          if (tool === "git_commit")
+            return done ? "committed the changes." : "Committing changes...";
+          if (tool === "cdp_navigate")
+            return done ? "opened " + a + "." : "Opening " + a + "...";
+          if (tool.indexOf("ui_") === 0)
+            return done ? "finished a device action." : "Working with the device...";
+          return done ? "finished " + tool + "." : (a ? tool + " " + a + "..." : tool + "...");
+        }
+
+        function render(glyph, line) {
+          var bar = el("ai-status-bar");
+          if (!bar) return;
+          bar.style.display = "block";
+          var hist = el("live-history");
+          var cur = el("live-line");
+          if (hist) hist.textContent = historyLines.join("\n");
+          if (cur) cur.textContent = glyph + " " + line;
+        }
+
+        function renderRunning() {
+          render(FRAMES[frame % FRAMES.length], current);
+        }
+
+        function applySteps(steps, activity) {
+          lastSteps = steps || [];
+          var active = null;
+          for (var i = lastSteps.length - 1; i >= 0; i--) {
+            if (lastSteps[i].state === "running") { active = lastSteps[i]; break; }
+          }
+          // No tool in flight: the model is either reasoning or composing the
+          // final reply, both of which read better than a bare "thinking".
+          current = active
+            ? phrase(active.text || "", false)
+            : (activity === "done" ? "Writing the response..." : "Thinking through your request...");
+
+          historyLines = lastSteps
+            .filter(function (s) { return s.state === "done" || s.state === "error"; })
+            .slice(-3)
+            .map(function (s) {
+              return (s.state === "error" ? "✖ " : "✔ ") +
+                     phrase(s.text || "", s.state === "done");
+            });
+          renderRunning();
+        }
+
+        function poll() {
+          return fetch("/opencode/status")
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (running) applySteps(d.steps || [], d.activity); })
+            .catch(function () {});
+        }
+
+        window.startLiveActivity = function () {
+          clearTimeout(endTimer);
+          running = true;
+          frame = 0;
+          current = "Thinking through your request...";
+          historyLines = [];
+          lastSteps = [];
+          renderRunning();
+          poll();
+          clearInterval(pollTimer);
+          pollTimer = setInterval(poll, 350);
+          clearInterval(frameTimer);
+          frameTimer = setInterval(function () { frame++; renderRunning(); }, 90);
+        };
+
+        window.stopLiveActivity = function (glyph, message) {
+          running = false;
+          clearInterval(pollTimer);
+          clearInterval(frameTimer);
+          pollTimer = frameTimer = null;
+
+          function finish() {
+            var doneMsg = message;
+            if (!doneMsg) {
+              // Prefer the last edit/write, so the readout ends with the file
+              // ACEsi actually changed ("Done - updated src/.../auth.ts.").
+              var edit = null, any = null;
+              lastSteps.forEach(function (s) {
+                if (s.state !== "done") return;
+                any = s;
+                if (/^(edit_file|write_file) /.test(String(s.text || ""))) edit = s;
+              });
+              var pick = edit || any;
+              doneMsg = pick ? "Done — " + phrase(pick.text || "", true) : "Done.";
+            }
+            render(glyph || "✔", doneMsg);
+
+            clearTimeout(endTimer);
+            endTimer = setTimeout(function () {
+              var bar = el("ai-status-bar");
+              if (bar) bar.style.display = "none";
+            }, 2800);
+          }
+
+          if (message) { finish(); return; }
+
+          // The response can arrive before the last step flips from running to
+          // done. One settled read keeps the final line accurate.
+          fetch("/opencode/status")
+            .then(function (r) { return r.json(); })
+            .then(function (d) { lastSteps = d.steps || []; finish(); })
+            .catch(finish);
+        };
+
+        // Socket events also fire outside /chat (e.g. auto-fix). Show them
+        // briefly without hijacking an active chat readout.
+        window.pushLiveActivity = function (tool, path) {
+          if (running) return;
+          current = phrase(String(tool || "") + (path ? " " + path : ""), false);
+          render(FRAMES[frame++ % FRAMES.length], current);
+          clearTimeout(endTimer);
+          endTimer = setTimeout(function () {
+            var bar = el("ai-status-bar");
+            if (bar) bar.style.display = "none";
+          }, 1800);
+        };
+      })();
+
       var currentAbortController = null;
 
 async function sendMessage() {
@@ -8975,8 +9166,7 @@ async function sendMessage() {
 
         try {
 
-          var statusBar = document.getElementById("ai-status-bar");
-if (statusBar) { statusBar.textContent = "ACEsi is planning..."; statusBar.style.display = "block"; }
+          startLiveActivity();
 const res = await fetch("/chat", {
 
             method: "POST",
@@ -8990,7 +9180,7 @@ const res = await fetch("/chat", {
 
           const data = await res.json();
           console.log("ACEsi raw response:", data);
-if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { statusBar.textContent = ""; statusBar.style.display = "none"; }, 1500); }
+stopLiveActivity();
 
           const aiReply = data.reply;
 
@@ -9120,7 +9310,7 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
           // error, so do not print a red "Server error" line for it.
           if (e && e.name === "AbortError") {
 
-            if (statusBar) { statusBar.textContent = "Stopped."; setTimeout(function() { statusBar.textContent = ""; statusBar.style.display = "none"; }, 1500); }
+            stopLiveActivity("■", "Stopped.");
 
           } else {
 
@@ -13029,13 +13219,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.socket.on('ai_action', function(data) {
       console.log("Raw data:", JSON.stringify(data));
       if (!data) return;
-      var statusBar = document.getElementById("ai-status-bar");
-      if (statusBar) {
-        var actionText = "ACEsi: " + data.tool;
-        if (data.path) actionText += " (" + data.path + ")";
-        statusBar.textContent = actionText;
-        statusBar.style.display = "block";
-      }
+      if (window.pushLiveActivity) window.pushLiveActivity(data.tool, data.path);
       if (data.path) {
 
         var finalPath = data.path.replace(/\\/g, "/");
