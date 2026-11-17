@@ -8925,7 +8925,14 @@
         var frame = 0;
         var frameTimer = null, pollTimer = null;
         var running = false, current = "", historyLines = [], lastSteps = [];
-        var liveSeq = [0], activeRowId = null;
+        var liveSeq = [0], activeRowId = null, startedAt = 0;
+        // Keep the readout on screen long enough to read. This is display-only;
+        // it does not slow down the server or the request.
+        var MIN_VISIBLE_MS = 1500;
+        try {
+          var savedMs = parseInt(localStorage.getItem("ace_live_min_ms"), 10);
+          if (savedMs >= 600 && savedMs <= 10000) MIN_VISIBLE_MS = savedMs;
+        } catch (e) {}
 
         function el(id) { return document.getElementById(id); }
 
@@ -9040,7 +9047,7 @@
 
           historyLines = lastSteps
             .filter(function (s) { return s.state === "done" || s.state === "error"; })
-            .slice(-3)
+            .slice(-8)
             .map(function (s) {
               return (s.state === "error" ? "✖ " : "✔ ") +
                      phrase(s.text || "", s.state === "done");
@@ -9058,6 +9065,7 @@
         window.startLiveActivity = function () {
           running = true;
           frame = 0;
+          startedAt = Date.now();
           current = "Thinking through your request...";
           historyLines = [];
           lastSteps = [];
@@ -9076,34 +9084,46 @@
           clearInterval(frameTimer);
           pollTimer = frameTimer = null;
 
-          function finish() {
-            var doneMsg = message;
-            if (!doneMsg) {
-              // Prefer the last edit/write, so the readout ends with the file
-              // ACEsi actually changed ("Done - updated src/.../auth.ts.").
-              var edit = null, any = null;
-              lastSteps.forEach(function (s) {
-                if (s.state !== "done") return;
-                any = s;
-                if (/^(edit_file|write_file) /.test(String(s.text || ""))) edit = s;
-              });
-              var pick = edit || any;
-              doneMsg = pick ? "Done — " + phrase(pick.text || "", true) : "Done.";
+          return new Promise(function (resolve) {
+            function finish() {
+              var doneMsg = message;
+              if (!doneMsg) {
+                // Prefer the last edit/write, so the readout ends with the file
+                // ACEsi actually changed ("Done - updated src/.../auth.ts.").
+                var edit = null, any = null;
+                lastSteps.forEach(function (s) {
+                  if (s.state !== "done") return;
+                  any = s;
+                  if (/^(edit_file|write_file) /.test(String(s.text || ""))) edit = s;
+                });
+                var pick = edit || any;
+                doneMsg = pick ? "Done — " + phrase(pick.text || "", true) : "Done.";
+              }
+              // Keep the row in the chat as a finished record. Stop uses red,
+              // normal completion green — both scroll up with the conversation.
+              render(glyph || "✔", doneMsg, glyph === "■" ? "stopped" : "done");
+              activeRowId = null;
+              resolve();
             }
-            // Keep the row in the chat as a finished record. Stop uses red,
-            // normal completion green — both scroll up with the conversation.
-            render(glyph || "✔", doneMsg, glyph === "■" ? "stopped" : "done");
-            activeRowId = null;
-          }
 
-          if (message) { finish(); return; }
+            // Do not flash the row away before it can be read. The request is
+            // already finished; only the display is held briefly.
+            function settle() {
+              var wait = startedAt
+                ? Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt))
+                : 0;
+              setTimeout(finish, wait);
+            }
 
-          // The response can arrive before the last step flips from running to
-          // done. One settled read keeps the final line accurate.
-          fetch("/opencode/status")
-            .then(function (r) { return r.json(); })
-            .then(function (d) { lastSteps = d.steps || []; finish(); })
-            .catch(finish);
+            if (message) { settle(); return; }
+
+            // The response can arrive before the last step flips from running
+            // to done. One settled read keeps the final line accurate.
+            fetch("/opencode/status")
+              .then(function (r) { return r.json(); })
+              .then(function (d) { lastSteps = d.steps || []; settle(); })
+              .catch(settle);
+          });
         };
 
         // Socket events also fire outside /chat (e.g. auto-fix). Give them
@@ -9218,7 +9238,8 @@ const res = await fetch("/chat", {
 
           const data = await res.json();
           console.log("ACEsi raw response:", data);
-stopLiveActivity();
+          // Hold the live tool row briefly so the steps can actually be seen.
+          await stopLiveActivity();
 
           const aiReply = data.reply;
 

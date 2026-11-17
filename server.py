@@ -4222,6 +4222,29 @@ def _bug_answer_is_useless(text, user_message=""):
     return False
 
 
+def _explain_answer_is_useless(text, user_message=""):
+    """A file explanation answered in one word is not an answer.
+
+    A live "explain ace_prompt.py" run read the file twice and then returned
+    "pong". The bug-report guard already rejects that shape, but explanations
+    are classified as read-only so they never reached it. Apply the same bar
+    here: a real explanation is more than a few words and mentions something
+    from the question (e.g. the filename or "prompt").
+    """
+    t = str(text or "").strip()
+    if not t:
+        return True
+    if len(t.split()) < 8:
+        return True
+    q = str(user_message or "")
+    if _CODE_EXT_RE.search(q) or re.search(
+            r'\b(?:file|script|module|code)\b', q, re.IGNORECASE):
+        key = _key_nouns(q)
+        if key and not any(k in t.lower() for k in key):
+            return True
+    return False
+
+
 def _no_summary_note(active):
     """Why the model-written summary is missing, from evidence rather than a guess."""
     try:
@@ -4296,6 +4319,103 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
         return _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
                                    question=user_message)
     return _evidence_fallback(evidence, names)
+
+
+def _retry_file_explanation(question, bad_reply, llm_messages, active, chat_one):
+    """One no-tools retry after a one-word answer to an explanation request."""
+    if not active or chat_one is None:
+        return None
+    directive = (
+        "Your previous answer was %r - that is not an explanation.\n"
+        "Answer this question properly: %s\n"
+        "The file content is already in the conversation above. Write a plain-text "
+        "explanation in at least 3 sentences: name the main functions/classes and "
+        "what the file is for. Do not call tools. Do not mention this correction."
+        % (str(bad_reply)[:60], str(question or ""))
+    )
+    msgs = list(llm_messages or []) + [{"role": "user", "content": directive}]
+    try:
+        got = chat_one(active[0], active[1], active[2], active[3], msgs,
+                       tools_schema=[], tool_choice="none")
+    except Exception:
+        return None
+    if not got:
+        return None
+    text = (got[0] or "").strip() if isinstance(got, (tuple, list)) else str(got).strip()
+    return _sanitize_reply(text) or None
+
+
+def _deterministic_file_explanation(question, llm_messages):
+    """Last-resort explanation built from the file itself, no provider needed."""
+    import ast
+
+    q = str(question or "")
+    m = _FILE_WITH_EXT_RE.search(q)
+    if not m:
+        return None
+    token = m.group(0)
+    base = os.path.basename(token.replace("\\", "/"))
+    content = ""
+    try:
+        safe = _ide_path(token)
+        if safe and os.path.isfile(safe):
+            content = open(safe, encoding="utf-8", errors="replace").read()
+    except Exception:
+        content = ""
+    if not content:
+        for msg in reversed(llm_messages or []):
+            if msg.get("role") != "user":
+                continue
+            c = str(msg.get("content") or "")
+            if base in c:
+                content = c
+                break
+    if not content:
+        return None
+
+    header = " ".join(
+        line.strip()[1:].strip()
+        for line in content.splitlines()[:10]
+        if line.strip().startswith("#")
+    )[:220]
+    parts = []
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        tree = None
+    if tree is not None:
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                doc = (ast.get_docstring(node) or "").splitlines()
+                label = node.name
+                if doc and doc[0].strip():
+                    label += " - " + doc[0].strip()
+                parts.append(label)
+    if parts:
+        out = "I read %s. It defines %s." % (base, ", ".join(parts[:6]))
+    else:
+        out = "I read %s." % base
+    if header:
+        out += " The file says: \"%s\"." % header
+    return out + " Those definitions are the main pieces of this module."
+
+
+def _repair_explain_answer(question, reply, llm_messages, active):
+    """Replace 'pong'-style answers to explanation requests with a real answer."""
+    if not (_is_explain_only(question)
+            and _explain_answer_is_useless(reply, question)):
+        return reply
+    retried = _retry_file_explanation(question, reply, llm_messages, active,
+                                      _chat_one)
+    if retried and not _explain_answer_is_useless(retried, question):
+        print("[explain-guard] replaced short answer with grounded retry",
+              flush=True)
+        return retried
+    fallback = _deterministic_file_explanation(question, llm_messages)
+    if fallback:
+        print("[explain-guard] used deterministic file explanation", flush=True)
+        return fallback
+    return reply
 
 
 def _final_summary_call(active, llm_messages, names, last_screen):
@@ -5712,6 +5832,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         # A bug report answered with tool meta or a single word is not an
         # answer. This is the path the live "There are 9 CDP tools available."
         # reply took: no FINAL marker, no grounded call, straight to Chris.
+        clean = _repair_explain_answer(user_message, clean, llm_messages, active)
         if _bug_re.search(user_message or "") and _bug_answer_is_useless(clean, user_message):
             clean = _bug_evidence_reply(
                 _collect_tool_evidence(llm_messages),
@@ -5767,6 +5888,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
         summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
+    summary = _repair_explain_answer(user_message, summary, llm_messages, active)
     if _bug_re.search(user_message or "") and _bug_answer_is_useless(summary, user_message):
         summary = _bug_evidence_reply(
             _collect_tool_evidence(llm_messages),
