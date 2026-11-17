@@ -4566,7 +4566,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # only NAME the file - which is why an Explorer ask produced prose instead
     # of edits. Detect it first, collect the exact analyzer diagnostics here,
     # force the file/analysis tools, and use a prompt that demands real edits.
-    _explorer_intent = bool(_explorer_fix_re.search(user_message or ""))
+    # "Explain what flutter analyze does" mentions the analyzer but is not a
+    # repair request. Suppress Explorer-fix mode for explanation-only asks.
+    _explorer_intent = (bool(_explorer_fix_re.search(user_message or ""))
+                        and not _is_explain_only(user_message))
     _explorer_sys = ""
     _explorer_before = -1
     _explorer_first_path = ""
@@ -6029,6 +6032,11 @@ def chat():
     global _LAST_TOKEN_USAGE
     data = request.json
     user_message = data.get('message', '')
+    # Keep the user's actual request intact. The file-read path below and the
+    # pinned-editor context block append file text to `user_message` for the
+    # PROMPT only; routing/intent detection must never read that text (it can
+    # contain words like "flutter analyze" which trigger Explorer-fix mode).
+    request_text = user_message
     # Clients that omit "model" (phone UI, external callers) must still use the
     # provider/model saved in Settings instead of silently reverting to Groq.
     requested_model = data.get('model', '') or get_config('model', '') or ''
@@ -6482,20 +6490,29 @@ def chat():
         for h in history:
             if h.get('role') in ('user', 'assistant'):
                 llm_messages.append({"role": h['role'], "content": h['content']})
+        # Attach editor/file context to the PROMPT only. `request_text` stays
+        # clean so intent detection cannot be hijacked by keywords inside the
+        # attached source (e.g. a file that mentions "flutter analyze").
+        prompt_user_message = user_message
         if _CURRENT_CONTEXT:
-                                    ctx_str = "\n\n[System Note: The user has asked about the attached code. The answer is a simple text explanation. You must reply with text directly. DO NOT use any tools. Task complete.]\n"
-        for f in _CURRENT_CONTEXT:
+            ctx_str = ("\n\n[System Note: The user has asked about the attached code. "
+                       "The answer is a simple text explanation. You must reply with "
+                       "text directly. DO NOT use any tools. Task complete.]\n")
+            for f in _CURRENT_CONTEXT:
                 ctx_str += f"--- FILE: {f['path']} ---\n{f['content']}\n\n"
-                ctx_str += "]"
-                user_message += ctx_str
+            ctx_str += "]"
+            prompt_user_message += ctx_str
 
-        llm_messages.append({"role": "user", "content": user_message})
+        llm_messages.append({"role": "user", "content": prompt_user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
         # defers to the user. Returns the final text reply or None.
+        # IMPORTANT: pass the user's ORIGINAL words for routing. The augmented
+        # message above is already inside llm_messages; passing it here made a
+        # plain "explain this file" look like an Explorer/analyzer repair job.
         model = requested_model if requested_model else model
-        reply = _chat_dispatch(llm_messages, user_message=user_message, preferred_model=model)
+        reply = _chat_dispatch(llm_messages, user_message=request_text, preferred_model=model)
         _live_log("dispatch done: %d msgs, %s"
                   % (len(llm_messages), "reply" if reply else "no reply"))
         if reply:
@@ -6505,11 +6522,11 @@ def chat():
                               if s.get("state") == "done" and s.get("kind") == "work"]
             done_tool_names = [t.split(" ")[0].strip("()") for t in chat_tools if t]
             if done_tool_names and not _kill_armed():
-                playbook_note(user_message, done_tool_names, reply)
+                playbook_note(request_text, done_tool_names, reply)
             save_conversation("assistant", reply)
             # Journal the session close when Chris signs off for the day
-            if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', user_message, re.IGNORECASE):
-                add_journal(f"Session closed. Chris said: \"{user_message[:200]}\". I replied: \"{reply[:200]}\"")
+            if re.search(r'\b(good\s?night|goodbye|bye|that.s all|that is all|done for now|end of session|i.m done|im done|going to sleep|off to bed)\b', request_text, re.IGNORECASE):
+                add_journal(f"Session closed. Chris said: \"{request_text[:200]}\". I replied: \"{reply[:200]}\"")
                 print("📓 Journaled session close")
             # Token usage updated by llm_reply
             _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
@@ -11350,6 +11367,38 @@ _CODE_TROUBLE_RE = re.compile(
     r'|\b(?:fix|fixes|fixed|repair|correct|resolve|remove)\b.{0,60}'
     r'\b(?:errors?|issues?|problems?|bugs?|warnings?|file|code)\b',
     re.IGNORECASE)
+
+# A question ABOUT code is not a repair job. Naming a .py/.dart file (or even
+# saying "flutter analyze") while asking for an explanation must not put ACEsi
+# into CODE-FILE-FIX / EXPLORER-FIX mode, which demands edits and analyzer runs.
+_EXPLAIN_ONLY_RE = re.compile(
+    r"\b(?:explain|describe|summari[sz]e|overview|purpose|"
+    r"what\s+(?:does|is|are)|how\s+does|tell\s+me(?:\s+about)?|"
+    r"walk\s+me\s+through)\b",
+    re.IGNORECASE,
+)
+_REPAIR_VERB_RE = re.compile(
+    r"\b(?:fix|clear|resolve|repair|correct|rewrite|update|modify|apply|"
+    r"edit|change)\b",
+    re.IGNORECASE,
+)
+_NEGATED_REPAIR_RE = re.compile(
+    r"\b(?:do\s+not|don'?t|never|no)\s+"
+    r"(?:fix|clear|resolve|repair|correct|rewrite|update|modify|apply|"
+    r"edit|change)\w*\b",
+    re.IGNORECASE,
+)
+
+
+def _is_explain_only(message):
+    """True for 'what is/explain/tell me about' asks with no repair intent."""
+    low = str(message or "").lower()
+    if not _EXPLAIN_ONLY_RE.search(low):
+        return False
+    scrubbed = _NEGATED_REPAIR_RE.sub("", low)
+    return not _REPAIR_VERB_RE.search(scrubbed)
+
+
 _FILE_TOKEN_RE = re.compile(r'\b[A-Za-z_][A-Za-z0-9_.-]*\b')
 _NON_FILE_TOKENS = {
     "and", "the", "for", "with", "this", "that", "error", "errors", "fix",
@@ -11391,9 +11440,16 @@ def _stem_variants(stem):
 
 
 def _looks_like_code_file_request(user_message):
-    """True when the message names a source file and asks for code work."""
+    """True when the message names a source file and asks for code work.
+
+    A plain "read/explain this file" is NOT code work. Without this guard the
+    literal filename alone sent every explanation into CODE-FILE-FIX mode,
+    which tells the model to edit and run flutter_analyze instead of answering.
+    """
     m = str(user_message or "")
     low = m.lower()
+    if _is_explain_only(user_message) and not _CODE_TROUBLE_RE.search(low):
+        return False
     # A literal .dart/.py/... filename anywhere is already a strong code signal.
     if _CODE_EXT_RE.search(low):
         return True
