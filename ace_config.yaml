@@ -55,7 +55,8 @@ tool_caps:
             "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
              "curl", "restart", "notify",
-             "get_time", "web_search", "weather", "note"]
+             "get_time", "web_search", "weather", "note",
+             "devtool_list", "devtool_run"]
   generic:
 
     allowed: ["ui", "code", "net", "ctrl"]
@@ -64,7 +65,8 @@ tool_caps:
             "git_merge", "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
              "curl", "restart", "notify",
-             "get_time", "web_search", "weather", "note"]
+             "get_time", "web_search", "weather", "note",
+             "devtool_list", "devtool_run"]
   web_only:
 
     allowed: ["ui", "net", "ctrl"]

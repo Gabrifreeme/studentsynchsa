@@ -882,6 +882,43 @@ def evaluate_js(expr):
         return False, "evaluate failed: %s" % json.dumps(resp)[:500]
 
 
+def evaluate_js_async(expr, timeout=15):
+    """Promise-aware Runtime.evaluate for the DevTool+ bridge.
+
+    evaluate_js() deliberately sends only {"expression": ...} so ordinary
+    cdp_evaluate calls keep their historical behaviour. DevTool+ tool runs are
+    async (SubtleCrypto digests, HMAC), so this variant adds awaitPromise and
+    returnByValue. The caller passes an async IIFE and gets the resolved value.
+    """
+    if not expr:
+        return False, "usage: evaluate_js_async <expression>"
+    s = _get_session()
+    if not s:
+        return False, "no reachable CDP target"
+    mid = s._send("Runtime.evaluate", {
+        "expression": expr,
+        "awaitPromise": True,
+        "returnByValue": True,
+    })
+    resp = s._wait(mid, timeout=timeout)
+    try:
+        result = resp.get("result") or {}
+        exc = result.get("exceptionDetails")
+        if exc:
+            detail = exc.get("exception") or {}
+            return False, ("JS error: %s" % (detail.get("description")
+                                            or detail.get("value")
+                                            or json.dumps(exc)[:300]))
+        r = result["result"]
+        if "value" in r:
+            return True, _format_js_value(r.get("value"))
+        if r.get("type") == "undefined":
+            return True, ""
+        return True, r.get("description", str(r))
+    except Exception:
+        return False, "evaluate failed: %s" % json.dumps(resp)[:500]
+
+
 def navigate_url(url, wait=True, wait_for="load", timeout=30, idle_ms=500):
     """Navigate the attached page via CDP Page.navigate.
 

@@ -589,3 +589,79 @@ window.addEventListener('keydown', (e) => {
     window.toggleDevToolPlus();
   }
 });
+
+/* ------------------------------------------------------- programmatic API
+ * ACEsi itself uses the SAME tools the panel uses. The server calls this object
+ * through CDP (devtool_list / devtool_run), so the model and the user can never
+ * drift apart: one TOOLS array, one implementation, all local/offline.
+ */
+const _fieldInfo = (f) => {
+  const info = { key: f.key, label: f.label, type: f.type, placeholder: f.placeholder || '' };
+  if (f.options) info.options = f.options.map((o) => ({ value: o.value, label: o.label }));
+  return info;
+};
+
+function findTool(idOrName) {
+  const key = String(idOrName || '').trim().toLowerCase();
+  if (!key) return null;
+  return TOOLS.find((t) => t.id.toLowerCase() === key
+    || t.name.toLowerCase() === key
+    || t.tags.some((tag) => tag.toLowerCase() === key)) || null;
+}
+
+function normalizeValues(tool, values) {
+  const fields = tool.fields || [];
+  const args = {};
+  for (const f of fields) {
+    args[f.key] = f.type === 'select' ? (f.options[0]?.value ?? '') : '';
+  }
+  if (values === undefined || values === null || values === '') return args;
+  if (typeof values !== 'object' || Array.isArray(values)) {
+    if (fields.length) {
+      args[fields[0].key] = Array.isArray(values) ? values.join('\n') : String(values);
+    }
+    return args;
+  }
+  for (const [k, v] of Object.entries(values)) {
+    const declared = fields.find((f) => f.key === k
+      || f.key.toLowerCase() === String(k).toLowerCase());
+    args[declared ? declared.key : k] =
+      (v === null || v === undefined) ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+  }
+  return args;
+}
+
+const devToolPlusApi = {
+  version: 1,
+  count: TOOLS.length,
+  categories: CATEGORIES.slice(),
+  list(filter) {
+    const f = typeof filter === 'string' ? { query: filter } : (filter || {});
+    const q = String(f.query || f.q || '').trim().toLowerCase();
+    const cat = String(f.category || '').trim().toLowerCase();
+    return TOOLS.filter((t) => {
+      if (cat && t.category.toLowerCase() !== cat) return false;
+      if (!q) return true;
+      return (t.id + ' ' + t.name + ' ' + t.category + ' ' + t.tags.join(' '))
+        .toLowerCase().includes(q);
+    }).map((t) => ({
+      id: t.id, name: t.name, category: t.category, tags: t.tags,
+      fields: (t.fields || []).map(_fieldInfo), action: !!t.action,
+    }));
+  },
+  describe(idOrName) {
+    const t = findTool(idOrName);
+    return t ? { id: t.id, name: t.name, category: t.category, tags: t.tags,
+      fields: (t.fields || []).map(_fieldInfo), action: !!t.action } : null;
+  },
+  async run(idOrName, values) {
+    const t = findTool(idOrName);
+    if (!t) throw new Error('Unknown DevTool+ tool: ' + idOrName);
+    const args = normalizeValues(t, values);
+    const out = await t.run(args);
+    return { id: t.id, name: t.name, category: t.category,
+      input: args, output: String(out ?? '') };
+  },
+};
+window.devToolPlus = devToolPlusApi;
+window.devtoolPlus = devToolPlusApi; // tolerant lowercase alias

@@ -9245,6 +9245,119 @@ def tool_need_verify_in_browser(target="", url="", checks=""):
     return bool(ok_all), "\n".join(lines)
 
 
+# ---- DevTool+ bridge: ACEsi uses the SAME tools the Code Editor panel uses ----
+# The panel publishes window.devToolPlus (devtool_plus/src/devtool-plus.js).
+# These tools call that object in ACEsi's own already-open tab over CDP, so there
+# is one implementation of every utility - no Python copies that could drift
+# from what the user sees. Nothing navigates; nothing leaves the machine.
+def _devtool_eval(api_expression):
+    """Evaluate one window.devToolPlus expression in ACEsi's own tab."""
+    ok, res = _call_tool("cdp_connect", {"target": _ACE_VERIFY_TARGET})
+    if not ok:
+        return False, "DevTool+: could not attach to the ACEsi page: %s" % res
+    expr = (
+        "(async () => {"
+        "  if (!window.devToolPlus) {"
+        "    try { await import('/static/devtool-plus.js'); }"
+        "    catch (e) { return JSON.stringify({error: 'DevTool+ failed to load: '"
+        "      + ((e && e.message) || e)}); }"
+        "  }"
+        "  const api = window.devToolPlus || window.devtoolPlus;"
+        "  if (!api) return JSON.stringify({error: 'DevTool+ API unavailable'});"
+        "  try { return JSON.stringify(" + api_expression + "); }"
+        "  catch (e) { return JSON.stringify({error: 'DevTool+ error: '"
+        "    + ((e && e.message) || e)}); }"
+        "})()"
+    )
+    ok, res = d.evaluate_js_async(expr)
+    if not ok:
+        return False, "DevTool+: %s" % res
+    text = str(res)
+    try:
+        payload = json.loads(text)
+    except Exception:
+        payload = None
+    if isinstance(payload, dict) and payload.get("error"):
+        return False, "DevTool+: %s" % payload["error"]
+    return True, text
+
+
+def tool_devtool_list(tool="", category="", query=""):
+    """List the local DevTool+ tools ACEsi can run, or describe one by id/name.
+
+    With no args: compact catalogue of all tools (id, name, category, fields).
+    Filter with category (Data/Encoding/Cryptography/Text/Design) or query.
+    Pass tool=<id> for the full field specification of one tool.
+    """
+    if tool:
+        expr = "api.describe(%s)" % json.dumps(tool)
+    else:
+        expr = "api.list(%s)" % json.dumps({"category": category, "query": query})
+    ok, res = _devtool_eval(expr)
+    if not ok:
+        return ok, res
+    try:
+        data = json.loads(res)
+    except Exception:
+        return True, res
+    if isinstance(data, dict):
+        return True, ("DevTool+ tool %s (%s, %s)\nFields: %s\n%s"
+                      % (data.get("name", tool), data.get("id", tool),
+                         data.get("category", "?"),
+                         ", ".join(f["key"] for f in data.get("fields", [])) or "(none)",
+                         json.dumps(data, indent=2)))
+    if not data:
+        return True, ("No DevTool+ tools matched (category=%r, query=%r). "
+                      "Call devtool_list with no args to see all." % (category, query))
+    lines = ["DevTool+ %d local tools:" % len(data)]
+    for t in data:
+        fields = ", ".join(f["key"] for f in t.get("fields", [])) or "(no input)"
+        lines.append("- %s | %s | %s | fields: %s"
+                     % (t["id"], t["name"], t["category"], fields))
+    lines.append("Run one with devtool_run {tool: <id>, input: <text>} or "
+                 "{tool: <id>, values: {\"<field>\": \"<value>\"}}.")
+    return True, "\n".join(lines)
+
+
+def tool_devtool_run(tool="", input="", values=None):
+    """Run a DevTool+ tool inside ACEsi's own page and return its output.
+
+    Args: tool (REQUIRED, id or name from devtool_list); input (plain text for a
+    one-field tool); values (JSON object of field keys for multi-field tools,
+    e.g. {"msg": "Hello", "key": "secret"}). All processing is local/offline.
+    """
+    if not tool:
+        return False, ("usage: devtool_run {tool: <id or name>, "
+                       "input: <text for single-field tools>, "
+                       "values: <JSON object of field keys>}")
+    v = values
+    if isinstance(v, str):
+        s = v.strip()
+        if s[:1] in ("{", "["):
+            try:
+                v = json.loads(s)
+            except Exception:
+                return False, ("devtool_run: values must be a JSON object like "
+                               "{\"msg\": \"Hello\", \"key\": \"secret\"}")
+        else:
+            v = s
+    if (v is None or v == "") and input != "":
+        v = input
+    expr = "await api.run(%s, %s)" % (json.dumps(tool), json.dumps(v))
+    ok, res = _devtool_eval(expr)
+    if not ok:
+        return ok, res
+    try:
+        data = json.loads(res)
+    except Exception:
+        return True, res
+    if isinstance(data, dict) and "output" in data:
+        used = json.dumps(data.get("input", {}), ensure_ascii=False)
+        return True, ("[DevTool+ %s] input=%s\n%s"
+                      % (data.get("name") or data.get("id"), used, data["output"]))
+    return True, res
+
+
 import urllib.request as _urlreq
 import urllib.error as _urlerr
 import socket as _socket
@@ -9839,6 +9952,8 @@ TOOLS = {
     "cdp_get_response_body": (tool_cdp_get_response_body, ()),
     "cdp_status": (tool_cdp_status, ()),
     "need_verify_in_browser": (tool_need_verify_in_browser, ("target", "url", "checks")),
+    "devtool_list": (tool_devtool_list, ("tool", "category", "query")),
+    "devtool_run": (tool_devtool_run, ("tool", "input", "values")),
     "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
     "view_web_image": (tool_view_web_image, ("url",)),
     "notify": (tool_notify, ("title", "message")),
@@ -10068,6 +10183,20 @@ TOOLS_SCHEMA = [
         "parameters": {"type": "object", "properties": {
             "checks": {"type": "string", "title": "checks", "description": "Optional comma list: status,dom,console,network. Default is all four."}},
             "required": []}}},
+    {"type": "function", "function": {"name": "devtool_list",
+        "description": "List the 55 local DevTool+ utilities built into ACEsi's Code Editor (the SAME tools the user sees in the DevTool+ panel). Everything runs locally in the page: no network, no external services. With no args returns every tool id/name/category/field keys; use category (Data, Encoding, Cryptography, Text, Design) or query to narrow it, or tool=<id> for one tool's full field spec. Call this BEFORE devtool_run if you do not know a tool id.",
+        "parameters": {"type": "object", "properties": {
+            "tool": {"type": "string", "title": "tool", "description": "Optional. A DevTool+ id or name to describe in full."},
+            "category": {"type": "string", "title": "category", "description": "Optional filter: Data, Encoding, Cryptography, Text, Design."},
+            "query": {"type": "string", "title": "query", "description": "Optional search text matched against id, name, category and tags."}},
+            "required": []}}},
+    {"type": "function", "function": {"name": "devtool_run",
+        "description": "Run one local DevTool+ utility inside ACEsi's own page and return its output. Use devtool_list first to learn ids and field keys. Args: tool (REQUIRED id or name), input (plain text for one-field tools such as sha256 or b64-encode), values (JSON object of field keys for multi-field tools such as {\"msg\":\"Hello\",\"key\":\"secret\"}). Runs offline in the browser; never sends data anywhere.",
+        "parameters": {"type": "object", "properties": {
+            "tool": {"type": "string", "title": "tool", "description": "REQUIRED. DevTool+ tool id or name from devtool_list."},
+            "input": {"type": "string", "title": "input", "description": "Plain text input for a one-field tool (e.g. sha256, b64-encode)."},
+            "values": {"type": "string", "title": "values", "description": "JSON object of field keys for multi-field tools, e.g. {\"msg\":\"Hello\",\"key\":\"secret\"}."}},
+            "required": ["tool"]}}},
     {"type": "function", "function": {"name": "curl",
         "description": "Hit a URL like a browser and return the HTTP status + a body snippet. Use this to confirm whether a network service (e.g. an ITS portal) is UP before blaming on-device code. Args: url (REQUIRED, http(s)://...), method (optional, default GET), timeout (optional int seconds, default 20), verify (optional bool, default true), allow_redirects (optional bool, default true). Returns ok=True even on 4xx/5xx (a server responded); ok=False only on DNS failure / connection refused / timeout = the 'no web service / port closed' signal.",
         "parameters": {"type": "object", "properties": {
@@ -10606,6 +10735,9 @@ _TOOL_DOMAINS = {
     "cdp_connect": "ui", "cdp_navigate": ("ui", "net"), "cdp_evaluate": "ui", "cdp_console_logs": "ui",
     "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_get_response_body": ("ui", "net"), "cdp_status": "ui",
     "need_verify_in_browser": ("ui", "net"),
+    # DevTool+ lives in the Code Editor, so its bridge tools are code-domain
+    # (and therefore also reachable from the general/file tool pool).
+    "devtool_list": "code", "devtool_run": "code",
     # network / URL probes — the new curl tool isolates "is this URL up?" from
     # both code edits and on-device taps
     "curl": "net",
@@ -10646,6 +10778,12 @@ def _explicit_tool_domain(user_message):
     dispatch loop skips the ambiguity gate and runs THAT tool directly. This is
     the 'ignore the menu — this is a direct instruction' case."""
     m = (user_message or "").lower()
+    # "DevTool+" (and "devtool plus") names the Code Editor toolkit itself, so
+    # route it to the code domain where devtool_list/devtool_run live. Without
+    # this, the '+' boundary makes the CDP-intent classifier treat it as browser
+    # DevTools and hide the very tools the user asked for.
+    if re.search(r'\bdev\s?tool\s*(?:\+|plus\b)', m):
+        return "code"
     best = None
     for name, dom in _TOOL_DOMAINS.items():
         # Word-boundary anchored so a note/filename like "notes/rental_agencies.md"
@@ -11334,10 +11472,18 @@ def _explicit_cdp_intent(m):
     """True when the message explicitly names DevTools / CDP / F12. These are
     on-device browser inspections, so they belong to the 'ui' domain where the
     cdp_* tools live - not to 'net' just because "status code" appears."""
+    m = m or ""
+    # "DevTool+" is the Code Editor's local utility toolkit, NOT browser
+    # DevTools. Without this guard the '+' is swallowed by \b and a request to
+    # hash/encode something with DevTool+ is misrouted to the CDP/UI domain,
+    # which strips every devtool_* tool out of the model's schema.
+    if re.search(r'\bdev\s?tool\s*(?:\+|plus\b)', m, re.IGNORECASE):
+        if not re.search(r'\bcdp\b|\bf12\b|chrome\s+dev', m, re.IGNORECASE):
+            return False
     return bool(re.search(
-        r'\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b'
+        r'\bdev\s?tools?\b(?!\s*(?:\+|plus\b))|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b'
         r'|\bneed\s+verify\s+in\s+browser\b|\bverify\s+in\s+browser\b'
-        r'|\bbrowser\s+verif\w*\b', m or ""))
+        r'|\bbrowser\s+verif\w*\b', m, re.IGNORECASE))
 
 
 def _classify_message(user_message):
@@ -11646,6 +11792,8 @@ _SHORT_DESCRIPTIONS = {
     "cdp_console_logs": "Read console messages from the attached page.",
     "cdp_status": "Report whether DevTools is attached, plus event counts.",
     "need_verify_in_browser": "One-shot verification of ACEsi's current already-open page (status,dom,console,network). Does not navigate; never pass a url or invent a route.",
+    "devtool_list": "List the local DevTool+ toolkit in ACEsi's Code Editor, or describe one tool. Args: tool, category, query (all optional).",
+    "devtool_run": "Run a local DevTool+ tool in ACEsi's page. Args: tool (REQUIRED), input (text) or values (JSON object of fields).",
     # --- on-device UI ---
     # ui_connect/ui_device need short descriptions or _short_tool() returns None
     # for them and they vanish from the reduced schema entirely - they can sit in
@@ -11682,6 +11830,7 @@ _REDUCED_TOOL_ORDER = [
     "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_swipe", "ui_key",
     "ui_screenshot",
     "run_command", "read_file",
+    "devtool_list", "devtool_run",
 ]
 # Explorer fixes need a DIFFERENT reduced schema: the browser-shaped order
 # above omits edit_file and flutter_analyze entirely, so a rate-limited model
@@ -11689,9 +11838,11 @@ _REDUCED_TOOL_ORDER = [
 _EXPLORER_TOOL_ORDER = [
     "read_file", "edit_file", "write_file", "grep", "list_files",
     "flutter_analyze", "git_status", "run_command",
+    "devtool_list", "devtool_run",
 ]
 _EXPLORER_FIX_TOOLS = {"read_file", "edit_file", "write_file",
-                       "flutter_analyze", "run_command"}
+                       "flutter_analyze", "run_command",
+                       "devtool_list", "devtool_run"}
 # Never shed these: without them a network or navigation task cannot be done at
 # all, so losing them would turn a working reduced schema into a useless one.
 _REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",

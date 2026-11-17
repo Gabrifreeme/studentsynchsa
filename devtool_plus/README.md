@@ -33,7 +33,23 @@ Add an entry to the `TOOLS` array in `src/devtool-plus.js`:
 - `run` receives `{ fieldKey: value }` and returns a string (or a Promise of one).
   Output updates instantly as the user types. Set `action: true` for tools with
   no input that need a Generate button (e.g. the UUID generator).
-- Pinned favorites and are stored in `localStorage` under `devtoolplus.pinned`.
+- Pinned favorites are stored in `localStorage` under `devtoolplus.pinned`.
 
 The toolbar button in ACEsi's Code Editor calls `window.toggleDevToolPlus()`;
 `Ctrl+Alt+D` does the same.
+
+## ACEsi (the model) uses the same tools
+`src/devtool-plus.js` also publishes `window.devToolPlus` with:
+
+- `list({category, query})` — compact catalogue; `describe(id)` — one tool's fields.
+- `run(id, values)` — Promise resolving to `{id, name, category, input, output}`.
+  `values` may be a plain string (sent to the tool's first field) or an object
+  keyed by field name.
+
+`server.py` exposes two tools to the model, `devtool_list` and `devtool_run`,
+which call that object inside ACEsi's own already-open tab over CDP. There is
+**one** `TOOLS` array and one implementation for both the user and ACEsi.
+
+Rebuild and bump the cache-bust query in `ACEsi.html`
+(`/static/devtool-plus.js?v=2` → `?v=3`, …) whenever `src/` changes, otherwise
+browsers may keep serving the previous bundle.
