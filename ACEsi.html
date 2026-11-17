@@ -1127,8 +1127,6 @@
 
     .acesi-tab-close { color: #ff9d00 !important; }
 
-#search-btn, #goto-btn { display: inline-flex !important; }
-
 #editor-tab-bar { display: none !important; }
 
 #terminal-output { display: block !important; width: 100% !important; height: 100% !important; padding: 0 !important; margin: 0 !important; text-align: left !important; } .xterm-screen { margin: 0 !important; left: 0 !important; } .xterm-rows { margin: 0 !important; }
@@ -5072,62 +5070,6 @@
 
           >
 
-            <button
-
-              id="search-btn"
-
-              class="btn"
-
-              title="Find text or line (Ctrl+F)"
-
-              style="
-
-                background: #000;
-
-                color: #ff9d00;
-
-                border: 1px solid #ff9d00;
-
-                padding: 4px 8px;
-
-                font-size: 11px;
-
-                margin-bottom: 2px;
-
-              "
-
-              onclick="editorSearchOpen()"
-
-            >
-
-              Search
-
-            </button>
-
-            <button
-
-              id="goto-btn"
-
-              class="btn"
-
-              title="Go to line number (Ctrl+G)"
-
-              style="
-                background: #000;
-                color: #ff9d00;
-                border: 1px solid #ff9d00;
-                padding: 4px 8px;
-                font-size: 11px;
-                margin-bottom: 2px;
-              "
-
-              onclick="window.openGotoModal && window.openGotoModal()"
-
-            >
-
-              Ctrl+G
-
-            </button>
 
             <button
 
@@ -13323,19 +13265,34 @@ document.addEventListener('DOMContentLoaded', function() {
             '<span style="color:#ff9d00; font-family:monospace; white-space:pre;">PS C:\\Users\\chris\\LipSyncStudent&gt;&nbsp;</span>' +
             '<input id="term-input" type="text" style="flex:1; min-width:0; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off">' +
           '</div>' +
-          '<div id="term-history" style="white-space:pre-wrap; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
-        
+          '<div id="term-history" style="white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; overflow-x:hidden; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
+
         var termInput = document.getElementById("term-input");
         var termHistory = document.getElementById("term-history");
+
+        // Use textContent, never innerHTML, for command output. PowerShell's
+        // `dir` prints <DIR> markers; innerHTML parsed those as HTML elements
+        // and pushed the rest of the listing off to the right. Each output line
+        // is appended as its own left-aligned row directly under the prompt.
+        function appendTerminalLine(text, color) {
+          var line = document.createElement('div');
+          line.style.whiteSpace = 'pre-wrap';
+          line.style.overflowWrap = 'anywhere';
+          line.style.wordBreak = 'break-word';
+          if (color) line.style.color = color;
+          line.textContent = text;
+          termHistory.appendChild(line);
+          termHistory.scrollTop = termHistory.scrollHeight;
+          termHistory.scrollLeft = 0;
+        }
 
         termInput.addEventListener("keydown", function(e) {
             if (e.key === "Enter") {
                 var cmd = termInput.value.trim();
                 if (!cmd) return;
                 termInput.value = "";
-                
-                termHistory.innerHTML += '<div>PS C:\\Users\\chris\\LipSyncStudent&gt; ' + cmd + '</div>';
-                termHistory.scrollTop = termHistory.scrollHeight;
+
+                appendTerminalLine('PS C:\\Users\\chris\\LipSyncStudent> ' + cmd, '#ff9d00');
 
                 fetch('/api/system/exec', {
                     method: 'POST',
@@ -13347,11 +13304,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     var out = data.stdout || "";
                     if (data.stderr) out += "\n" + data.stderr;
                     if (!out) out = "[No output]";
-                    termHistory.innerHTML += '<div style="white-space: pre-wrap;">' + out + '</div>';
-                    termHistory.scrollTop = termHistory.scrollHeight;
+                    out.split(/\r?\n/).forEach(function (line) {
+                        appendTerminalLine(line, '#ff9d00');
+                    });
                 })
                 .catch(err => {
-                    termHistory.innerHTML += '<div style="color:red;">Error: ' + err.message + '</div>';
+                    appendTerminalLine('Error: ' + err.message, 'red');
                 });
             }
         });
@@ -13624,8 +13582,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function bindAll() {
     var map = {
-      'search-btn': window.editorSearchOpen,
-      'goto-btn': window.openGotoModal,
       'save-btn': window.aceToolbarSave,
       'format-btn': window.aceToolbarFormat,
       'clear-btn': window.aceToolbarClear,
