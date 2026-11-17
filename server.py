@@ -15,6 +15,7 @@ import re
 import uuid
 import winsound
 import subprocess
+import shutil
 import time
 import tempfile
 import threading
@@ -6150,9 +6151,14 @@ def chat():
         _rp = _resolve_pc_file_open(user_message)
         if _rp and os.path.isfile(_rp):
             _fname = os.path.basename(_rp)
+            _ext = os.path.splitext(_rp)[1].lower()
+            _kind = 'image' if _ext in ('.png', '.jpg', '.jpeg', '.gif',
+                                        '.webp', '.bmp', '.tif', '.tiff') else (
+                    'pdf' if _ext == '.pdf' else 'text')
             socketio.emit('open_user_file_in_editor', {
                 'path': _rp,
                 'name': _fname,
+                'kind': _kind,
             })
             reply = "Opened %s in the Code Editor." % _fname
             print("📂 PC-file open -> Code Editor: %s" % _rp)
@@ -6950,6 +6956,105 @@ def api_user_file_content():
             return Response(placeholder, mimetype='text/plain')
         with open(full, 'r', encoding='utf-8', errors='replace') as f:
             return Response(f.read(), mimetype='text/plain')
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-file-raw', methods=['GET'])
+@require_token
+def api_user_file_raw():
+    """Serve the raw bytes of a viewable PC file so the Code Editor can render
+    images/PDFs directly instead of dumping their bytes into the textarea."""
+    raw = request.args.get('path', '')
+    full = _safe_user_path(raw)
+    if not full or not os.path.isfile(full):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    ext = os.path.splitext(full)[1].lower()
+    mimes = {
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
+        '.tif': 'image/tiff', '.tiff': 'image/tiff', '.pdf': 'application/pdf',
+    }
+    if ext not in mimes:
+        return jsonify({'ok': False, 'error': 'not a viewable file'}), 400
+    try:
+        with open(full, 'rb') as f:
+            data = f.read()
+        return Response(data, mimetype=mimes[ext])
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+def _ps_quote(value):
+    """Quote a path for PowerShell -Command using single quotes."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _find_local_app(executable, candidates):
+    # Prefer the real .exe so subprocess does not have to launch a .cmd shim.
+    for candidate in candidates:
+        expanded = os.path.expandvars(candidate)
+        if expanded and os.path.isfile(expanded):
+            return expanded
+    return shutil.which(executable)
+
+
+@app.route('/api/user-file-action', methods=['POST'])
+@require_token
+def api_user_file_action():
+    """Run a File Actions command (Reveal / Copy Path / Open in ...) for a
+    PC file already opened in ACEsi's Code Editor."""
+    data = request.get_json(silent=True) or {}
+    action = (data.get('action') or '').strip()
+    raw_path = data.get('path', '')
+
+    full = _safe_user_path(raw_path)
+    if not full or not os.path.isfile(full):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+
+    directory = os.path.dirname(full) or os.path.expanduser('~')
+
+    try:
+        if action == 'copy-path':
+            return jsonify({'ok': True, 'action': action, 'path': full})
+
+        if action == 'reveal':
+            subprocess.Popen(['explorer', '/select,' + full], shell=False)
+        elif action == 'explorer':
+            subprocess.Popen(['explorer', directory], shell=False)
+        elif action == 'vscode':
+            exe = _find_local_app('code', [
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Microsoft VS Code', 'Code.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Microsoft VS Code', 'Code.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'Microsoft VS Code', 'Code.exe'),
+            ])
+            if not exe:
+                return jsonify({'ok': False, 'error': 'VS Code was not found on this PC.'}), 404
+            subprocess.Popen([exe, full], shell=False)
+        elif action == 'powershell':
+            exe = shutil.which('powershell.exe') or shutil.which('powershell') or os.path.join(
+                os.environ.get('WINDIR', r'C:\Windows'), 'System32',
+                'WindowsPowerShell', 'v1.0', 'powershell.exe')
+            command = 'Set-Location -LiteralPath ' + _ps_quote(directory)
+            subprocess.Popen([exe, '-NoExit', '-Command', command], shell=False)
+        elif action == 'sublime':
+            exe = _find_local_app('subl', [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Sublime Text', 'subl.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Sublime Text 3', 'subl.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'Sublime Text 3', 'subl.exe'),
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Sublime Text', 'subl.exe'),
+            ])
+            if not exe:
+                return jsonify({'ok': False, 'error': 'Sublime Text was not found on this PC.'}), 404
+            subprocess.Popen([exe, full], shell=False)
+        elif action == 'notepad':
+            exe = shutil.which('notepad.exe') or os.path.join(
+                os.environ.get('WINDIR', r'C:\Windows'), 'System32', 'notepad.exe')
+            subprocess.Popen([exe, full], shell=False)
+        else:
+            return jsonify({'ok': False, 'error': 'unknown action'}), 400
+
+        return jsonify({'ok': True, 'action': action, 'path': full})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

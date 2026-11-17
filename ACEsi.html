@@ -5312,6 +5312,17 @@
 
 .acesi-tab-close:hover { color:#ff4d4d; }
 
+.acesi-tab-menu { margin-left:6px; color:#ff9d00; font-weight:bold; flex-shrink:0; padding:0 2px; }
+.acesi-tab-menu:hover { color:#fff; background:rgba(255,157,0,0.25); border-radius:3px; }
+
+.acesi-file-menu { position:absolute; z-index:10000; min-width:240px; background:#000; color:#ff9d00; border:1px solid #ff9d00; border-radius:4px; box-shadow:0 6px 20px #000; font-family:monospace; font-size:11px; padding:4px; }
+.acesi-file-menu-title { padding:6px 8px; color:#ff9d00; border-bottom:1px solid #333; margin-bottom:4px; max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:bold; }
+.acesi-file-menu button { display:block; width:100%; text-align:left; background:transparent; color:#ff9d00; border:1px solid transparent; border-radius:3px; padding:6px 8px; font-family:inherit; font-size:inherit; cursor:pointer; }
+.acesi-file-menu button:hover { background:#ff9d00; color:#000; }
+.acesi-file-menu-sep { height:1px; background:#333; margin:4px 0; }
+.acesi-file-menu-label { padding:4px 8px 2px; color:#ff9d00; opacity:0.8; }
+.acesi-file-menu button.acesi-open-in-item { padding-left:18px; }
+
 </style>
 
 <div
@@ -5485,6 +5496,17 @@
 
             </div>
 
+          </div>
+
+          <div id="image-preview-overlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:#000; z-index:50; flex-direction:column; align-items:center; justify-content:center; color:#ff9d00; font-family:monospace;">
+            <div style="flex:0 0 auto; width:100%; box-sizing:border-box; padding:6px 10px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #333;">
+              <span id="image-preview-name" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+              <button id="image-preview-close" type="button" title="Close preview" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:2px 8px; cursor:pointer;">&#10005;</button>
+            </div>
+            <div style="flex:1; width:100%; display:flex; align-items:center; justify-content:center; overflow:auto; padding:10px; box-sizing:border-box;">
+              <img id="image-preview-img" alt="File preview" style="max-width:100%; max-height:100%; object-fit:contain; box-shadow:0 0 20px rgba(255,157,0,0.2);" />
+              <embed id="image-preview-pdf" type="application/pdf" style="display:none; width:100%; height:100%;" />
+            </div>
           </div>
 
           <div
@@ -6892,6 +6914,8 @@
 
             saveBtn.onclick = function () {
 
+              if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
+
               const content = codeEditor ? codeEditor.value : "";
 
               if (!content.trim()) {
@@ -6993,6 +7017,8 @@
           if (formatBtn)
 
             formatBtn.onclick = function () {
+
+              if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('formatted')) return;
 
               const content = codeEditor ? codeEditor.value : '';
 
@@ -7196,6 +7222,8 @@
           if (saveBtn)
 
             saveBtn.onclick = function () {
+
+              if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
 
               const content = codeEditor ? codeEditor.value : "";
 
@@ -9315,6 +9343,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
             saveBtn.onclick = function () {
 
+              if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
+
               const content = codeEditor ? codeEditor.value : "";
 
               if (!content.trim()) {
@@ -10732,6 +10762,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       window.saveFile = function () {
 
+        if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
+
         var ta = document.getElementById("code-editor");
 
         if (!ta) {
@@ -10791,6 +10823,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
           if (saveBtn)
 
             saveBtn.onclick = function () {
+
+              if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
 
               const content = codeEditor ? codeEditor.value : "";
 
@@ -11062,6 +11096,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
               });
 
           } else if (text === "Save") {
+
+            if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
 
             var codeEditor = document.getElementById("code-editor");
 
@@ -11645,6 +11681,18 @@ window.needVerifyInBrowser = function(detail) {
 
 window.openTabs = [];
 
+// PC files opened from outside the project carry an absolute Windows path.
+window._aceIsExternalPath = function(p) {
+    if (!p) return false;
+    var s = String(p).replace(/\\/g, '/');
+    return /^[A-Za-z]:\//.test(s) || /^\/\//.test(s);
+};
+
+window._aceExternalPathForTab = function(tab) {
+    if (!tab) return '';
+    return String(tab.path || tab.name || '').replace(/\\/g, '/');
+};
+
 
 
 window.renderTabs = function() {
@@ -11709,6 +11757,30 @@ window.renderTabs = function() {
 
             el.appendChild(name);
 
+            var listPath = window._aceExternalPathForTab(tab);
+
+            if (window._aceIsExternalPath(listPath)) {
+                var listMenu = document.createElement('span');
+
+                listMenu.className = 'acesi-tab-menu';
+
+                listMenu.textContent = '\u22EF';
+
+                listMenu.title = 'File actions';
+
+                listMenu.onclick = function(e) {
+
+                    e.stopPropagation();
+
+                    if (typeof window._aceOpenFileActionsMenu === 'function') {
+                        window._aceOpenFileActionsMenu(tab, listMenu);
+                    }
+
+                };
+
+                el.appendChild(listMenu);
+            }
+
             
 
             el.onclick = function() {
@@ -11739,13 +11811,54 @@ window.renderTabs = function() {
 
         el.className = 'acesi-tab' + (tab.active ? ' active' : '');
 
-        el.innerHTML = '<span class="acesi-tab-name">' + tab.name + '</span><span class="acesi-tab-close">&times;</span>';
+        const nameSpan = document.createElement('span');
+
+        nameSpan.className = 'acesi-tab-name';
+
+        nameSpan.textContent = tab.name;
+
+        el.appendChild(nameSpan);
+
+        const tabPath = (typeof window._aceExternalPathForTab === 'function')
+            ? window._aceExternalPathForTab(tab) : '';
+
+        if (typeof window._aceIsExternalPath === 'function' && window._aceIsExternalPath(tabPath)) {
+            const menuSpan = document.createElement('span');
+
+            menuSpan.className = 'acesi-tab-menu';
+
+            menuSpan.textContent = '\u22EF';
+
+            menuSpan.title = 'File actions (\u22EF)';
+
+            el.appendChild(menuSpan);
+        }
+
+        const closeSpan = document.createElement('span');
+
+        closeSpan.className = 'acesi-tab-close';
+
+        closeSpan.textContent = '\u00D7';
+
+        el.appendChild(closeSpan);
 
         
 
         // Click to switch
 
         el.onclick = (e) => {
+
+            if (e.target.classList.contains('acesi-tab-menu')) {
+
+                e.stopPropagation();
+
+                if (typeof window._aceOpenFileActionsMenu === 'function') {
+                    window._aceOpenFileActionsMenu(tab, e.target);
+                }
+
+                return;
+
+            }
 
             if (e.target.classList.contains('acesi-tab-close')) {
 
@@ -11754,6 +11867,8 @@ window.renderTabs = function() {
                 // Close tab
 
                 const idx = window.openTabs.indexOf(tab);
+
+                if (typeof window._aceReleaseTabUrl === 'function') window._aceReleaseTabUrl(tab);
 
                 window.openTabs.splice(idx, 1);
 
@@ -11774,6 +11889,8 @@ window.renderTabs = function() {
                         if (ta) ta.value = '';
 
                         if (typeof updateLineNumbers === 'function') updateLineNumbers();
+
+                        if (typeof window._aceHideImagePreview === 'function') window._aceHideImagePreview();
 
                         window.currentFile = null;
 
@@ -11827,6 +11944,14 @@ window.switchToTab = function(filename) {
 
     window.currentFile = target.name;
 
+    if ((target.kind === 'image' || target.kind === 'pdf') && target.imageUrl) {
+        if (typeof window._aceShowImagePreview === 'function') {
+            window._aceShowImagePreview(target.imageUrl, target.label || target.name, target.kind);
+        }
+    } else if (typeof window._aceHideImagePreview === 'function') {
+        window._aceHideImagePreview();
+    }
+
     
 
     const ta = document.getElementById('code-editor');
@@ -11858,6 +11983,8 @@ window.loadFile = function(filename) {
         return;
 
     }
+
+    if (typeof window._aceHideImagePreview === 'function') window._aceHideImagePreview();
 
     
 
@@ -13281,11 +13408,230 @@ document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('DOMContentLoaded', function() {
     if (!window.socket) window.socket = io();
 
+    // Show / hide the in-editor image/PDF viewer.
+    window._aceShowImagePreview = function(url, label, kind) {
+      var ov = document.getElementById('image-preview-overlay');
+      if (!ov) return;
+      var img = document.getElementById('image-preview-img');
+      var pdf = document.getElementById('image-preview-pdf');
+      var isPdf = kind === 'pdf';
+      if (img) {
+        img.style.display = isPdf ? 'none' : 'block';
+        if (!isPdf) img.src = url;
+      }
+      if (pdf) {
+        pdf.style.display = isPdf ? 'block' : 'none';
+        if (isPdf) pdf.src = url;
+      }
+      var name = document.getElementById('image-preview-name');
+      if (name) name.textContent = label || '';
+      ov.style.display = 'flex';
+    };
+    window._aceHideImagePreview = function() {
+      var ov = document.getElementById('image-preview-overlay');
+      if (ov) ov.style.display = 'none';
+      // Keep the blob URL alive: the image tab still owns it so switching back
+      // to that tab can show the preview again.
+    };
+    window._aceReleaseTabUrl = function(tab) {
+      if (tab && tab.imageUrl && tab.imageUrl.indexOf('blob:') === 0) {
+        try { URL.revokeObjectURL(tab.imageUrl); } catch (e) {}
+        tab.imageUrl = null;
+      }
+    };
+
+    // Binary/image tabs are view-only: the textarea is intentionally empty, so
+    // Save/Format must never be allowed to overwrite the original binary file.
+    window._aceActiveTabIsViewOnly = function() {
+      var active = (window.openTabs || []).find(function(t) { return t.active; });
+      return !!(active && (active.kind === 'image' || active.kind === 'pdf'));
+    };
+    window._aceBlockViewOnlyAction = function(action) {
+      if (!window._aceActiveTabIsViewOnly()) return false;
+      if (window.showAceToast) {
+        window.showAceToast('This file is open as a preview and cannot be ' + action + '.', 'error', 4000);
+      }
+      return true;
+    };
+
+    // Three-dot File Actions menu for PC files opened in the Code Editor.
+    var aceFileMenuClose = null;
+    window._aceCloseFileActionsMenu = function() {
+      if (typeof aceFileMenuClose === 'function') aceFileMenuClose();
+    };
+
+    window._aceOpenFileActionsMenu = function(tab, anchor) {
+      if (window._aceCloseFileActionsMenu) window._aceCloseFileActionsMenu();
+
+      var path = window._aceExternalPathForTab(tab);
+      if (!window._aceIsExternalPath(path)) return;
+      var nativePath = tab.path || path;
+
+      var menu = document.createElement('div');
+      menu.className = 'acesi-file-menu';
+
+      var title = document.createElement('div');
+      title.className = 'acesi-file-menu-title';
+      title.textContent = tab.label || path.split('/').pop() || path;
+      menu.appendChild(title);
+
+      var addItem = function(label, action, extraClass) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.setAttribute('data-action', action);
+        if (extraClass) btn.className = extraClass;
+        menu.appendChild(btn);
+        return btn;
+      };
+
+      addItem('Reveal in File Explorer', 'reveal');
+      addItem('Copy Path', 'copy-path');
+
+      var sep = document.createElement('div');
+      sep.className = 'acesi-file-menu-sep';
+      menu.appendChild(sep);
+
+      var groupLabel = document.createElement('div');
+      groupLabel.className = 'acesi-file-menu-label';
+      groupLabel.textContent = 'Open in:';
+      menu.appendChild(groupLabel);
+
+      addItem('A. File Explorer', 'explorer', 'acesi-open-in-item');
+      addItem('B. VS CODE', 'vscode', 'acesi-open-in-item');
+      addItem('C. Powershell', 'powershell', 'acesi-open-in-item');
+      addItem('D. Sublime Text', 'sublime', 'acesi-open-in-item');
+      addItem('E. Notepad', 'notepad', 'acesi-open-in-item');
+
+      document.body.appendChild(menu);
+
+      var r = anchor.getBoundingClientRect();
+      var scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
+      var scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      var docW = document.documentElement.scrollWidth;
+      var docH = document.documentElement.scrollHeight;
+      var left = r.left + scrollX;
+      var top = r.bottom + scrollY + 4;
+      if (top + menu.offsetHeight > docH - 4) {
+        top = r.top + scrollY - menu.offsetHeight - 4;
+      }
+      left = Math.max(4, Math.min(left, docW - menu.offsetWidth - 4));
+      top = Math.max(4, top);
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+
+      var onOutside = function(e) {
+        if (!menu.contains(e.target)) window._aceCloseFileActionsMenu();
+      };
+      var onKey = function(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          window._aceCloseFileActionsMenu();
+        }
+      };
+      aceFileMenuClose = function() {
+        document.removeEventListener('pointerdown', onOutside, true);
+        document.removeEventListener('keydown', onKey, true);
+        if (menu.parentNode) menu.parentNode.removeChild(menu);
+        aceFileMenuClose = null;
+      };
+      document.addEventListener('pointerdown', onOutside, true);
+      document.addEventListener('keydown', onKey, true);
+
+      menu.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var btn = e.target.closest ? e.target.closest('button[data-action]') : null;
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        var label = btn.textContent || action;
+        window._aceCloseFileActionsMenu();
+
+        if (action === 'copy-path') {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(nativePath)
+              .then(function() {
+                if (window.showAceToast) window.showAceToast('Path copied.', 'success', 2500);
+              })
+              .catch(function(err) {
+                if (window.showAceToast) window.showAceToast('Copy failed: ' + err.message, 'error', 4000);
+              });
+          } else if (window.showAceToast) {
+            window.showAceToast('Path: ' + path, 'success', 6000);
+          }
+          return;
+        }
+
+        if (window.showAceToast) window.showAceToast('Opening...', 'success', 1500);
+        fetch('/api/user-file-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: path, action: action })
+        })
+          .then(function(r) {
+            return r.json().then(function(d) { return { ok: r.ok, d: d }; });
+          })
+          .then(function(res) {
+            if (window.showAceToast) {
+              if (res.ok && res.d && res.d.ok) {
+                window.showAceToast('Done: ' + label, 'success', 2500);
+              } else {
+                window.showAceToast((res.d && res.d.error) || 'Action failed.', 'error', 5000);
+              }
+            }
+          })
+          .catch(function(err) {
+            if (window.showAceToast) window.showAceToast('Action failed: ' + err.message, 'error', 5000);
+          });
+      });
+    };
+
+    var closeImgBtn = document.getElementById('image-preview-close');
+    if (closeImgBtn) {
+      closeImgBtn.onclick = function() {
+        var idx = window.openTabs.findIndex(function(t) { return t.active; });
+        if (idx >= 0) {
+          window._aceReleaseTabUrl(window.openTabs[idx]);
+          window.openTabs.splice(idx, 1);
+        }
+        if (window.openTabs.length) {
+          var last = window.openTabs[window.openTabs.length - 1];
+          last.active = true;
+          window.switchToTab(last.name);
+        } else {
+          window.currentFile = null;
+          window._aceHideImagePreview();
+          var ta = document.getElementById('code-editor');
+          if (ta) ta.value = '';
+          window.renderTabs();
+        }
+      };
+    }
+
     // Deterministic PC-file open: server resolved a file on disk (outside the
     // project) and wants it loaded into the Code Editor, not the default app.
     window.socket.on('open_user_file_in_editor', function(data) {
       if (!data || !data.path) return;
       var label = data.name || data.path.split(/[\\/]/).pop();
+      var finish = function(message) {
+        if (window.showAceToast) window.showAceToast(message, 'success', 4000);
+      };
+      // Images and PDFs render in the viewer; everything else loads as text.
+      if (data.kind === 'image' || data.kind === 'pdf') {
+        fetch('/api/user-file-raw?path=' + encodeURIComponent(data.path))
+          .then(function(r) {
+            if (!r.ok) throw new Error('Could not load ' + label);
+            return r.blob();
+          })
+          .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            window.loadImageInEditor(data.path, label, url, data.kind);
+            finish('Opened ' + (data.kind === 'pdf' ? 'PDF' : 'image') + ' in Code Editor: ' + label);
+          })
+          .catch(function(e) {
+            if (window.showAceToast) window.showAceToast(e.message, 'error', 5000);
+          });
+        return;
+      }
       fetch('/api/user-file-content?path=' + encodeURIComponent(data.path))
         .then(function(r) { return r.text(); })
         .then(function(text) {
@@ -13294,14 +13640,10 @@ document.addEventListener('DOMContentLoaded', function() {
           } else if (typeof window.loadFile === 'function') {
             window.loadFile(data.path);
           }
-          if (window.showAceToast) {
-            window.showAceToast('Opened in Code Editor: ' + label, 'success', 4000);
-          }
+          finish('Opened in Code Editor: ' + label);
         })
         .catch(function(e) {
-          if (window.showAceToast) {
-            window.showAceToast('Could not open file: ' + e.message, 'error', 5000);
-          }
+          if (window.showAceToast) window.showAceToast('Could not open file: ' + e.message, 'error', 5000);
         });
     });
 
@@ -13309,6 +13651,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // (from /api/user-file-content) and the tab name is the absolute PC path so
     // Save/Format keep writing to the right file.
     window.loadExternalFile = function(absolutePath, label, text) {
+      window._aceHideImagePreview();
       var tabName = absolutePath.replace(/\\/g, '/');
       var existing = window.openTabs.find(function(t) { return t.name === tabName; });
       if (existing) { window.switchToTab(tabName); return; }
@@ -13318,7 +13661,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currentTa) activeTab.content = currentTa.value;
       }
       window.openTabs.forEach(function(t) { t.active = false; });
-      window.openTabs.push({ name: tabName, content: text, active: true, label: label });
+      window.openTabs.push({ name: tabName, path: absolutePath, content: text, active: true, label: label, kind: 'text' });
       window.currentFile = tabName;
       var ta = document.getElementById('code-editor');
       if (ta) {
@@ -13327,6 +13670,31 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.aceEditorRefresh) window.aceEditorRefresh();
       }
       window.renderTabs();
+    };
+
+    // Open an image/PDF as a real tab whose content is shown by the viewer.
+    window.loadImageInEditor = function(absolutePath, label, url, kind) {
+      var tabName = absolutePath.replace(/\\/g, '/');
+      var existing = window.openTabs.find(function(t) { return t.name === tabName; });
+      if (existing) {
+        window._aceReleaseTabUrl(existing);
+        existing.imageUrl = url;
+        existing.kind = kind;
+        window.switchToTab(tabName);
+        return;
+      }
+      var activeTab = window.openTabs.find(function(t) { return t.active; });
+      if (activeTab) {
+        var currentTa = document.getElementById('code-editor');
+        if (currentTa) activeTab.content = currentTa.value;
+      }
+      window.openTabs.forEach(function(t) { t.active = false; });
+      window.openTabs.push({
+        name: tabName, path: absolutePath, content: '', active: true, label: label,
+        kind: kind, imageUrl: url
+      });
+      window.currentFile = tabName;
+      window.switchToTab(tabName);
     };
   });
 
@@ -13519,6 +13887,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   function saveWithName(filename) {
+    if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
     var ta = editor();
     var content = ta ? ta.value : '';
     fetch('/api/save-file', {
@@ -13539,6 +13908,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   window.aceToolbarSave = function () {
+    if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('saved')) return;
     var ta = editor();
     if (!ta || !ta.value.trim()) {
       doneOrError(false, '', 'Editor is empty - nothing to save.');
@@ -13558,6 +13928,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   window.aceToolbarFormat = function () {
+    if (window._aceBlockViewOnlyAction && window._aceBlockViewOnlyAction('formatted')) return;
     var ta = editor();
     if (!ta || !ta.value.trim()) {
       doneOrError(false, '', 'Editor is empty - nothing to format.');
