@@ -30,7 +30,7 @@
 .EXAMPLE
   .\launch.ps1                 # what the desktop icon does
   .\launch.ps1 -ForceRestart   # always replace the running server
-  .\launch.ps1 -DevTools       # window with devtools enabled (F12)
+  .\launch.ps1 -DevTools       # also open the devtools panel (F12 works anyway)
 #>
 [CmdletBinding()]
 param(
@@ -260,9 +260,22 @@ try {
 
   # ---- 6. open the window ------------------------------------------------
   $desktopArgs = '"{0}" --port {1}' -f $appPy, $Port
-  if ($DevTools) { $desktopArgs += ' --debug' }
+  if ($DevTools) { $desktopArgs += ' --devtools' }
   Write-Log "opening desktop window: $desktopArgs"
-  $win = Start-Process -FilePath $Python -ArgumentList $desktopArgs -WorkingDirectory $Root -PassThru
+  # python.exe is a console program: launching it pops a black console window
+  # behind the app. -WindowStyle Hidden is not an option either - Windows
+  # applies SW_HIDE to the process's first ShowWindow call, which is the
+  # pywebview window, so the app would start invisible. pythonw.exe is the GUI
+  # build of the same interpreter: no console, and a normal window.
+  $windowExe = Join-Path (Split-Path -Parent $Python) 'pythonw.exe'
+  if (-not (Test-Path $windowExe)) {
+    Write-Log "WARNING: $windowExe not found, falling back to python.exe (a console window will show)"
+    $windowExe = $Python
+  }
+  $win = Start-Process -FilePath $windowExe -ArgumentList $desktopArgs -WorkingDirectory $Root `
+    -RedirectStandardOutput (Join-Path $Root 'desktop_stdout.log') `
+    -RedirectStandardError (Join-Path $Root 'desktop_stderr.log') `
+    -PassThru
 
   for ($i = 0; $i -lt 80; $i++) {
     if ($win.HasExited) {

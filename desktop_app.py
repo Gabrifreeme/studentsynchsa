@@ -35,9 +35,9 @@ def main():
     parser = argparse.ArgumentParser(description="ACEsi desktop window")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument(
-        "--debug",
+        "--devtools",
         action="store_true",
-        help="start with devtools enabled (F12 / right-click -> Inspect)",
+        help="open the devtools panel at startup (F12 works either way)",
     )
     args = parser.parse_args()
 
@@ -52,8 +52,16 @@ def main():
         # The browser lets you select chat text; the pywebview default does not.
         text_select=True,
     )
+
+    # pywebview ties devtools, the right-click menu and the browser keyboard
+    # shortcuts (F12, Ctrl+Shift+I, Ctrl+R) to debug mode. This is a local app
+    # talking to 127.0.0.1, so keep them on permanently - the browser version
+    # has them too. Only the panel that pops up on launch is opt-in, otherwise
+    # every start would open a devtools window.
+    webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = bool(args.devtools)
+
     webview.start(
-        debug=args.debug,
+        debug=True,
         private_mode=False,
         storage_path=storage_dir(),
     )

@@ -416,7 +416,11 @@
 
         line-height: 21px;
 
-        white-space: pre;
+        /* Must wrap exactly like the textarea above it, otherwise the colours
+           drift away from the caret. */
+        white-space: pre-wrap;
+
+        overflow-wrap: break-word;
 
         tab-size: 4;
 
@@ -430,9 +434,8 @@
 
         z-index: 2;
 
-        /* Extra room so the overlay can scroll as far as the textarea,
-
-               whose horizontal scrollbar shrinks its own viewport. */
+        /* Bottom room so the overlay can scroll as far as the textarea,
+           whose scrollbar shrinks its own viewport. */
 
         padding-bottom: 40px;
 
@@ -518,11 +521,17 @@
 
         line-height: 21px;
 
-        white-space: pre;
+        /* Soft wrap: a long line folds onto the next row instead of running
+           off the right edge, so the editor never scrolls sideways. */
+        white-space: pre-wrap;
+
+        overflow-wrap: break-word;
 
         tab-size: 4;
 
-        overflow: auto;
+        overflow-x: hidden;
+
+        overflow-y: auto;
 
         outline: none;
 
@@ -5380,7 +5389,7 @@
 
               id="code-editor"
 
-              wrap="off"
+              wrap="soft"
 
               spellcheck="false"
 
@@ -5743,7 +5752,7 @@
 
       async function restartAcesi() {
 
-        if (!confirm("Restart ACESi Server? The UI will reload in 8 seconds."))
+        if (!confirm("Restart ACESi Server? The page reloads as soon as it is back."))
 
           return;
 
@@ -5761,15 +5770,55 @@
 
           document.body.innerHTML =
 
-            "<div style='color:#ff9d00; background:#000; height:100vh; display:flex; justify-content:center; align-items:center; font-family:monospace; font-size:24px;'>Restarting ACESi... Please wait.</div>";
+            "<div id='ace-restarting' style='color:#ff9d00; background:#000; height:100vh; display:flex; justify-content:center; align-items:center; font-family:monospace; font-size:24px;'>Restarting ACESi... Please wait.</div>";
 
 
 
-          setTimeout(() => {
+          // The old process has to stop and Python has to import everything
 
-            window.location.reload();
+          // again, which takes longer than a fixed timer can guess: reloading
 
-          }, 8000);
+          // too early lands on a "can't connect" page. Poll instead, and only
+
+          // reload once "/" actually answers.
+
+          var startedAt = Date.now();
+
+          var waitForServer = function () {
+
+            fetch("/?restart_ping=" + Date.now(), { cache: "no-store" })
+
+              .then(function (res) {
+
+                if (!res.ok) throw new Error("HTTP " + res.status);
+
+                window.location.replace("/?v=" + Date.now());
+
+              })
+
+              .catch(function () {
+
+                if (Date.now() - startedAt > 120000) {
+
+                  var box = document.getElementById("ace-restarting");
+
+                  if (box) {
+
+                    box.textContent = "ACESi did not come back. Close this window and open the app again.";
+
+                  }
+
+                  return;
+
+                }
+
+                setTimeout(waitForServer, 1000);
+
+              });
+
+          };
+
+          setTimeout(waitForServer, 1500);
 
         } catch (e) {
 
@@ -8406,7 +8455,219 @@
 
       // gutter in sync with its line count and vertical scroll position.
 
-      function updateLineNumbers() {
+      //
+
+      // Long lines soft-wrap now, so one logical line can occupy several rows.
+
+      // A plain "1\n2\n3" gutter drifts as soon as anything wraps, so the rows
+
+      // each line really takes are read back from the highlight layer (same
+
+      // text, same width) and the gutter entry is given that height. Files
+
+      // without wrapping keep the cheap text path.
+
+      var _gutterKey = "";
+
+      var _editorRevision = 0;
+
+      var _editorCharWidth = 0;
+
+      var _lastEditorWidth = -1;
+
+      // The overlay must be exactly as wide as the textarea's text area: when
+
+      // the vertical scrollbar appears, clientWidth shrinks and both layers
+
+      // have to wrap at the same column.
+
+      function syncEditorWidth() {
+
+        var ta = document.getElementById("code-editor");
+
+        var layer = document.getElementById("highlight-layer");
+
+        if (!ta || !layer) return;
+
+        var w = ta.clientWidth;
+
+        if (w > 0) {
+
+          layer.style.width = w + "px";
+
+          _lastEditorWidth = w;
+
+        }
+
+      }
+
+      function editorCharWidth(layer) {
+
+        if (_editorCharWidth) return _editorCharWidth;
+
+        try {
+
+          var cs = getComputedStyle(layer);
+
+          var ctx = document.createElement("canvas").getContext("2d");
+
+          ctx.font = cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+
+          var w = ctx.measureText("MMMMMMMMMM").width / 10;
+
+          _editorCharWidth = w > 0 ? w : parseFloat(cs.fontSize) * 0.6;
+
+        } catch (e) {
+
+          _editorCharWidth = 8.4;
+
+        }
+
+        return _editorCharWidth;
+
+      }
+
+      function visualLength(s) {
+
+        // A tab grows to the next 4-column stop; counting four is only ever too
+
+        // wide, which makes the line get measured instead of skipped.
+
+        var n = 0;
+
+        for (var i = 0; i < s.length; i++) n += s.charAt(i) === "\t" ? 4 : 1;
+
+        return n;
+
+      }
+
+      // Rows each logical line occupies, or null when nothing wraps.
+
+      function measureGutterRows(lines, layer) {
+
+        var cs = getComputedStyle(layer);
+
+        var lineH = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5;
+
+        var padTop = parseFloat(cs.paddingTop) || 0;
+
+        var padBottom = parseFloat(cs.paddingBottom) || 0;
+
+        var plain = padTop + padBottom + lines.length * lineH;
+
+        if (layer.scrollHeight <= plain + 1) return null;
+
+        var contentW = layer.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+
+        var maxChars = Math.max(1, Math.floor(contentW / editorCharWidth(layer)));
+
+        var longLine = lines.map(function (s) { return visualLength(s) > maxChars; });
+
+        var anyLong = false;
+
+        for (var q = 0; q < longLine.length; q++) { if (longLine[q]) { anyLong = true; break; } }
+
+        if (!anyLong) return null;
+
+        // One walk over the layer's text nodes: remember where the lines that
+
+        // can wrap start and end, so a Range can report their row boxes.
+
+        var starts = {};
+
+        var ends = {};
+
+        var walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT, null, false);
+
+        var line = 0;
+
+        var node;
+
+        while ((node = walker.nextNode()) && line < lines.length) {
+
+          var text = node.nodeValue;
+
+          var pos = 0;
+
+          while (pos < text.length && line < lines.length) {
+
+            var nl = text.indexOf("\n", pos);
+
+            var segEnd = nl === -1 ? text.length : nl;
+
+            if (segEnd > pos && longLine[line]) {
+
+              if (!starts[line]) starts[line] = { node: node, offset: pos };
+
+              ends[line] = { node: node, offset: segEnd };
+
+            }
+
+            if (nl === -1) break;
+
+            line++;
+
+            pos = nl + 1;
+
+          }
+
+        }
+
+        var range = document.createRange();
+
+        var rowsPerLine = [];
+
+        for (var i = 0; i < lines.length; i++) {
+
+          var rows = 1;
+
+          if (starts[i] && ends[i]) {
+
+            try {
+
+              range.setStart(starts[i].node, starts[i].offset);
+
+              range.setEnd(ends[i].node, ends[i].offset);
+
+              var rects = range.getClientRects();
+
+              var tops = [];
+
+              for (var r = 0; r < rects.length; r++) {
+
+                var top = Math.round(rects[r].top);
+
+                var seen = false;
+
+                for (var k = 0; k < tops.length; k++) {
+
+                  if (Math.abs(tops[k] - top) <= 2) { seen = true; break; }
+
+                }
+
+                if (!seen) tops.push(top);
+
+              }
+
+              if (tops.length > rows) rows = tops.length;
+
+            } catch (e) {
+
+              rows = 1;
+
+            }
+
+          }
+
+          rowsPerLine.push(rows);
+
+        }
+
+        return rowsPerLine;
+
+      }
+
+      function updateLineNumbers(force) {
 
         var ta = document.getElementById("code-editor");
 
@@ -8414,13 +8675,38 @@
 
         if (!ta || !gutter) return;
 
-        var count = ta.value.split("\n").length;
+        syncEditorWidth();
 
-        var lines = [];
+        var key = _editorRevision + ":" + ta.clientWidth;
 
-        for (var i = 1; i <= count; i++) lines.push(i);
+        if (!force && key === _gutterKey) {
 
-        gutter.textContent = lines.join("\n");
+          gutter.scrollTop = ta.scrollTop;
+
+          return;
+
+        }
+
+        _gutterKey = key;
+
+        var lines = ta.value.split("\n");
+
+        var layer = document.getElementById("highlight-layer");
+
+        var rowsPerLine = layer ? measureGutterRows(lines, layer) : null;
+
+        // One number per logical line, plus a blank filler row for every extra
+        // visual row the line wraps onto. The gutter keeps a single text node,
+        // so a 20k-line file costs the same as before.
+        var numbers = [];
+        for (var row = 0; row < lines.length; row++) {
+          numbers.push(String(row + 1));
+          if (rowsPerLine) {
+            for (var pad = 1; pad < rowsPerLine[row]; pad++) numbers.push("");
+          }
+        }
+
+        gutter.textContent = numbers.join("\n");
 
         gutter.scrollTop = ta.scrollTop;
 
@@ -8925,6 +9211,8 @@
 
           document.body.classList.add("syntax-on");
 
+          _editorRevision++;
+
         } catch (err) {
 
           layer.innerHTML = "";
@@ -8934,6 +9222,10 @@
           return;
 
         }
+
+        syncEditorWidth();
+
+        updateLineNumbers(true);
 
         syncEditorScroll();
 
@@ -8985,6 +9277,18 @@
 
         }
 
+        // A scrollbar appearing changes the wrap column, so the gutter has to
+
+        // be rebuilt whenever the text area gets narrower or wider.
+
+        if (ta.clientWidth > 0 && ta.clientWidth !== _lastEditorWidth) {
+
+          syncEditorWidth();
+
+          updateLineNumbers(true);
+
+        }
+
       }
 
 
@@ -9003,7 +9307,7 @@
 
         if (!ta) return;
 
-        ta.addEventListener("input", updateLineNumbers);
+        ta.addEventListener("input", function () { updateLineNumbers(); });
 
         ta.addEventListener("input", renderHighlight);
 
@@ -9016,6 +9320,29 @@
         });
 
         window.addEventListener("resize", scheduleBracketMarks);
+
+        // Dragging a panel splitter changes the wrap column without a window
+        // resize, so watch the editor box itself.
+
+        if (window.ResizeObserver) {
+
+          var area = document.getElementById("editor-area");
+
+          if (area) {
+
+            new ResizeObserver(function () {
+
+              syncEditorWidth();
+
+              updateLineNumbers(true);
+
+              scheduleBracketMarks();
+
+            }).observe(area);
+
+          }
+
+        }
 
         ta.addEventListener("click", updateBracketHighlight);
 

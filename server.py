@@ -17702,24 +17702,32 @@ def restart_server():
     script = os.path.join(root, "restart_server.ps1")
     if os.path.isfile(script):
         safe = script.replace("'", "''")
-        cmd = [
-            "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-WindowStyle", "Hidden", "-Command",
-            "Start-Sleep -Seconds 2; & '%s'" % safe,
-        ]
         try:
-            # Spawn a detached PowerShell process that waits, kills this specific PID, and starts a new server
-            current_pid = os.getpid()
-            cmd_str = f"Start-Sleep -Seconds 2; Stop-Process -Id {current_pid} -Force -ErrorAction SilentlyContinue; Start-Process python -ArgumentList 'server.py' -WorkingDirectory '{root}'"
-            
-            subprocess.Popen(
-                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", cmd_str],
-                cwd=root,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            return jsonify({"status": "restarting", "via": "detached powershell"})
+            # restart_server.ps1 stops whoever holds the port, starts the server
+            # with the absolute interpreter and keeps stdout/stderr on disk. The
+            # two-second delay lets this response reach the browser first.
+            #
+            # The child must NOT inherit this process's stdout: that handle is
+            # server_stdout.txt, and the script rotates that file. An inherited
+            # handle keeps it open, rotation fails, and the script used to abort
+            # there - after stopping the old server - leaving nothing running.
+            restart_log = open(os.path.join(root, "restart.log"), "ab")
+            try:
+                subprocess.Popen(
+                    ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                     "-WindowStyle", "Hidden", "-Command",
+                     "Start-Sleep -Seconds 2; & '%s'" % safe],
+                    cwd=root,
+                    stdin=subprocess.DEVNULL,
+                    stdout=restart_log,
+                    stderr=subprocess.STDOUT,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            finally:
+                restart_log.close()
+            return jsonify({"status": "restarting", "via": "restart_server.ps1"})
         except Exception as e:
-            print("[restart] detached spawn failed (%s)" % e)
+            print("[restart] restart_server.ps1 failed to launch (%s)" % e)
     try:
         subprocess.Popen("restart_server.bat", shell=True,
                          creationflags=subprocess.CREATE_NEW_CONSOLE)

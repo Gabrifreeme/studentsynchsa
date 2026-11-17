@@ -72,12 +72,21 @@ if ($still) {
 if (-not $NoRotate) {
   # Append-only logs grow without bound (the access log alone hit 69 KB in
   # minutes), and a fresh file makes "is the banner there?" unambiguous.
+  #
+  # Rotation is best effort: any process that inherited the redirect (a tool
+  # call the server spawned, an old restart helper) keeps the handle open, and
+  # failing to rotate must never abort a restart - the server is already down
+  # at this point, so aborting here would leave nothing running.
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   foreach ($f in @($out, $err)) {
     if (Test-Path $f) {
       $bak = "$f.$stamp"
-      Move-Item -LiteralPath $f -Destination $bak -Force
-      Write-Host "  rotated $(Split-Path $f -Leaf) -> $(Split-Path $bak -Leaf)"
+      try {
+        Move-Item -LiteralPath $f -Destination $bak -Force -ErrorAction Stop
+        Write-Host "  rotated $(Split-Path $f -Leaf) -> $(Split-Path $bak -Leaf)"
+      } catch {
+        Write-Host "  could not rotate $(Split-Path $f -Leaf) ($($_.Exception.Message)) - continuing" -ForegroundColor Yellow
+      }
     }
   }
 }
