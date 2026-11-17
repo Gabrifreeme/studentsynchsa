@@ -1,0 +1,16 @@
+{
+  "name": "ace-devtool-plus",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DevTool+ - a local-only developer utility toolkit embedded in ACEsi's Code Editor. Built with Lit and bundled offline.",
+  "scripts": {
+    "build": "esbuild src/devtool-plus.js --bundle --minify --format=esm --target=es2022 --outfile=../static/devtool-plus.js"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

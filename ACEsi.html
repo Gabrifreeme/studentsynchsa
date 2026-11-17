@@ -1225,6 +1225,9 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 
+    <!-- DevTool+ : bundled with Lit locally in /static/ so it works offline and sends nothing out. -->
+    <script type="module" src="/static/devtool-plus.js"></script>
+
 
 
     <style>
@@ -5253,6 +5256,32 @@
 
             </button>
 
+            <button
+
+              id="devtool-plus-btn"
+
+              class="btn"
+
+              title="Open DevTool+ (Ctrl+Alt+D) - local developer utility toolkit"
+
+              style="
+                background: #ff9d00;
+                color: #000;
+                border: 1px solid #ff9d00;
+                padding: 4px 8px;
+                font-size: 11px;
+                margin-bottom: 2px;
+                font-weight: bold;
+              "
+
+              onclick="window.toggleDevToolPlus && window.toggleDevToolPlus()"
+
+            >
+
+              🧰 DevTool+
+
+            </button>
+
           </div>
 
         </div>
@@ -5527,6 +5556,9 @@
             "
 
           ></div>
+
+          <!-- DevTool+: local-only developer utility toolkit (Lit, offline bundle) -->
+          <devtool-plus-panel id="devtool-plus-panel"></devtool-plus-panel>
 
         </div>
 
