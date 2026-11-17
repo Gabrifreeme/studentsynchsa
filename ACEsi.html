@@ -3240,7 +3240,7 @@
 
               "
 
-              onchange="updateModelsForProvider()"
+              onchange="onProviderChange()"
 
             >
 
@@ -3271,6 +3271,8 @@
             <select
 
               id="settings-model"
+
+              onchange="persistModelSelection()"
 
               style="
 
@@ -8981,7 +8983,7 @@ const res = await fetch("/chat", {
 
             headers: { "Content-Type": "application/json" },
 
-            body: JSON.stringify({ message: text }),
+            body: JSON.stringify({ message: text, model: getSelectedModel() }),
 
             signal: signal
           });
@@ -9081,6 +9083,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
                   output +
 
                   "\n\nWhat should we do next?",
+
+                model: getSelectedModel(),
 
               }),
 
@@ -9421,7 +9425,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       function updateModelsForProvider() {
 
-        var provider = document.getElementById("settings-provider").value;
+        var providerSel = document.getElementById("settings-provider");
+        var provider = providerSel ? providerSel.value : "groq";
 
         var modelSelect = document.getElementById("settings-model");
 
@@ -9448,6 +9453,60 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       }
 
+      function onProviderChange() {
+
+        updateModelsForProvider();
+
+        // A provider change rebuilds the options; persist the new pair at once
+        // so a reload keeps it even if "Save All Settings" was never pressed.
+        persistModelSelection();
+
+      }
+
+      function persistModelSelection() {
+
+        var p = document.getElementById("settings-provider");
+        var m = document.getElementById("settings-model");
+
+        if (p) localStorage.setItem("ace_selected_provider", p.value);
+        if (m && m.value) localStorage.setItem("ace_selected_model", m.value);
+
+        var ind = document.getElementById("current-model-indicator");
+        if (ind && m && m.value) ind.textContent = m.value;
+
+      }
+
+      function getSelectedModel() {
+
+        var m = document.getElementById("settings-model");
+        if (m && m.value) return m.value;
+        return localStorage.getItem("ace_selected_model") || "";
+
+      }
+
+      function restoreModelSelection(d) {
+
+        d = d || {};
+
+        var p = document.getElementById("settings-provider");
+        var m = document.getElementById("settings-model");
+        if (!p || !m) return;
+
+        // Read BOTH saved values first. Rebuilding the options must not write
+        // its default model over the one we are about to restore.
+        var provider = localStorage.getItem("ace_selected_provider") || d.provider || "groq";
+        var savedModel = localStorage.getItem("ace_selected_model") || d.model || "";
+        p.value = provider;
+
+        updateModelsForProvider();
+
+        if (savedModel) m.value = savedModel;
+        if (!m.value && m.options.length) m.value = m.options[0].value;
+
+        persistModelSelection();
+
+      }
+
       /* ===== Load Settings from Server ===== */
 
       async function loadSettings() {
@@ -9458,21 +9517,7 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
           var d = await r.json();
 
-          var providerSel = document.getElementById("settings-provider");
-          var savedProvider = localStorage.getItem("ace_selected_provider") || d.provider;
-          if (savedProvider) providerSel.value = savedProvider;
-
-          updateModelsForProvider();
-
-          var modelSel = document.getElementById("settings-model");
-          var savedModel = localStorage.getItem("ace_selected_model") || d.model;
-          if (savedModel) modelSel.value = savedModel;
-          if (!modelSel.value && modelSel.options.length) {
-            modelSel.value = modelSel.options[0].value;
-          }
-
-          document.getElementById("current-model-indicator").textContent =
-            modelSel.value || "openai/gpt-oss-120b";
+          restoreModelSelection(d);
 
           if (d.groq_key)
             document.getElementById("settings-groq-key").value = d.groq_key;
@@ -9492,6 +9537,18 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
         }
 
       }
+
+      // Restore the saved provider/model on EVERY page load, not only when the
+      // Settings panel is opened. Otherwise a hard reload silently reverted the
+      // header indicator and chat requests to the hardcoded gpt-oss default.
+      document.addEventListener("DOMContentLoaded", function () {
+
+        fetch("http://127.0.0.1:5000/api/settings")
+          .then(function (r) { return r.json(); })
+          .then(function (d) { restoreModelSelection(d); })
+          .catch(function () { restoreModelSelection({}); });
+
+      });
 
       /* ===== Save All Settings ===== */
 
@@ -9579,7 +9636,7 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
           headers: { "Content-Type": "application/json" },
 
-          body: JSON.stringify({ message: "ping" }),
+          body: JSON.stringify({ message: "ping", model: getSelectedModel() }),
 
         })
 
