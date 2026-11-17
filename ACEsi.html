@@ -679,6 +679,129 @@
       }
 
 
+      /* ===== Bracket highlighting ===== */
+
+      /* Nesting depth colours. Only `color`, background and an inset shadow are
+         used, so no glyph box changes size and the overlay stays aligned with
+         the textarea character for character. */
+
+      .br-d0 { color: #ffd75f; }
+
+      .br-d1 { color: #ff79c6; }
+
+      .br-d2 { color: #61afef; }
+
+      .br-d3 { color: #50fa7b; }
+
+      .br-d4 { color: #c678dd; }
+
+      .br-d5 { color: #e5c07b; }
+
+
+      /* A bracket with no partner: red, tinted, so it stands out in the tree of
+         otherwise balanced pairs. */
+
+      .br-bad {
+
+        color: #ff5555;
+
+        background: rgba(255, 85, 85, 0.18);
+
+        border-radius: 2px;
+
+      }
+
+
+      /* The pair under the caret lives in a tiny overlay rather than in more
+         spans in the highlight layer: moving the caret must not rebuild and
+         reparse the whole highlighted document. */
+      #bracket-marks {
+
+        position: absolute;
+
+        inset: 0;
+
+        overflow: hidden;
+
+        pointer-events: none;
+
+        z-index: 1;
+
+      }
+
+      .bracket-mark {
+
+        position: absolute;
+
+        display: none;
+
+        border-radius: 2px;
+
+        background: rgba(255, 157, 0, 0.35);
+
+        box-shadow: inset 0 0 0 1px #ff9d00;
+
+      }
+
+      .bracket-mark.bad {
+
+        background: rgba(255, 85, 85, 0.4);
+
+        box-shadow: inset 0 0 0 1px #ff5555;
+
+      }
+
+
+      /* Continuous bracket guide, in the editor's amber: out from the opening
+         bracket, down, then back to the closing bracket. */
+      .bracket-guide-h {
+
+        position: absolute;
+
+        display: none;
+
+        height: 2px;
+
+        background: #ff9d00;
+
+        box-shadow: 0 0 4px rgba(255, 157, 0, 0.7);
+
+      }
+
+      .bracket-guide-v {
+
+        position: absolute;
+
+        display: none;
+
+        width: 2px;
+
+        background: #ff9d00;
+
+        box-shadow: 0 0 4px rgba(255, 157, 0, 0.7);
+
+      }
+
+
+      /* Amber tint on the line holding the partner bracket. */
+
+      .bracket-line {
+
+        position: absolute;
+
+        display: none;
+
+        left: 0;
+
+        right: 0;
+
+        background: rgba(255, 157, 0, 0.10);
+
+        border-left: 2px solid rgba(255, 157, 0, 0.55);
+
+      }
+
+
 
       #editor-search {
 
@@ -5199,6 +5322,23 @@
 
             </div>
 
+
+            <div id="bracket-marks" aria-hidden="true">
+
+              <div id="bracket-line" class="bracket-line"></div>
+
+              <span id="bracket-guide-top" class="bracket-guide-h"></span>
+
+              <span id="bracket-guide-v" class="bracket-guide-v"></span>
+
+              <span id="bracket-guide-bottom" class="bracket-guide-h"></span>
+
+              <span id="bracket-mark-a" class="bracket-mark"></span>
+
+              <span id="bracket-mark-b" class="bracket-mark"></span>
+
+            </div>
+
             <textarea
 
               id="code-editor"
@@ -8241,6 +8381,8 @@
 
             lineNumbers: true,
 
+            matchBrackets: true,
+
           });
 
           cm.setSize("100%", "100%");
@@ -8305,6 +8447,395 @@
 
 
 
+      /* ===== Bracket highlighting ===== */
+      // A textarea cannot paint individual characters, so the highlight layer
+      // underneath it does the work: every bracket is emitted as a <span> whose
+      // class records its nesting depth, and the pair the caret touches gets an
+      // extra class. Matching is structural - strings and comments are skipped -
+      // and a stack pass flags brackets that never found a partner.
+      var BRACKET_OPEN = { "(": ")", "[": "]", "{": "}" };
+
+      var BRACKET_CLOSE = { ")": "(", "]": "[", "}": "{" };
+
+      var BRACKET_CHARS = "()[]{}";
+
+      var BRACKET_SCAN_RE =
+        /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|('''[\s\S]*?'''|"""[\s\S]*?"""|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*")/g;
+
+      var _bracketScanCache = { src: null };
+
+      var _bracketCaretKey = "";
+
+
+      function bracketIsChar(ch) {
+
+        return BRACKET_CHARS.indexOf(ch) >= 0;
+
+      }
+
+
+      function bracketScan(src) {
+
+        if (_bracketScanCache.src === src) return _bracketScanCache;
+
+        var len = src.length;
+
+        var depth = new Array(len);
+
+        var match = {};
+
+        var skip = new Uint8Array(len);
+
+        var re = BRACKET_SCAN_RE;
+
+        var m;
+
+        re.lastIndex = 0;
+
+        while ((m = re.exec(src))) {
+
+          var stop = re.lastIndex;
+
+          for (var s = m.index; s < stop; s++) skip[s] = 1;
+
+        }
+
+        var stack = [];
+
+        for (var i = 0; i < len; i++) {
+
+          if (skip[i]) continue;
+
+          var ch = src.charAt(i);
+
+          if (BRACKET_OPEN[ch]) {
+
+            depth[i] = stack.length % 6;
+
+            stack.push(i);
+
+          } else if (BRACKET_CLOSE[ch]) {
+
+            var top = stack.length ? stack[stack.length - 1] : -1;
+
+            if (top >= 0 && BRACKET_OPEN[src.charAt(top)] === ch) {
+
+              stack.pop();
+
+              depth[i] = stack.length % 6;
+
+              match[i] = top;
+
+              match[top] = i;
+
+            } else {
+
+              depth[i] = -2;
+
+            }
+
+          }
+
+        }
+
+        while (stack.length) depth[stack.pop()] = -2;
+
+        _bracketScanCache = { src: src, depth: depth, match: match, skip: skip };
+
+        return _bracketScanCache;
+
+      }
+
+
+      // Which bracket is the caret touching, and where is its partner?
+      function bracketCaretInfo(ta) {
+
+        var none = { set: null, key: "" };
+
+        var src = ta.value;
+
+        var pos = ta.selectionStart;
+
+        if (ta.selectionEnd !== pos) return none; // a selection, not a caret
+
+        var scan = bracketScan(src);
+
+        var idx = -1;
+
+        if (pos < src.length && bracketIsChar(src.charAt(pos)) && !scan.skip[pos]) {
+
+          idx = pos;
+
+        } else if (pos > 0 && bracketIsChar(src.charAt(pos - 1)) && !scan.skip[pos - 1]) {
+
+          idx = pos - 1;
+
+        }
+
+        if (idx < 0) return none;
+
+        var partner = scan.match[idx];
+
+        var set = {};
+
+        set[idx] = 1;
+
+        if (partner !== undefined) set[partner] = 1;
+
+        return {
+          set: set,
+          key: idx + ":" + (partner === undefined ? "x" : partner),
+          unmatched: partner === undefined,
+          index: idx,
+        };
+
+      }
+
+
+      function bracketClass(index) {
+
+        var depth = _bracketScanCache.depth;
+
+        var d = depth ? depth[index] : undefined;
+
+        if (d === undefined) return "";
+
+        return d === -2 ? "br br-bad" : "br br-d" + d;
+
+      }
+
+
+      // Escape a plain-text run while wrapping its brackets.
+      function bracketEmit(text, start) {
+
+        var out = "";
+
+        var run = "";
+
+        for (var i = 0; i < text.length; i++) {
+
+          var ch = text.charAt(i);
+
+          if (!bracketIsChar(ch)) {
+
+            run += ch;
+
+            continue;
+
+          }
+
+          if (run) {
+
+            out += escapeHtml(run);
+
+            run = "";
+
+          }
+
+          var cls = bracketClass(start + i);
+
+          out += cls
+            ? '<span class="' + cls + '">' + ch + "</span>"
+            : escapeHtml(ch);
+
+        }
+
+        if (run) out += escapeHtml(run);
+
+        return out;
+
+      }
+
+
+      // On-screen rectangle of one character in the highlight layer. The layer
+      // holds exactly the textarea's characters (plus a trailing newline), so a
+      // source offset is also a layer text offset.
+      function bracketCharRect(index) {
+
+        var layer = document.getElementById("highlight-layer");
+
+        if (!layer || index < 0) return null;
+
+        var walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT, null, false);
+
+        var node;
+
+        var seen = 0;
+
+        while ((node = walker.nextNode())) {
+
+          var len = node.nodeValue.length;
+
+          if (index < seen + len) {
+
+            var range = document.createRange();
+
+            range.setStart(node, index - seen);
+
+            range.setEnd(node, Math.min(index - seen + 1, len));
+
+            return range.getBoundingClientRect();
+
+          }
+
+          seen += len;
+
+        }
+
+        return null;
+
+      }
+
+      var _bracketPaintQueued = false;
+
+      function paintBracketMarks() {
+
+        _bracketPaintQueued = false;
+
+        var ta = document.getElementById("code-editor");
+
+        var area = document.getElementById("editor-area");
+
+        var markA = document.getElementById("bracket-mark-a");
+
+        var markB = document.getElementById("bracket-mark-b");
+
+        var segTop = document.getElementById("bracket-guide-top");
+
+        var segV = document.getElementById("bracket-guide-v");
+
+        var segBottom = document.getElementById("bracket-guide-bottom");
+
+        var line = document.getElementById("bracket-line");
+
+        if (!ta || !area || !markA || !markB || !segTop || !segV || !segBottom || !line) return;
+
+        markA.style.display = "none";
+
+        markB.style.display = "none";
+
+        segTop.style.display = "none";
+
+        segV.style.display = "none";
+
+        segBottom.style.display = "none";
+
+        line.style.display = "none";
+
+        var info = bracketCaretInfo(ta);
+
+        if (!info.set) return;
+
+        var indices = [];
+
+        for (var key in info.set) indices.push(parseInt(key, 10));
+
+        indices.sort(function (a, b) { return a - b; });
+
+        var areaRect = area.getBoundingClientRect();
+
+        var rectA = bracketCharRect(indices[0]);
+
+        var rectB = indices.length > 1 ? bracketCharRect(indices[1]) : null;
+
+        function place(el, r, bad) {
+
+          if (!r || !r.width) return;
+
+          el.style.left = (r.left - areaRect.left) + "px";
+
+          el.style.top = (r.top - areaRect.top) + "px";
+
+          el.style.width = r.width + "px";
+
+          el.style.height = r.height + "px";
+
+          el.className = "bracket-mark" + (bad ? " bad" : "");
+
+          el.style.display = "block";
+
+        }
+
+        place(markA, rectA, info.unmatched);
+
+        place(markB, rectB, false);
+
+        if (!rectA || !rectB) return;
+
+        // One continuous amber guide: out from the opening bracket, down, then
+        // back to the closing bracket. The segments overlap by a pixel so the
+        // corners have no visible gap.
+        if (Math.abs(rectA.top - rectB.top) > 2) {
+
+          var ya = rectA.bottom - areaRect.top;
+
+          var yb = rectB.top - areaRect.top;
+
+          var xa = rectA.right - areaRect.left;
+
+          var xb = rectB.left - areaRect.left;
+
+          var col = Math.max(xa, xb) + 12;
+
+          function hseg(el, x1, x2, y) {
+
+            var left = Math.min(x1, x2);
+
+            var w = Math.abs(x2 - x1);
+
+            if (w < 1) return;
+
+            el.style.left = left + "px";
+
+            el.style.top = (y - 1) + "px";
+
+            el.style.width = w + "px";
+
+            el.style.display = "block";
+
+          }
+
+          hseg(segTop, xa, col, ya);
+
+          segV.style.left = (col - 1) + "px";
+
+          segV.style.top = (ya - 1) + "px";
+
+          segV.style.height = (yb - ya + 2) + "px";
+
+          segV.style.display = "block";
+
+          hseg(segBottom, col, xb, yb);
+
+        }
+
+        // Tint the partner's line only when the pair spans multiple lines.
+        var partnerIsFirst = indices[0] !== info.index;
+
+        var partnerRect = partnerIsFirst ? rectA : rectB;
+
+        if (Math.abs(rectA.top - rectB.top) > 2) {
+
+          line.style.top = (partnerRect.top - areaRect.top - 2) + "px";
+
+          line.style.height = (partnerRect.height + 4) + "px";
+
+          line.style.display = "block";
+
+        }
+
+      }
+
+      function scheduleBracketMarks() {
+
+        if (_bracketPaintQueued) return;
+
+        _bracketPaintQueued = true;
+
+        requestAnimationFrame(paintBracketMarks);
+
+      }
+
       function highlightDart(src) {
 
         var re =
@@ -8317,9 +8848,11 @@
 
           m;
 
+        bracketScan(src); // fills the cache bracketEmit() reads
+
         while ((m = re.exec(src))) {
 
-          if (m.index > last) out += escapeHtml(src.slice(last, m.index));
+          if (m.index > last) out += bracketEmit(src.slice(last, m.index), last);
 
           if (m[1]) {
 
@@ -8359,7 +8892,7 @@
 
         }
 
-        out += escapeHtml(src.slice(last));
+        out += bracketEmit(src.slice(last), last);
 
         return out;
 
@@ -8377,6 +8910,10 @@
 
         try {
 
+          var info = bracketCaretInfo(ta);
+
+          _bracketCaretKey = info.key;
+
           layer.innerHTML = highlightDart(ta.value) + "\n";
 
           document.body.classList.add("syntax-on");
@@ -8392,6 +8929,26 @@
         }
 
         syncEditorScroll();
+
+        scheduleBracketMarks();
+
+      }
+
+      // Moving the caret only needs a repaint when the touched bracket changes,
+      // which keeps arrow keys and text selection cheap on large files.
+      function updateBracketHighlight() {
+
+        var ta = document.getElementById("code-editor");
+
+        if (!ta) return;
+
+        var info = bracketCaretInfo(ta);
+
+        if (info.key === _bracketCaretKey) return;
+
+        _bracketCaretKey = info.key;
+
+        paintBracketMarks();
 
       }
 
@@ -8443,7 +9000,29 @@
 
         ta.addEventListener("input", renderHighlight);
 
-        ta.addEventListener("scroll", syncLineNumbersScroll);
+        ta.addEventListener("scroll", function () {
+
+          syncLineNumbersScroll();
+
+          scheduleBracketMarks();
+
+        });
+
+        window.addEventListener("resize", scheduleBracketMarks);
+
+        ta.addEventListener("click", updateBracketHighlight);
+
+        ta.addEventListener("keyup", updateBracketHighlight);
+
+        ta.addEventListener("focus", updateBracketHighlight);
+
+        ta.addEventListener("select", updateBracketHighlight);
+
+        document.addEventListener("selectionchange", function () {
+
+          if (document.activeElement === ta) updateBracketHighlight();
+
+        });
 
         updateLineNumbers();
 
