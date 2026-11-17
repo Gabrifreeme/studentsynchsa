@@ -9185,6 +9185,43 @@ def tool_cdp_status():
     return True, d.status()
 
 
+def tool_need_verify_in_browser(target="", url="", checks=""):
+    """One-shot browser verification: attach, optionally navigate, then read
+    status/DOM/console/network through the existing CDP tools and return one
+    compact report. Safe to call repeatedly."""
+    wanted = set(x.strip().lower() for x in str(checks or "").split(",") if x.strip())
+    if not wanted:
+        wanted = {"status", "dom", "console", "network"}
+    run = {
+        "status": "cdp_status",
+        "dom": "cdp_dom_state",
+        "console": "cdp_console_logs",
+        "network": "cdp_network_requests",
+    }
+    lines, ok_all = [], True
+    ok, res = _call_tool("cdp_connect", {"target": target})
+    ok_all = ok_all and ok
+    lines.append("connect: %s" % str(res)[:300])
+    if url:
+        ok, res = _call_tool("cdp_navigate", {"url": url})
+        ok_all = ok_all and ok
+        lines.append("navigate: %s" % str(res)[:300])
+    for key in ("status", "dom", "console", "network"):
+        if key not in wanted:
+            continue
+        name = run[key]
+        try:
+            ok, res = _call_tool(name, {})
+        except Exception as e:
+            ok, res = False, "harness error: %s" % e
+        ok_all = ok_all and ok
+        text = str(res)
+        if len(text) > 1400:
+            text = text[:1400] + "…"
+        lines.append("%s: %s" % (name, text))
+    return bool(ok_all), "\n".join(lines)
+
+
 import urllib.request as _urlreq
 import urllib.error as _urlerr
 import socket as _socket
@@ -9778,6 +9815,7 @@ TOOLS = {
     "cdp_network_requests": (tool_cdp_network_requests, ()),
     "cdp_get_response_body": (tool_cdp_get_response_body, ()),
     "cdp_status": (tool_cdp_status, ()),
+    "need_verify_in_browser": (tool_need_verify_in_browser, ("target", "url", "checks")),
     "curl": (tool_curl, ("url", "method", "timeout", "verify", "allow_redirects")),
     "view_web_image": (tool_view_web_image, ("url",)),
     "notify": (tool_notify, ("title", "message")),
@@ -10002,6 +10040,13 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "cdp_status",
         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "need_verify_in_browser",
+        "description": "One-shot browser verification via CDP in a single call: attach (optionally navigate), then report connection status, DOM snapshot, console messages and network requests. Args: target (optional tab fragment), url (optional page to open first), checks (optional comma list of status,dom,console,network).",
+        "parameters": {"type": "object", "properties": {
+            "target": {"type": "string", "title": "target", "description": "Optional URL/title fragment of the CDP tab to attach to."},
+            "url": {"type": "string", "title": "url", "description": "Optional http(s) URL to navigate to before verifying."},
+            "checks": {"type": "string", "title": "checks", "description": "Optional comma list: status,dom,console,network. Default is all four."}},
+            "required": []}}},
     {"type": "function", "function": {"name": "curl",
         "description": "Hit a URL like a browser and return the HTTP status + a body snippet. Use this to confirm whether a network service (e.g. an ITS portal) is UP before blaming on-device code. Args: url (REQUIRED, http(s)://...), method (optional, default GET), timeout (optional int seconds, default 20), verify (optional bool, default true), allow_redirects (optional bool, default true). Returns ok=True even on 4xx/5xx (a server responded); ok=False only on DNS failure / connection refused / timeout = the 'no web service / port closed' signal.",
         "parameters": {"type": "object", "properties": {
@@ -10228,6 +10273,7 @@ _ICONS = {
     "todo_remove": "🗑️", "note": "📝",
     "cdp_connect": "🔌", "cdp_navigate": "➡️", "cdp_evaluate": "💻", "cdp_console_logs": "📜",
     "cdp_dom_state": "🌐", "cdp_network_requests": "🌍", "cdp_get_response_body": "📄", "cdp_status": "📊",
+    "need_verify_in_browser": "🔎",
     "curl": "🔗",
     "git_status": "🌿", "git_log": "🌿", "git_commit": "🌿",
     "git_branch": "🌿", "git_merge": "🌿", "build_apk": "📦",
@@ -10538,6 +10584,7 @@ _TOOL_DOMAINS = {
     # needing cdp_connect in its schema.
     "cdp_connect": "ui", "cdp_navigate": ("ui", "net"), "cdp_evaluate": "ui", "cdp_console_logs": "ui",
     "cdp_dom_state": "ui", "cdp_network_requests": ("ui", "net"), "cdp_get_response_body": ("ui", "net"), "cdp_status": "ui",
+    "need_verify_in_browser": ("ui", "net"),
     # network / URL probes — the new curl tool isolates "is this URL up?" from
     # both code edits and on-device taps
     "curl": "net",
@@ -11267,7 +11314,9 @@ def _explicit_cdp_intent(m):
     on-device browser inspections, so they belong to the 'ui' domain where the
     cdp_* tools live - not to 'net' just because "status code" appears."""
     return bool(re.search(
-        r'\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b', m or ""))
+        r'\bdev\s?tools?\b|\bchrome\s+dev\b|\bcdp[_ ]?[a-z_]*\b|\bf12\b'
+        r'|\bneed\s+verify\s+in\s+browser\b|\bverify\s+in\s+browser\b'
+        r'|\bbrowser\s+verif\w*\b', m or ""))
 
 
 def _classify_message(user_message):
@@ -11298,7 +11347,8 @@ def _classify_message(user_message):
         "ui_tap", "ui_swipe", "ui_type", "ui_key", "ui_dump", "ui_screenshot",
         "ui_app_open", "ui_assert", "ui_expect", "ui_test_run",
         "emulator", "open the app", "go to", "navigate", "navigation",
-        "tap ", "swipe ", "cdp_", "webview", "show me", "take a", "screenshot")) \
+        "tap ", "swipe ", "cdp_", "webview", "show me", "take a", "screenshot",
+        "need verify in browser", "verify in browser", "browser verification")) \
         or _test_task(m)
     # Situational/ambient UI asks that don't name a tool but DO place the
     # assistant on the device screen: "You are on the ITS portal", "what does
@@ -11574,6 +11624,7 @@ _SHORT_DESCRIPTIONS = {
     "cdp_dom_state": "Read the attached page's title, URL and HTML.",
     "cdp_console_logs": "Read console messages from the attached page.",
     "cdp_status": "Report whether DevTools is attached, plus event counts.",
+    "need_verify_in_browser": "One-shot browser verification. Args: target, url, checks (status,dom,console,network).",
     # --- on-device UI ---
     # ui_connect/ui_device need short descriptions or _short_tool() returns None
     # for them and they vanish from the reduced schema entirely - they can sit in
@@ -11605,7 +11656,7 @@ _SHORT_DESCRIPTIONS = {
 _REDUCED_TOOL_ORDER = [
     "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
     "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
-    "cdp_status",
+    "cdp_status", "need_verify_in_browser",
     "ui_connect", "ui_device",
     "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_swipe", "ui_key",
     "ui_screenshot",
@@ -11623,7 +11674,8 @@ _EXPLORER_FIX_TOOLS = {"read_file", "edit_file", "write_file",
 # Never shed these: without them a network or navigation task cannot be done at
 # all, so losing them would turn a working reduced schema into a useless one.
 _REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
-                      "cdp_network_requests", "cdp_get_response_body", "cdp_console_logs", "cdp_dom_state", "cdp_status"}
+                      "cdp_network_requests", "cdp_get_response_body", "cdp_console_logs", "cdp_dom_state", "cdp_status",
+                      "need_verify_in_browser"}
 
 # The toolset a reduced browser task is actually required to carry. These are
 # protected from budget shedding for the same reason: a schema that silently

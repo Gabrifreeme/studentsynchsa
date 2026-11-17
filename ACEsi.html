@@ -1127,7 +1127,7 @@
 
     .acesi-tab-close { color: #ff9d00 !important; }
 
-#search-btn { display: none !important; }
+#search-btn, #goto-btn { display: inline-flex !important; }
 
 #editor-tab-bar { display: none !important; }
 
@@ -2758,7 +2758,7 @@
 
           addOutput(
 
-            'ðŸ” DOM: ' +
+            '🔍 DOM: ' +
 
               document.documentElement.outerHTML.substring(0, 80) +
 
@@ -2910,7 +2910,7 @@
 
         onclick="
 
-          addOutput('ðŸ§¹ Clear log', 'success', 3000);
+          addOutput('🧹 Clear log', 'success', 3000);
 
           var cm = document.getElementById('chat-messages');
 
@@ -2948,7 +2948,7 @@
 
       <button
 
-        onclick="addOutput('ðŸ“‹ Copy buffer')"
+        onclick="addOutput('📋 Copy buffer')"
 
         style="
 
@@ -2972,7 +2972,7 @@
 
       <button
 
-        onclick="addOutput('ðŸ§ª Test ping')"
+        onclick="addOutput('🧪 Test ping')"
 
         style="
 
@@ -4412,6 +4412,22 @@
 
         class="btn"
 
+        title="Need verify in browser"
+
+        onclick="window.needVerifyInBrowser && window.needVerifyInBrowser()"
+
+        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;"
+
+      >
+
+        Verify in Browser
+
+      </button>
+
+      <button
+
+        class="btn"
+
         id="explorer-refresh-btn"
 
         title="Refresh Explorer"
@@ -5090,6 +5106,31 @@
 
             <button
 
+              id="goto-btn"
+
+              class="btn"
+
+              title="Go to line number (Ctrl+G)"
+
+              style="
+                background: #000;
+                color: #ff9d00;
+                border: 1px solid #ff9d00;
+                padding: 4px 8px;
+                font-size: 11px;
+                margin-bottom: 2px;
+              "
+
+              onclick="window.openGotoModal && window.openGotoModal()"
+
+            >
+
+              Ctrl+G
+
+            </button>
+
+            <button
+
               id="save-btn"
 
               class="btn"
@@ -5377,13 +5418,15 @@
 
                 z-index: 100;
 
-                display: flex;
-
                 gap: 8px;
 
                 align-items: center;
 
                 box-shadow: 0 4px 10px #000;
+
+                font-family: monospace;
+
+                font-size: 11px;
 
               "
 
@@ -5395,7 +5438,7 @@
 
                 type="text"
 
-                placeholder="Find text..."
+                placeholder="Find text in editor..."
 
                 style="
 
@@ -5407,107 +5450,53 @@
 
                   padding: 4px;
 
-                  width: 200px;
+                  width: 220px;
 
-                "
+                  font-family: monospace;
 
-                onkeydown="
-
-                  if (event.key === 'Enter') {
-
-                    window.find(
-
-                      this.value,
-
-                      false,
-
-                      false,
-
-                      true,
-
-                      false,
-
-                      false,
-
-                      false
-
-                    );
-
-                  }
+                  outline: none;
 
                 "
 
               />
 
-              <button
-
-                type="button"
-
-                onclick="
-
-                  window.find(
-
-                    document.getElementById('search-input').value,
-
-                    false,
-
-                    false,
-
-                    true,
-
-                    false,
-
-                    false,
-
-                    false,
-
-                  )
-
-                "
-
-                style="background: #ff9d00; color: #000; cursor: pointer"
-
-              >
-
-                Find
-
-              </button>
+              <span id="search-count" style="color: #ff9d00; min-width: 54px; text-align: center;"></span>
 
               <button
 
                 type="button"
 
-                onclick="
+                id="search-prev-btn"
 
-                  document.getElementById('search-input').value = '';
+                title="Previous match (Shift+Enter)"
 
-                  document.getElementById('editor-search').style.display =
+                style="background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 8px; cursor: pointer;"
 
-                    'none';
+              >▲</button>
 
-                "
+              <button
 
-                style="
+                type="button"
 
-                  background: #000;
+                id="search-next-btn"
 
-                  color: #ff9d00;
+                title="Next match (Enter)"
 
-                  border: 1px solid #ff9d00;
+                style="background: #ff9d00; color: #000; border: 1px solid #ff9d00; padding: 4px 8px; cursor: pointer; font-weight: bold;"
 
-                  padding: 4px 8px;
+              >▼</button>
 
-                  font-size: 11px;
+              <button
 
-                  cursor: pointer;
+                type="button"
 
-                "
+                id="search-close-btn"
 
-              >
+                title="Close search (Escape)"
 
-                ✕
+                style="background: #000; color: #ff9d00; border: 1px solid #ff9d00; padding: 4px 8px; cursor: pointer;"
 
-              </button>
+              >✕</button>
 
             </div>
 
@@ -5673,7 +5662,7 @@
 
         // Print the command with a smiley
         output.innerHTML +=
-          "<div><span style='color:#ff9d00;'>[smiley] " + cmd + "</span></div>";
+          "<div><span style='color:#ff9d00;'>😊 " + cmd + "</span></div>";
 
         output.scrollTop = output.scrollHeight;
 
@@ -7732,6 +7721,7 @@
     <!-- Terminal title bar: one row, horizontally centred in the window -->
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #333; flex: 0 0 auto; box-sizing: border-box;">
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
+      <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" title="Toggle live server logs" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
       <span id="terminal-min-btn" onclick="window.toggleMinimize()" title="Minimize" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">&ndash;</span>
       <span id="terminal-close-btn" onclick="window.closeAceTerminal()" title="Close" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">X Close</span>
     </div>
@@ -10979,15 +10969,10 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       document.addEventListener("DOMContentLoaded", function () {
 
-        // 1. Force hide the stuck search bar
+        // The editor search bar starts hidden in markup. Do not force-hide it
+        // with !important here; Ctrl+F / the Search button must be able to show it.
 
         var searchBar = document.getElementById("editor-search");
-
-        if (searchBar) {
-
-          searchBar.style.setProperty("display", "none", "important");
-
-        }
 
 
 
@@ -11397,6 +11382,81 @@ document.addEventListener('DOMContentLoaded', function() {
 
 }
 
+/* ACEsi custom amber dialogs - no native browser theme. */
+.ace-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+}
+
+.ace-dialog {
+  background: #000;
+  color: #ff9d00;
+  border: 2px solid #ff9d00;
+  box-shadow: 0 0 24px rgba(255, 157, 0, 0.45);
+  min-width: 320px;
+  max-width: 560px;
+  padding: 20px;
+}
+
+.ace-dialog-title {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+.ace-dialog-message {
+  font-size: 12px;
+  color: #ffd08a;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.ace-dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #000;
+  color: #ff9d00;
+  border: 1px solid #ff9d00;
+  padding: 8px;
+  font-family: monospace;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+.ace-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ace-dialog button {
+  background: #000;
+  color: #ff9d00;
+  border: 1px solid #ff9d00;
+  padding: 7px 14px;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ace-dialog button.ace-dialog-primary {
+  background: #ff9d00;
+  color: #000;
+  font-weight: bold;
+}
+
+.ace-dialog button:hover {
+  box-shadow: 0 0 8px rgba(255, 157, 0, 0.7);
+}
+
 </style>
 
 <script>
@@ -11439,6 +11499,143 @@ window.showAceToast = function(message, type = 'success', duration = 3000) {
 
   }
 
+};
+
+/* Amber confirmation / prompt dialogs. These replace native alert/confirm/prompt
+   so every ACEsi confirmation uses the same black + amber theme. */
+window._aceDialogHost = null;
+
+function _aceDialogHostEl() {
+  if (window._aceDialogHost && document.body.contains(window._aceDialogHost)) {
+    return window._aceDialogHost;
+  }
+  var host = document.createElement('div');
+  host.id = 'ace-dialog-host';
+  document.body.appendChild(host);
+  window._aceDialogHost = host;
+  return host;
+}
+
+function _aceCloseDialog(overlay) {
+  if (!overlay || !overlay.parentNode) return;
+  overlay.parentNode.removeChild(overlay);
+}
+
+window.showAceDone = function(title, message, duration) {
+  var host = _aceDialogHostEl();
+  var overlay = document.createElement('div');
+  overlay.className = 'ace-dialog-overlay';
+  var card = document.createElement('div');
+  card.className = 'ace-dialog';
+  var h = document.createElement('div');
+  h.className = 'ace-dialog-title';
+  h.textContent = '✅ ' + (title || 'Done');
+  var p = document.createElement('div');
+  p.className = 'ace-dialog-message';
+  p.textContent = message || '';
+  var actions = document.createElement('div');
+  actions.className = 'ace-dialog-actions';
+  var ok = document.createElement('button');
+  ok.className = 'ace-dialog-primary';
+  ok.textContent = 'OK';
+  ok.onclick = function () { _aceCloseDialog(overlay); };
+  actions.appendChild(ok);
+  card.appendChild(h);
+  card.appendChild(p);
+  card.appendChild(actions);
+  overlay.appendChild(card);
+  overlay.onclick = function (e) { if (e.target === overlay) _aceCloseDialog(overlay); };
+  host.appendChild(overlay);
+  if (duration === undefined) duration = 2400;
+  if (duration > 0) setTimeout(function () { _aceCloseDialog(overlay); }, duration);
+  return overlay;
+};
+
+window.aceConfirm = function(title, message, onConfirm) {
+  var host = _aceDialogHostEl();
+  var overlay = document.createElement('div');
+  overlay.className = 'ace-dialog-overlay';
+  var card = document.createElement('div');
+  card.className = 'ace-dialog';
+  var h = document.createElement('div');
+  h.className = 'ace-dialog-title';
+  h.textContent = title || 'Confirm';
+  var p = document.createElement('div');
+  p.className = 'ace-dialog-message';
+  p.textContent = message || '';
+  var actions = document.createElement('div');
+  actions.className = 'ace-dialog-actions';
+  var cancel = document.createElement('button');
+  cancel.textContent = 'Cancel';
+  cancel.onclick = function () { _aceCloseDialog(overlay); };
+  var yes = document.createElement('button');
+  yes.className = 'ace-dialog-primary';
+  yes.textContent = 'Yes, do it';
+  yes.onclick = function () { _aceCloseDialog(overlay); if (typeof onConfirm === 'function') onConfirm(); };
+  actions.appendChild(cancel);
+  actions.appendChild(yes);
+  card.appendChild(h);
+  card.appendChild(p);
+  card.appendChild(actions);
+  overlay.appendChild(card);
+  host.appendChild(overlay);
+  return overlay;
+};
+
+window.acePrompt = function(title, message, defaultValue, onOk) {
+  var host = _aceDialogHostEl();
+  var overlay = document.createElement('div');
+  overlay.className = 'ace-dialog-overlay';
+  var card = document.createElement('div');
+  card.className = 'ace-dialog';
+  var h = document.createElement('div');
+  h.className = 'ace-dialog-title';
+  h.textContent = title || 'Enter value';
+  var p = document.createElement('div');
+  p.className = 'ace-dialog-message';
+  p.textContent = message || '';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'ace-dialog-input';
+  input.value = defaultValue || '';
+  var actions = document.createElement('div');
+  actions.className = 'ace-dialog-actions';
+  var cancel = document.createElement('button');
+  cancel.textContent = 'Cancel';
+  cancel.onclick = function () { _aceCloseDialog(overlay); };
+  var ok = document.createElement('button');
+  ok.className = 'ace-dialog-primary';
+  ok.textContent = 'OK';
+  ok.onclick = function () {
+    var value = input.value.trim();
+    if (!value) return;
+    _aceCloseDialog(overlay);
+    if (typeof onOk === 'function') onOk(value);
+  };
+  input.onkeydown = function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); ok.click(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel.click(); }
+  };
+  actions.appendChild(cancel);
+  actions.appendChild(ok);
+  card.appendChild(h);
+  card.appendChild(p);
+  card.appendChild(input);
+  card.appendChild(actions);
+  overlay.appendChild(card);
+  host.appendChild(overlay);
+  input.focus();
+  input.select();
+  return overlay;
+};
+
+window.needVerifyInBrowser = function(detail) {
+  var input = document.getElementById('chat-input');
+  var msg = 'Need verify in browser' + (detail ? ' - ' + detail : '');
+  if (input) input.value = msg;
+  if (window.showAceToast) window.showAceToast('Verifying in browser...', 'success', 2000);
+  if (typeof window.sendMessage === 'function') return window.sendMessage();
+  return false;
 };
 
 </script>
@@ -12540,7 +12737,7 @@ document.addEventListener('keydown', function(e) {
 
 
 
-    // Ctrl+F - Focus Explorer search
+    // Ctrl+F - Open the Code Editor word search
 
     if (e.ctrlKey && key === 'f' && !e.shiftKey) {
 
@@ -12548,15 +12745,7 @@ document.addEventListener('keydown', function(e) {
 
         e.stopPropagation();
 
-        // Use setTimeout to ensure the browser doesn't steal the focus back
-
-        setTimeout(function() {
-
-            var searchBox = document.getElementById('explorer-search');
-
-            if (searchBox) searchBox.focus();
-
-        }, 50);
+        if (typeof window.editorSearchOpen === 'function') window.editorSearchOpen();
 
         return;
 
@@ -12616,35 +12805,13 @@ document.addEventListener('keydown', function(e) {
 
 
 
-    // Ctrl+G - Go to line (Custom UI)
+    // Ctrl+G - Go to line number (Custom amber UI, also on the toolbar)
 
     if (e.ctrlKey && key === 'g' && !e.shiftKey) {
 
         e.preventDefault();
 
-        var modal = document.getElementById('acesi-goto-modal');
-
-        var input = document.getElementById('acesi-goto-input');
-
-        modal.style.display = 'block';
-
-        input.value = '';
-
-        input.focus();
-
-        
-
-        // Handle Enter key inside the input
-
-        input.onkeydown = function(ev) {
-
-            if (ev.key === 'Enter') {
-
-                window._doGoto();
-
-            }
-
-        };
+        if (typeof window.openGotoModal === 'function') window.openGotoModal();
 
         return;
 
@@ -13192,6 +13359,311 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() { termInput.focus(); }, 500);
      }   
   });
+</script>
+
+<script>
+/* ACEsi final toolbar wiring: one canonical set of handlers, loaded last so it
+   wins over the older duplicate blocks. stopPropagation keeps the old delegated
+   body listener from firing a second time for the same button. */
+(function () {
+  function editor() { return document.getElementById('code-editor'); }
+
+  function refreshEditor() {
+    if (typeof window.updateLineNumbers === 'function') window.updateLineNumbers();
+    if (typeof window.aceEditorRefresh === 'function') window.aceEditorRefresh();
+  }
+
+  function doneOrError(ok, title, message) {
+    if (ok) {
+      if (typeof window.showAceDone === 'function') window.showAceDone(title, message);
+      else if (window.showAceToast) window.showAceToast(message, 'success', 3000);
+    } else if (window.showAceToast) {
+      window.showAceToast(message, 'error', 5000);
+    }
+  }
+
+  window.openGotoModal = function () {
+    var modal = document.getElementById('acesi-goto-modal');
+    var input = document.getElementById('acesi-goto-input');
+    if (!modal || !input) return;
+    // The modal markup lives inside the hidden terminal panel. Move it to the
+    // body so Ctrl+G works from the Code Editor without opening the terminal;
+    // otherwise the input has no layout box and cannot receive focus.
+    if (modal.parentNode !== document.body) document.body.appendChild(modal);
+    modal.style.display = 'block';
+    input.value = '';
+    setTimeout(function () { input.focus(); input.select(); }, 0);
+    input.onkeydown = function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); window._doGoto(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); modal.style.display = 'none'; }
+    };
+  };
+
+  window.editorSearchOpen = function () {
+    var bar = document.getElementById('editor-search');
+    var input = document.getElementById('search-input');
+    if (!bar || !input) return;
+    bar.style.removeProperty('display');
+    bar.style.setProperty('display', 'flex', 'important');
+    input.focus();
+    input.select();
+    window.editorSearchFind(1);
+  };
+
+  window.editorSearchClose = function () {
+    var bar = document.getElementById('editor-search');
+    var count = document.getElementById('search-count');
+    if (bar) bar.style.setProperty('display', 'none', 'important');
+    if (count) count.textContent = '';
+  };
+
+  window.editorSearchFind = function (dir) {
+    var ta = editor();
+    var input = document.getElementById('search-input');
+    var count = document.getElementById('search-count');
+    if (!ta || !input) return;
+    var term = input.value || '';
+    if (!count) return;
+    if (!term) { count.textContent = ''; return; }
+
+    var text = ta.value || '';
+    var lowerText = text.toLowerCase();
+    var needle = term.toLowerCase();
+    var total = 0;
+    var scan = lowerText.indexOf(needle);
+    while (scan !== -1) { total++; scan = lowerText.indexOf(needle, scan + needle.length); }
+    if (!total) { count.textContent = '0 / 0'; return; }
+
+    var pos = dir > 0 ? ta.selectionEnd : Math.max(0, ta.selectionStart - needle.length);
+    var found = dir > 0
+      ? lowerText.indexOf(needle, pos)
+      : lowerText.lastIndexOf(needle, pos);
+    if (found < 0) found = dir > 0 ? lowerText.indexOf(needle) : lowerText.lastIndexOf(needle);
+
+    var ordinal = lowerText.slice(0, found).split(needle).length - 1 + 1;
+    count.textContent = ordinal + ' / ' + total;
+    ta.focus();
+    ta.setSelectionRange(found, found + term.length);
+
+    var line = text.slice(0, found).split('\n').length;
+    var wrap = document.getElementById('code-editor-wrap');
+    if (wrap) wrap.scrollTop = Math.max(0, (line - 1) * 21 - (wrap.clientHeight / 2));
+  };
+
+  function saveWithName(filename) {
+    var ta = editor();
+    var content = ta ? ta.value : '';
+    fetch('/api/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content, filename: filename })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok) {
+          doneOrError(true, 'Save complete', 'Saved ' + filename);
+          if (typeof window.checkSyntax === 'function') window.checkSyntax(filename);
+        } else {
+          doneOrError(false, '', 'Save failed: ' + ((d && d.error) || 'unknown'));
+        }
+      })
+      .catch(function (e) { doneOrError(false, '', 'Save failed: ' + e.message); });
+  }
+
+  window.aceToolbarSave = function () {
+    var ta = editor();
+    if (!ta || !ta.value.trim()) {
+      doneOrError(false, '', 'Editor is empty - nothing to save.');
+      return;
+    }
+    var filename = window.currentFile || '';
+    if (!filename) {
+      if (typeof window.acePrompt === 'function') {
+        window.acePrompt('Save file', 'Enter the filename to save:', 'lib/main.dart', function (name) {
+          window.currentFile = name;
+          saveWithName(name);
+        });
+      }
+      return;
+    }
+    saveWithName(filename);
+  };
+
+  window.aceToolbarFormat = function () {
+    var ta = editor();
+    if (!ta || !ta.value.trim()) {
+      doneOrError(false, '', 'Editor is empty - nothing to format.');
+      return;
+    }
+    fetch('/api/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: ta.value, filename: window.currentFile || '' })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.formatted_code !== undefined) {
+          ta.value = d.formatted_code;
+          refreshEditor();
+          doneOrError(true, 'Format complete', 'Code formatted successfully.');
+        } else {
+          doneOrError(false, '', 'Format failed: ' + ((d && d.error) || 'unknown'));
+        }
+      })
+      .catch(function (e) { doneOrError(false, '', 'Format failed: ' + e.message); });
+  };
+
+  window.aceToolbarClear = function () {
+    var ta = editor();
+    if (!ta) return;
+    ta.value = '';
+    var layer = document.getElementById('highlight-layer');
+    if (layer) layer.textContent = '';
+    refreshEditor();
+    doneOrError(true, 'Clear complete', 'Editor cleared.');
+  };
+
+  window.aceToolbarCopy = function () {
+    var ta = editor();
+    if (!ta) return;
+    var text = ta.value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(function () { doneOrError(true, 'Copy complete', 'Editor content copied to clipboard.'); })
+        .catch(function (e) { doneOrError(false, '', 'Copy failed: ' + e.message); });
+      return;
+    }
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    doneOrError(ok, 'Copy complete', ok ? 'Editor content copied to clipboard.' : 'Copy failed in this browser.');
+  };
+
+  window.aceToolbarPaste = function () {
+    var ta = editor();
+    if (!ta) return;
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      doneOrError(false, '', 'Paste is not available in this browser context.');
+      return;
+    }
+    navigator.clipboard.readText()
+      .then(function (text) {
+        ta.value = text;
+        refreshEditor();
+        doneOrError(true, 'Paste complete', 'Clipboard content pasted into editor.');
+      })
+      .catch(function (e) { doneOrError(false, '', 'Paste failed: ' + e.message); });
+  };
+
+  window.aceStripAnsi = function (text) {
+    return String(text == null ? '' : text).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+  };
+
+  window.aceAppendTerminalLine = function (text, color) {
+    var history = document.getElementById('term-history');
+    if (!history) return;
+    var line = document.createElement('div');
+    line.style.whiteSpace = 'pre-wrap';
+    line.style.color = color || '#8fd3ff';
+    line.textContent = text;
+    history.appendChild(line);
+    history.scrollTop = history.scrollHeight;
+  };
+
+  function setLiveLogButton(on) {
+    var btn = document.getElementById('terminal-logs-btn');
+    if (btn) btn.textContent = on ? '📜 Live Logs: ON' : '📜 Live Logs';
+  }
+
+  window.startAceLiveLogs = function () {
+    if (window._aceLogSource && window._aceLogSource.readyState !== 2) return;
+    if (typeof EventSource === 'undefined') return;
+    var source = new EventSource('/api/logs');
+    window._aceLogSource = source;
+    setLiveLogButton(true);
+    window.aceAppendTerminalLine('📜 Live server logs connected.', '#00ffaa');
+    source.onmessage = function (e) {
+      var raw = e && e.data;
+      if (typeof raw !== 'string' || raw.charAt(0) === ':') return;
+      var text = raw;
+      try {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.log !== undefined) text = parsed.log;
+      } catch (err) {}
+      text = window.aceStripAnsi(text);
+      if (!text.trim()) return;
+      window.aceAppendTerminalLine(text);
+    };
+    source.onerror = function () {
+      if (!window._aceLogWarned) {
+        window._aceLogWarned = true;
+        window.aceAppendTerminalLine('⚠️ Live logs disconnected; retrying...', '#ff9d00');
+      }
+    };
+    source.onopen = function () { window._aceLogWarned = false; };
+  };
+
+  window.stopAceLiveLogs = function () {
+    if (window._aceLogSource) {
+      try { window._aceLogSource.close(); } catch (e) {}
+      window._aceLogSource = null;
+    }
+    setLiveLogButton(false);
+    window.aceAppendTerminalLine('📜 Live server logs stopped.', '#ff9d00');
+  };
+
+  window.toggleAceLiveLogs = function () {
+    if (window._aceLogSource) window.stopAceLiveLogs();
+    else window.startAceLiveLogs();
+  };
+
+  window.addOutput = function (msg) {
+    window.aceAppendTerminalLine('🔧 ' + String(msg == null ? '' : msg), '#ff9d00');
+  };
+
+  function bindAll() {
+    var map = {
+      'search-btn': window.editorSearchOpen,
+      'goto-btn': window.openGotoModal,
+      'save-btn': window.aceToolbarSave,
+      'format-btn': window.aceToolbarFormat,
+      'clear-btn': window.aceToolbarClear,
+      'copy-btn': window.aceToolbarCopy,
+      'paste-btn': window.aceToolbarPaste
+    };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.onclick = function (e) { e.stopPropagation(); map[id](); };
+    });
+
+    var input = document.getElementById('search-input');
+    if (input) {
+      input.oninput = function () { window.editorSearchFind(1); };
+      input.onkeydown = function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); window.editorSearchFind(e.shiftKey ? -1 : 1); }
+        if (e.key === 'Escape') { e.preventDefault(); window.editorSearchClose(); }
+      };
+    }
+    ['search-prev-btn', 'search-next-btn', 'search-close-btn'].forEach(function (id) {
+      var btn = document.getElementById(id);
+      if (btn) btn.onclick = function (e) {
+        e.stopPropagation();
+        if (id === 'search-prev-btn') window.editorSearchFind(-1);
+        if (id === 'search-next-btn') window.editorSearchFind(1);
+        if (id === 'search-close-btn') window.editorSearchClose();
+      };
+    });
+  }
+
+  function ready() {
+    bindAll();
+    setTimeout(bindAll, 1250);
+    window.startAceLiveLogs();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
+  else ready();
+})();
 </script>
 </body>
 

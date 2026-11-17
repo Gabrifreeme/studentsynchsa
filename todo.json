@@ -1,1 +1,34 @@
-{"items": []}
+{
+  "items": [
+    {
+      "id": 1,
+      "text": "Add a reusable \"Need verify in browser\" function/capability to ACEsi for future use.",
+      "status": "done",
+      "created": "2026-11-17"
+    },
+    {
+      "id": 2,
+      "text": "Bring back the real-time log in ACEsi's terminal, including all emojis that were previously shown.",
+      "status": "done",
+      "created": "2026-11-17"
+    },
+    {
+      "id": 3,
+      "text": "Add amber-themed confirmation pop-ups for the Code Editor toolbar actions: Save, Format, Clear, Copy, and Paste. Do not use the standard browser theme.",
+      "status": "done",
+      "created": "2026-11-17"
+    },
+    {
+      "id": 4,
+      "text": "Add the search button back to the Code Editor so words can be searched inside the editor.",
+      "status": "done",
+      "created": "2026-11-17"
+    },
+    {
+      "id": 5,
+      "text": "Add Ctrl+G back to the Code Editor toolbar for line-number search/go-to-line.",
+      "status": "done",
+      "created": "2026-11-17"
+    }
+  ]
+}
