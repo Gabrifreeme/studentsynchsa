@@ -914,6 +914,36 @@ def get_recent_conversation(limit=8):
     return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
 
 
+def get_completed_conversation(limit=9):
+    """Recent prompt context: only user -> assistant pairs that were completed.
+
+    /chat saves the user message before the agent runs. If the request is
+    stopped or fails, no assistant row is written, leaving a dangling question
+    in the table. Injecting that into the next prompt makes the model answer
+    the OLD question instead of the new one (e.g. an aborted "read
+    ace_config.yaml" followed by "read debug_server.py" answered about
+    ace_config.yaml). Keep only turns that actually got a reply.
+
+    Consecutive user turns collapse to the last one in the run, and a trailing
+    unpaired user turn is the current message, so no [:-1] slice is needed at
+    the call site.
+    """
+    rows = get_recent_conversation(limit)
+    out = []
+    i = 0
+    while i < len(rows):
+        if rows[i].get("role") == "user":
+            if i + 1 < len(rows) and rows[i + 1].get("role") == "assistant":
+                out.append(rows[i])
+                out.append(rows[i + 1])
+                i += 2
+                continue
+            i += 1  # unpaired user: current message or an abandoned question
+            continue
+        i += 1  # stray assistant with no user in this window
+    return out
+
+
 # ===== Conversation Recall & Session Management =====
 def get_conversations_by_date(date_str, limit=50):
     """Get all conversations on a specific date (YYYY-MM-DD)."""
@@ -6444,8 +6474,10 @@ def chat():
         if _saved_sys_prompt and str(_saved_sys_prompt).strip():
             system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
 
-        # Recent turns (minus the just-saved current message) give ACEsi context.
-        history = get_recent_conversation(9)[:-1]
+        # Recent COMPLETED turns give ACEsi context. The current message and any
+        # abandoned question that never got a reply are dropped, so a stopped
+        # chat cannot hijack the answer to the next one.
+        history = get_completed_conversation(9)
         llm_messages = [{"role": "system", "content": system_prompt}]
         for h in history:
             if h.get('role') in ('user', 'assistant'):
