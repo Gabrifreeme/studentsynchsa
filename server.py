@@ -9185,10 +9185,25 @@ def tool_cdp_status():
     return True, d.status()
 
 
+# "Verify in Browser" always inspects ACEsi's own, already-open page. The old
+# tool accepted a model-supplied `url` and navigated to it; the model invented
+# paths like /explorer, got a 404, then asked for a Flask route that does not
+# exist. Verification must never navigate to an invented URL.
+# Attach by the root page's title ("ACESi"). A stale /explorer tab from an old
+# bad run has title "404 Not Found" and shares the 127.0.0.1:5000 URL prefix,
+# so a host-based fragment would attach to that 404 tab instead of the real UI.
+_ACE_VERIFY_TARGET = "ACESi"
+
+
 def tool_need_verify_in_browser(target="", url="", checks=""):
-    """One-shot browser verification: attach, optionally navigate, then read
-    status/DOM/console/network through the existing CDP tools and return one
-    compact report. Safe to call repeatedly."""
+    """One-shot browser verification of ACEsi's own page via CDP.
+
+    Attaches to the currently open ACEsi tab, then reports connection status,
+    DOM, console messages and network requests in one compact report. It NEVER
+    navigates: the page under test is whatever ACEsi already has open. A
+    model-supplied `url` is ignored on purpose - inventing a path (e.g.
+    /explorer) and navigating to it only yields a meaningless 404 and is not
+    what "verify in browser" means. Safe to call repeatedly."""
     wanted = set(x.strip().lower() for x in str(checks or "").split(",") if x.strip())
     if not wanted:
         wanted = {"status", "dom", "console", "network"}
@@ -9198,14 +9213,22 @@ def tool_need_verify_in_browser(target="", url="", checks=""):
         "console": "cdp_console_logs",
         "network": "cdp_network_requests",
     }
+    # Always attach to ACEsi's own root tab. Caller-supplied target and url are
+    # deliberately ignored so the tool is deterministic and cannot be steered
+    # onto an invented route.
     lines, ok_all = [], True
-    ok, res = _call_tool("cdp_connect", {"target": target})
+    ok, res = _call_tool("cdp_connect", {"target": _ACE_VERIFY_TARGET})
     ok_all = ok_all and ok
     lines.append("connect: %s" % str(res)[:300])
-    if url:
-        ok, res = _call_tool("cdp_navigate", {"url": url})
-        ok_all = ok_all and ok
-        lines.append("navigate: %s" % str(res)[:300])
+    if (url or "").strip():
+        lines.append("note: url argument ignored - verification inspects the current page, it does not navigate")
+    # State plainly which page was inspected, so the report cannot be mistaken
+    # for a check of some invented route. Non-fatal if the probe fails.
+    try:
+        ok_href, href = _call_tool("cdp_evaluate", {"expr": "location.href"})
+        lines.append("page: %s" % (str(href).strip()[:200] if ok_href else "(unknown)"))
+    except Exception:
+        pass
     for key in ("status", "dom", "console", "network"):
         if key not in wanted:
             continue
@@ -10041,10 +10064,8 @@ TOOLS_SCHEMA = [
         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {"name": "need_verify_in_browser",
-        "description": "One-shot browser verification via CDP in a single call: attach (optionally navigate), then report connection status, DOM snapshot, console messages and network requests. Args: target (optional tab fragment), url (optional page to open first), checks (optional comma list of status,dom,console,network).",
+        "description": "One-shot browser verification of ACEsi's own already-open page via CDP in a single call: attach to the current ACEsi tab, then report connection status, DOM snapshot, console messages and network requests. Inspects the current page only - IT DOES NOT NAVIGATE, so never supply a url or invent a route like /explorer; there is no such page and a 404 proves nothing. Args: checks (optional comma list of status,dom,console,network).",
         "parameters": {"type": "object", "properties": {
-            "target": {"type": "string", "title": "target", "description": "Optional URL/title fragment of the CDP tab to attach to."},
-            "url": {"type": "string", "title": "url", "description": "Optional http(s) URL to navigate to before verifying."},
             "checks": {"type": "string", "title": "checks", "description": "Optional comma list: status,dom,console,network. Default is all four."}},
             "required": []}}},
     {"type": "function", "function": {"name": "curl",
@@ -11624,7 +11645,7 @@ _SHORT_DESCRIPTIONS = {
     "cdp_dom_state": "Read the attached page's title, URL and HTML.",
     "cdp_console_logs": "Read console messages from the attached page.",
     "cdp_status": "Report whether DevTools is attached, plus event counts.",
-    "need_verify_in_browser": "One-shot browser verification. Args: target, url, checks (status,dom,console,network).",
+    "need_verify_in_browser": "One-shot verification of ACEsi's current already-open page (status,dom,console,network). Does not navigate; never pass a url or invent a route.",
     # --- on-device UI ---
     # ui_connect/ui_device need short descriptions or _short_tool() returns None
     # for them and they vanish from the reduced schema entirely - they can sit in

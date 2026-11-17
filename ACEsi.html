@@ -931,11 +931,13 @@
 
         height: 16px;
 
-        border: 2px solid #ff9d00;
+        /* Amber X spinner: two crossed bars. Same footprint and animation as
+           the old ring, but drawn as an X so it reads as a loading cross. */
+        background:
 
-        border-top-color: transparent;
+          linear-gradient(45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%),
 
-        border-radius: 50%;
+          linear-gradient(-45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%);
 
         animation: spin 0.8s linear infinite;
 
@@ -9010,6 +9012,9 @@ async function sendMessage() {
         if (!text) return;
 
         currentAbortController = new AbortController();
+        // Capture the signal once so every request in this flow (initial chat,
+        // exec, follow-up chat) can be cancelled by the same Stop click.
+        const signal = currentAbortController.signal;
         if (sendBtn) { sendBtn.textContent = "Stop"; sendBtn.style.background = "#ff0000"; }
 
 
@@ -9063,24 +9068,11 @@ async function sendMessage() {
         input.value = "";
 
         chatContainer.scrollTop = chatContainer.scrollHeight;
-        if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
-        currentAbortController = null;
-
-
 
         try {
 
           var statusBar = document.getElementById("ai-status-bar");
 if (statusBar) { statusBar.textContent = "ACEsi is planning..."; statusBar.style.display = "block"; }
-          var sendBtn = document.querySelector('button[onclick="sendMessage()"]');
-          if (currentAbortController) {
-              currentAbortController.abort();
-              currentAbortController = null;
-              if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
-              return;
-          }
-          currentAbortController = new AbortController();
-          if (sendBtn) { sendBtn.textContent = "Stop"; sendBtn.style.background = "#ff0000"; }
 const res = await fetch("/chat", {
 
             method: "POST",
@@ -9089,7 +9081,7 @@ const res = await fetch("/chat", {
 
             body: JSON.stringify({ message: text }),
 
-            signal: currentAbortController.signal
+            signal: signal
           });
 
           const data = await res.json();
@@ -9127,6 +9119,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
               headers: { "Content-Type": "application/json" },
 
               body: JSON.stringify({ command: command }),
+
+              signal: signal,
 
             });
 
@@ -9188,6 +9182,8 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
               }),
 
+              signal: signal,
+
             });
 
             const followData = await followRes.json();
@@ -9214,13 +9210,23 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
         } catch (e) {
 
-          chatContainer.innerHTML +=
+          // A user-initiated Stop aborts these fetches; that is not a server
+          // error, so do not print a red "Server error" line for it.
+          if (e && e.name === "AbortError") {
 
-            '<div style="color:red;padding:8px;">Server error: ' +
+            if (statusBar) { statusBar.textContent = "Stopped."; setTimeout(function() { statusBar.textContent = ""; statusBar.style.display = "none"; }, 1500); }
 
-            e.message +
+          } else {
 
-            "</div>";
+            chatContainer.innerHTML +=
+
+              '<div style="color:red;padding:8px;">Server error: ' +
+
+              e.message +
+
+              "</div>";
+
+          }
 
         } finally {
 
@@ -9229,6 +9235,11 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
           if (spinnerLeft) spinnerLeft.style.display = "none";
 
           if (spinnerRight) spinnerRight.style.display = "none";
+
+          // The request is done (or was cancelled): release the controller and
+          // restore the Send button so the next message submits on one click.
+          currentAbortController = null;
+          if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
 
           chatContainer.scrollTop = chatContainer.scrollHeight;
 
