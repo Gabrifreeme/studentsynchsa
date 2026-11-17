@@ -5999,8 +5999,10 @@ def chat():
     global _LAST_TOKEN_USAGE
     data = request.json
     user_message = data.get('message', '')
-    requested_model = data.get('model', '')
-    requested_provider = data.get('provider', '')
+    # Clients that omit "model" (phone UI, external callers) must still use the
+    # provider/model saved in Settings instead of silently reverting to Groq.
+    requested_model = data.get('model', '') or get_config('model', '') or ''
+    requested_provider = data.get('provider', '') or get_config('provider', '') or ''
   
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
@@ -6682,9 +6684,14 @@ def _ide_path(rel):
 @app.route('/api/ai/usage', methods=['GET'])
 @require_token
 def api_ai_usage():
+    # Report the model the user actually selected in Settings. This used to
+    # return the compile-time GROQ_MODEL unconditionally, so the header label
+    # claimed "openai/gpt-oss-120b" even while chat was routed to Gemini, and
+    # the UI repainted that stale value every five seconds.
+    active_model = get_config('model') or GROQ_MODEL
     return jsonify({
         'ok': True,
-        'model': GROQ_MODEL,
+        'model': active_model,
         'last_total_tokens': _LAST_TOKEN_USAGE,
         'limit': _DAILY_TOKEN_LIMIT
     })
