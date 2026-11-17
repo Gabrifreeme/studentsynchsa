@@ -3237,6 +3237,52 @@ _URL_SCHEME_RE = re.compile(r'\b(?:https?|ftp|file|wss?)://', re.IGNORECASE)
 # Characters Windows forbids in a filename. Tested after stripping a drive
 # spec, since "C:\..." legitimately contains a colon.
 _WIN_ILLEGAL_RE = re.compile(r'[<>:"|?*\x00-\x1f]')
+# Shared extension list for the file target extractor and the file_like test.
+# Keep these in sync so a filename recognised as a target is never then
+# rejected as "not file-like".
+_FILE_TARGET_EXT_PATTERN = (
+    r'(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|'
+    r'pdf|png|jpe?g|gif|bmp|webp|docx?|xlsx?|pptx?|json|ya?ml|xml|'
+    r'csv|log|html?|css|sql|zip|tar|gz|7z|gitignore|env)'
+)
+_FILE_WITH_EXT_RE = re.compile(
+    r'(?:[A-Za-z]:[\\/])?[A-Za-z0-9_.\-~%]+'
+    r'(?:[\\/][A-Za-z0-9_.\-~%]+)*\.'
+    + _FILE_TARGET_EXT_PATTERN + r'\b',
+    re.IGNORECASE)
+_FILE_INSTRUCTION_RE = re.compile(
+    r'\b(?:and|then|after|find|fix|repair|check|look|read|edit|summari[sz]e|'
+    r'explain|show|tell|please)\b', re.IGNORECASE)
+
+
+def _extract_file_target(tail):
+    """Return ONLY the file target from an 'open/read ...' instruction tail.
+
+    The old matcher used the whole tail as the path. That turned
+    "sync_provider.dart and find the syntax error and fix it" into a filename
+    and failed in open() before the code-intent router ever ran. Prefer an
+    explicit filename/path token; then an extensionless known project file;
+    otherwise return None so the caller can treat the message as vague and
+    hand it to the model instead of attempting to open a sentence.
+    """
+    m = _FILE_WITH_EXT_RE.search(tail or "")
+    if m:
+        return m.group(0)
+    # Extensionless references like "sync_provider" / plural "sync_providers".
+    # These helpers are defined later in the module but are available whenever
+    # a chat request is actually handled.
+    try:
+        idx = _project_file_index()
+        for tok in _FILE_TOKEN_RE.findall(tail or ""):
+            if tok in _NON_FILE_TOKENS:
+                continue
+            stem = tok.rsplit(".", 1)[0] if "." in tok else tok
+            for variant in _stem_variants(stem):
+                if variant in idx["stems"]:
+                    return tok if "." in tok else variant
+    except Exception:
+        pass
+    return None
 
 
 def _plausible_path_tail(candidate):
@@ -3273,7 +3319,17 @@ def _match_file_request(message):
     # happens to start with "open"/"read".
     if _WIN_ILLEGAL_RE.search(re.sub(r'^[A-Za-z]:[\\/]', '', tail)):
         return False, None, False
-    candidate = tail
+    # Extract just the file target. A sentence like "sync_provider.dart and
+    # find the syntax error and fix it" must NOT become the path argument.
+    explicit_target = _extract_file_target(tail)
+    if explicit_target:
+        candidate = explicit_target
+    elif _FILE_INSTRUCTION_RE.search(tail):
+        # "open the file and fix it" has no usable filename: fall through to the
+        # agent path instead of handing "and fix it" to open().
+        return True, "", True
+    else:
+        candidate = tail
     has_file_word = re.search(r'\bfile\b', message, re.IGNORECASE) is not None
     # "file manager/explorer" or "files app" are UI instructions, not documents
     not_file_ui = re.search(
@@ -3285,9 +3341,7 @@ def _match_file_request(message):
         or (bool(re.search(r'[/\\]', candidate)) and _plausible_path_tail(candidate))
         or (has_file_word and not_file_ui)
         or bool(re.search(
-            r'(?:\.(?:txt|md|markdown|dart|py|js|ts|tsx|kt|java|gradle|kts|'
-            r'pdf|png|jpe?g|gif|bmp|webp|docx?|xlsx?|pptx?|json|ya?ml|xml|'
-            r'csv|log|html?|css|sql|zip|tar|gz|7z|gitignore|env))$', candidate, re.IGNORECASE))
+            r'\.' + _FILE_TARGET_EXT_PATTERN + r'$', candidate, re.IGNORECASE))
     )
     if not file_like:
         return False, None, False
