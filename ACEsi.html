@@ -13271,9 +13271,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var termHistory = document.getElementById("term-history");
 
         // Use textContent, never innerHTML, for command output. PowerShell's
-        // `dir` prints <DIR> markers; innerHTML parsed those as HTML elements
-        // and pushed the rest of the listing off to the right. Each output line
-        // is appended as its own left-aligned row directly under the prompt.
+        // dir prints <DIR> markers; innerHTML parsed those as HTML elements
+        // and pushed the rest of the listing off to the right. One text node
+        // keeps a long dir listing cheap and left-aligned under the prompt.
         function appendTerminalLine(text, color) {
           var line = document.createElement('div');
           line.style.whiteSpace = 'pre-wrap';
@@ -13282,6 +13282,11 @@ document.addEventListener('DOMContentLoaded', function() {
           if (color) line.style.color = color;
           line.textContent = text;
           termHistory.appendChild(line);
+          // Live logs also stream into this element; keep the DOM bounded so a
+          // long session plus a big dir listing cannot stall the terminal.
+          while (termHistory.children.length > 1000) {
+            termHistory.removeChild(termHistory.firstChild);
+          }
           termHistory.scrollTop = termHistory.scrollHeight;
           termHistory.scrollLeft = 0;
         }
@@ -13304,9 +13309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     var out = data.stdout || "";
                     if (data.stderr) out += "\n" + data.stderr;
                     if (!out) out = "[No output]";
-                    out.split(/\r?\n/).forEach(function (line) {
-                        appendTerminalLine(line, '#ff9d00');
-                    });
+                    appendTerminalLine(out, '#ff9d00');
                 })
                 .catch(err => {
                     appendTerminalLine('Error: ' + err.message, 'red');
@@ -13523,10 +13526,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!history) return;
     var line = document.createElement('div');
     line.style.whiteSpace = 'pre-wrap';
+    line.style.overflowWrap = 'anywhere';
+    line.style.wordBreak = 'break-word';
     line.style.color = color || '#8fd3ff';
     line.textContent = text;
     history.appendChild(line);
+    // Same bound as the command-output helper: live logs must not grow the
+    // terminal DOM without limit.
+    while (history.children.length > 1000) {
+      history.removeChild(history.firstChild);
+    }
     history.scrollTop = history.scrollHeight;
+    history.scrollLeft = 0;
   };
 
   function setLiveLogButton(on) {
