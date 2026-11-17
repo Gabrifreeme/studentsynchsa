@@ -6141,6 +6141,27 @@ def chat():
         save_conversation("assistant", _follow_reply)
         return jsonify({"reply": _follow_reply})
 
+    # Deterministic PC-file open. Instructions like "Go to D:/Pictures/
+    # Screenshots find the file flyfly.png and open it." are NOT device
+    # navigation ("go to" used to trip _nav_task and burn 144s in the UI loop).
+    # Resolve the file locally and push it straight into ACEsi's Code Editor.
+    # No model, no agent rounds — this returns in milliseconds.
+    if _match_pc_file_open_request(user_message):
+        _rp = _resolve_pc_file_open(user_message)
+        if _rp and os.path.isfile(_rp):
+            _fname = os.path.basename(_rp)
+            socketio.emit('open_user_file_in_editor', {
+                'path': _rp,
+                'name': _fname,
+            })
+            reply = "Opened %s in the Code Editor." % _fname
+            print("📂 PC-file open -> Code Editor: %s" % _rp)
+        else:
+            reply = "I couldn't find that file on your PC. Check the folder and filename and try again."
+            print("📂 PC-file open: not found for %r" % user_message[:120])
+        save_conversation("assistant", reply)
+        return jsonify({"reply": reply})
+
     # Handle file read requests via the strict matcher above.
     global LAST_FILE_PATH
     is_file_req, candidate, vague = _match_file_request(user_message)
@@ -6640,7 +6661,13 @@ def _ide_path(rel):
     project root first and fall back to lib/ when that is where the file lives.
     """
     rel = (rel or '').strip().replace('\\', '/')
-    if not rel or rel.startswith('/') or '..' in rel.split('/'):
+    if not rel:
+        return None
+    # An absolute Windows path is allowed when it already exists. That is how a
+    # PC file opened into the Code Editor keeps its identity for save/format.
+    if re.match(r'^[A-Za-z]:/', rel) and '..' not in rel.split('/') and os.path.isfile(rel):
+        return os.path.realpath(rel)
+    if rel.startswith('/') or '..' in rel.split('/'):
         return None
     root = os.path.realpath(_IDE_ROOT)
     full = os.path.realpath(os.path.join(root, rel))
@@ -6883,6 +6910,44 @@ def api_file_content():
     if not full or not os.path.isfile(full):
         return jsonify({'ok': False, 'error': 'bad path'}), 400
     try:
+        with open(full, 'r', encoding='utf-8', errors='replace') as f:
+            return Response(f.read(), mimetype='text/plain')
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-file-content', methods=['GET'])
+@require_token
+def api_user_file_content():
+    """Return the content of a file anywhere on Chris's PC for the Code Editor.
+
+    Kept separate from /api/file-content so the Explorer stays restricted to the
+    project tree. Binary files (images, PDFs, etc.) get a readable placeholder
+    instead of raw bytes being dumped into the text editor.
+    """
+    raw = request.args.get('path', '')
+    full = _safe_user_path(raw)
+    if not full or not os.path.isfile(full):
+        return jsonify({'ok': False, 'error': 'bad path'}), 400
+    try:
+        ext = os.path.splitext(full)[1].lower()
+        binary_exts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif',
+                       '.tiff', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip',
+                       '.exe', '.dll', '.ico', '.mp3', '.mp4', '.avi', '.mov'}
+        with open(full, 'rb') as fh:
+            head = fh.read(8)
+        is_binary = ext in binary_exts or b'\x00' in head
+        if is_binary:
+            try:
+                size = os.path.getsize(full)
+            except Exception:
+                size = -1
+            placeholder = (
+                "[Binary file opened in ACEsi Code Editor]\n"
+                "File: %s\nPath: %s\nSize: %s bytes\n\n"
+                "This file type cannot be edited as plain text here."
+            ) % (os.path.basename(full), full, size)
+            return Response(placeholder, mimetype='text/plain')
         with open(full, 'r', encoding='utf-8', errors='replace') as f:
             return Response(f.read(), mimetype='text/plain')
     except Exception as e:
@@ -7584,6 +7649,86 @@ def _match_open_user_file(message):
         r'\b(?:file|picture|photo|image|capture|median|gdpfgdpf)\b|\.(?:png|jpe?g|gif|pdf|txt|md|docx)\b', ml))
     find_open = bool(re.search(r'\bfind\b[^.!?\n]{0,80}\b(?:open|view|show)\b', ml))
     return bool((has_open and filey) or find_open)
+
+
+def _match_pc_file_open_request(message):
+    """True for 'open a file on my PC' instructions that must load straight into
+    ACEsi's Code Editor, never into the UI/navigation agent loop.
+
+    The key trap: 'Go to D:\\... find the file X and open it' contains 'go to',
+    which _nav_task() treats as device navigation. When an explicit Windows path
+    or a 'find <file> ... open' phrase is present, this wins first.
+    """
+    m = (message or "").strip()
+    if not m:
+        return False
+    # Project source-file fixes belong to the code agent, not this fast path.
+    try:
+        if _looks_like_code_file_request(m):
+            return False
+    except Exception:
+        pass
+    ml = m.lower()
+    # An explicit drive path plus any file action is unambiguous.
+    if re.search(r'\b[a-z]:[\\/][^\s,;]+', ml) and \
+            re.search(r'\b(?:open|view|show|find|display|read|load)\b', ml):
+        return True
+    # 'find the file X and open it' / 'go to <folder> ... show ...'
+    if re.search(r'\bfind\b[^.!?\n]{0,120}\b(?:open|view|show|display)\b', ml):
+        return True
+    # Plain 'open/view/show the file/picture <name>' (no path) also qualifies,
+    # but only when a filename was actually given.
+    if re.search(r'\b(?:open|view|show|display)\b[^.!?\n]{0,80}'
+                 r'\b(?:file|picture|photo|image|screenshot|capture)\b', ml) and \
+            re.search(_FILE_WITH_EXT_RE.pattern, m, re.IGNORECASE):
+        return True
+    return False
+
+
+def _resolve_pc_file_open(message):
+    """Resolve the exact file a 'find/open on my PC' instruction points at.
+
+    Handles three shapes:
+      1. A full path in the message: 'open D:\\Pictures\\Screenshots\\flyfly.png'
+      2. A folder + filename: 'go to D:\\Pictures\\Screenshots ... flyfly.png'
+      3. A bare filename: 'open flyfly.png' (fuzzy search under the home tree)
+    Returns the realpath of an existing file, or None.
+    """
+    raw = (message or "").strip()
+    if not raw:
+        return None
+    m = _FILE_WITH_EXT_RE.search(raw)
+    cand = m.group(0).rstrip('.,;:') if m else None
+    # 1. Full path with extension anywhere in the message. Only try this when
+    #    the token is an actual path: a bare filename would send _safe_user_path
+    #    into a full home-tree walk (~70s on this PC) before we even look at the
+    #    folder the user explicitly named.
+    if cand and re.search(r'[\\/]', cand):
+        rp = _safe_user_path(cand)
+        if rp and os.path.isfile(rp):
+            return rp
+    # 2. A drive-letter folder named after 'go to'/'in'/'under', combined with
+    #    the filename hint from the same sentence.
+    folder = None
+    fm = re.search(r'\b(?:go\s+to|in|inside|under|from)\s+'
+                   r'([A-Za-z]:[\\/][^\s,;]+)', raw, re.IGNORECASE)
+    if fm:
+        folder = fm.group(1).rstrip('\\/.,;:')
+    hint = _extract_user_file_hint(raw)
+    if cand and not hint:
+        hint = os.path.basename(cand)
+    if hint:
+        hint = os.path.basename(hint.strip().strip('"\'').rstrip('.,;:'))
+    if folder and hint:
+        rp = _safe_user_path(os.path.join(folder, hint))
+        if rp and os.path.isfile(rp):
+            return rp
+    # 3. Bare filename anywhere on the PC.
+    if hint:
+        rp = _find_user_file_fuzzy(hint)
+        if rp and os.path.isfile(rp):
+            return rp
+    return None
 
 
 def _find_user_file_fuzzy(name):

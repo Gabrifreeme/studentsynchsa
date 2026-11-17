@@ -13278,6 +13278,58 @@ document.addEventListener('DOMContentLoaded', function() {
 
   });
 
+  document.addEventListener('DOMContentLoaded', function() {
+    if (!window.socket) window.socket = io();
+
+    // Deterministic PC-file open: server resolved a file on disk (outside the
+    // project) and wants it loaded into the Code Editor, not the default app.
+    window.socket.on('open_user_file_in_editor', function(data) {
+      if (!data || !data.path) return;
+      var label = data.name || data.path.split(/[\\/]/).pop();
+      fetch('/api/user-file-content?path=' + encodeURIComponent(data.path))
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+          if (typeof window.loadExternalFile === 'function') {
+            window.loadExternalFile(data.path, label, text);
+          } else if (typeof window.loadFile === 'function') {
+            window.loadFile(data.path);
+          }
+          if (window.showAceToast) {
+            window.showAceToast('Opened in Code Editor: ' + label, 'success', 4000);
+          }
+        })
+        .catch(function(e) {
+          if (window.showAceToast) {
+            window.showAceToast('Could not open file: ' + e.message, 'error', 5000);
+          }
+        });
+    });
+
+    // Same tab behaviour as window.loadFile, but the content is already fetched
+    // (from /api/user-file-content) and the tab name is the absolute PC path so
+    // Save/Format keep writing to the right file.
+    window.loadExternalFile = function(absolutePath, label, text) {
+      var tabName = absolutePath.replace(/\\/g, '/');
+      var existing = window.openTabs.find(function(t) { return t.name === tabName; });
+      if (existing) { window.switchToTab(tabName); return; }
+      var activeTab = window.openTabs.find(function(t) { return t.active; });
+      if (activeTab) {
+        var currentTa = document.getElementById('code-editor');
+        if (currentTa) activeTab.content = currentTa.value;
+      }
+      window.openTabs.forEach(function(t) { t.active = false; });
+      window.openTabs.push({ name: tabName, content: text, active: true, label: label });
+      window.currentFile = tabName;
+      var ta = document.getElementById('code-editor');
+      if (ta) {
+        ta.value = text;
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+        if (window.aceEditorRefresh) window.aceEditorRefresh();
+      }
+      window.renderTabs();
+    };
+  });
+
 </script>
 
 <script>
