@@ -274,6 +274,30 @@
 
       }
 
+      /* Live tool activity lives in the chat stream, so it scrolls away with
+         the conversation instead of floating over the editor. */
+      .live-activity {
+        align-self: stretch;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #ff9d00;
+        background: #0a0a0a;
+        color: #ff9d00;
+        font-family: &quot;Roboto Mono&quot;, monospace;
+        font-size: 11px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .live-activity .live-history { color: #a06a00; }
+      .live-activity .live-line { color: #ff9d00; }
+      .live-activity.done { border-color: #2e7d32; }
+      .live-activity.done .live-line { color: #00e676; }
+      .live-activity.stopped { border-color: #c62828; }
+      .live-activity.stopped .live-line { color: #ff8a80; }
+
 
 
       #explorer {
@@ -4860,34 +4884,6 @@
 
           <div id="line-numbers">1</div>
 
-          <div
-            id="ai-status-bar"
-            style="
-              position: absolute;
-              top: 10px;
-              left: 50%;
-              transform: translateX(-50%);
-              min-width: 380px;
-              max-width: 70%;
-              padding: 8px 12px;
-              font-family: &quot;Roboto Mono&quot;, monospace;
-              font-size: 11px;
-              font-weight: normal;
-              color: #ff9d00;
-              background: #0a0a0a;
-              border: 1px solid #ff9d00;
-              border-radius: 4px;
-              z-index: 9999;
-              display: none;
-              box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-              white-space: pre-wrap;
-              line-height: 1.6;
-            "
-          >
-            <div id="live-history" style="color: #a06a00"></div>
-            <div id="live-line"></div>
-          </div>
-
           <div id="editor-area">
 
             <pre id="highlight-layer" aria-hidden="true"></pre>
@@ -8927,10 +8923,43 @@
       (function () {
         var FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         var frame = 0;
-        var frameTimer = null, pollTimer = null, endTimer = null;
+        var frameTimer = null, pollTimer = null;
         var running = false, current = "", historyLines = [], lastSteps = [];
+        var liveSeq = [0], activeRowId = null;
 
         function el(id) { return document.getElementById(id); }
+
+        // Each activity block is a normal chat row, so it scrolls away with the
+        // conversation and stays behind as a record when the request finishes.
+        // Look it up by id each time: sendMessage() uses innerHTML += for the
+        // reply, which replaces every child node in #chat-messages.
+        function newRow() {
+          var chat = el("chat-messages");
+          if (!chat) return null;
+          activeRowId = "live" + (++liveSeq[0]);
+          var row = document.createElement("div");
+          row.className = "live-activity";
+          row.setAttribute("data-live-id", activeRowId);
+          row.innerHTML = '<div class="live-history"></div><div class="live-line"></div>';
+          chat.appendChild(row);
+          scrollChat();
+          return row;
+        }
+
+        function currentRow() {
+          var chat = el("chat-messages");
+          if (!chat || !activeRowId) return null;
+          return chat.querySelector('[data-live-id="' + activeRowId + '"]');
+        }
+
+        function scrollChat() {
+          var chat = el("chat-messages");
+          if (!chat) return;
+          // Do not yank the view back if the user scrolled up to read history.
+          if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 140) {
+            chat.scrollTop = chat.scrollHeight;
+          }
+        }
 
         function shortPath(p) {
           p = String(p || "").replace(/\\/g, "/");
@@ -8979,14 +9008,18 @@
           return done ? "finished " + tool + "." : (a ? tool + " " + a + "..." : tool + "...");
         }
 
-        function render(glyph, line) {
-          var bar = el("ai-status-bar");
-          if (!bar) return;
-          bar.style.display = "block";
-          var hist = el("live-history");
-          var cur = el("live-line");
+        function render(glyph, line, cls) {
+          // Re-resolve the row every time: sendMessage() appends with
+          // innerHTML +=, which replaces all child nodes. Looking the row up
+          // by id (and recreating it if it vanished) keeps updates reliable.
+          var row = currentRow() || newRow();
+          if (!row) return;
+          if (cls) row.classList.add(cls);
+          var hist = row.querySelector(".live-history");
+          var cur = row.querySelector(".live-line");
           if (hist) hist.textContent = historyLines.join("\n");
           if (cur) cur.textContent = glyph + " " + line;
+          scrollChat();
         }
 
         function renderRunning() {
@@ -9023,12 +9056,12 @@
         }
 
         window.startLiveActivity = function () {
-          clearTimeout(endTimer);
           running = true;
           frame = 0;
           current = "Thinking through your request...";
           historyLines = [];
           lastSteps = [];
+          newRow();
           renderRunning();
           poll();
           clearInterval(pollTimer);
@@ -9057,13 +9090,10 @@
               var pick = edit || any;
               doneMsg = pick ? "Done — " + phrase(pick.text || "", true) : "Done.";
             }
-            render(glyph || "✔", doneMsg);
-
-            clearTimeout(endTimer);
-            endTimer = setTimeout(function () {
-              var bar = el("ai-status-bar");
-              if (bar) bar.style.display = "none";
-            }, 2800);
+            // Keep the row in the chat as a finished record. Stop uses red,
+            // normal completion green — both scroll up with the conversation.
+            render(glyph || "✔", doneMsg, glyph === "■" ? "stopped" : "done");
+            activeRowId = null;
           }
 
           if (message) { finish(); return; }
@@ -9076,16 +9106,24 @@
             .catch(finish);
         };
 
-        // Socket events also fire outside /chat (e.g. auto-fix). Show them
-        // briefly without hijacking an active chat readout.
+        // Socket events also fire outside /chat (e.g. auto-fix). Give them
+        // their own chat row that settles to a done state, without hijacking
+        // an active chat readout.
         window.pushLiveActivity = function (tool, path) {
           if (running) return;
+          newRow();
+          historyLines = [];
           current = phrase(String(tool || "") + (path ? " " + path : ""), false);
           render(FRAMES[frame++ % FRAMES.length], current);
-          clearTimeout(endTimer);
-          endTimer = setTimeout(function () {
-            var bar = el("ai-status-bar");
-            if (bar) bar.style.display = "none";
+          var id = activeRowId;
+          activeRowId = null;
+          setTimeout(function () {
+            var chat = el("chat-messages");
+            var row = chat && chat.querySelector('[data-live-id="' + id + '"]');
+            if (!row) return;
+            row.classList.add("done");
+            var cur = row.querySelector(".live-line");
+            if (cur) cur.textContent = "✔ " + current;
           }, 1800);
         };
       })();
