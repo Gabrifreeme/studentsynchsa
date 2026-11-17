@@ -3356,18 +3356,20 @@ def _match_file_request(message):
 # or None. Used by /chat so ACEsi can actually execute ui_*/dev tools instead of
 # replying "please provide the commands".
 def _chat_providers(domain=""):
-    """The provider chain, with Groq's model chosen for the task.
+    """Working provider chain: Groq first, then Gemini.
 
-    Browser work gets GROQ_MODEL_BROWSER. The default chat model is fine for
-    conversation but unreliable at the one thing a browser task hinges on:
-    actually submitting a form. Returns (name, endpoint, key, model).
+    Only providers whose key/model pair was verified live belong here. Each
+    provider appears twice so a spent or rate-limited model falls through to
+    the other model on the same provider before the next provider is tried.
+    Browser work gets GROQ_MODEL_BROWSER. Returns (name, endpoint, key, model).
     """
     groq_model = (GROQ_MODEL_BROWSER if domain in _BROWSER_DOMAINS and
                   GROQ_MODEL_BROWSER else GROQ_MODEL)
     return [
         ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, groq_model),
+        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_FALLBACKS[0]),
         ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
-        ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
+        ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_FALLBACK_MODELS[0]),
     ]
 
 
@@ -3391,8 +3393,8 @@ def _find_provider_for_model(preferred_model):
         return None
     if preferred_model in GROQ_FALLBACKS:
         return ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, preferred_model)
-    if preferred_model in OPENROUTER_FALLBACKS:
-        return ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, preferred_model)
+    if preferred_model in GEMINI_FALLBACK_MODELS:
+        return ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, preferred_model)
     return None
 
 # ===== Provider failure diagnostics =====
@@ -4909,8 +4911,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             if active is None:
                 got = None
                 tc = "required" if ((_ui_task(user_message) or _code_file_intent) and not names) else "auto"
-                # FORCE GROQ ONLY - Local models removed
                 providers = _chat_providers(active_domain)
+                # Honour the model picked in Settings: rotate that provider/model
+                # to the front, but keep the rest of the chain as fallback. This
+                # is what makes selecting Gemini actually reach Gemini first.
+                if preferred_model:
+                    _wanted = _find_provider_for_model(preferred_model)
+                    if _wanted:
+                        _want = (_wanted[0], _wanted[3])
+                        providers.sort(key=lambda p: 0 if (p[0], p[3]) == _want else 1)
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
@@ -4991,26 +5000,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if got is not None:
                         active = p
                         break
-                if got is None:
-                    for model in OPENROUTER_FALLBACKS:
-                        # Same reduced payload as the primary OpenRouter attempt:
-                        # the free balance rejects the full prompt, so retrying
-                        # other slugs with it would just fail identically.
-                        or_schema = build_reduced_schema(
-                            _reduced_tool_pool(active_domain,
-                                               net_domain_schema or full_domain_schema),
-                            want_files=_want_files, want_device=_want_device,
-                            drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET,
-                            tool_order=_fix_tool_order,
-                            extra_protected=_fix_tools)
-                        or_msgs = _reduced_msgs(llm_messages)
-                        got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                        OPENROUTER_API_KEY, model, or_msgs,
-                                        tools_schema=or_schema, tool_choice=tc)
-                        if got is not None:
-                            active = ("OpenRouter-fallback", OPENROUTER_ENDPOINT,
-                                      OPENROUTER_API_KEY, model)
-                            break
+                # OpenRouter fallback removed: that key has no credits. Both
+                # Groq and Gemini model variants are already in the chain above.
                 if got is None and OLLAMA_ENABLED:
                     # Ollama warm-up probe first: cheap tiny call that forces the
                     # model to LOAD (with keep_alive persisted in Ollama) so the
@@ -6305,7 +6296,8 @@ def chat():
     if provider:
         _, _, _, model, *_ = provider
     else:
-        model = OPENROUTER_MODEL
+        # OpenRouter has no credits; default to a model that actually works.
+        model = GROQ_MODEL
 
     # "note this / write down: X / log X" → journal entry
     note_match = re.match(r'^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$', user_message, re.IGNORECASE)
@@ -12324,10 +12316,9 @@ OPENROUTER_REDUCED_BUDGET = 3000
 # it (~1900-2200). That is still ~3x under Groq's measured 7000 ITPM cap.
 _REDUCED_SCHEMA_FLOOR = 3500
 
-# Providers that get the reduced payload. Groq and OpenRouter are on free tiers
-# that reject the full prompt outright; Cerebras and FreeLLM are reached with the
-# full one and fall back reactively via the 413 handler in _chat_one.
-REDUCED_MODE_PROVIDERS = {"Groq", "OpenRouter", "Gemini"}
+# Providers that get the reduced payload. Groq and Gemini are the only active
+# providers; both reject the full tool schema on their free tiers.
+REDUCED_MODE_PROVIDERS = {"Groq", "Gemini"}
 _REDUCED_ENV = os.environ.get("ACE_REDUCED_MODE", "")
 if _REDUCED_ENV:
     REDUCED_MODE_PROVIDERS = {p.strip() for p in _REDUCED_ENV.split(",") if p.strip()}
@@ -15766,19 +15757,13 @@ def auto_fix_stream():
             {"role": "user", "content": content}
         ]
         fixed_code = None
-        # If a local model was requested, skip the cloud providers completely
+        # Only the two verified working providers (Groq, Gemini). Every other
+        # key was either invalid or has no credits and only caused retries.
         providers = [
                 ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-                ("Groq-Fallback", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_FALLBACKS[0]),
+                ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_FALLBACKS[0]),
                 ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
-                ("OpenRouter", OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL),
-                ("Cerebras", CEREBRAS_ENDPOINT, CEREBRAS_API_KEY, CEREBRAS_MODEL),
-                ("HuggingFace", HF_ENDPOINT, HF_API_KEY, HF_MODEL),
-                ("NVIDIA", NVIDIA_ENDPOINT, NVIDIA_API_KEY, NVIDIA_MODEL),
-                ("SambaNova", SAMBANOVA_ENDPOINT, SAMBANOVA_API_KEY, SAMBANOVA_MODEL),
-                ("GitHub", GITHUB_ENDPOINT, GITHUB_API_KEY, GITHUB_MODEL),
-                ("Mistral", MISTRAL_ENDPOINT, MISTRAL_API_KEY, MISTRAL_MODEL),
-                ("Cloudflare", CLOUDFLARE_ENDPOINT, CLOUDFLARE_API_KEY, CLOUDFLARE_MODEL)
+                ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_FALLBACK_MODELS[0]),
             ]
         
         for name, endpoint, api_key, model in providers:
@@ -15787,7 +15772,9 @@ def auto_fix_stream():
             try:
                 resp = requests.post(
                     f"{endpoint}/chat/completions",
-                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}",
+                             "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                            "AppleWebKit/537.36 Chrome/120 Safari/537.36")},
                     json={"model": model, "messages": fix_messages, "temperature": 0.3, "max_tokens": 400},
                     timeout=(10, 120)
                 )
@@ -17577,17 +17564,12 @@ def api_settings():
             set_config('provider', str(data['provider']))
         # Persist API keys to .ace_keys.local so they take effect on server restart.
         # server.py reads these via _load_local_keys() at startup.
+        # Only the two verified working chat providers are configurable. A key
+        # cleared in the UI is now DELETED; the old code skipped empty values,
+        # so dead keys could never be removed from Settings.
         key_map = {
-            'groq': data.get('groq_key', ''),
-            'gemini': data.get('gemini_key', ''),
-            'openrouter': data.get('openrouter_key', ''),
-            'cerebras': data.get('cerebras_key', ''),
-            'huggingface': data.get('hf_key', ''),
-            'mistral': data.get('mistral_key', ''),
-            'cloudflare': data.get('cloudflare_key', ''),
-            'nvidia': data.get('nvidia_key', ''),
-            'sambanova': data.get('sambanova_key', ''),
-            'github': data.get('github_key', ''),
+            'groq': 'groq_key',
+            'gemini': 'gemini_key',
         }
         keys_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.ace_keys.local')
         existing = {}
@@ -17596,7 +17578,16 @@ def api_settings():
                 existing = json.load(f) or {}
         except Exception:
             pass
-        existing.update({k: v for k, v in key_map.items() if v})
+        # Drop keys left behind by the old multi-provider Settings UI.
+        existing = {k: v for k, v in existing.items() if k in key_map}
+        for store_key, field in key_map.items():
+            if field not in data:
+                continue
+            value = str(data.get(field) or '').strip()
+            if value:
+                existing[store_key] = value
+            else:
+                existing.pop(store_key, None)
         with open(keys_file, 'w', encoding='utf-8') as f:
             json.dump(existing, f, indent=2)
         return jsonify({"ok": True, "message": "Settings saved", "restart": True})
@@ -17609,18 +17600,11 @@ def api_settings():
         except Exception:
             pass
         return jsonify({
-            'system_prompt':  get_config('system_prompt', ''),
-            'model':          get_config('model', ''),
-            'groq_key':       k.get('groq', ''),
-            'gemini_key':     k.get('gemini', ''),
-            'openrouter_key': k.get('openrouter', ''),
-            'cerebras_key':   k.get('cerebras', ''),
-            'hf_key':         k.get('huggingface', ''),
-            'mistral_key':    k.get('mistral', ''),
-            'cloudflare_key': k.get('cloudflare', ''),
-            'nvidia_key':     k.get('nvidia', ''),
-            'sambanova_key':  k.get('sambanova', ''),
-            'github_key':     k.get('github', ''),
+            'system_prompt': get_config('system_prompt', ''),
+            'model':         get_config('model', ''),
+            'provider':      get_config('provider', ''),
+            'groq_key':      k.get('groq', ''),
+            'gemini_key':    k.get('gemini', ''),
         })
 
 if __name__ == '__main__':
@@ -18172,6 +18156,10 @@ def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
     headers = {
         "Authorization": "Bearer " + (api_key or ""),
         "Content-Type": "application/json",
+        # Groq rejects requests with a non-browser User-Agent (HTTP 403,
+        # error code 1010); requests' default UA made this route always fail.
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                       "AppleWebKit/537.36 Chrome/120 Safari/537.36"),
     }
     if headers_extra:
         headers.update(headers_extra)
@@ -18217,7 +18205,7 @@ def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
 
 @app.route("/api/ai/chat", methods=["POST", "OPTIONS"])
 def api_ai_chat():
-    """Stream ACEsi responses. Tries OpenRouter first, falls back to Groq on any error."""
+    """Stream ACEsi responses, falling back from Groq to Gemini."""
     if request.method == "OPTIONS":
         return ("", 204)
     data = request.get_json(silent=True) or {}
@@ -18228,27 +18216,41 @@ def api_ai_chat():
         return jsonify({"ok": False, "error": "prompt too long (max 8000)"}), 400
 
     def generate():
-        # To re-enable OpenRouter when credits are topped up, add it back as a
-        # provider (see git history patch_07) and restore the fallback loop.
-        name = "Groq"
-        endpoint = GROQ_ENDPOINT
-        key = GROQ_API_KEY
-        model = GROQ_MODEL
-        extra = None
-        if not key:
-            yield "data: " + json.dumps({"error": name + ": no API key configured"}) + "\n\n"
-            yield "data: [DONE]\n\n"
-            return
-        try:
-            for tok in _ai_stream_provider(endpoint, key, model, prompt, extra,
-                                            system_prompt=_AI_SYSTEM_PROMPT):
-                yield "data: " + json.dumps({"token": tok}) + "\n\n"
-            yield "data: " + json.dumps({"provider": name}) + "\n\n"
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            print("[ai/chat] provider %s failed: %s" % (name, e))
-            yield "data: " + json.dumps({"error": name + ": " + str(e)}) + "\n\n"
-            yield "data: [DONE]\n\n"
+        # Groq -> Gemini fallback. OpenRouter/SambaNova keys exist but have no
+        # credits, so they are deliberately not in this chain.
+        providers = [
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_FALLBACKS[0]),
+            ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
+            ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_FALLBACK_MODELS[0]),
+        ]
+        errors = []
+        for name, endpoint, key, model in providers:
+            if not key:
+                errors.append(name + ": no API key configured")
+                continue
+            emitted = False
+            try:
+                for tok in _ai_stream_provider(endpoint, key, model, prompt, None,
+                                                system_prompt=_AI_SYSTEM_PROMPT):
+                    emitted = True
+                    yield "data: " + json.dumps({"token": tok}) + "\n\n"
+                if emitted:
+                    yield "data: " + json.dumps({"provider": name}) + "\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                errors.append(name + ": no tokens returned")
+            except Exception as e:
+                print("[ai/chat] provider %s/%s failed: %s" % (name, model, e))
+                # A partial stream cannot be rewound; end instead of starting a
+                # second answer in the same response.
+                if emitted:
+                    yield "data: [DONE]\n\n"
+                    return
+                errors.append("%s/%s: %s" % (name, model, str(e)[:160]))
+        for err in errors:
+            yield "data: " + json.dumps({"error": err}) + "\n\n"
+        yield "data: [DONE]\n\n"
 
     return Response(
         generate(),

@@ -3248,21 +3248,13 @@
 
               <option value="gemini">Gemini</option>
 
-              <option value="openrouter">OpenRouter</option>
 
-              <option value="cerebras">Cerebras</option>
 
-              <option value="huggingface">HuggingFace</option>
 
-              <option value="mistral">Mistral</option>
 
-              <option value="cloudflare">Cloudflare</option>
 
-              <option value="nvidia">NVIDIA</option>
 
-              <option value="sambanova">SambaNova</option>
 
-              <option value="github">GitHub</option>
 
             </select>
 
@@ -3334,7 +3326,7 @@
 
           <div style="font-size: 10px; color: #888; margin-bottom: 6px">
 
-            Keys are saved to config.json on the server.
+            Keys are saved to .ace_keys.local on the server.
 
           </div>
 
@@ -3372,189 +3364,13 @@
 
           />
 
-          <label
+          
 
-            style="
+          
 
-              display: block;
+          
 
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >OpenRouter API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-openrouter-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter OpenRouter API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >Ollama Host (default http://localhost:11434)</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-ollama-host"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="http://localhost:11434"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >OpenAI API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-openai-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="sk-..."
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >Anthropic API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-anthropic-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="sk-ant-..."
-
-          />
+          
 
           <label
 
@@ -3602,327 +3418,19 @@
 
           />
 
-          <label
+          
 
-            style="
+          
 
-              display: block;
+          
 
-              margin-top: 4px;
+          
 
-              margin-bottom: 2px;
+          
 
-              font-size: 10px;
+          
 
-            "
-
-            >Cerebras API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-cerebras-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter Cerebras API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >SambaNova API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-sambanova-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter SambaNova API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >HuggingFace API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-hf-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter HF API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >Mistral API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-mistral-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter Mistral API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >Cloudflare API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-cloudflare-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter Cloudflare API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >NVIDIA API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-nvidia-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter NVIDIA API Key"
-
-          />
-
-          <label
-
-            style="
-
-              display: block;
-
-              margin-top: 4px;
-
-              margin-bottom: 2px;
-
-              font-size: 10px;
-
-            "
-
-            >GitHub API Key</label
-
-          >
-
-          <input
-
-            type="text"
-
-            id="settings-github-key"
-
-            style="
-
-              width: 100%;
-
-              background: #111;
-
-              color: #ff9d00;
-
-              border: 1px solid #ff9d00;
-
-              padding: 6px;
-
-              font-family: &quot;Roboto Mono&quot;, monospace;
-
-              font-size: 10px;
-
-            "
-
-            placeholder="Enter GitHub API Key"
-
-          />
+          
 
         </div>
 
@@ -9927,91 +9435,10 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
         modelSelect.innerHTML = "";
 
-        var models = [];
-
-        switch (provider) {
-
-          case "groq":
-
-            models = [
-
-              "openai/gpt-oss-120b",
-
-              "qwen/qwen3.8-27b",
-
-              "llama-3.1-70b-versatile",
-
-              "gemma-7b-it",
-
-            ];
-
-            break;
-
-          case "gemini":
-
-            models = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
-
-            break;
-
-          case "openrouter":
-
-            models = [
-
-              "deepseek/deepseek-v4-flash-0731:free",
-
-              "anthropic/claude-3.5-sonnet",
-
-              "openai/gpt-4o",
-
-              "meta-llama/llama-3.1-405b-instruct",
-
-            ];
-
-            break;
-
-          case "cerebras":
-
-            models = ["gpt-oss-120b", "llama-3.3-70b"];
-
-            break;
-
-          case "huggingface":
-
-            models = ["Qwen/Qwen3-32B", "Qwen/Qwen2.5-72B-Instruct"];
-
-            break;
-
-          case "mistral":
-
-            models = ["codestral-latest", "mistral-large-latest"];
-
-            break;
-
-          case "cloudflare":
-
-            models = ["@cf/qwen/qwen2.5-coder-32b-instruct"];
-
-            break;
-
-          case "nvidia":
-
-            models = ["meta/llama-3.3-70b-instruct"];
-
-            break;
-
-          case "sambanova":
-
-            models = ["Meta-Llama-3.3-70B-Instruct", "Llama-3.1-405B-Instruct"];
-
-            break;
-
-          case "github":
-
-            models = ["gpt-4o", "gpt-4o-mini"];
-
-            break;
-
-        }
+        // Only models behind the two verified working keys.
+        var models = provider === "gemini"
+          ? ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+          : ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
 
         models.forEach(function (m) {
 
@@ -10027,8 +9454,6 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       }
 
-
-
       /* ===== Load Settings from Server ===== */
 
       async function loadSettings() {
@@ -10039,121 +9464,30 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
           var d = await r.json();
 
-          if (d.provider)
+          var providerSel = document.getElementById("settings-provider");
+          var savedProvider = localStorage.getItem("ace_selected_provider") || d.provider;
+          if (savedProvider) providerSel.value = savedProvider;
 
-            document.getElementById("settings-provider").value = d.provider;
-
-          var savedProvider = localStorage.getItem("ace_selected_provider");
-          if (savedProvider) {
-              document.getElementById("settings-provider").value = savedProvider;
-          }
           updateModelsForProvider();
 
-          if (d.model)
-
-            document.getElementById("settings-model").value = localStorage.getItem("ace_selected_model") || d.model;
-
-          document.getElementById("current-model-indicator").textContent = d.model || localStorage.getItem("ace_selected_model") || "openai/gpt-oss-120b";
-
-
-
-          if (d.groq_key)
-
-            document.getElementById("settings-groq-key").value = d.groq_key;
-
-          if (d.openrouter_key)
-
-            document.getElementById("settings-openrouter-key").value =
-
-              d.openrouter_key;
-
-          if (d.ollama_host)
-
-            document.getElementById("settings-ollama-host").value =
-
-              d.ollama_host;
-
-          if (d.openai_key)
-
-            document.getElementById("settings-openai-key").value = d.openai_key;
-
-          if (d.anthropic_key)
-
-            document.getElementById("settings-anthropic-key").value =
-
-              d.anthropic_key;
-
-          if (d.gemini_key)
-
-            document.getElementById("settings-gemini-key").value = d.gemini_key;
-
-          if (d.cerebras_key)
-
-            document.getElementById("settings-cerebras-key").value =
-
-              d.cerebras_key;
-
-          if (d.sambanova_key)
-
-            document.getElementById("settings-sambanova-key").value =
-
-              d.sambanova_key;
-
-          if (d.hf_key)
-
-            document.getElementById("settings-hf-key").value = d.hf_key;
-
-          if (d.mistral_key)
-
-            document.getElementById("settings-mistral-key").value =
-
-              d.mistral_key;
-
-          if (d.cloudflare_key)
-
-            document.getElementById("settings-cloudflare-key").value =
-
-              d.cloudflare_key;
-
-          if (d.nvidia_key)
-
-            document.getElementById("settings-nvidia-key").value = d.nvidia_key;
-
-          if (d.sambanova_key)
-
-            document.getElementById("settings-sambanova-key").value =
-
-              d.sambanova_key;
-
-          if (d.github_key)
-
-            document.getElementById("settings-github-key").value = d.github_key;
-
-          if (d.system_prompt)
-
-            document.getElementById("settings-prompt").value = d.system_prompt;
-
-          // Set default model if none saved
-
-          if (!d.model) {
-
-            document.getElementById("settings-model").value =
-
-              document.getElementById("settings-model").options[0]?.value || "";
-
+          var modelSel = document.getElementById("settings-model");
+          var savedModel = localStorage.getItem("ace_selected_model") || d.model;
+          if (savedModel) modelSel.value = savedModel;
+          if (!modelSel.value && modelSel.options.length) {
+            modelSel.value = modelSel.options[0].value;
           }
 
-          document.getElementById("current-model-indicator").textContent = localStorage.getItem("ace_selected_model") || "openai/gpt-oss-120b";
+          document.getElementById("current-model-indicator").textContent =
+            modelSel.value || "openai/gpt-oss-120b";
 
+          if (d.groq_key)
+            document.getElementById("settings-groq-key").value = d.groq_key;
 
+          if (d.gemini_key)
+            document.getElementById("settings-gemini-key").value = d.gemini_key;
 
-
-
-
-
-
-
-
+          if (d.system_prompt)
+            document.getElementById("settings-prompt").value = d.system_prompt;
 
           checkModelStatus();
 
@@ -10165,8 +9499,6 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
       }
 
-
-
       /* ===== Save All Settings ===== */
 
       function saveSettings() {
@@ -10174,7 +9506,9 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
         var provider = document.getElementById("settings-provider").value;
 
         var model = document.getElementById("settings-model").value;
-        localStorage.setItem("ace_selected_provider", document.getElementById("settings-provider").value);
+
+        localStorage.setItem("ace_selected_provider", provider);
+        if (model) localStorage.setItem("ace_selected_model", model);
 
         var data = {
 
@@ -10184,41 +9518,7 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
           groq_key: document.getElementById("settings-groq-key").value,
 
-          openrouter_key: document.getElementById("settings-openrouter-key")
-
-            .value,
-
-          ollama_host: document.getElementById("settings-ollama-host").value,
-
-          openai_key: document.getElementById("settings-openai-key").value,
-
-          anthropic_key: document.getElementById("settings-anthropic-key")
-
-            .value,
-
           gemini_key: document.getElementById("settings-gemini-key").value,
-
-          cerebras_key: document.getElementById("settings-cerebras-key").value,
-
-          sambanova_key: document.getElementById("settings-sambanova-key")
-
-            .value,
-
-          hf_key: document.getElementById("settings-hf-key").value,
-
-          mistral_key: document.getElementById("settings-mistral-key").value,
-
-          cloudflare_key: document.getElementById("settings-cloudflare-key")
-
-            .value,
-
-          nvidia_key: document.getElementById("settings-nvidia-key").value,
-
-          sambanova_key: document.getElementById("settings-sambanova-key")
-
-            .value,
-
-          github_key: document.getElementById("settings-github-key").value,
 
           system_prompt: document.getElementById("settings-prompt").value,
 
@@ -10234,39 +9534,26 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
         })
 
-          .then(function (r) {
-
-            return r.json();
-
-          })
+          .then(function (r) { return r.json(); })
 
           .then(function (d) {
 
             if (d && d.ok) {
 
-              document.getElementById("current-model-indicator").textContent =
+              document.getElementById("current-model-indicator").textContent = model;
 
-                model;
+              var mobile = document.getElementById("mobile-model-indicator");
+              if (mobile) mobile.textContent = model;
 
-              document.getElementById("mobile-model-indicator").textContent =
+              if (window.showAceToast) window.showAceToast("Settings saved. Restart ACEsi to apply key changes.", 'success', 3000);
 
-                model;
+              checkModelStatus();
 
-              // Restart call removed: settings apply on reload
+            } else if (window.showAceToast) {
 
-            } else {
-
-              if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.message) || "unknown"), 'error', 5000);
+              window.showAceToast("Save failed: " + ((d && d.message) || "unknown"), 'error', 5000);
 
             }
-
-          })
-
-          .then(function (d) {
-
-            if (window.showAceToast) window.showAceToast("Settings saved. Server is restarting to apply new API keys.", 'success', 3000);
-
-            checkModelStatus();
 
           })
 
@@ -10277,8 +9564,6 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
           });
 
       }
-
-
 
       /* ===== Check Model Status ===== */
 

@@ -10,17 +10,18 @@ global:
   # LLM provider profile names referenced by context.llm_profile
   # Each profile: provider chain (first available wins), then fallback to local Ollama.
   profiles:
-    # Fast + capable cloud model (preferred for planning, code, complex reasoning)
+    # Fast + capable cloud chain. Only Groq and Gemini keys are kept; both were
+    # verified live. Each provider's second entry is its model-level fallback.
     cloud:
-      - provider: "openrouter"
-        model: "openai/o1-preview"
-      - provider: "cerebas"
-        model: "gpt-oss-120b"
       - provider: "groq"
-        model: "llama-3.3-70b-versatile"
-      - provider: "openrouter"
-        model: "nvidia/nemotron-super-120b-a12b:free"
-    # CPU-friendly local model (always available, offline)
+        model: "openai/gpt-oss-120b"
+      - provider: "groq"
+        model: "qwen/qwen3.8-27b"
+      - provider: "gemini"
+        model: "gemini-2.5-flash"
+      - provider: "gemini"
+        model: "gemini-2.5-flash-lite"
+    # CPU-friendly local model (only used when Ollama is actually running)
     local:
       - provider: "ollama"
         model: "qwen2.5:7b"
@@ -28,14 +29,16 @@ global:
     local_fast:
       provider: "ollama"
       model: "qwen2.5:3b"
-    # Code-specific: best cloud model for code reasoning
+    # Code-specific: the same two working cloud providers
     code:
-      - provider: "openrouter"
-        model: "openai/o1-preview"
       - provider: "groq"
-        model: "llama-3.3-70b-versatile"
-      - provider: "ollama"
-        model: "qwen2.5:7b"
+        model: "openai/gpt-oss-120b"
+      - provider: "groq"
+        model: "qwen/qwen3.8-27b"
+      - provider: "gemini"
+        model: "gemini-2.5-flash"
+      - provider: "gemini"
+        model: "gemini-2.5-flash-lite"
 
 # ── Tool capability restrictions per context ───────────────────────────────
 # Tools not listed here are unavailable when the context is active.
