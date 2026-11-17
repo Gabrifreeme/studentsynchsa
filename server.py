@@ -4408,6 +4408,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _AGENT["activity"] = "E-STOPPED"
             _AGENT["last_reply"] = "E-STOP is armed — ACEsi is stopped."
         return _AGENT["last_reply"]
+    _code_file_intent = _looks_like_code_file_request(user_message)
     explicit_dom = _explicit_tool_domain(user_message)
     active_domain = explicit_dom or (next(iter(concrete)) if concrete else "general")
     # Belt-and-suspenders: any navigation/portal/screenshot request that isn't an
@@ -4417,6 +4418,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # on the ITS portal" -> monologue, no tools, dead after 3 rounds).
     if active_domain == "general" and _nav_task(user_message):
         active_domain = "ui"
+    # A named source file fix wins over every other signal. This is the guard
+    # that stops a stray ui_* keyword from putting device tools back in schema.
+    if _code_file_intent:
+        active_domain = "code"
     allowed_names = _domain_tool_names(active_domain)
     # Multi-context: pick the active context from ace_config.yaml by domain and
     # (a) intersect its per-context tool-caps with the domain filter, and
@@ -4428,6 +4433,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         if ctx_domains == "all":
             allowed_names = ctx_tools
     ctx_overlay = _context_overlay(ctx_name)
+    _ctx_overlay_base = ctx_overlay
+    if _code_file_intent:
+        # The reduced provider prompt describes device work; without this block
+        # a small model falls back to ui_tap even though the schema has no such
+        # tool. Appending here covers full-schema providers too. Reduced mode
+        # uses _ctx_overlay_base with _CODE_FILE_FIX_SYS as its system prompt,
+        # so the directive is not sent twice.
+        ctx_overlay = (ctx_overlay or "") + "\n" + _CODE_FILE_FIX_SYS
     if ctx_overlay and llm_messages and llm_messages[0].get("role") == "system":
         merged = llm_messages[0].get("content", "") + "\n\n" + ctx_overlay
         llm_messages[0] = {"role": "system", "content": merged}
@@ -4439,6 +4452,20 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # correctly reports it cannot do them.
     _registered = {t["function"]["name"] for t in TOOLS_SCHEMA}
     allowed_names = ace_dispatcher.widen_to_cover(user_message, allowed_names, _registered)
+    if _code_file_intent:
+        # Binding enforcement, not just prompt advice: remove every UI/browser
+        # tool and guarantee the file-editing/analyzer tools are present.
+        _code_tools = {
+            "list_files", "read_file", "grep", "write_file", "edit_file",
+            "flutter_analyze", "run_command", "git_status",
+            "devtool_list", "devtool_run",
+        } & _registered
+        allowed_names = (allowed_names | _code_tools) & _registered
+        allowed_names = {n for n in allowed_names
+                         if not n.startswith(("ui_", "cdp_"))
+                         and n != "need_verify_in_browser"}
+        print("[code-file-fix] ui/cdp tools stripped; file tools=%s"
+              % sorted(allowed_names & _code_tools), flush=True)
     # A device task must never see a browser tool. Stripped here, at the one
     # point allowed_names is final, so the Ollama, full and net schemas are all
     # covered by one edit rather than three that can drift apart.
@@ -4604,10 +4631,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             print("[bugre] pre-inspection failed: %s" % _e)
 
     def _reduced_msgs(_msgs):
-        """reduced_messages() plus the Explorer / bug-report observation."""
+        """reduced_messages() plus the Explorer / code-fix / bug-report observation."""
         if _explorer_intent:
             return reduced_messages(_msgs, active_domain, ctx_overlay,
                                     system=_explorer_sys)
+        if _code_file_intent:
+            return reduced_messages(_msgs, active_domain, _ctx_overlay_base,
+                                    system=_CODE_FILE_FIX_SYS)
         if not _bug_obs:
             return reduced_messages(_msgs, active_domain, ctx_overlay)
         return reduced_messages(_msgs, active_domain,
@@ -4626,13 +4656,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         return _AGENT["last_reply"]
     # Ollama uses the COMPACT schema (prompt-size critical on this CPU); cloud
     # providers get the FULL schema restricted to the active domain only.
-    if _explorer_intent:
+    _file_fix_intent = _explorer_intent or _code_file_intent
+    _fix_sys = _explorer_sys or (_CODE_FILE_FIX_SYS if _code_file_intent else None)
+    _fix_tool_order = _EXPLORER_TOOL_ORDER if _file_fix_intent else None
+    _fix_tools = _EXPLORER_FIX_TOOLS if _file_fix_intent else None
+    if _file_fix_intent:
         # OLLAMA_TOOLS_SCHEMA is device-shaped and has no edit_file / flutter_analyze.
         # A fallback model must still be able to change files and verify the result.
         ollama_domain_schema = build_reduced_schema(
             _filter_tools_schema(TOOLS_SCHEMA, allowed_names), want_files=True,
-            tool_order=_EXPLORER_TOOL_ORDER,
-            extra_protected=_EXPLORER_FIX_TOOLS)
+            tool_order=_fix_tool_order,
+            extra_protected=_fix_tools)
     else:
         ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
     full_domain_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names)
@@ -4819,27 +4853,27 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 return "Stopped by user."
             if active is None:
                 got = None
-                tc = "required" if (_ui_task(user_message) and not names) else "auto"
+                tc = "required" if ((_ui_task(user_message) or _code_file_intent) and not names) else "auto"
                 # FORCE GROQ ONLY - Local models removed
                 providers = _chat_providers(active_domain)
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
                     # files; otherwise it is dead weight in the schema.
-                    _want_files = _explorer_intent or bool(re.search(
+                    _want_files = _file_fix_intent or bool(re.search(
                         r"\b(file|files|folder|read|open|edit|save|document|"
                         r"download|desktop|documents)\b", (user_message or ""), re.I))
                     # Same idea for the phone: the connect tools are only worth
                     # their schema tokens when the task is about reaching a device.
                     _want_device = _needs_phone_link(user_message)
-                    _no_cdp = _is_device_task(user_message)
+                    _no_cdp = _is_device_task(user_message) or _code_file_intent
                     if len(p) > 4 and p[4] == "compact":
                         # Ollama chosen via the model picker: use the compact schema
                         # and always route the pared-down local messages so the slow
                         # CPU model gets a small prefill.
                         schema = ollama_domain_schema
                         msgs = _ollama_local_messages(
-                            llm_messages, system=_explorer_sys or None)
+                            llm_messages, system=_fix_sys)
                         tc2 = tc
                     elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
                         # Reduced payload: the full one is rejected outright by
@@ -4856,8 +4890,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             _base, want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, msgs, _base),
-                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
-                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
+                            tool_order=_fix_tool_order,
+                            extra_protected=_fix_tools)
                         if _explorer_intent:
                             print("[explorer-fix] opening schema: %s"
                                   % [t["function"]["name"] for t in schema])
@@ -4912,8 +4946,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                                                net_domain_schema or full_domain_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET,
-                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
-                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
+                            tool_order=_fix_tool_order,
+                            extra_protected=_fix_tools)
                         or_msgs = _reduced_msgs(llm_messages)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                         OPENROUTER_API_KEY, model, or_msgs,
@@ -4938,7 +4972,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         pass
                     got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
                                     OLLAMA_CHAT_MODEL, _ollama_local_messages(
-                                        llm_messages, system=_explorer_sys or None),
+                                        llm_messages, system=_fix_sys),
                                     timeout=(15, 300),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                     if got is not None:
@@ -4950,11 +4984,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _prov_log_summary(providers)
                     break
             else:
-                tc = "required" if (_ui_task(user_message) and not names) else "auto"
+                tc = "required" if ((_ui_task(user_message) or _code_file_intent) and not names) else "auto"
                 if len(active) > 4 and active[4] == "compact":
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     _ollama_local_messages(
-                                        llm_messages, system=_explorer_sys or None),
+                                        llm_messages, system=_fix_sys),
                                     timeout=(15, 300),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                 else:
@@ -4979,8 +5013,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
                             budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema),
-                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
-                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
+                            tool_order=_fix_tool_order,
+                            extra_protected=_fix_tools)
                     else:
                         fwd_msgs = llm_messages
                     got = _chat_one(active[0], active[1], active[2], active[3],
@@ -10947,6 +10981,100 @@ def _strip_cdp_tools(schema):
             if not t["function"]["name"].startswith("cdp_")]
 
 
+# SINGLE-FILE CODE FIX INTENT. A request like "Open sync_provider find and fix
+# the syntax error" is disk work. It MUST NOT reach the deterministic UI step
+# parser: that parser turned fragments of a Dart import ("package:flutter_riverpod
+# /flutter_riverpod.dart", "; import") into blind ui_tap targets and answered
+# "Done - steps executed" without ever reading or editing a file. The filename
+# may be extensionless (Chris often says "sync_provider" or even the plural
+# "sync_providers"), so resolve it against real project basenames instead of
+# relying only on a code extension.
+_CODE_FILE_EXTS = (
+    "dart", "py", "js", "jsx", "ts", "tsx", "html", "css", "json", "yaml",
+    "yml", "md", "sh", "bat", "rs", "go", "java", "kt", "swift", "c", "cpp",
+    "h", "hpp",
+)
+_CODE_EXT_RE = re.compile(
+    r'\.(?:' + '|'.join(re.escape(e) for e in _CODE_FILE_EXTS) + r')\b',
+    re.IGNORECASE)
+_CODE_TROUBLE_RE = re.compile(
+    r'\b(?:syntax|compile|parser?|type|analy[sz]\w*|lint)\s+'
+    r'(?:errors?|issues?|problems?|warnings?)\b'
+    r'|\b(?:missing|unmatched|unexpected|stray)\s+'
+    r'(?:closing|opening|brace|braces|bracket|brackets|parenthes(?:is|es)|'
+    r'semicolon|colon|comma)\b'
+    r'|\b(?:errors?|issues?|problems?|bugs?|warnings?)\b.{0,60}'
+    r'\b(?:fix|fixes|fixed|repair|correct|resolve|remove)\b'
+    r'|\b(?:fix|fixes|fixed|repair|correct|resolve|remove)\b.{0,60}'
+    r'\b(?:errors?|issues?|problems?|bugs?|warnings?|file|code)\b',
+    re.IGNORECASE)
+_FILE_TOKEN_RE = re.compile(r'\b[A-Za-z_][A-Za-z0-9_.-]*\b')
+_NON_FILE_TOKENS = {
+    "and", "the", "for", "with", "this", "that", "error", "errors", "fix",
+    "find", "open", "read", "edit", "syntax", "file", "code", "dart", "flutter",
+}
+_PROJECT_FILE_INDEX = {"at": 0.0, "stems": set(), "names": set()}
+
+
+def _project_file_index():
+    """Cached basename/stem index of this project, for fuzzy file references."""
+    now = time.time()
+    if _PROJECT_FILE_INDEX["names"] and now - _PROJECT_FILE_INDEX["at"] < 30:
+        return _PROJECT_FILE_INDEX
+    root = os.path.dirname(os.path.abspath(__file__))
+    skip = {".git", ".dart_tool", "build", "node_modules", "deepseek-desktop",
+            "__pycache__"}
+    names, stems = set(), set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d.lower() not in skip]
+        for fn in filenames:
+            low = fn.lower()
+            names.add(low)
+            stems.add(os.path.splitext(low)[0])
+    _PROJECT_FILE_INDEX["names"] = names
+    _PROJECT_FILE_INDEX["stems"] = stems
+    _PROJECT_FILE_INDEX["at"] = now
+    return _PROJECT_FILE_INDEX
+
+
+def _stem_variants(stem):
+    """Include obvious plural typos: sync_providers -> sync_provider."""
+    s = str(stem or "").strip(".").lower()
+    out = {s}
+    if s.endswith("ies") and len(s) > 4:
+        out.add(s[:-3] + "y")
+    if s.endswith("s") and len(s) > 3:
+        out.add(s[:-1])
+    return {v for v in out if v}
+
+
+def _looks_like_code_file_request(user_message):
+    """True when the message names a source file and asks for code work."""
+    m = str(user_message or "")
+    low = m.lower()
+    # A literal .dart/.py/... filename anywhere is already a strong code signal.
+    if _CODE_EXT_RE.search(low):
+        return True
+    if not _CODE_TROUBLE_RE.search(low) and not re.search(
+            r'\b(?:open|read|edit|inspect|fix)\b', low):
+        return False
+    idx = _project_file_index()
+    for tok in _FILE_TOKEN_RE.findall(low):
+        if tok in _NON_FILE_TOKENS or len(tok) < 4:
+            continue
+        # Plain English words only count when they are an exact project basename;
+        # snake_case / dotted / hyphenated tokens are plausible filenames.
+        if not re.search(r'[_\-.]', tok) and tok not in idx["stems"]:
+            continue
+        stem = tok.rsplit(".", 1)[0] if "." in tok else tok
+        for variant in _stem_variants(stem):
+            if variant in idx["stems"] or any(
+                    variant + "." + ext in idx["names"]
+                    for ext in _CODE_FILE_EXTS):
+                return True
+    return False
+
+
 def _needs_model_driven_ui(user_message):
     """True when a request must go to the model-driven loop (URL / DevTools /
     CDP / network inspection) instead of the deterministic step parser."""
@@ -11558,6 +11686,12 @@ def _classify_message(user_message):
     # toolset out of the schema and the model cannot do the task at all.
     if _explicit_cdp_intent(m):
         return {"ui"}
+    # A named source file + syntax/error/fix intent is pure code work. This must
+    # run before the UI branches so extensionless names ("sync_provider" / the
+    # user's plural "sync_providers") cannot be pulled into a device task by an
+    # incidental "open" or "find".
+    if _looks_like_code_file_request(user_message):
+        return {"code"}
     # A strong net request with no device ACTION is purely network work, even if
     # the URL hostname contains UI-ish words (e.g. ...univenierp...portal/...).
     if net_strong and not ui_action:
@@ -12285,6 +12419,28 @@ _EXPLORER_FIX_SYS = (
 )
 
 
+# Prompt for a single named source file (syntax/compile fix). It REPLACES the
+# device-shaped reduced prompt so a small provider cannot fall back to ui_tap.
+_CODE_FILE_FIX_SYS = (
+    "You are ACEsi in CODE-FILE-FIX mode. Chris named a SOURCE FILE and asked "
+    "you to find/fix a problem in it. This is disk work, not a device task.\n"
+    "NEVER call ui_* or cdp_* tools for this request. Do not report blocked UI "
+    "taps or screen state.\n"
+    "WORKFLOW:\n"
+    "1. Use grep / list_files / read_file to locate and READ the exact file. "
+    "Fuzzy names are expected: 'sync_provider' and 'sync_providers' both mean "
+    "lib/presentation/providers/sync_provider.dart.\n"
+    "2. Use edit_file (or write_file for a full rewrite) to APPLY the change. "
+    "For a syntax error, repair the smallest broken construct - do not "
+    "rewrite unrelated code or add commentary.\n"
+    "3. Call flutter_analyze to verify. If it still reports a problem in that "
+    "file, read and edit again; repeat until clean.\n"
+    "4. Emit ONE tool call per message. Only after verification, give a short "
+    "final reply naming the file, the fix, and the analyzer result. Never say "
+    "a fix was applied unless edit_file/write_file returned success."
+)
+
+
 def _shrink_messages_for_retry(msgs, cut):
     """Progressively drop conversation content after a 413.
 
@@ -12932,6 +13088,9 @@ def _ui_task(user_message):
     the user expects real device actions on. Distinct from _nav_task (narrower
     keyword list used for time-budget sizing)."""
     m = (user_message or "").lower()
+    # Code-file fixes are never UI work, even when they say "open" or "find".
+    if _looks_like_code_file_request(user_message):
+        return False
     if _nav_task(m) or _ui_situational_ask(m) or _test_task(m):
         return True
     if any(k in m for k in (
@@ -14188,6 +14347,14 @@ def _enrich_webview(screen, adb_ok):
 def _execute_ui_script(user_message):
     """Deterministic executor for explicit UI step lists. Returns a reply string
     if the message was handled (steps executed on the device), else None."""
+    # A named source file + syntax/error/fix intent is code work. It used to be
+    # parsed into blind ui_tap steps (fragments like "package:flutter_riverpod/
+    # flutter_riverpod.dart" and "; import"), producing "Done - steps executed:
+    # ui_tap(...BLOCKED...)" instead of reading and editing the file.
+    if _looks_like_code_file_request(user_message):
+        print("💻 ui_script bail: code file fix task - deferring to code tools",
+              flush=True)
+        return None
     # Bail out before parsing: a URL / DevTools / CDP / network-inspection ask
     # is not a deterministic step list. Parsing it used to turn "navigate to
     # <url>" and the '404' link label into a blind ui_tap, which then answered
@@ -14537,11 +14704,26 @@ def run_agent(user_message):
     # exceeds it and every provider 4xx/413s, which surfaced as "all model
     # providers are unavailable". Mirrors _chat_dispatch's active_domain logic.
     _concrete = _classify_message(user_message) - {"general"}
+    _agent_code_file_intent = _looks_like_code_file_request(user_message)
     _agent_domain = (_explicit_tool_domain(user_message)
                      or (next(iter(_concrete)) if _concrete else "general"))
     if _agent_domain == "general" and _nav_task(user_message):
         _agent_domain = "ui"
+    if _agent_code_file_intent:
+        _agent_domain = "code"
+        messages[0] = {"role": "system",
+                       "content": messages[0].get("content", "") + "\n\n" + _CODE_FILE_FIX_SYS}
     _agent_allowed = _domain_tool_names(_agent_domain)
+    if _agent_code_file_intent:
+        _code_tools = {
+            "list_files", "read_file", "grep", "write_file", "edit_file",
+            "flutter_analyze", "run_command", "git_status",
+            "devtool_list", "devtool_run",
+        }
+        _agent_allowed = (_agent_allowed | _code_tools)
+        _agent_allowed = {n for n in _agent_allowed
+                          if not n.startswith(("ui_", "cdp_"))
+                          and n != "need_verify_in_browser"}
     try:
         corrective_max = 6
         for i in range(max_iters):
@@ -14556,7 +14738,7 @@ def run_agent(user_message):
             # Force a structured tool call on UI tasks until a tool has run or
             # the previous round stalled (no tool call) — otherwise qwen2.5:3b
             # narrates a plan instead of acting.
-            force_tool = (_ui_task(user_message) and
+            force_tool = ((_ui_task(user_message) or _agent_code_file_intent) and
                           (_AGENT["tools_used"] == 0 or not last_had_tools) and
                           i < 4)
             reply, native_calls = llm_reply(messages, max_tokens=2048, temperature=0.3,

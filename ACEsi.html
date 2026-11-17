@@ -925,7 +925,9 @@
 
       .spinner {
 
-        display: none;
+        /* Keep the X visible at all times (dimmed when idle) so it never looks
+           "mia"; sendMessage() adds .active to brighten and spin it. */
+        display: block;
 
         width: 16px;
 
@@ -939,7 +941,17 @@
 
           linear-gradient(-45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%);
 
-        animation: spin 0.8s linear infinite;
+        opacity: 0.35;
+
+        animation: spin 0.8s linear infinite paused;
+
+      }
+
+      .spinner.active {
+
+        opacity: 1;
+
+        animation-play-state: running;
 
       }
 
@@ -9069,9 +9081,9 @@ async function sendMessage() {
 
         }
 
-        if (spinnerLeft) spinnerLeft.style.display = "block";
+        if (spinnerLeft) spinnerLeft.classList.add("active");
 
-        if (spinnerRight) spinnerRight.style.display = "block";
+        if (spinnerRight) spinnerRight.classList.add("active");
 
 
 
@@ -9264,9 +9276,9 @@ if (statusBar) { statusBar.textContent = "Done."; setTimeout(function() { status
 
           if (window._timerInterval) clearInterval(window._timerInterval);
 
-          if (spinnerLeft) spinnerLeft.style.display = "none";
+          if (spinnerLeft) spinnerLeft.classList.remove("active");
 
-          if (spinnerRight) spinnerRight.style.display = "none";
+          if (spinnerRight) spinnerRight.classList.remove("active");
 
           // The request is done (or was cancelled): release the controller and
           // restore the Send button so the next message submits on one click.
