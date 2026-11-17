@@ -11760,7 +11760,7 @@ window.renderTabs = function() {
 
             var listPath = window._aceExternalPathForTab(tab);
 
-            if (window._aceIsExternalPath(listPath)) {
+            if (window._aceIsExternalPath(listPath) && tab.kind !== 'image' && tab.kind !== 'pdf') {
                 var listMenu = document.createElement('span');
 
                 listMenu.className = 'acesi-tab-menu';
@@ -13427,10 +13427,18 @@ document.addEventListener('DOMContentLoaded', function() {
       var name = document.getElementById('image-preview-name');
       if (name) name.textContent = label || '';
       ov.style.display = 'flex';
+      // The preview header now owns the three-dot menu; hide the copy in the
+      // open-editors list while a preview is visible.
+      document.querySelectorAll('#open-editors-list .acesi-tab-menu').forEach(function(el) {
+        el.style.display = 'none';
+      });
     };
     window._aceHideImagePreview = function() {
       var ov = document.getElementById('image-preview-overlay');
       if (ov) ov.style.display = 'none';
+      document.querySelectorAll('#open-editors-list .acesi-tab-menu').forEach(function(el) {
+        el.style.display = '';
+      });
       // Keep the blob URL alive: the image tab still owns it so switching back
       // to that tab can show the preview again.
     };
