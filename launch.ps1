@@ -30,7 +30,14 @@
 .EXAMPLE
   .\launch.ps1                 # what the desktop icon does (safe defaults)
   .\launch.ps1 -ForceRestart   # always replace the running server
-  .\launch.ps1 -DevTools       # enable F12 / Ctrl+Shift+I / right-click Inspect
+  .\launch.ps1 -Gpu            # use hardware rendering instead of software
+
+.NOTES
+  Debugging needs no flag and nothing to remember: the desktop window always
+  opens a localhost CDP endpoint on port 9222 so the ACEsi assistant can
+  inspect the running page. That connection does NOT open a devtools window
+  (the second WebView2 window that hard-reset this machine). F12 and Inspect
+  stay disabled on purpose.
 #>
 [CmdletBinding()]
 param(
@@ -38,11 +45,6 @@ param(
   [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python314\python.exe",
   [string]$Root,
   [switch]$ForceRestart,
-  # Devtools need pywebview's debug mode, which also enables the browser
-  # accelerators and the right-click menu. It is opt-in because opening the
-  # devtools window is a second WebView2 window, and that is what this machine
-  # hard-reset on. The normal launch therefore has no devtools at all.
-  [switch]$DevTools,
   # Use GPU rendering for the window. Software rendering is the default: the
   # display driver on this machine times out several times a day, and the UI is
   # plain HTML, so the CPU compositor costs nothing visually.
@@ -268,7 +270,6 @@ try {
 
   # ---- 6. open the window ------------------------------------------------
   $desktopArgs = '"{0}" --port {1}' -f $appPy, $Port
-  if ($DevTools) { $desktopArgs += ' --devtools' }
   if ($Gpu) { $desktopArgs += ' --gpu' }
   Write-Log "opening desktop window: $desktopArgs"
   # python.exe is a console program: launching it pops a black console window

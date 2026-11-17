@@ -31,40 +31,46 @@ def storage_dir():
     return path
 
 
+CDP_PORT = 9222
+
+
 def configure_webview2(use_gpu):
-    """Keep WebView2's compositor on the CPU unless the caller asks for the GPU.
+    """Set the WebView2 browser flags used for every normal launch.
 
-    The display driver on this machine resets several times a day (the system
-    log has hundreds of "nvlddmkm stopped responding" events), and the PC
-    hard-reset while a second WebView2 window - the devtools panel - was
-    opening. Software rendering keeps compositing in the CPU, where a failing
-    driver cannot take the whole machine down. The UI is plain HTML, so the
-    visual difference is nil.
+    Two things matter here:
 
-    Flags already in the environment (a remote debugging port, for instance)
-    are preserved rather than overwritten.
+    * Software rendering (--disable-gpu). The display driver on this machine
+      resets hundreds of times a day, and the PC hard-reset while a second
+      WebView2 window - the devtools panel - was opening. Keeping the
+      compositor on the CPU means a failing driver cannot take the machine
+      down. The UI is plain HTML, so there is no visible difference.
+
+    * A localhost CDP endpoint (--remote-debugging-port). This is what devtools
+      is actually for here: it lets the ACEsi assistant inspect and debug the
+      running window programmatically. A CDP connection does NOT open a
+      devtools window, so it carries none of the crash risk the visible panel
+      did. Chromium binds it to 127.0.0.1 only.
+
+    Flags already in the environment are preserved; only the ones we manage
+    are added or removed.
     """
     flags = (os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") or "").split()
     flags = [f for f in flags if f]
-    if use_gpu:
-        flags = [f for f in flags if f != "--disable-gpu"]
-    elif "--disable-gpu" not in flags:
+
+    def drop(flag):
+        return [f for f in flags if f != flag and not f.startswith(flag + "=")]
+
+    flags = drop("--disable-gpu")
+    flags = drop("--remote-debugging-port")
+    if not use_gpu:
         flags.append("--disable-gpu")
-    if flags:
-        os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = " ".join(flags)
+    flags.append("--remote-debugging-port=%d" % CDP_PORT)
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = " ".join(flags)
 
 
 def main():
     parser = argparse.ArgumentParser(description="ACEsi desktop window")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument(
-        "--devtools",
-        action="store_true",
-        help=(
-            "enable devtools (F12, Ctrl+Shift+I, right-click Inspect). Off by "
-            "default: opening the devtools window has crashed this machine."
-        ),
-    )
     parser.add_argument(
         "--gpu",
         action="store_true",
@@ -87,15 +93,14 @@ def main():
     )
 
     # pywebview ties devtools, the right-click menu and the browser keyboard
-    # shortcuts (F12, Ctrl+Shift+I, Ctrl+R) to debug mode, so they are only on
-    # for `--devtools`. The normal launch stays on the safe side: opt in
-    # deliberately when you actually want to inspect something.
-    # OPEN_DEVTOOLS_IN_DEBUG stays off so enabling the keys never pops the
-    # panel open by itself - that window is the thing that crashed the PC.
+    # shortcuts to debug mode. Keep debug off permanently: the visible devtools
+    # window is what hard-reset this machine. Debugging is still possible
+    # through the CDP endpoint configured above - a remote connection inspects
+    # the page without ever opening a second WebView2 window.
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
 
     webview.start(
-        debug=bool(args.devtools),
+        debug=False,
         private_mode=False,
         storage_path=storage_dir(),
     )
