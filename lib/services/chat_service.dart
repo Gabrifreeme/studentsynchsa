@@ -1,17 +1,3 @@
-﻿// chat_service.dart
-// Phase 2a: cross-device chat over socket_io_client 3.x, namespace /chat.
-// Server is authoritative: send() does NOT optimistically render. The server
-// echoes chat_message, which we persist via ChatStorage and emit on the stream.
-// The UI reads from ChatStorage (single source of truth); the stream signals
-// "the box changed, reload".
-//
-// Token: optional. Stored in Hive _meta box under 'chat_token'. Absent token +
-// loopback = Guest. Non-loopback without token = 401 on chat_connect.
-//
-// Attachments (fileData / mimeType) are local-only in 2a. send() rejects
-// attachmentJson. The UI surfaces this rather than silently producing
-// unsynced messages.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -108,9 +94,8 @@ class ChatService {
       _emitStatus(ChatConnectionState.connecting);
 
       final socket = io.io(
-        _serverBaseUrl + "/chat",
+        '$_serverBaseUrl/chat',
         io.OptionBuilder()
-
             .disableAutoConnect()
             .setPath('/socket.io')
             .build(),

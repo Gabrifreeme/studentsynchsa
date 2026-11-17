@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lipsyncstudent/core/theme/app_theme.dart';
 import 'package:lipsyncstudent/data/datasources/mock_bursary_data.dart';
 import 'package:lipsyncstudent/domain/models/bursary.dart';
-import 'package:lipsyncstudent/presentation/widgets/common_widgets.dart';
 
 class FundingListScreen extends StatefulWidget {
   const FundingListScreen({super.key});

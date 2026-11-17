@@ -3791,7 +3791,7 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_opti
 
 
 
-def _ollama_local_messages(llm_messages):
+def _ollama_local_messages(llm_messages, system=None):
     """Return a compacted copy of llm_messages for the LOCAL Ollama model: swap
     the giant persona for the terse OLLAMA_SYS_PROMPT. Critically, only KEEP the
     original task message plus the last 3 turns of tool feedback — otherwise the
@@ -3806,6 +3806,11 @@ def _ollama_local_messages(llm_messages):
             # Local prompt = driving persona + a memory-awareness section with the
             # light facts block, so the 3b model knows it HAS persistent memory and
             # can actually quote stored facts when asked (/chat never strips this).
+            # An Explorer-fix run passes its own prompt so the exact analyzer
+            # diagnostics survive the local fallback too.
+            if system:
+                sys_ = {"role": "system", "content": system}
+                continue
             sys_ = {"role": "system", "content":
                     OLLAMA_SYS_PROMPT +
                     "\nMEMORY: You DO have persistent memory. The bracketed blocks below "
@@ -4442,11 +4447,46 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         allowed_names = {n for n in allowed_names if not n.startswith("cdp_")}
         if _dropped_cdp:
             print("[cdp-strip] device task: removed %s" % _dropped_cdp)
+    # EXPLORER-FIX OVERRIDE. A request to fix the Explorer's problems is a disk
+    # job, not a page bug report. The bug-report path below tells the model to
+    # only NAME the file - which is why an Explorer ask produced prose instead
+    # of edits. Detect it first, collect the exact analyzer diagnostics here,
+    # force the file/analysis tools, and use a prompt that demands real edits.
+    _explorer_intent = bool(_explorer_fix_re.search(user_message or ""))
+    _explorer_sys = ""
+    _explorer_before = -1
+    _explorer_first_path = ""
+    _explorer_talk_nudges = 0
+    if _explorer_intent:
+        _fix_tools = {"list_files", "read_file", "grep", "write_file",
+                      "edit_file", "run_command", "git_status", "flutter_analyze"}
+        allowed_names = (set(allowed_names) | _fix_tools)
+        # Nothing here needs a browser: strip CDP/UI so the model cannot wander
+        # back into the bug-report behaviour that caused the original complaint.
+        allowed_names = {n for n in allowed_names
+                         if not n.startswith(("cdp_", "ui_"))}
+        _explorer_obs, _explorer_before = _explorer_problems_obs()
+        if _explorer_before == 0:
+            # Nothing to fix: do not hand a clean Explorer to a provider that
+            # will invent a narrative about what it "fixed".
+            _reply = ("Explorer is already clean. flutter analyze reports "
+                      "No issues found; no files were changed.")
+            with _AGENT_LOCK:
+                _AGENT["running"] = False
+                _AGENT["activity"] = "done"
+                _AGENT["last_reply"] = _reply
+            return _reply
+        _explorer_sys = _EXPLORER_FIX_SYS + "\n\n" + _explorer_obs
+        _m = re.search(r"- (\S+?\.(?:dart|yaml|py)):\d+:\d+", _explorer_obs)
+        _explorer_first_path = _m.group(1) if _m else ""
+        print("[explorer-fix] %d problem(s) collected in code; tools=%d"
+              % (_explorer_before, len(allowed_names)))
     # Bug-report override: if this looks like a bug report AND a debug
     # Chrome is up, ensure diagnostic CDP tools are in the schema and take the
     # three cheap observations now, in code.
     _bug_obs = ""
-    _bug_intent = bool(_bug_re.search((user_message or "").lower()))
+    _bug_intent = (bool(_bug_re.search((user_message or "").lower()))
+                   and not _explorer_intent)
     _cdp_live = _cdp_target_live() if _bug_intent else False
     _bug_mode = _bug_intent and _cdp_live
     if _bug_intent and not _cdp_live:
@@ -4564,7 +4604,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             print("[bugre] pre-inspection failed: %s" % _e)
 
     def _reduced_msgs(_msgs):
-        """reduced_messages() plus the bug-report observation, if any."""
+        """reduced_messages() plus the Explorer / bug-report observation."""
+        if _explorer_intent:
+            return reduced_messages(_msgs, active_domain, ctx_overlay,
+                                    system=_explorer_sys)
         if not _bug_obs:
             return reduced_messages(_msgs, active_domain, ctx_overlay)
         return reduced_messages(_msgs, active_domain,
@@ -4583,7 +4626,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         return _AGENT["last_reply"]
     # Ollama uses the COMPACT schema (prompt-size critical on this CPU); cloud
     # providers get the FULL schema restricted to the active domain only.
-    ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
+    if _explorer_intent:
+        # OLLAMA_TOOLS_SCHEMA is device-shaped and has no edit_file / flutter_analyze.
+        # A fallback model must still be able to change files and verify the result.
+        ollama_domain_schema = build_reduced_schema(
+            _filter_tools_schema(TOOLS_SCHEMA, allowed_names), want_files=True,
+            tool_order=_EXPLORER_TOOL_ORDER,
+            extra_protected=_EXPLORER_FIX_TOOLS)
+    else:
+        ollama_domain_schema = _filter_tools_schema(OLLAMA_TOOLS_SCHEMA, allowed_names)
     full_domain_schema = _filter_tools_schema(TOOLS_SCHEMA, allowed_names)
     # Compact schema for net-domain tools (OpenRouter free tier token limit).
     # Also used for hybrid web-research tasks (search + save to a file) which
@@ -4619,8 +4670,49 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _AGENT["activity"] = "done"
             _AGENT["last_reply"] = script_reply
         return script_reply
+    # EXPLORER-FIX DETERMINISTIC PASS. The provider in this project has already
+    # demonstrated that it can loop on read_file forever and hit 429 before it
+    # emits an edit. Do the known-safe edits here, from the exact diagnostics
+    # collected above, then re-run the analyzer. Only an unresolved remainder
+    # is handed to the model.
+    _explorer_names = []
+    if _explorer_intent:
+        _changes, _applied, _failures = _explorer_safe_fixes(_explorer_obs)
+        for _desc in _applied:
+            _tool_name = "write_file" if _desc.startswith("created ") else "edit_file"
+            _explorer_record_fix_step(_tool_name, _desc, True)
+            _explorer_names.append(_tool_name)
+        for _fail in _failures:
+            _explorer_record_fix_step("edit_file", _fail, False, _fail)
+        if _changes:
+            _obs_after_fix, _explorer_after_fix = _explorer_problems_obs()
+            if re.match(r"^\[EXPLORER PROBLEMS", _obs_after_fix or ""):
+                _explorer_obs = _obs_after_fix
+            _explorer_before = _explorer_after_fix
+            _m2 = re.search(r"- (\S+?\.(?:dart|yaml|py)):\d+:\d+", _explorer_obs)
+            _explorer_first_path = _m2.group(1) if _m2 else ""
+            _explorer_sys = (
+                _EXPLORER_FIX_SYS + "\n\n" + _explorer_obs +
+                "\n\n[SAFE FIXES ALREADY APPLIED BY ACEsi IN CODE]\n" +
+                "Changed: %s.\n" % ", ".join(_changes) +
+                "flutter analyze now reports %s problem(s). Do not redo those "
+                "edits. Fix only what still appears in the list above, then "
+                "verify once with flutter_analyze."
+                % (_explorer_after_fix if _explorer_after_fix >= 0 else "an unknown number of")
+            )
+            print("[explorer-fix] deterministic pass changed %d file(s); %d problem(s) remain"
+                  % (len(_changes), _explorer_after_fix))
+            if _explorer_after_fix == 0:
+                _reply = _explorer_verify_reply(
+                    "Applied the Explorer fixes.", _explorer_names,
+                    _explorer_before)
+                with _AGENT_LOCK:
+                    _AGENT["running"] = False
+                    _AGENT["activity"] = "done"
+                    _AGENT["last_reply"] = _reply
+                return _reply
     active = None
-    names = []
+    names = list(_explorer_names)
     last_text = None
     last_screen = None
     dead_rounds = 0
@@ -4734,7 +4826,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
                     # files; otherwise it is dead weight in the schema.
-                    _want_files = bool(re.search(
+                    _want_files = _explorer_intent or bool(re.search(
                         r"\b(file|files|folder|read|open|edit|save|document|"
                         r"download|desktop|documents)\b", (user_message or ""), re.I))
                     # Same idea for the phone: the connect tools are only worth
@@ -4746,7 +4838,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # and always route the pared-down local messages so the slow
                         # CPU model gets a small prefill.
                         schema = ollama_domain_schema
-                        msgs = _ollama_local_messages(llm_messages)
+                        msgs = _ollama_local_messages(
+                            llm_messages, system=_explorer_sys or None)
                         tc2 = tc
                     elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
                         # Reduced payload: the full one is rejected outright by
@@ -4762,7 +4855,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         schema = build_reduced_schema(
                             _base, want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
-                            budget=_reduced_schema_budget(_budget, msgs, _base))
+                            budget=_reduced_schema_budget(_budget, msgs, _base),
+                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
+                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
+                        if _explorer_intent:
+                            print("[explorer-fix] opening schema: %s"
+                                  % [t["function"]["name"] for t in schema])
                         if _bug_obs:
                             # The prompt names specific cdp_* tools; if the schema
                             # dropped one the provider rejects the whole round with
@@ -4813,7 +4911,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             _reduced_tool_pool(active_domain,
                                                net_domain_schema or full_domain_schema),
                             want_files=_want_files, want_device=_want_device,
-                            drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET)
+                            drop_cdp=_no_cdp, budget=OPENROUTER_REDUCED_BUDGET,
+                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
+                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
                         or_msgs = _reduced_msgs(llm_messages)
                         got = _chat_one("OpenRouter-fallback", OPENROUTER_ENDPOINT,
                                         OPENROUTER_API_KEY, model, or_msgs,
@@ -4837,7 +4937,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     except Exception:
                         pass
                     got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                    OLLAMA_CHAT_MODEL, _ollama_local_messages(llm_messages),
+                                    OLLAMA_CHAT_MODEL, _ollama_local_messages(
+                                        llm_messages, system=_explorer_sys or None),
                                     timeout=(15, 300),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                     if got is not None:
@@ -4852,7 +4953,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 tc = "required" if (_ui_task(user_message) and not names) else "auto"
                 if len(active) > 4 and active[4] == "compact":
                     got = _chat_one(active[0], active[1], active[2], active[3],
-                                    _ollama_local_messages(llm_messages), timeout=(15, 300),
+                                    _ollama_local_messages(
+                                        llm_messages, system=_explorer_sys or None),
+                                    timeout=(15, 300),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                 else:
                     fwd_schema = full_domain_schema
@@ -4875,7 +4978,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             else _reduced_tool_pool(active_domain, fwd_schema),
                             want_files=_want_files, want_device=_want_device,
                             drop_cdp=_no_cdp,
-                            budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema))
+                            budget=_reduced_schema_budget(_budget, fwd_msgs, fwd_schema),
+                            tool_order=_EXPLORER_TOOL_ORDER if _explorer_intent else None,
+                            extra_protected=_EXPLORER_FIX_TOOLS if _explorer_intent else None)
                     else:
                         fwd_msgs = llm_messages
                     got = _chat_one(active[0], active[1], active[2], active[3],
@@ -5177,6 +5282,30 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # even when the model answered from memory without a tool call.
                     _auto_open_user_file_fallback(names, llm_messages, user_message)
                     _auto_open_web_image_fallback(text or "", llm_messages, user_message)
+                    # EXPLORER-FIX GUARD. A text-only reply with no edit_file
+                    # call is the exact "just talk" failure: the old loop
+                    # returned it straight to Chris. Force the model back into
+                    # the tool loop, then fall back to the observed diagnostics.
+                    if (_explorer_intent
+                            and not any(n in ("edit_file", "write_file")
+                                        for n in names)):
+                        _explorer_talk_nudges += 1
+                        if _explorer_talk_nudges <= 2:
+                            llm_messages.append({"role": "user", "content":
+                                "STOP. You answered in prose but changed no file. "
+                                "Explorer still has %s analyzer problem(s). Do NOT "
+                                "write a summary. Call read_file on %s, then call "
+                                "edit_file with the exact old and new text. "
+                                "One tool call only, no narration."
+                                % (_explorer_before, _explorer_first_path or "the first file in the list")})
+                            active = None
+                            dead_rounds += 1
+                            continue
+                        reply = _explorer_verify_reply(
+                            _terse_reply(text or ""), names, _explorer_before)
+                        with _AGENT_LOCK:
+                            _AGENT["last_reply"] = reply
+                        return reply
                     return _terse_reply(text or "")
 # Model returned empty text after using tools — nudge it to answer
                 if names:
@@ -5440,6 +5569,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     def _auto_open_user_file():
         return _auto_open_user_file_fallback(names, llm_messages, user_message)
 
+    def _explorer_finish(text):
+        """Append the freshly-measured Explorer result to an Explorer-fix reply."""
+        if not _explorer_intent:
+            return text
+        return _explorer_verify_reply(text, names, _explorer_before)
+
     # If the model already emitted a FINAL line, that is the answer.
     # But if it's ungrounded, re-ground it with tool evidence first.
     # The auto-open fallback MUST run before this return, otherwise a
@@ -5452,6 +5587,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             summary = _final_answer(llm_messages, names, last_screen, active,
                                     user_message, chat_one=_chat_one,
                                     bug_obs=_bug_obs)
+            summary = _explorer_finish(summary)
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = summary
             return summary
@@ -5470,6 +5606,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 "instead of describing the page." % str(clean)[:60],
                 obs=_bug_obs,
                 question=user_message)
+        clean = _explorer_finish(clean)
         with _AGENT_LOCK:
             _AGENT["last_reply"] = clean
         return clean
@@ -5513,6 +5650,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     summary = _final_answer(llm_messages, names, last_screen, active,
                             user_message, chat_one=_chat_one, bug_obs=_bug_obs)
     summary = _normalize_reply(summary)
+    summary = _explorer_finish(summary)
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
         summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
@@ -6437,6 +6575,187 @@ def api_ai_usage():
         'last_total_tokens': _LAST_TOKEN_USAGE,
         'limit': _DAILY_TOKEN_LIMIT
     })
+
+
+# ===== Explorer problem badge (/api/problems) =====
+# ACEsi.html's Explorer badge reads this route. It must report the same analyzer
+# output the fix workflow uses, otherwise the badge and "fix Explorer" disagree.
+_PROBLEMS_CACHE = {"ts": 0.0, "data": None}
+_PROBLEMS_LOCK = threading.Lock()
+_PROBLEMS_TTL = 20.0
+_PROBLEM_EXCLUDE_DIRS = {
+    '.git', 'build', 'node_modules', '.dart_tool',
+    'android', 'ios', 'windows', 'linux', 'macos', 'web',
+    '__pycache__', '.idea', '.vscode', 'dist', 'target',
+    'venv', '.venv', 'env', 'coverage', '.next', '.nuxt',
+    'deepseek-desktop', 'nim-proxy',
+}
+_PROBLEM_PY_RE = re.compile(
+    r"^(server|devtools_service|ace_[a-z0-9_]+|acesi_[a-z0-9_]+)\.py$")
+_PROBLEM_PATH_RE = re.compile(r"\.(?:dart|yaml|yml|py|html|htm|js|mjs|cjs)$", re.I)
+
+
+def _problems_blank():
+    return {"total": 0, "counts": {"error": 0, "warning": 0, "info": 0},
+            "files": {}, "running": False}
+
+
+def _problems_add(files, counts, path, severity):
+    sev = str(severity or "info").strip().lower()
+    if sev not in ("error", "warning", "info"):
+        sev = "info"
+    path = str(path or "?").replace("\\", "/")
+    entry = files.setdefault(path, {"error": 0, "warning": 0, "info": 0})
+    entry[sev] += 1
+    counts[sev] += 1
+
+
+def _problems_rel(path):
+    """Normalize an analyzer path to the slash-separated path the tree uses."""
+    p = str(path or "").strip().replace("\\", os.sep).replace("/", os.sep)
+    if os.path.isabs(p):
+        try:
+            p = os.path.relpath(p, PROJECT_ROOT)
+        except Exception:
+            pass
+    return p.replace("\\", "/")
+
+
+def _scan_dart_problems(files, counts):
+    """Read `dart analyze --format=machine` (the badge's own source of truth)."""
+    env = os.environ.copy()
+    r = subprocess.run(["dart", "analyze", "--format=machine"], cwd=PROJECT_ROOT,
+                       env=env, capture_output=True, text=True, timeout=300,
+                       errors="replace")
+    text = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
+    for line in text.splitlines():
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+        sev = parts[0].lower()
+        if sev not in ("error", "warning", "info"):
+            continue
+        for i in range(len(parts) - 2):
+            cand = _problems_rel(parts[i])
+            if (not _PROBLEM_PATH_RE.search(cand)
+                    or not parts[i + 1].isdigit()
+                    or not parts[i + 2].isdigit()):
+                continue
+            _problems_add(files, counts, cand, sev)
+            break
+
+
+def _scan_python_problems(files, counts):
+    """Syntax-check only first-party Python modules; never scratch scripts."""
+    try:
+        names = sorted(os.listdir(PROJECT_ROOT))
+    except Exception:
+        return
+    for name in names:
+        if not _PROBLEM_PY_RE.match(name):
+            continue
+        full = os.path.join(PROJECT_ROOT, name)
+        if not os.path.isfile(full):
+            continue
+        try:
+            # utf-8-sig: server.py itself starts with a BOM, which py_compile
+            # accepts but compile() on plain utf-8 text does not.
+            with open(full, "r", encoding="utf-8-sig", errors="replace") as f:
+                source = f.read()
+            compile(source, name, "exec")
+        except SyntaxError:
+            _problems_add(files, counts, name, "error")
+        except Exception:
+            pass
+
+
+def _node_check(full, rel, files, counts):
+    try:
+        r = subprocess.run(["node", "--check", full], cwd=PROJECT_ROOT,
+                           capture_output=True, text=True, timeout=30,
+                           errors="replace")
+    except (OSError, subprocess.SubprocessError):
+        return
+    if r.returncode != 0:
+        _problems_add(files, counts, rel, "error")
+
+
+def _scan_js_problems(files, counts):
+    """Syntax-check first-party JS and inline HTML scripts.
+
+    JSON/ld+json data blocks are skipped: they are data, not executable script,
+    and feeding them to `node --check` produces false Explorer badges.
+    """
+    for root, dirs, names in os.walk(PROJECT_ROOT):
+        dirs[:] = [d for d in dirs
+                   if d not in _PROBLEM_EXCLUDE_DIRS and not d.startswith('.')]
+        for name in names:
+            full = os.path.join(root, name)
+            rel = _problems_rel(os.path.relpath(full, PROJECT_ROOT))
+            ext = os.path.splitext(name)[1].lower()
+            if ext in (".js", ".mjs", ".cjs"):
+                _node_check(full, rel, files, counts)
+            elif ext in (".html", ".htm"):
+                try:
+                    with open(full, "r", encoding="utf-8", errors="replace") as f:
+                        html = f.read()
+                except Exception:
+                    continue
+                for m in re.finditer(
+                        r"<script\b([^>]*)>(.*?)</script\s*>", html,
+                        re.IGNORECASE | re.DOTALL):
+                    attrs, code = m.group(1) or "", m.group(2) or ""
+                    tm = re.search(r"\btype\s*=\s*(['\"])(.*?)\1", attrs, re.I)
+                    stype = (tm.group(2).strip().lower() if tm else "")
+                    if stype and stype not in ("text/javascript", "module",
+                                               "application/javascript",
+                                               "text/ecmascript"):
+                        continue
+                    if not code.strip():
+                        continue
+                    suffix = (".mjs" if re.search(r"\b(?:import|export)\b", code)
+                              else ".js")
+                    tmp = None
+                    try:
+                        with tempfile.NamedTemporaryFile(
+                                "w", suffix=suffix, delete=False,
+                                encoding="utf-8", newline="") as f:
+                            f.write(code)
+                            tmp = f.name
+                        _node_check(tmp, rel, files, counts)
+                    except Exception:
+                        pass
+                    finally:
+                        if tmp:
+                            try:
+                                os.unlink(tmp)
+                            except Exception:
+                                pass
+
+
+@app.route('/api/problems', methods=['GET'])
+@require_token
+def api_problems():
+    force = request.args.get("refresh") == "1"
+    now = time.time()
+    if not force:
+        with _PROBLEMS_LOCK:
+            cached = _PROBLEMS_CACHE.get("data")
+            if cached is not None and now - _PROBLEMS_CACHE.get("ts", 0) < _PROBLEMS_TTL:
+                return jsonify(cached)
+    data = _problems_blank()
+    files, counts = data["files"], data["counts"]
+    for scanner in (_scan_dart_problems, _scan_python_problems, _scan_js_problems):
+        try:
+            scanner(files, counts)
+        except Exception as e:
+            print("[problems] %s failed: %s" % (scanner.__name__, e), flush=True)
+    data["total"] = sum(counts.values())
+    data["generated"] = int(time.time())
+    with _PROBLEMS_LOCK:
+        _PROBLEMS_CACHE["ts"] = time.time()
+        _PROBLEMS_CACHE["data"] = data
+    return jsonify(data)
 
 
 @app.route('/api/files', methods=['GET'])
@@ -10453,6 +10772,26 @@ _bug_re = re.compile(
 )
 
 
+# EXPLORER-FIX INTENT. "Check Explorer for errors and fix it" is a static
+# analysis repair job, NOT a page bug report. The bug-report prompt tells the
+# model to only NAME the file to change, which is exactly why an Explorer ask
+# came back as prose about a provider instead of edits. Detect it before the
+# bug-report override so it gets a fix workflow with the real analyzer output.
+_explorer_fix_re = re.compile(
+    # ACEsi's own file Explorer / problem badge.
+    r"\bexplorer\b.{0,80}\b(?:error|problem|issue|warn|badge|fix|clean|analyz)\w*\b"
+    r"|\b(?:error|problem|issue|warn|badge)s?\b.{0,80}\bexplorer\b"
+    # An explicit analyze/lint/diagnostic repair request.
+    r"|\b(?:fix|clear|resolve|repair)\b.{0,60}\b(?:analyz\w*|lint|diagnostic|flutter)\b"
+    r"|\b(?:analyz\w*|lint|diagnostic)s?\b.{0,60}\b(?:fix|clear|resolve|repair)\b"
+    r"|\bflutter\s+analy(?:ze|sis)\b"
+    # "fix all 13 problems" with no other keyword.
+    r"|\b(?:fix|clear|resolve|repair)\b.{0,30}\b\d+\s+"
+    r"(?:problems?|errors?|issues?|warnings?)\b",
+    re.IGNORECASE,
+)
+
+
 # The page a bug report is assumed to be about when the message names no URL
 # and the debug browser has no page open. The Flutter app under test; override
 # with ACESI_BUG_URL (the dev-server port changes between runs: 9999, 9000).
@@ -10482,6 +10821,272 @@ def _bug_live_url():
         if _bug_url_reachable(u):
             return u
     return _BUG_DEFAULT_URL
+
+
+def _explorer_problems_obs():
+    """Run flutter analyze in code and return (prompt block, problem count).
+
+    This is the Explorer badge's own data source. Collecting it before the model
+    is called means the diagnosis cannot be skipped when a provider is slow or
+    rate-limited, and the model works from the exact file:line:col diagnostics
+    instead of a paraphrase of a web page it never needed to open.
+    """
+    try:
+        ok, out = _call_tool("flutter_analyze", {})
+    except Exception as e:
+        return ("[EXPLORER PROBLEMS]\nflutter analyze could not run: %s\n" % e), -1
+    text = str(out or "")
+    issues = [s.strip() for s in text.splitlines()
+              if re.match(r"^\s*(info|warning|error)\s+-", s)]
+    count = len(issues)
+    summary = next((s.strip() for s in text.splitlines()
+                    if "issues found" in s.lower()), "")
+    if count == 0 and ("no issues found" in text.lower()
+                       or (ok and not summary)):
+        return ("[EXPLORER PROBLEMS - collected in code BEFORE you were called]\n"
+                "flutter analyze: No issues found. The Explorer badge is clear.\n"), 0
+    digest = "\n".join(issues[:60]) or text[:3000]
+    return (
+        "[EXPLORER PROBLEMS - collected in code BEFORE you were called. "
+        "Do not re-run flutter analyze just to 'check'; the numbers below are "
+        "the live state of the Explorer badge.]\n"
+        "There are %d analyzer problem(s). Every one is listed here:\n%s\n"
+        "Analyzer summary line: %s\n"
+        % (count, digest, summary or "(none)")
+    ), count
+
+
+def _explorer_parse_issues(text):
+    """Parse machine-style flutter analyze lines into diagnostic dicts."""
+    issues = []
+    pat = re.compile(
+        r"^\s*(info|warning|error)\s+-\s+(.*?)\s+-\s+(.+?):(\d+):(\d+)\s+-\s+(\S+)\s*$")
+    for line in str(text or "").splitlines():
+        m = pat.match(line)
+        if not m:
+            continue
+        issues.append({
+            "severity": m.group(1), "message": m.group(2).strip(),
+            "path": m.group(3).strip(), "line": int(m.group(4)),
+            "col": int(m.group(5)), "code": m.group(6),
+        })
+    return issues
+
+
+def _explorer_safe_fixes(obs_text):
+    """Apply narrow fixes for diagnostics ACEsi already measured in code.
+
+    This is the deterministic part of Explorer-fix: the provider is no longer
+    the only thing standing between "fix it" and an actual file edit. Only
+    exact, low-risk transformations are attempted. Anything unknown is left for
+    the model loop, and every change is re-measured by flutter analyze.
+    """
+    issues = _explorer_parse_issues(obs_text)
+    if not issues:
+        return [], [], []
+
+    by_file = {}
+    for it in issues:
+        rp = _safe_path(it["path"])
+        if not rp or not os.path.isfile(rp) or _kill_protected_path(rp):
+            continue
+        by_file.setdefault(it["path"], []).append(it)
+
+    changed, applied, failures = [], [], []
+    for path, its in by_file.items():
+        rp = _safe_path(path)
+        try:
+            with open(rp, 'r', encoding='utf-8', errors='replace', newline='') as f:
+                raw = f.read()
+        except Exception as e:
+            failures.append("%s: %s" % (path, e))
+            continue
+        nl = "\r\n" if "\r\n" in raw else "\n"
+        lines = raw.splitlines(keepends=True)
+        repl, delete, insert = {}, set(), {}
+
+        for it in its:
+            idx = it["line"] - 1
+            if idx < 0 or idx >= len(lines):
+                failures.append("%s:%d: line not found" % (path, it["line"]))
+                continue
+            code, msg = it["code"], it["message"]
+            body = lines[idx].rstrip("\r\n")
+            indent = re.match(r"\s*", body).group(0)
+
+            if code == "prefer_interpolation_to_compose_strings":
+                if "' ' + message.text.split('⭐ ')[1]" in body:
+                    new_body = body.replace(
+                        "' ' + message.text.split('⭐ ')[1]",
+                        "' ${message.text.split('⭐ ')[1]}'")
+                elif "message.text + ' '" in body:
+                    new_body = body.replace("message.text + ' '", "'${message.text} '")
+                elif '_serverBaseUrl + "/chat"' in body:
+                    new_body = body.replace(
+                        '_serverBaseUrl + "/chat"', "'$_serverBaseUrl/chat'")
+                elif "'Portal: ' + widget.universityName" in body:
+                    new_body = body.replace(
+                        "'Portal: ' + widget.universityName",
+                        "'Portal: ${widget.universityName}'")
+                else:
+                    # Conservative generic case: 'prefix' + identifier.
+                    m = re.search(
+                        r"(['\"])([^'\"]*)\1\s*\+\s*([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)",
+                        body)
+                    new_body = (body[:m.start()] + m.group(1) + m.group(2)
+                                + "${" + m.group(3) + "}" + m.group(1)
+                                + body[m.end():]) if m else body
+                if new_body != body:
+                    repl[idx] = new_body + nl
+
+            elif code == "unnecessary_brace_in_string_interps":
+                # A previous fix can make `${name}` a simple interpolation,
+                # which flutter analyze then flags. Remove only those braces.
+                m = re.search(r"\$\{([A-Za-z_]\w*)\}", body)
+                if m:
+                    new_body = body.replace(
+                        "${%s}" % m.group(1), "$" + m.group(1))
+                    if new_body != body:
+                        repl[idx] = new_body + nl
+
+            elif code == "unused_import" and body.strip().startswith("import "):
+                delete.add(idx)
+
+            elif code == "override_on_non_overriding_member":
+                if idx > 0 and "@override" in lines[idx - 1]:
+                    delete.add(idx - 1)
+
+            elif code == "annotate_overrides":
+                if idx == 0 or "@override" not in lines[idx - 1]:
+                    insert.setdefault(idx, []).append(indent + "@override" + nl)
+
+            elif code == "use_build_context_synchronously":
+                # The diagnostic names a BuildContext use after an await. The
+                # nearest preceding mounted guard may belong to the State, not
+                # to this context parameter, so guard the context itself.
+                for j in range(idx - 1, max(-1, idx - 4), -1):
+                    if "if (!mounted) return;" in lines[j]:
+                        repl[j] = lines[j].replace(
+                            "if (!mounted) return;", "if (!context.mounted) return;", 1)
+                        break
+
+            elif "OptionBuilder" in msg and ".path(" in body:
+                repl[idx] = body.replace(".path(", ".setPath(", 1) + nl
+
+            elif (code in ("deprecated_member_use", "avoid_web_libraries_in_flutter")
+                  and "dart:html" in body):
+                prev = lines[idx - 1] if idx > 0 else ""
+                pending = insert.get(idx, [])
+                if "ignore:" not in prev and not any("ignore:" in p for p in pending):
+                    insert.setdefault(idx, []).append(
+                        indent + "// ignore: deprecated_member_use, "
+                        "avoid_web_libraries_in_flutter" + nl)
+
+        # Asset-directory warnings do not have a source line to edit.
+        for it in its:
+            if it["code"] != "asset_directory_does_not_exist":
+                continue
+            m = (re.search(r"'([^']+)'", it["message"])
+                 or re.search(r'"([^"]+)"', it["message"]))
+            if not m:
+                continue
+            asset = m.group(1).strip().rstrip("/\\")
+            arp = _safe_path(asset)
+            if not arp or _kill_protected_path(arp):
+                continue
+            try:
+                os.makedirs(arp, exist_ok=True)
+                keep = os.path.join(arp, ".gitkeep")
+                if not os.path.isfile(keep):
+                    with open(keep, 'w', encoding='utf-8', newline='') as f:
+                        f.write("")
+                changed.append(asset + "/.gitkeep")
+                applied.append("created %s/.gitkeep" % asset)
+            except Exception as e:
+                failures.append("%s: %s" % (asset, e))
+
+        if not repl and not delete and not insert:
+            continue
+        out = []
+        for i, line in enumerate(lines):
+            out.extend(insert.get(i, []))
+            if i in delete:
+                continue
+            out.append(repl.get(i, line))
+        new = "".join(out)
+        if new == raw:
+            continue
+        if _kill_armed():
+            failures.append("%s: E-STOP is armed" % path)
+            continue
+        try:
+            with open(rp, 'w', encoding='utf-8', newline='') as f:
+                f.write(new)
+            changed.append(path)
+            applied.append("edited %s" % path)
+        except Exception as e:
+            failures.append("%s: %s" % (path, e))
+
+    # Preserve order, drop duplicates.
+    return list(dict.fromkeys(changed)), applied, failures
+
+
+def _explorer_record_fix_step(name, desc, ok, result=""):
+    """Show a deterministic Explorer fix in the same progress list as tools."""
+    sid = _agent_next_id()
+    with _AGENT_LOCK:
+        _AGENT["steps"].append({
+            "id": sid, "kind": "work", "text": desc,
+            "state": "done" if ok else "error",
+            "icon": _tool_icon(name), "error": "" if ok else str(result)[:300],
+        })
+        _AGENT["tools_used"] += 1
+        if not ok:
+            _AGENT["last_error"] = "%s: %s" % (name, str(result)[:300])
+
+
+def _explorer_verify_reply(reply, names, before):
+    """Re-measure the Explorer after the run and make the reply evidence-based.
+
+    A model that answers with a provider narrative instead of edits must not be
+    shown as having fixed anything. This appends what actually changed and what
+    flutter analyze now reports, and replaces an off-topic answer with the exact
+    remaining diagnostics.
+    """
+    text = str(reply or "").strip()
+    edits = [n for n in (names or []) if n in ("edit_file", "write_file")]
+    _obs, after = _explorer_problems_obs()
+    with _AGENT_LOCK:
+        step_texts = [s.get("text", "") for s in _AGENT.get("steps", [])
+                      if s.get("kind") == "work"]
+    paths = []
+    for st in step_texts:
+        parts = str(st).split()
+        if len(parts) > 1 and (parts[0] in ("edit_file", "write_file")
+                               or parts[0] in ("edited", "created")):
+            paths.append(parts[1])
+    if paths:
+        changed = "Files changed by ACEsi: %s." % ", ".join(dict.fromkeys(paths))
+    elif edits:
+        changed = "Files changed by ACEsi: %s." % ", ".join(dict.fromkeys(edits))
+    else:
+        changed = "No files were changed by ACEsi this run."
+
+    if not edits and after and after > 0:
+        # The exact failure mode being fixed: a fluent, unrelated narrative.
+        # Replace it with the observed facts, never with another guess.
+        detail = "\n".join(line.strip() for line in (_obs or "").splitlines()
+                           if re.match(r"^\s*(info|warning|error)\s+-", line))[:1800]
+        text = ("I did not apply any fixes this run. Explorer still has %d "
+                "analyzer problem(s):\n%s" % (after, detail))
+
+    if after < 0:
+        status = "flutter analyze could not be re-run."
+    elif after == 0:
+        status = "flutter analyze now reports No issues found."
+    else:
+        status = "flutter analyze still reports %d problem(s)." % after
+    return "%s\n\nExplorer verification: %s %s" % (text, changed, status)
 
 
 def _bug_console_digest(text, limit=8, max_chars=600):
@@ -10953,6 +11558,13 @@ def _prov_token_audit(name, model, messages, tools_schema, max_tokens, note=""):
 
 # One sentence each. These replace the long originals ONLY in reduced mode.
 _SHORT_DESCRIPTIONS = {
+    # --- Explorer-fix tools (without these the reduced schema drops them) ---
+    "edit_file": "Replace exact text in a file; old must match once. Args: path, old, new.",
+    "write_file": "Create or overwrite a file. Args: path, content.",
+    "grep": "Regex search file contents. Args: pattern, path.",
+    "list_files": "List files and folders in a directory. Args: path.",
+    "flutter_analyze": "Run flutter analyze and return every diagnostic. No args.",
+    "git_status": "Short git status including the current branch. No args.",
     # --- DevTools / network ---
     "cdp_connect": "Attach to the Chrome/WebView DevTools target.",
     "cdp_navigate": "Navigate the attached browser to a URL. Args: url, wait (bool, default true), wait_for ('load' or 'network_idle'), timeout (int, default 30).",
@@ -10999,6 +11611,15 @@ _REDUCED_TOOL_ORDER = [
     "ui_screenshot",
     "run_command", "read_file",
 ]
+# Explorer fixes need a DIFFERENT reduced schema: the browser-shaped order
+# above omits edit_file and flutter_analyze entirely, so a rate-limited model
+# was told to fix files but was never offered a tool that can change one.
+_EXPLORER_TOOL_ORDER = [
+    "read_file", "edit_file", "write_file", "grep", "list_files",
+    "flutter_analyze", "git_status", "run_command",
+]
+_EXPLORER_FIX_TOOLS = {"read_file", "edit_file", "write_file",
+                       "flutter_analyze", "run_command"}
 # Never shed these: without them a network or navigation task cannot be done at
 # all, so losing them would turn a working reduced schema into a useless one.
 _REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
@@ -11282,7 +11903,8 @@ def _bug_tool_pool(pre_inspected=False):
 
 
 def build_reduced_schema(base_schema, want_files=False, budget=None,
-                         want_device=False, drop_cdp=False):
+                         want_device=False, drop_cdp=False, tool_order=None,
+                         extra_protected=None):
     """Task-shaped tool subset with one-sentence descriptions, ordered so the
     tools a network/UI task needs survive any budget-driven shedding.
 
@@ -11296,7 +11918,7 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
         # allowed_names upstream does not reach this path.
         base_schema = _strip_cdp_tools(base_schema)
     by_name = {t["function"]["name"]: t for t in (base_schema or [])}
-    allowed = [n for n in _REDUCED_TOOL_ORDER if n in by_name]
+    allowed = [n for n in (tool_order or _REDUCED_TOOL_ORDER) if n in by_name]
     if want_files and "read_file" in by_name and "read_file" not in allowed:
         allowed.append("read_file")
     # A device-connect task needs the connect tools even if the budget would
@@ -11325,6 +11947,8 @@ def build_reduced_schema(base_schema, want_files=False, budget=None,
         protected.add("read_file")
     if want_device:
         protected |= _REDUCED_DEVICE_REQUIRED
+    if extra_protected:
+        protected |= set(extra_protected)
     if budget:
         # Shed from the tail, skipping anything protected.
         i = len(tools) - 1
@@ -11395,6 +12019,45 @@ _REDUCED_SYS = (
     "AFTER A TOOL RETURNS: read the actual values in the result and report THEM - "
     "the real status codes, error strings, URLs, console lines. Never describe what "
     "should happen or what to do next; only state what you actually observed."
+)
+
+
+# The system prompt for an Explorer-fix run. It REPLACES _REDUCED_SYS because
+# that prompt's bug-report rule says to only name the file to change, which is
+# the opposite of what "fix it" asks for.
+_EXPLORER_FIX_SYS = (
+    "You are ACEsi in EXPLORER-FIX mode. Chris asked you to FIX the problems "
+    "shown in ACEsi's Explorer, not to describe them.\n"
+    "The exact analyzer output is already in this system prompt. It was collected "
+    "before you were called. Do NOT call cdp_* tools, do NOT inspect a web page, "
+    "and do NOT answer from memory or from unrelated files.\n\n"
+    "WORKFLOW - repeat until the list is empty:\n"
+    "1. Call read_file on the path named by the first problem; use its line:column "
+    "to find the exact code.\n"
+    "2. Call edit_file with the exact old text and the corrected text. APPLY the "
+    "fix - never just name the file or suggest a change.\n"
+    "3. Do the same for the next problem, one tool call per message.\n"
+    "4. After the listed problems are edited, call flutter_analyze {} to verify. "
+    "If it reports anything, fix those too and analyze again. Repeat until it "
+    "says 'No issues found'.\n"
+    "5. Only then stop calling tools and give the final report.\n\n"
+    "FIX RECIPES for the common messages:\n"
+    "- prefer_interpolation_to_compose_strings: join with $ - 'Total: ' + n "
+    "becomes 'Total: $n'.\n"
+    "- unused_import: delete the whole import line named in the diagnostic.\n"
+    "- annotate_overrides: add @override on the line directly above that member.\n"
+    "- override_on_non_overriding_member: remove the @override line above it.\n"
+    "- use_build_context_synchronously: add 'if (!mounted) return;' before the "
+    "context use.\n"
+    "- asset_directory_does_not_exist: create the directory with a .gitkeep file.\n"
+    "- undefined_method: read the class definition and correct the member name.\n"
+    "- deprecated_member_use / avoid_web_libraries_in_flutter: migrate dart:html "
+    "to package:web where straightforward, otherwise add the narrowest "
+    "// ignore: comment with that diagnostic name.\n\n"
+    "RULES: one tool call per message, no narration between calls. Never say a fix "
+    "was applied unless edit_file or write_file returned success. Never reply with "
+    "a provider narrative, a troubleshooting list, or a question. The final report "
+    "must say what you changed and quote the last flutter analyzer line you read."
 )
 
 
@@ -11476,6 +12139,11 @@ def _clip_tool_result(name, text, limit):
     """
     if name == "ui_dump" or "labeled nodes" in str(text or ""):
         return _clip_dump(text, max(_UI_DUMP_CLIP, limit))
+    if name == "flutter_analyze":
+        # Every diagnostic line is a change the model still has to make. The
+        # generic clip collapsed these to one prose run and hid later problems.
+        raw = str(text or "")
+        return raw[:6000]
     return _clip(text, limit)
 
 
@@ -11548,7 +12216,7 @@ def _clip_dump(text, limit):
     return "\n".join(out)
 
 
-def reduced_messages(messages, domain="", overlay="", context_budget=400):
+def reduced_messages(messages, domain="", overlay="", context_budget=400, system=None):
     """Swap the full persona for the compact protocol prompt.
 
     The full system prompt carries the whole injected context block (2.5k+
@@ -11593,7 +12261,8 @@ def reduced_messages(messages, domain="", overlay="", context_budget=400):
     # correction underneath leaves both sets of instructions in the prompt and
     # the CDP ones win, because they come first and are more specific.
     _device = _is_device_task(_first_user_text(rest))
-    out = [{"role": "system", "content": _DEVICE_SYS if _device else _REDUCED_SYS}]
+    _base_sys = system or (_DEVICE_SYS if _device else _REDUCED_SYS)
+    out = [{"role": "system", "content": _base_sys}]
     if domain:
         out[0]["content"] += "\nActive task domain: %s." % domain
     # Chris's saved prompt (Settings -> System Prompt) used to be appended only to

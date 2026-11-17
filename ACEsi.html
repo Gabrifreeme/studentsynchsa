@@ -13143,7 +13143,20 @@ document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('DOMContentLoaded', function() {
     var termOutput = document.getElementById("terminal-output");
     if (termOutput) {
-        termOutput.innerHTML = '<div id="term-history" style="white-space: pre-wrap; font-family: monospace; color: #ff9d00; padding: 10px; height: 100%; overflow-y: auto;"></div><div style="display:flex; padding: 0 10px;"><span style="color:#ff9d00; font-family: monospace;">PS C:\\Users\\chris\\LipSyncStudent&gt;&nbsp;</span><input id="term-input" type="text" style="flex:1; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off"></div>';
+        // Keep the prompt pinned at the top-left of the terminal window. The
+        // old history div used height:100%, which pushed the prompt row below
+        // the visible area. Use a flex column instead: prompt first, then a
+        // scrollable history section underneath it.
+        termOutput.style.setProperty('display', 'flex', 'important');
+        termOutput.style.setProperty('flex-direction', 'column', 'important');
+        termOutput.style.setProperty('align-items', 'stretch', 'important');
+        termOutput.style.setProperty('padding', '0', 'important');
+        termOutput.innerHTML =
+          '<div id="term-prompt-row" style="display:flex; flex:0 0 auto; padding:8px 10px 4px;">' +
+            '<span style="color:#ff9d00; font-family:monospace; white-space:pre;">PS C:\\Users\\chris\\LipSyncStudent&gt;&nbsp;</span>' +
+            '<input id="term-input" type="text" style="flex:1; min-width:0; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off">' +
+          '</div>' +
+          '<div id="term-history" style="white-space:pre-wrap; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
         
         var termInput = document.getElementById("term-input");
         var termHistory = document.getElementById("term-history");

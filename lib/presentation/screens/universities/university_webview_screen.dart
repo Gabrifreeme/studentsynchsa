@@ -450,7 +450,6 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     try { Process.run('code', [relativePath]); } catch (_) {}
   }
 
-  @override
   Widget _buildWebFallback(BuildContext context) {
     final url = widget.url;
     return Scaffold(
@@ -467,7 +466,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
               const Icon(Icons.public, size: 64, color: Colors.blue),
               const SizedBox(height: 24),
               Text(
-                'Portal: ' + widget.universityName,
+                'Portal: ${widget.universityName}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
@@ -505,7 +504,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
                   }
                   final script = star.buildAutofillScript(json);
                   await Clipboard.setData(ClipboardData(text: script));
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Autofill script copied! Paste it in F12 Console on the UFS portal.'),
@@ -522,6 +521,7 @@ class _UniversityWebViewScreenState extends State<UniversityWebViewScreen> {
     );
   }
 
+  @override
   Widget build(BuildContext context) {
     if (kIsWeb) { return _buildWebFallback(context); }
     return Scaffold(
