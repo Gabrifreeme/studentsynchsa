@@ -7662,17 +7662,24 @@ def _match_pc_file_open_request(message):
     m = (message or "").strip()
     if not m:
         return False
-    # Project source-file fixes belong to the code agent, not this fast path.
+    ml = m.lower()
+    has_drive = bool(re.search(r'\b[a-z]:[\\/][^\s,;]+', ml))
+    has_action = bool(re.search(r'\b(?:open|view|show|find|display|read|load)\b', ml))
+    # An explicit drive path plus a file action is unambiguous. It must win even
+    # when the sentence says "in the code editor": _looks_like_code_file_request
+    # can misread the word 'editor' as a project file (editor.dart) and would
+    # otherwise send a simple PC-file open into the code agent.
+    if has_drive and has_action:
+        # A genuine source-file repair on an explicit path still goes to code.
+        if _CODE_TROUBLE_RE.search(ml) and _CODE_EXT_RE.search(ml):
+            return False
+        return True
+    # Pathless requests: keep the code-agent exclusion.
     try:
         if _looks_like_code_file_request(m):
             return False
     except Exception:
         pass
-    ml = m.lower()
-    # An explicit drive path plus any file action is unambiguous.
-    if re.search(r'\b[a-z]:[\\/][^\s,;]+', ml) and \
-            re.search(r'\b(?:open|view|show|find|display|read|load)\b', ml):
-        return True
     # 'find the file X and open it' / 'go to <folder> ... show ...'
     if re.search(r'\bfind\b[^.!?\n]{0,120}\b(?:open|view|show|display)\b', ml):
         return True
