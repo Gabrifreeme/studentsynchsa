@@ -93,14 +93,15 @@ def main():
     )
 
     # pywebview ties devtools, the right-click menu and the browser keyboard
-    # shortcuts to debug mode. Keep debug off permanently: the visible devtools
-    # window is what hard-reset this machine. Debugging is still possible
-    # through the CDP endpoint configured above - a remote connection inspects
-    # the page without ever opening a second WebView2 window.
+    # shortcuts (F12, Ctrl+Shift+I) to debug mode, so keep it on: the browser
+    # version has them and that is what was asked for. What crashed the machine
+    # was the devtools *window opening*, not the shortcuts, so keep that window
+    # from opening by itself. For our own debugging we use the CDP endpoint
+    # above, which needs no window at all.
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
 
     webview.start(
-        debug=False,
+        debug=True,
         private_mode=False,
         storage_path=storage_dir(),
     )

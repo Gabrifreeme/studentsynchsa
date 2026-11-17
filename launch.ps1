@@ -35,9 +35,10 @@
 .NOTES
   Debugging needs no flag and nothing to remember: the desktop window always
   opens a localhost CDP endpoint on port 9222 so the ACEsi assistant can
-  inspect the running page. That connection does NOT open a devtools window
-  (the second WebView2 window that hard-reset this machine). F12 and Inspect
-  stay disabled on purpose.
+  inspect the running page without opening any extra window. F12, Ctrl+Shift+I
+  and right-click Inspect also work, as in the browser. What crashed the
+  machine once was the devtools panel *opening*, not the shortcuts - so the
+  panel is never opened automatically, and the assistant uses CDP instead.
 #>
 [CmdletBinding()]
 param(
