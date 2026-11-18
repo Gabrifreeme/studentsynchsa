@@ -3980,6 +3980,119 @@ def _looks_like_tool_markup(text):
     return bool(_TOOL_MARKUP_RE.search(t))
 
 
+_FILE_QA_RE = re.compile(
+    r"\b(?:read|open|show|explain|summari[sz]e|search|find|look)\b",
+    re.IGNORECASE)
+_SEARCH_TERM_RE = re.compile(
+    r"\b(?:search|find|look)\s+(?:for|of)\s+"
+    r"(?:\"([^\"]{1,80})\"|'([^']{1,80})'|([A-Za-z0-9_.*?\-]{1,80}))",
+    re.IGNORECASE)
+
+
+def _search_term_from_question(question):
+    q = str(question or "")
+    m = _SEARCH_TERM_RE.search(q)
+    if m:
+        return next((g for g in m.groups() if g), "")
+    m = re.search(r"\b(?:search|find|look)\s+(.+)$", q, re.IGNORECASE)
+    if m:
+        return m.group(1).strip().strip("\"'.,:;")
+    return ""
+
+
+def _looks_like_raw_evidence(text):
+    """True when a reply is a raw tool dump instead of an answer."""
+    t = str(text or "").strip()
+    if not t:
+        return False
+    if t.startswith("\ufeff") or "--- RESULT" in t:
+        return True
+    if re.search(r"^\s*[-*]\s*(?:\ufeff|\S+:\d+:)", t, re.MULTILINE):
+        return True
+    if re.search(
+            r"^\s*[-*]\s*(?:#\s*-\*-\s*coding|from\s+\w+\s+import|import\s+\w+)",
+            t, re.MULTILINE | re.IGNORECASE):
+        return True
+    return False
+
+
+def _plain_english_evidence_reply(question, evidence, names=None):
+    """Turn file-search tool output into one short, human answer.
+
+    The old fallback printed the first 400 characters of each tool result, which
+    looked like this: "-  # -*- coding: utf-8 -*- from flask import ...". The
+    tools had worked, but the reply was unreadable. Say what was searched and
+    what was found instead.
+    """
+    term = _search_term_from_question(question)
+    if not term:
+        return None
+    grep_parts, read_parts = [], []
+    for e in (evidence or []):
+        tool = str(e.get("tool") or "")
+        content = str(e.get("content") or "")
+        if tool == "grep":
+            grep_parts.append(content)
+        elif tool in ("read_file", "read_user_file", "view_user_file"):
+            read_parts.append(content)
+    if not grep_parts:
+        return None
+
+    hits, files, no_match = [], [], False
+    for content in grep_parts:
+        if "(no matches)" in content.lower():
+            no_match = True
+        for line in content.splitlines():
+            m = re.match(r"^\s*(.+?):(\d+):\s*(.*)$", line)
+            if not m:
+                continue
+            path, _num, text = m.groups()
+            text = text.strip()
+            if text.startswith("...[more truncated]"):
+                continue
+            base = os.path.basename(path.replace("\\", "/"))
+            if base and base not in files:
+                files.append(base)
+            hits.append(text)
+
+    fm = _FILE_WITH_EXT_RE.search(str(question or ""))
+    target = os.path.basename(fm.group(0).replace("\\", "/")) if fm else ""
+    if target and (target in files or read_parts):
+        subject = target
+    elif files:
+        subject = " and ".join(files[:2])
+        if len(files) > 2:
+            subject += " and %d other files" % (len(files) - 2)
+    else:
+        subject = "the project"
+
+    if read_parts and target:
+        out = 'I read %s and searched it for "%s".' % (subject, term)
+    else:
+        out = 'I searched %s for "%s".' % (subject, term)
+
+    if no_match and not hits:
+        return out + " I did not find it."
+    if not hits:
+        return out + " I could not read the results clearly."
+
+    out += " I found %d %s." % (len(hits), "mention" if len(hits) == 1 else "mentions")
+    joined = " ".join(hits).lower()
+    if "diagnosis" in joined and ("guard" in joined or "answer" in joined):
+        out += (" The notes say that word is not a real diagnosis and that a "
+                "check rejects it as an answer.")
+    elif "guard" in joined and ("reject" in joined or "replace" in joined):
+        out += (" The notes say a check rejects that word as an answer and "
+                "replaces it with a proper reply.")
+    elif "diagnosis" in joined:
+        out += " The note says that word is not a real diagnosis."
+    else:
+        out += " The matches are in notes about that word."
+    if not any(str(n) in ("edit_file", "write_file") for n in (names or [])):
+        out += " No files were changed."
+    return out
+
+
 def _sanitize_reply(text):
     """Clean a candidate reply. Returns the text, or None when the model
     emitted tool markup instead of an answer and the caller must fall back to
@@ -3998,11 +4111,16 @@ def _sanitize_reply(text):
     return None
 
 
-def _evidence_fallback(evidence, names, max_chars=400, max_results=5):
-    """No model available? Show the user just the actual findings, tersely.
+def _evidence_fallback(evidence, names, max_chars=400, max_results=5,
+                       question=""):
+    """No model available? Answer from the findings in plain English.
 
-    Chris asked for short answers: list at most `max_results` findings with a
-    short, clean snippet each instead of dumping every raw tool payload."""
+    Chris asked for short answers. For file/search asks, a deterministic summary
+    is far more useful than the old bulleted dump of raw tool payloads."""
+    if question:
+        plain = _plain_english_evidence_reply(question, evidence, names)
+        if plain:
+            return plain
     lines = []
     if not evidence:
         lines.append("I couldn't find that.")
@@ -4039,16 +4157,27 @@ def _build_grounded_prompt(question, evidence, max_evidence_chars=3500):
             parts.append("--- RESULT %d from `%s` ---\n%s" % (
                 len(parts) + 1, e["tool"], content))
         body = "\n\n".join(parts)
+    if _FILE_WITH_EXT_RE.search(str(question or "")) or _search_term_from_question(question):
+        instruction = (
+            "Write a concise 2-3 sentence plain-English answer to the question, "
+            "based ONLY on these results. Say what you found and what it means. "
+            "Do NOT paste code, raw file text, line dumps, bullet lists, or tool "
+            "names. Do NOT guess and do NOT answer from memory."
+        )
+    else:
+        instruction = (
+            "Write a concise 2-sentence summary of what the page does and does not do, "
+            "based ONLY on these results. State what you observed, and if a relevant "
+            "detail (e.g. a GET or POST request with status 4xx/5xx) is not present, "
+            "say so explicitly. Do NOT guess and do NOT answer from memory. Do NOT "
+            "list tool names as findings - \"web_search\" is not a result. Never "
+            "claim a result that is not in the evidence below."
+        )
     return (
         "Question: %s\n\n"
         "Below is a slice of the tool results collected during this run.\n\n"
         "%s\n\n"
-        "Write a concise 2-sentence summary of what the page does and does not do, "
-        "based ONLY on these results. State what you observed, and if a relevant "
-        "detail (e.g. a %s request with status 4xx/5xx) is not present, say so "
-        "explicitly. Do NOT guess and do NOT answer from memory. Do NOT list tool "
-        "names as findings - \"web_search\" is not a result. Never claim a result "
-        "that is not in the evidence below." % (question, body, "GET or POST"))
+        "%s" % (question, body, instruction))
 
 
 _BUG_STOPWORDS = {
@@ -4291,7 +4420,7 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
         if _bug_re.search(user_message or ""):
             return _bug_evidence_reply(evidence, _no_summary_note(active),
                                        obs=bug_obs, question=user_message)
-        return _evidence_fallback(evidence, names)
+        return _evidence_fallback(evidence, names, question=user_message)
 
     if chat_one is not None and active:
         try:
@@ -4306,6 +4435,8 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
             # through to the evidence fallback instead of showing it to Chris.
             text = _sanitize_reply(text) if text else None
             if text:
+                text = _repair_plain_english_answer(
+                    user_message, text, evidence, names)
                 if (_bug_re.search(user_message or "")
                         and _bug_answer_is_useless(text)):
                     return _bug_evidence_reply(
@@ -4318,7 +4449,7 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
     if _bug_re.search(user_message or ""):
         return _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
                                    question=user_message)
-    return _evidence_fallback(evidence, names)
+    return _evidence_fallback(evidence, names, question=user_message)
 
 
 def _retry_file_explanation(question, bad_reply, llm_messages, active, chat_one):
@@ -4398,6 +4529,17 @@ def _deterministic_file_explanation(question, llm_messages):
     if header:
         out += " The file says: \"%s\"." % header
     return out + " Those definitions are the main pieces of this module."
+
+
+def _repair_plain_english_answer(question, reply, evidence, names=None):
+    """Replace a raw tool dump with a short human answer when we can."""
+    if not _looks_like_raw_evidence(reply):
+        return reply
+    plain = _plain_english_evidence_reply(question, evidence, names)
+    if plain:
+        print("[plain-english-guard] replaced raw tool output", flush=True)
+        return plain
+    return reply
 
 
 def _repair_explain_answer(question, reply, llm_messages, active):
@@ -5820,6 +5962,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             summary = _final_answer(llm_messages, names, last_screen, active,
                                     user_message, chat_one=_chat_one,
                                     bug_obs=_bug_obs)
+            summary = _repair_plain_english_answer(
+                user_message, summary, _collect_tool_evidence(llm_messages), names)
             summary = _explorer_finish(summary)
             with _AGENT_LOCK:
                 _AGENT["last_reply"] = summary
@@ -5832,6 +5976,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         # A bug report answered with tool meta or a single word is not an
         # answer. This is the path the live "There are 9 CDP tools available."
         # reply took: no FINAL marker, no grounded call, straight to Chris.
+        clean = _repair_plain_english_answer(
+            user_message, clean, _collect_tool_evidence(llm_messages), names)
         clean = _repair_explain_answer(user_message, clean, llm_messages, active)
         if _bug_re.search(user_message or "") and _bug_answer_is_useless(clean, user_message):
             clean = _bug_evidence_reply(
@@ -5884,10 +6030,13 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     summary = _final_answer(llm_messages, names, last_screen, active,
                             user_message, chat_one=_chat_one, bug_obs=_bug_obs)
     summary = _normalize_reply(summary)
+    summary = _repair_plain_english_answer(
+        user_message, summary, _collect_tool_evidence(llm_messages), names)
     summary = _explorer_finish(summary)
     # Final net: nothing resembling tool syntax may ever reach Chris as a reply.
     if _looks_like_tool_markup(summary):
-        summary = _evidence_fallback(_collect_tool_evidence(llm_messages), names)
+        summary = _evidence_fallback(
+            _collect_tool_evidence(llm_messages), names, question=user_message)
     summary = _repair_explain_answer(user_message, summary, llm_messages, active)
     if _bug_re.search(user_message or "") and _bug_answer_is_useless(summary, user_message):
         summary = _bug_evidence_reply(
