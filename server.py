@@ -4007,6 +4007,8 @@ def _looks_like_raw_evidence(text):
         return False
     if t.startswith("\ufeff") or "--- RESULT" in t:
         return True
+    if "tool error:" in t or "📁" in t or "📄" in t:
+        return True
     if re.search(r"^\s*[-*]\s*(?:\ufeff|\S+:\d+:)", t, re.MULTILINE):
         return True
     if re.search(
@@ -4035,8 +4037,17 @@ def _plain_english_evidence_reply(question, evidence, names=None):
             grep_parts.append(content)
         elif tool in ("read_file", "read_user_file", "view_user_file"):
             read_parts.append(content)
+    fm = _FILE_WITH_EXT_RE.search(str(question or ""))
+    target = os.path.basename(fm.group(0).replace("\\", "/")) if fm else ""
     if not grep_parts:
-        return None
+        # The model sometimes calls list_files or a device tool instead of the
+        # search tool. Never show that error dump; say plainly that it failed.
+        if read_parts:
+            return ('I read %s but did not run the search for "%s", so I do not '
+                    'have a reliable answer.' % (target or "the file", term))
+        return ('I could not search %s for "%s" because the tool call did not '
+                'work. I do not have a reliable answer.'
+                % (target or "the project", term))
 
     hits, files, no_match = [], [], False
     for content in grep_parts:
@@ -4055,8 +4066,6 @@ def _plain_english_evidence_reply(question, evidence, names=None):
                 files.append(base)
             hits.append(text)
 
-    fm = _FILE_WITH_EXT_RE.search(str(question or ""))
-    target = os.path.basename(fm.group(0).replace("\\", "/")) if fm else ""
     if target and (target in files or read_parts):
         subject = target
     elif files:
@@ -4091,6 +4100,73 @@ def _plain_english_evidence_reply(question, evidence, names=None):
     if not any(str(n) in ("edit_file", "write_file") for n in (names or [])):
         out += " No files were changed."
     return out
+
+
+def _is_read_only_file_qa(question):
+    """A named-file read/search question, not a repair or device task."""
+    q = str(question or "")
+    if not (_FILE_WITH_EXT_RE.search(q) or re.search(r"\bfile\b", q, re.IGNORECASE)):
+        return False
+    if not _FILE_QA_RE.search(q):
+        return False
+    if re.search(
+            r"\b(?:web|browser|website|url|http|curl|screen|device|app|phone)\b",
+            q, re.IGNORECASE):
+        return False
+    scrubbed = _NEGATED_REPAIR_RE.sub("", q)
+    return not _REPAIR_VERB_RE.search(scrubbed)
+
+
+def _deterministic_file_search_reply(question):
+    """Do a simple 'read file + search word' job in code, before the model.
+
+    Providers kept choosing list_files/devtool_list and burning a minute on
+    tool errors. This is a read-only, well-understood request: run the two
+    correct tools ourselves and show the real result in plain English.
+    """
+    q = str(question or "")
+    if not _is_read_only_file_qa(q):
+        return None
+    term = _search_term_from_question(q)
+    fm = _FILE_WITH_EXT_RE.search(q)
+    if not term or not fm:
+        return None
+    target = fm.group(0)
+    evidence, names = [], []
+
+    calls = (
+        ("read_file", {"path": target}),
+        ("grep", {"pattern": re.escape(term), "path": target}),
+    )
+    for name, args in calls:
+        sid = _agent_next_id()
+        desc = _tool_desc(name, args)
+        icon = _tool_icon(name)
+        with _AGENT_LOCK:
+            _AGENT["activity"] = "executing %s" % name
+            _AGENT["steps"].append({
+                "id": sid, "kind": "work", "text": desc,
+                "state": "running", "icon": icon,
+            })
+        ok, result = _call_tool(name, args)
+        with _AGENT_LOCK:
+            _AGENT["tools_used"] += 1
+            if not ok:
+                _AGENT["last_error"] = "%s: %s" % (name, str(result)[:300])
+            for s in _AGENT["steps"]:
+                if s["id"] == sid:
+                    s["state"] = "done" if ok else "error"
+                    s["error"] = "" if ok else str(result)
+        names.append(name)
+        evidence.append({"tool": name, "content": str(result)})
+        if name == "read_file" and not ok:
+            return "I could not find %s in the project." % os.path.basename(target)
+
+    plain = _plain_english_evidence_reply(q, evidence, names)
+    if plain:
+        print("[file-search] handled in code: %s" % target, flush=True)
+        return plain
+    return 'I could not finish searching %s for "%s".' % (target, term)
 
 
 def _sanitize_reply(text):
@@ -4815,6 +4891,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                          and n != "need_verify_in_browser"}
         print("[code-file-fix] ui/cdp tools stripped; file tools=%s"
               % sorted(allowed_names & _code_tools), flush=True)
+    if _is_read_only_file_qa(user_message):
+        # Reading/searching a named file must not offer device or browser tools.
+        # Without this, providers picked devtool_list with an empty path and
+        # wasted the whole run on argument errors.
+        _read_only = {"list_files", "read_file", "grep"} & _registered
+        allowed_names = (allowed_names & _read_only) | _read_only
+        print("[file-read] read-only file tools only: %s" % sorted(_read_only),
+              flush=True)
     # A device task must never see a browser tool. Stripped here, at the one
     # point allowed_names is final, so the Ollama, full and net schemas are all
     # covered by one edit rather than three that can drift apart.
@@ -5056,6 +5140,16 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _AGENT["activity"] = "done"
             _AGENT["last_reply"] = script_reply
         return script_reply
+    # Read-only "read this file and search for X" jobs do not need a model.
+    # Running them here avoids providers wandering into list_files/devtool_list
+    # and returning raw tool errors instead of the answer.
+    _file_search_reply = _deterministic_file_search_reply(user_message)
+    if _file_search_reply:
+        with _AGENT_LOCK:
+            _AGENT["running"] = False
+            _AGENT["activity"] = "done"
+            _AGENT["last_reply"] = _file_search_reply
+        return _file_search_reply
     # EXPLORER-FIX DETERMINISTIC PASS. The provider in this project has already
     # demonstrated that it can loop on read_file forever and hit 429 before it
     # emits an edit. Do the known-safe edits here, from the exact diagnostics
