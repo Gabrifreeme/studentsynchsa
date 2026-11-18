@@ -7569,7 +7569,9 @@
 
         parts.forEach(function (p) {
 
-          var lines = p.value.split("\n");
+          var val = p.value || "";
+
+          var lines = val.split("\n");
 
           if (lines.length && lines[lines.length - 1] === "") lines.pop();
 
