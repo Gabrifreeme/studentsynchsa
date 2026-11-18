@@ -8246,27 +8246,101 @@ def _resolve_pc_file_open(message):
         rp = _safe_user_path(cand)
         if rp and os.path.isfile(rp):
             return rp
-    # 2. A drive-letter folder named after 'go to'/'in'/'under', combined with
-    #    the filename hint from the same sentence.
+    # 2. Find a folder mentioned in the message (drive path token) and/or one
+    #    named after 'go to'/'in'/'inside'/'under'/'from', combined with the
+    #    filename hint from the same sentence.
     folder = None
     fm = re.search(r'\b(?:go\s+to|in|inside|under|from)\s+'
-                   r'([A-Za-z]:[\\/][^\s,;]+)', raw, re.IGNORECASE)
+                   r'([A-Za-z]:[\\/][^\s,;\'"]+)', raw, re.IGNORECASE)
     if fm:
         folder = fm.group(1).rstrip('\\/.,;:')
+    folder_candidates = []
+    if folder and os.path.isdir(folder):
+        folder_candidates.append(folder)
+    for _dp in re.findall(r'([A-Za-z]:[\\/][^\s,;\'"]+)', raw):
+        _dp = _dp.rstrip('\\/.,;:')
+        if os.path.isdir(_dp) and _dp not in folder_candidates:
+            folder_candidates.append(_dp)
     hint = _extract_user_file_hint(raw)
     if cand and not hint:
         hint = os.path.basename(cand)
+    if not hint:
+        for hm in re.finditer(
+            r'\b(?:open|view|show|display|read|load|find)\s+'
+            r'(?:the\s+)?(?:file\s+|image\s+|picture\s+|photo\s+)?'
+            r'([A-Za-z0-9][A-Za-z0-9 _.\-]{1,80})', raw, re.IGNORECASE):
+            _h = hm.group(1).strip().rstrip('.,;:')
+            if len(_h) < 2 or re.match(r'^[A-Za-z]:', _h):
+                continue
+            if _h.lower() in ('it', 'this', 'that', 'file', 'image', 'picture', 'photo', 'folder', 'directory'):
+                continue
+            hint = _h
     if hint:
         hint = os.path.basename(hint.strip().strip('"\'').rstrip('.,;:'))
-    if folder and hint:
-        rp = _safe_user_path(os.path.join(folder, hint))
-        if rp and os.path.isfile(rp):
-            return rp
+    if folder_candidates and hint:
+        for folder in folder_candidates:
+            rp = _safe_user_path(os.path.join(folder, hint))
+            if rp and os.path.isfile(rp):
+                return rp
+            # Try common extensions / basename matches inside the named folder.
+            try:
+                hint_l = hint.lower()
+                hint_base = os.path.splitext(hint_l)[0]
+                for fn in os.listdir(folder):
+                    fp = os.path.join(folder, fn)
+                    if not os.path.isfile(fp):
+                        continue
+                    fnl = fn.lower()
+                    stem = os.path.splitext(fnl)[0]
+                    if fnl == hint_l or stem == hint_l or stem == hint_base:
+                        rp = _safe_user_path(fp)
+                        if rp and os.path.isfile(rp):
+                            return rp
+            except Exception:
+                pass
     # 3. Bare filename anywhere on the PC.
     if hint:
         rp = _find_user_file_fuzzy(hint)
         if rp and os.path.isfile(rp):
             return rp
+    # 4. If the request contained an absolute Windows path, try extracting a
+    #    parent folder + filename from it and search that folder. This handles
+    #    requests like "open C:\\Users\\gabri\\Pictures\\meliodas" where the
+    #    path token has no extension but the file exists under that folder.
+    if raw:
+        _abs_path_matches = re.findall(r'([A-Za-z]:[\\/][^\s,;"]+)', raw)
+        for abs_path in _abs_path_matches:
+            clean = abs_path.rstrip('\\/.,;:')
+            parts = clean.split('\\\\')
+            if len(parts) >= 2:
+                parent = '\\\\'.join(parts[:-1])
+                fname = parts[-1]
+                if os.path.isdir(parent):
+                    # Try the filename as-is
+                    rp = os.path.join(parent, fname)
+                    rp = os.path.realpath(rp)
+                    rp = _safe_user_path(rp)
+                    if rp and os.path.isfile(rp):
+                        return rp
+                    # Try with common extensions
+                    for ext in ['.png','.jpg','.jpeg','.webp','.bmp','.pdf','.txt']:
+                        rp2 = rp + ext
+                        rp2 = _safe_user_path(rp2)
+                        if rp2 and os.path.isfile(rp2):
+                            return rp2
+    # 5. If the request contains a drive path + filename (e.g. D:\Folder\File),
+    #    try the parent folder + filename directly.
+    if cand and re.search(r'[\\/]', cand):
+        m = re.search(r'([A-Za-z]:)[\\/][^\s,;"]+', cand)
+        if m:
+            drive = m.group(1)
+            rest = cand[m.end():].rstrip('\\/.,;:')
+            # Try the rest as a path under the drive root
+            full = drive + ':' + ('\\\\' if not rest.startswith('\\\\') else '') + rest
+            if os.path.isdir(os.path.dirname(full)):
+                rp = _safe_user_path(full)
+                if rp and os.path.isfile(rp):
+                    return rp
     return None
 
 
