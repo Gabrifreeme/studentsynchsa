@@ -4117,6 +4117,20 @@ def _is_read_only_file_qa(question):
     return not _REPAIR_VERB_RE.search(scrubbed)
 
 
+def _request_gaps(user_message, allowed_names):
+    """Do not mistake 'search this file' for a web-search task.
+
+    ace_dispatcher's gap probe matches any word 'search' and demands web_search.
+    A named-file read/search job has its own deterministic path, so skip that
+    probe for it instead of blocking with "missing tools for: web search".
+    """
+    if _is_read_only_file_qa(user_message):
+        return None
+    if ace_dispatcher is None:
+        return None
+    return ace_dispatcher.find_gaps(user_message, allowed_names)
+
+
 def _deterministic_file_search_reply(question):
     """Do a simple 'read file + search word' job in code, before the model.
 
@@ -5084,8 +5098,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
               % (active_domain, len(allowed_names),
                  sum(1 for n in allowed_names if n.startswith("cdp_")),
                  len(_bug_obs)))
-    _gaps = ace_dispatcher.find_gaps(user_message, allowed_names)
-    if _gaps.has_gaps:
+    _gaps = _request_gaps(user_message, allowed_names)
+    if _gaps is not None and _gaps.has_gaps:
         with _AGENT_LOCK:
             _AGENT["activity"] = "blocked (missing tools)"
             _AGENT["last_reply"] = "I can't complete this: %s" % _gaps
