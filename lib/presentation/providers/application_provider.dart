@@ -7,7 +7,7 @@ import 'package:lipsyncstudent/domain/repositories/application_repository.dart';
 class ApplicationsNotifier extends StateNotifier<AsyncValue<List<UniversityApplication>>> {
   late final ApplicationRepository _repo;
 
-  ApplicationsNotifier() : super(const AsyncLoading<List<UniversityApplication>>()) {
+  ApplicationsNotifier() : super(AsyncLoading<List<UniversityApplication>>()) {
     _repo = ApplicationRepositoryImpl();
     _init();
   }
@@ -43,7 +43,7 @@ class ApplicationsNotifier extends StateNotifier<AsyncValue<List<UniversityAppli
 class BursaryApplicationsNotifier extends StateNotifier<AsyncValue<List<BursaryApplication>>> {
   late final ApplicationRepository _repo;
 
-  BursaryApplicationsNotifier() : super(const AsyncLoading<List<BursaryApplication>>()) {
+  BursaryApplicationsNotifier() : super(AsyncLoading<List<BursaryApplication>>()) {
     _repo = ApplicationRepositoryImpl();
     _init();
   }

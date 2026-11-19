@@ -3400,7 +3400,32 @@ def _match_file_request(message):
 # One tools-capable OpenAI-compatible chat completion. Returns (text, tool_calls)
 # or None. Used by /chat so ACEsi can actually execute ui_*/dev tools instead of
 # replying "please provide the commands".
+
+def _refresh_runtime_keys():
+    global GROQ_API_KEY, GEMINI_API_KEY
+    for env_path in (r"D:\projects\acesi\.env", r"D:\projects\acesi\.ace_keys.local"):
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip().removeprefix("export ").strip()
+                    v = v.strip().strip("'").strip('"')
+                    if k and v:
+                        os.environ[k] = v
+        except OSError:
+            pass
+    g_key = (os.environ.get("GROQ_API_KEY") or "").strip()
+    gem_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    if g_key:
+        GROQ_API_KEY = g_key
+    if gem_key:
+        GEMINI_API_KEY = gem_key
+
 def _chat_providers(domain=""):
+    _refresh_runtime_keys()
     """Working provider chain: Groq first, then Gemini.
 
     Only providers whose key/model pair was verified live belong here. Each
@@ -3631,7 +3656,7 @@ def _nullable_optional(tools_schema):
     return out
 
 
-def _chat_one(name, endpoint, api_key, model, msgs, timeout=(10, 90), extra_options=None,
+def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_options=None,
               tools_schema=None, tool_choice="auto"):
     if not api_key:
         _prov_record(name, model, "nokey", "no API key configured for this provider")
@@ -5398,7 +5423,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         schema = full_domain_schema
                         msgs = llm_messages
                         tc2 = tc
-                        if p[0] in ("OpenRouter", "Groq") and net_domain_schema:
+                        if p[0] in ("OpenRouter", "Groq", "Gemini") and net_domain_schema:
                             schema = net_domain_schema
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2)
