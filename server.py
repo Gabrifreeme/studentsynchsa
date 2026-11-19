@@ -140,6 +140,16 @@ def _load_local_keys():
 
 _LAST_TOKEN_USAGE = 0
 _DAILY_TOKEN_LIMIT = 200000
+# Persist token usage so the /api/ai/usage display (model / used / limit)
+# survives a hard restart instead of resetting to 0.
+_TOKEN_USAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.ace_token_usage.json')
+try:
+    with open(_TOKEN_USAGE_FILE, 'r', encoding='utf-8') as _f:
+        _j = json.load(_f)
+    _LAST_TOKEN_USAGE = int(_j.get('last_total_tokens') or 0)
+    _DAILY_TOKEN_LIMIT = int(_j.get('limit') or 200000)
+except Exception:
+    pass
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-120b"
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
@@ -6909,6 +6919,11 @@ def chat():
                 print("📓 Journaled session close")
             # Token usage updated by llm_reply
             _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
+        try:
+            with open(_TOKEN_USAGE_FILE, 'w', encoding='utf-8') as _f:
+                json.dump({'last_total_tokens': _LAST_TOKEN_USAGE, 'limit': _DAILY_TOKEN_LIMIT}, _f)
+        except Exception:
+            pass
             return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
         # Every provider failed. Say WHICH and WHY instead of the old opaque
         # "no models available", which made a rate limit indistinguishable from
