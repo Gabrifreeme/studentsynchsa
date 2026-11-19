@@ -47,7 +47,7 @@ tool_caps:
   lipsyncstudent:
     allowed: ["ui", "code", "net", "ctrl"]
     tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "view_user_file", "grep", "write_file", "edit_file",
-            "run_command", "git_status", "git_log", "git_commit", "git_branch",
+            "run_command", "git_status", "git_log", "git_commit", "git_branch", "git_push",
             "git_merge", "build_apk", "pub_add", "pub_remove", "pub_upgrade",
             "flutter_test", "flutter_analyze",
               "ui_device", "ui_connect", "ui_app_open", "ui_tap", "ui_swipe", "ui_type",
@@ -64,7 +64,7 @@ tool_caps:
 
     allowed: ["ui", "code", "net", "ctrl"]
     tools: ["list_files", "read_file", "list_user_files", "read_user_file", "open_user_file", "view_user_file", "grep", "write_file", "edit_file",
-            "run_command", "git_status", "git_log", "git_commit", "git_branch",
+            "run_command", "git_status", "git_log", "git_commit", "git_branch", "git_push",
             "git_merge", "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
              "curl", "restart", "notify",
