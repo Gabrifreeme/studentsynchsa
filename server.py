@@ -7205,10 +7205,38 @@ def _problems_rel(path):
     return p.replace("\\", "/")
 
 
+def _find_dart():
+    """Locate the dart executable, on PATH or in a Flutter install.
+
+    Prefers a real dart.exe over a dart.bat wrapper (a .bat can't be
+    executed directly by subprocess without shell=True).
+    """
+    import shutil
+    p = shutil.which("dart")
+    if p and p.lower().endswith(".exe"):
+        return p
+    best = p
+    # Common Windows Flutter/SDK locations.
+    candidates = [
+        r"C:\src\flutter\bin\cache\dart-sdk\bin\dart.exe",
+        r"C:\flutter\bin\cache\dart-sdk\bin\dart.exe",
+        r"C:\Program Files\Dart\dart-sdk\bin\dart.exe",
+        r"C:\tools\dart-sdk\bin\dart.exe",
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return best
+
+
 def _scan_dart_problems(files, counts):
     """Read `dart analyze --format=machine` (the badge's own source of truth)."""
+    dart = _find_dart()
+    if not dart:
+        print("[problems] dart executable not found; skipping dart analyze")
+        return
     env = os.environ.copy()
-    r = subprocess.run(["dart", "analyze", "--format=machine"], cwd=PROJECT_ROOT,
+    r = subprocess.run([dart, "analyze", "--format=machine"], cwd=PROJECT_ROOT,
                        env=env, capture_output=True, text=True, timeout=300,
                        errors="replace")
     text = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
