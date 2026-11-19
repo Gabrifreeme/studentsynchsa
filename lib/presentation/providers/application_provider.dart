@@ -25,7 +25,7 @@ class ApplicationsNotifier extends StateNotifier<AsyncValue<List<UniversityAppli
     await _repo.saveApplication(app);
     final apps = await _repo.getApplications();
     state = AsyncData(apps);
-  }
+ 
 
   Future<void> update(UniversityApplication app) async {
     await _repo.updateApplication(app);

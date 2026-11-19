@@ -6640,12 +6640,24 @@ def chat():
             elif os.path.exists(proj_path):
                 file_path = proj_path
             else:
-                # Try to find the file anywhere in the project if the user just gave a filename
+                # Try to find the file anywhere in the project if the user just gave a filename.
+                # Walk both the legacy LipSyncStudent dir and DATA_DIR (the ACEsi project tree),
+                # skipping build/cache dirs so the walk stays fast.
                 found = False
-                for root, dirs, files in os.walk(proj_base):
-                    if file_path in files:
-                        file_path = os.path.join(root, file_path)
-                        found = True
+                _WALK_SKIP_DIRS = {'.git', '.dart_tool', 'build', '__pycache__', 'node_modules',
+                                   '.idea', '.vscode', 'android', 'ios', 'windows', 'linux',
+                                   'macos', 'web', 'dist', 'target', 'venv', '.venv', 'env'}
+                for base in (proj_base, DATA_DIR):
+                    if not os.path.isdir(base):
+                        continue
+                    for root, dirs, files in os.walk(base):
+                        dirs[:] = [d for d in dirs
+                                   if d not in _WALK_SKIP_DIRS and not d.startswith('.')]
+                        if file_path in files:
+                            file_path = os.path.join(root, file_path)
+                            found = True
+                            break
+                    if found:
                         break
                 if not found:
                     pass
