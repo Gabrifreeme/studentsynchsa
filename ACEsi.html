@@ -4570,7 +4570,7 @@ perspective: 900px;
 
             "
 
-            onclick="var __t=document.getElementById('chat-input'); if(__t){__t.focus(); __t.setSelectionRange(0,0);} "
+            onclick="var __t=document.getElementById('chat-input'); if(__t && __t.selectionStart===__t.selectionEnd){__t.focus(); __t.setSelectionRange(0,0);} "
 
           >
 
