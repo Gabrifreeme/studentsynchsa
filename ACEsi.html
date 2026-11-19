@@ -5578,7 +5578,7 @@
 
 };
 
-      var EXPLORER_ROOT_NAME = "LipSyncStudent";
+      var EXPLORER_ROOT_NAME = "acesi";
 
       var EXPLORER_ROOT_ICON = "folder-root";
 
@@ -6772,7 +6772,7 @@
             var cmd = c.value;
             var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b|dir\b)/i.test(cmd);
             if (isLong) {
-              aceAppendTerminalLine("PS C:\\Users\\chris\\LipSyncStudent> " + cmd, "#ff9d00");
+              aceAppendTerminalLine("PS D:\\projects\\acesi> " + cmd, "#ff9d00");
               fetch("/run", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -6788,13 +6788,38 @@
                 aceAppendTerminalLine("Error: " + e.message, "red");
               });
             } else {
-              if (window.term && window.termSocket) {
-                window.term.write(cmd + "\r\n");
-                window.termSocket.emit("terminal_input", cmd);
-              } else {
-                aceAppendTerminalLine("PS C:\\Users\\chris\\LipSyncStudent> " + cmd, "#ff9d00");
-                aceAppendTerminalLine("Terminal session not connected for this command.", "red");
+              if (typeof window.openAceTerminal === "function") {
+                try { window.openAceTerminal(); } catch (e) {}
               }
+              aceAppendTerminalLine("PS D:\\projects\\acesi> " + cmd, "#ff9d00");
+              fetch("/api/system/exec", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({command: cmd})
+              }).then(function(r) {
+                if (!r.ok && r.status === 404) {
+                  return fetch("/run", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({command: cmd})
+                  });
+                }
+                return r;
+              }).then(function(r) {
+                return r.json();
+              }).then(function(d) {
+                var out = "";
+                if (d) {
+                  out = d.stdout || d.output || "";
+                  if (d.stderr) out += (out ? "\n" : "") + d.stderr;
+                  if (!out && d.error) out = d.error;
+                }
+                if (!out) out = "(no output)";
+                var isErr = Boolean(d && (d.error || d.stderr || (typeof d.returncode === "number" && d.returncode !== 0)));
+                aceAppendTerminalLine(out, isErr ? "red" : "#ff9d00");
+              }).catch(function(e) {
+                aceAppendTerminalLine("Error: " + e.message, "red");
+              });
             }
           }, index * 1500);
         });
@@ -8922,8 +8947,8 @@
           // Try to highlight and open the file in the Explorer
           if (data.path) {
             var cleanPath = data.path.replace(/\\/g, '/');
-        if (cleanPath.startsWith('C:/Users/chris/LipSyncStudent/')) {
-            cleanPath = cleanPath.replace('C:/Users/chris/LipSyncStudent/', '');
+        if (cleanPath.startsWith('D:/projects/acesi/')) {
+            cleanPath = cleanPath.replace('D:/projects/acesi/', '');
         }
             var rows = document.querySelectorAll('#explorer .tree-row');
             for (var i = 0; i < rows.length; i++) {
@@ -8992,7 +9017,7 @@
 
         function shortPath(p) {
           p = String(p || "").replace(/\\/g, "/");
-          var root = "C:/Users/chris/LipSyncStudent/";
+          var root = "D:/projects/acesi/";
           var i = p.indexOf(root);
           return i >= 0 ? p.slice(i + root.length) : p;
         }
@@ -13307,7 +13332,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Remove the absolute root prefix
 
-        var prefix = "C:/Users/chris/LipSyncStudent/";
+        var prefix = "D:/projects/acesi/";
 
         if (finalPath.indexOf(prefix) === 0) {
 
@@ -13721,7 +13746,7 @@ document.addEventListener('DOMContentLoaded', function() {
         termOutput.style.setProperty('padding', '0', 'important');
         termOutput.innerHTML =
           '<div id="term-prompt-row" style="display:flex; flex:0 0 auto; padding:8px 10px 4px;">' +
-            '<span style="color:#ff9d00; font-family:monospace; white-space:pre;">PS C:\\Users\\chris\\LipSyncStudent&gt;&nbsp;</span>' +
+            '<span style="color:#ff9d00; font-family:monospace; white-space:pre;">PS D:\\projects\\acesi&gt;&nbsp;</span>' +
             '<input id="term-input" type="text" style="flex:1; min-width:0; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off">' +
           '</div>' +
           '<div id="term-history" style="white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; overflow-x:hidden; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
@@ -13756,7 +13781,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!cmd) return;
                 termInput.value = "";
 
-                appendTerminalLine('PS C:\\Users\\chris\\LipSyncStudent> ' + cmd, '#ff9d00');
+                appendTerminalLine('PS D:\\projects\\acesi> ' + cmd, '#ff9d00');
 
                 fetch('/api/system/exec', {
                     method: 'POST',

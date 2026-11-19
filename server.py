@@ -7584,7 +7584,10 @@ def api_system_exec():
         return jsonify({'ok': False, 'error': 'No command provided'}), 400
     
     # SECURITY: Force working directory to the project root
-    cwd = r'C:\Users\chris\LipSyncStudent'
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isdir(project_root) and os.path.isdir(r'D:\projects\acesi'):
+        project_root = r'D:\projects\acesi'
+    cwd = project_root if os.path.isdir(cwd_candidate := project_root) else os.getcwd()
     
     try:
         # Run the command, capture output, set timeout to 30 seconds
