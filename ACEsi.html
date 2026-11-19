@@ -2518,28 +2518,6 @@
 
         >
 
-        <label style="display: block; margin: 4px 0"
-
-          ><input
-
-            type="checkbox"
-
-            value="flutter run -d R52N518ESBE"
-
-            title="Runs on a specific tablet device by its ID (R52N518ESBE)"
-
-          />
-
-          SM T515 tablet (R52N518ESBE)</label
-
-        >
-
-        <label style="display: block; margin: 4px 0"
-
-          ><input type="checkbox" value="scrcpy" /> scrcpy</label
-
-        >
-
       </div>
 
       <div
@@ -2570,22 +2548,6 @@
 
             type="checkbox"
 
-            value="adb"
-
-            title="Android Debug Bridge: runs ADB commands"
-
-          />
-
-          adb</label
-
-        >
-
-        <label style="display: block; margin: 4px 0"
-
-          ><input
-
-            type="checkbox"
-
             value="dir"
 
             title="Lists files and directories in the current project"
@@ -2596,19 +2558,27 @@
 
         >
 
-      </div>
+        <label style="display: block; margin: 4px 0"
 
-      <div
+          ><input type="checkbox" value="scrcpy" /> scrcpy</label
 
-        style="border-top: 1px solid #ff9d00; padding-top: 8px; margin-top: 8px"
+        >
 
-      >
+        <label style="display: block; margin: 4px 0"
 
-        <div style="font-size: 10px; color: #ff9d00; margin-bottom: 4px">
+          ><input
 
-          System & Maintenance
+            type="checkbox"
 
-        </div>
+            value="explorer ."
+
+            title="Opens the project folder in the system file explorer"
+
+          />
+
+          Open Project Folder</label
+
+        >
 
         <label style="display: block; margin: 4px 0"
 
@@ -2625,6 +2595,20 @@
           adb devices</label
 
         >
+
+      </div>
+
+      <div
+
+        style="border-top: 1px solid #ff9d00; padding-top: 8px; margin-top: 8px"
+
+      >
+
+        <div style="font-size: 10px; color: #ff9d00; margin-bottom: 4px">
+
+          System & Maintenance
+
+        </div>
 
         <label style="display: block; margin: 4px 0"
 
@@ -2703,22 +2687,6 @@
           />
 
           git push</label
-
-        >
-
-        <label style="display: block; margin: 4px 0"
-
-          ><input
-
-            type="checkbox"
-
-            value="explorer ."
-
-            title="Opens the project folder in the system file explorer"
-
-          />
-
-          Open Project Folder</label
 
         >
 
@@ -6781,7 +6749,7 @@
         checks.forEach(function (c, index) {
           setTimeout(function() {
             var cmd = c.value;
-            var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start)/i.test(cmd);
+            var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b|dir\b)/i.test(cmd);
             if (isLong) {
               fetch('http://127.0.0.1:5000/run', {
                 method: 'POST',
