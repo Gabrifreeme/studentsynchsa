@@ -46,7 +46,7 @@ class Bursary {
     'requiresUniversityAdmission': requiresUniversityAdmission,
     'amount': amount,
     'coverage': coverage,
-  };
+ };
 
   factory Bursary.fromJson(Map<String, dynamic> json) => Bursary(
     id: json['id'] ?? '',

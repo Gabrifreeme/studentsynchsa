@@ -7008,17 +7008,21 @@ def autofix():
     try:
         # Force Groq directly
         if GROQ_API_KEY:
-            reply, _, _ = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs, tool_choice="none")
-            if reply:
-                return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": "Groq"})
+            result = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs, tool_choice="none")
+            if result:
+                reply, _, _ = result
+                if reply:
+                    return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": "Groq"})
         
         # Fallback to the first provider that works
         for name, endpoint, api_key, model in _chat_providers():
             if not api_key: continue
             try:
-                reply, _, _ = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
-                if reply:
-                    return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": name})
+                result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
+                if result:
+                    reply, _, _ = result
+                    if reply:
+                        return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": name})
             except: pass
             
         return jsonify({"ok": False, "error": "All providers failed or returned empty."})

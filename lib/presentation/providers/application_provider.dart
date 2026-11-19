@@ -10,7 +10,7 @@ class ApplicationsNotifier extends StateNotifier<AsyncValue<List<UniversityAppli
   ApplicationsNotifier() : super(const AsyncLoading()) {
     _repo = ApplicationRepositoryImpl();
     _init();
-  }
+ 
 
   Future<void> _init() async {
     try {
