@@ -2788,7 +2788,10 @@ git add -u (stage tracked)</label
 
       </div>
 
-      <div style="display: flex; gap: 8px; margin-top: 10px">
+      <div style="margin-top: 8px">
+  <input id="ace-git-commit-msg" type="text" placeholder="Commit message (e.g. Update UI)" style="width: 100%; box-sizing: border-box; padding: 6px 8px; background: #111; color: #ff9d00; border: 1px solid #444; border-radius: 4px;" />
+</div>
+<div style="display: flex; gap: 8px; margin-top: 10px">
 
         <button
 
@@ -6889,6 +6892,11 @@ perspective: 900px;
         checks.forEach(function (c, index) {
           setTimeout(function() {
             var cmd = c.value;
+            if (cmd.trim() === "git commit") {
+              var msgEl = document.getElementById("ace-git-commit-msg");
+              var msg = (msgEl && msgEl.value ? msgEl.value.trim() : "") || ("ACEsi update " + new Date().toISOString().slice(0, 19).replace("T", " "));
+              cmd = 'git commit -m "' + msg.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+            }
             var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b|dir\b)/i.test(cmd);
             if (isLong) {
               aceAppendTerminalLine("PS D:\\projects\\acesi> " + cmd, "#ff9d00");
