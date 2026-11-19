@@ -264,7 +264,12 @@ def init_db():
     conn = sqlite3.connect('ace_memory.db')
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, role TEXT, content TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS memories (key TEXT PRIMARY KEY, value TEXT, updated TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS memories (key TEXT PRIMARY KEY, value TEXT, updated TEXT, sort_order INTEGER NOT NULL DEFAULT 0)')
+    # Migrate older ace_memory.db files that predate the sort_order column.
+    _mem_cols = [r[1] for r in c.execute('PRAGMA table_info(memories)').fetchall()]
+    if _mem_cols and 'sort_order' not in _mem_cols:
+        c.execute('ALTER TABLE memories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0')
+
     c.execute('CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, entry TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS moods (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, mood TEXT, note TEXT)')
@@ -6919,11 +6924,11 @@ def chat():
                 print("📓 Journaled session close")
             # Token usage updated by llm_reply
             _LAST_TOKEN_USAGE = (len(user_message) // 4) + (len(reply) // 4)
-        try:
-            with open(_TOKEN_USAGE_FILE, 'w', encoding='utf-8') as _f:
-                json.dump({'last_total_tokens': _LAST_TOKEN_USAGE, 'limit': _DAILY_TOKEN_LIMIT}, _f)
-        except Exception:
-            pass
+            try:
+                with open(_TOKEN_USAGE_FILE, 'w', encoding='utf-8') as _f:
+                    json.dump({'last_total_tokens': _LAST_TOKEN_USAGE, 'limit': _DAILY_TOKEN_LIMIT}, _f)
+            except Exception:
+                pass
             return jsonify({"reply": reply, "shot_ts": _LAST_SHOT["ts"]})
         # Every provider failed. Say WHICH and WHY instead of the old opaque
         # "no models available", which made a rate limit indistinguishable from

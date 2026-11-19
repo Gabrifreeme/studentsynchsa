@@ -10,7 +10,7 @@ class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatu
     _sub = sync_service.SyncService.statusStream.listen((status) {
       state = AsyncData(status);
     });
-  }
+ 
 
   @override
   void dispose() {
