@@ -2414,7 +2414,25 @@
 }
 </style>
 
-<style id="acesi-prompt-amber-style">#chat-input,#chat-input:focus{border:2px solid #ffbf00 !important;}</style>
+<style id="acesi-prompt-amber-style">
+/* Chat prompt keeps the original double-thickness amber border. */
+#chat-input,
+#chat-input:focus {
+  border: 2px solid #ffbf00 !important;
+}
+/* Double-thick bright amber border wrapping every ACEsi message row.
+   Specificity (1,1,1) beats the generic "unboxed text" border:none !important
+   rules above (1,0,0 / 1,1,0), so this survives a hard reload. */
+#chat-messages > .acesi-msg,
+#chat-messages > div.acesi-msg {
+  border: 4px double #ffbf00 !important;
+  border-radius: 6px !important;
+  background: #1a1a1a !important;
+  padding: 8px 12px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 0 10px rgba(255, 191, 0, 0.25) !important;
+}
+</style>
 </head>
 
 
@@ -4382,7 +4400,7 @@ perspective: 900px;
 
 <div id="acesi-3d-notif-wrap">
   <div id="acesi-3d-notif-stage" class="acesi-3d-stage" data-single="1">
-    <div id="acesi-3d-default-box" class="acesi-3d-box" data-notif-id="default">
+    <div id="acesi-3d-default-box" class="acesi-3d-box acesi-msg" data-notif-id="default">
       <b>ACEsi:</b>
       <span id="ace-greeting">Chris, I'm here. Active and ready.</span><span
         id="ace-session"
@@ -9434,7 +9452,7 @@ const res = await fetch("/chat", {
             const command = execMatch[1].trim();
 
             chatContainer.insertAdjacentHTML("afterbegin",
-              '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply.split("[EXEC:")[0].trim() +
 
@@ -9526,7 +9544,7 @@ const res = await fetch("/chat", {
             const followData = await followRes.json();
 
             chatContainer.insertAdjacentHTML("afterbegin",
-              '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               followData.reply +
 
@@ -9536,7 +9554,7 @@ const res = await fetch("/chat", {
           } else {
 
             chatContainer.insertAdjacentHTML("afterbegin",
-              '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply +
 
@@ -10776,6 +10794,8 @@ const res = await fetch("/chat", {
         if (!container) return;
 
         var div = document.createElement("div");
+
+        div.className = "acesi-msg";
 
         div.style.background = "#1a1a1a";
 
