@@ -5210,7 +5210,17 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # collected above, then re-run the analyzer. Only an unresolved remainder
     # is handed to the model.
     _explorer_names = []
-    if _explorer_intent:
+    _has_edits = any(
+        str((_st or {}).get("tool") or "") in ("edit_file", "write_file")
+        for _st in (_AGENT.get("steps") or [])
+    )
+    _auto_error_pass = False
+    if not _explorer_intent and _has_edits:
+        _auto_obs, _auto_count = _explorer_problems_obs()
+        if _auto_count > 0 and re.search(r"\berror\b", _auto_obs or "", re.IGNORECASE):
+            _explorer_obs = _auto_obs
+            _auto_error_pass = True
+    if _explorer_intent or _auto_error_pass:
         _changes, _applied, _failures = _explorer_safe_fixes(_explorer_obs)
         for _desc in _applied:
             _tool_name = "write_file" if _desc.startswith("created ") else "edit_file"
@@ -7270,7 +7280,7 @@ def _scan_dart_problems(files, counts):
         if len(parts) < 5:
             continue
         sev = parts[0].lower()
-        if sev not in ("error", "warning", "info"):
+        if sev != "error":
             continue
         for i in range(len(parts) - 2):
             cand = _problems_rel(parts[i])
@@ -7387,7 +7397,7 @@ def api_problems():
             scanner(files, counts)
         except Exception as e:
             print("[problems] %s failed: %s" % (scanner.__name__, e), flush=True)
-    data["total"] = sum(counts.values())
+    data["total"] = counts.get("error", 0)
     data["generated"] = int(time.time())
     with _PROBLEMS_LOCK:
         _PROBLEMS_CACHE["ts"] = time.time()

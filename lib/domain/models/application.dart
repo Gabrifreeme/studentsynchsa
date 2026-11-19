@@ -17,8 +17,8 @@ enum ApplicationStatus {
       case rejected: return 'Rejected';
       case needMoreDocuments: return 'Need More Documents';
     }
- 
-
+  }
+}
 
 class UniversityApplication {
   final String id;

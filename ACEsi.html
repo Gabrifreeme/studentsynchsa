@@ -4221,6 +4221,73 @@
       <div id="chat-panel" class="panel" style="flex: 0 0 30%; min-width: 200px; max-width: 60%; display: flex; flex-direction: column;">
 
         <div class="panel-header">CONVERSATION</div>
+<style id="acesi-3d-notif-styles">
+#acesi-3d-notif-wrap {
+  perspective: 900px;
+  padding: 8px 10px 4px 10px;
+  flex-shrink: 0;
+}
+.acesi-3d-stage {
+  position: relative;
+  min-height: 56px;
+  max-height: 148px;
+  overflow-y: auto;
+  transform-style: preserve-3d;
+  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.acesi-3d-box {
+  background: #1a1a1a;
+  border: 1px solid #ff9d00;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), inset 0 0 12px rgba(255, 157, 0, 0.14);
+  transform-origin: top center;
+  animation: acesiAmberFlash 0.65s ease-out;
+}
+.acesi-3d-box:last-child {
+  margin-bottom: 0;
+}
+.acesi-3d-line-block {
+  display: block;
+  padding: 2px 6px;
+  margin: 2px 0;
+  border-radius: 4px;
+  background: rgba(255, 157, 0, 0.06);
+  border-left: 2px solid #ff9d00;
+  font-size: 12px;
+  line-height: 1.35;
+}
+@keyframes acesiAmberFlash {
+  0% {
+    background: #ff9d00;
+    color: #0d0d0d;
+    transform: rotateX(-38deg) translateY(-10px) scale(1.02);
+    box-shadow: 0 0 24px rgba(255, 157, 0, 0.95);
+  }
+  55% {
+    background: rgba(255, 157, 0, 0.28);
+    transform: rotateX(-8deg) translateY(-2px) scale(1.005);
+  }
+  100% {
+    background: #1a1a1a;
+    transform: rotateX(0deg) translateY(0px) scale(1);
+  }
+}
+</style>
+
+<div id="acesi-3d-notif-wrap">
+  <div id="acesi-3d-notif-stage" class="acesi-3d-stage" data-single="1">
+    <div id="acesi-3d-default-box" class="acesi-3d-box" data-notif-id="default">
+      <b>ACEsi:</b>
+      <span id="ace-greeting">Chris, I'm here. Active and ready.</span><span
+        id="ace-session"
+        style="display: block; color: #9a9a9a; font-size: 12px; margin-top: 4px;"
+      ></span>
+    </div>
+  </div>
+</div>
+
 
         <div
 
@@ -4230,49 +4297,7 @@
 
         >
 
-          <div
 
-            style="
-
-              background: #1a1a1a;
-
-              padding: 8px 12px;
-
-              border-radius: 6px;
-
-              border: 1px solid #ff9d00;
-
-              margin-bottom: 8px;
-
-            "
-
-          >
-
-            <b>ACEsi:</b>
-
-            <span id="ace-greeting">Chris, I'm here. Active and ready.</span
-
-            ><span
-
-              id="ace-session"
-
-              style="
-
-                display: block;
-
-                color: #9a9a9a;
-
-                font-size: 12px;
-
-                margin-top: 4px;
-
-                white-space: pre-line;
-
-              "
-
-            ></span>
-
-          </div>
 
         </div>
 
@@ -6000,7 +6025,9 @@
 
       function explorerAttachProblemPill(row, problems) {
 
-        if (!problems || !problems.total) return;
+        var errCount = (problems && problems.error) || 0;
+
+        if (!errCount) return;
 
         row.classList.add("has-problems");
 
@@ -6008,15 +6035,11 @@
 
         pill.className = "problem-pill";
 
-        pill.textContent = String(problems.total);
+        pill.textContent = String(errCount);
 
         pill.dataset.sev = explorerProblemSeverity(problems);
 
-        pill.title =
-
-          problems.error + " error(s), " + problems.warning +
-
-          " warning(s), " + problems.info + " info";
+        pill.title = (problems.error || 0) + " error(s)";
 
         row.appendChild(pill);
 
@@ -6030,9 +6053,9 @@
 
         var counts = data.counts || {};
 
-        var total = data.total || 0;
+        var errCount = counts.error || 0;
 
-        if (!total) {
+        if (!errCount) {
 
           badge.style.display = "none";
 
@@ -6050,7 +6073,7 @@
 
         }
 
-        badge.textContent = String(total);
+        badge.textContent = String(errCount);
 
         badge.dataset.sev = counts.error
 
@@ -6064,11 +6087,7 @@
 
         badge.style.display = "inline-block";
 
-        badge.title =
-
-          (counts.error || 0) + " error(s), " + (counts.warning || 0) +
-
-          " warning(s), " + (counts.info || 0) + " info - click to re-scan";
+        badge.title = (counts.error || 0) + " error(s) - click to re-scan";
 
       }
 
@@ -9073,6 +9092,9 @@
           var cur = row.querySelector(".live-line");
           if (hist) hist.textContent = historyLines.join("\n");
           if (cur) cur.textContent = glyph + " " + line;
+          if (typeof window.acesiPushLiveBlock === "function") {
+            window.acesiPushLiveBlock(glyph + " " + line, cls || "live");
+          }
           scrollChat();
         }
 
@@ -14119,6 +14141,137 @@ document.addEventListener('DOMContentLoaded', function() {
   else ready();
 })();
 </script>
+
+<script id="acesi-3d-notif-controller">
+(function () {
+  var cycleTimer = null;
+  var cycleIdx = 0;
+
+  function stageEl() {
+    return document.getElementById("acesi-3d-notif-stage");
+  }
+
+  function syncRollUp() {
+    var stage = stageEl();
+    if (!stage) return;
+    var boxes = Array.prototype.slice.call(stage.querySelectorAll(".acesi-3d-box"));
+    var extraBoxes = boxes.filter(function (b) { return b.getAttribute("data-notif-id") !== "default"; });
+
+    clearInterval(cycleTimer);
+    cycleTimer = null;
+
+    if (extraBoxes.length === 0) {
+      stage.setAttribute("data-single", "1");
+      stage.style.transform = "rotateX(0deg)";
+      boxes.forEach(function (b) { b.style.display = ""; });
+      return;
+    }
+
+    stage.setAttribute("data-single", "0");
+    if (extraBoxes.length > 1) {
+      cycleTimer = setInterval(function () {
+        cycleIdx = (cycleIdx + 1) % extraBoxes.length;
+        stage.style.transform = "rotateX(8deg)";
+        setTimeout(function () {
+          stage.style.transform = "rotateX(0deg)";
+        }, 220);
+        extraBoxes.forEach(function (b, i) {
+          b.style.order = String((i - cycleIdx + extraBoxes.length) % extraBoxes.length);
+        });
+      }, 2600);
+    } else {
+      stage.style.transform = "rotateX(0deg)";
+    }
+  }
+
+  window.acesiPushNotification = function (title, lines, opts) {
+    opts = opts || {};
+    var stage = stageEl();
+    if (!stage) return;
+    var id = opts.id || ("notif-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6));
+    var box = stage.querySelector('[data-notif-id="' + id + '"]');
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "acesi-3d-box";
+      box.setAttribute("data-notif-id", id);
+      stage.insertBefore(box, stage.firstChild);
+    }
+
+    var lineArr = Array.isArray(lines) ? lines : [String(lines || "")];
+    var blocksHtml = lineArr.map(function (txt) {
+      var safe = String(txt)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return '<div class="acesi-3d-line-block">' + safe + '</div>';
+    }).join("");
+
+    box.innerHTML =
+      '<div style="font-weight:700;color:#ffb833;margin-bottom:4px;">' +
+      String(title || "ACEsi Alert").replace(/</g, "&lt;") +
+      '</div>' +
+      blocksHtml;
+
+    box.style.animation = "none";
+    void box.offsetWidth;
+    box.style.animation = "acesiAmberFlash 0.65s ease-out";
+
+    syncRollUp();
+
+    var ttl = typeof opts.ttl === "number" ? opts.ttl : 9000;
+    if (ttl > 0) {
+      setTimeout(function () {
+        if (box && box.parentNode) {
+          box.parentNode.removeChild(box);
+          syncRollUp();
+        }
+      }, ttl);
+    }
+  };
+
+  window.acesiPushLiveBlock = function (text, cls) {
+    var stage = stageEl();
+    if (!stage) return;
+    var liveId = "live-stream-box";
+    var box = stage.querySelector('[data-notif-id="' + liveId + '"]');
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "acesi-3d-box";
+      box.setAttribute("data-notif-id", liveId);
+      box.innerHTML = '<div style="font-weight:700;color:#ffb833;margin-bottom:4px;">Live System Feed</div><div class="acesi-3d-lines"></div>';
+      stage.insertBefore(box, stage.firstChild);
+    }
+    var container = box.querySelector(".acesi-3d-lines");
+    if (!container) return;
+
+    var clean = String(text || "").trim();
+    if (!clean) return;
+
+    var lastLine = container.lastElementChild;
+    var block = document.createElement("div");
+    block.className = "acesi-3d-line-block";
+    block.textContent = clean;
+    if (cls === "done") block.style.borderLeftColor = "#2ecc71";
+    if (cls === "stopped") block.style.borderLeftColor = "#e74c3c";
+
+    if (lastLine && lastLine.textContent && lastLine.textContent.endsWith("...") && !clean.endsWith("...")) {
+      container.replaceChild(block, lastLine);
+    } else if (!lastLine || lastLine.textContent !== clean) {
+      container.appendChild(block);
+    }
+
+    while (container.children.length > 6) {
+      container.removeChild(container.firstChild);
+    }
+
+    box.style.animation = "none";
+    void box.offsetWidth;
+    box.style.animation = "acesiAmberFlash 0.65s ease-out";
+    syncRollUp();
+  };
+})();
+</script>
+
 </body>
 
 </html>
