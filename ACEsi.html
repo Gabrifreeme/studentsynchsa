@@ -6733,37 +6733,67 @@
 
 
         // Open the terminal panel
-
-        document.getElementById("terminal-panel").style.display = "flex";
-
-
+        if (window.openAceTerminal) {
+          window.openAceTerminal();
+        } else {
+          var tp = document.getElementById("terminal-panel");
+          if (tp) tp.style.display = "flex";
+        }
 
         // Hide the run panel
+        var rp = document.getElementById("run-panel");
+        if (rp) rp.style.display = "none";
 
-        document.getElementById("run-panel").style.display = "none";
+        function aceAppendTerminalLine(text, color) {
+          var hist = document.getElementById("term-history");
+          if (hist) {
+            var line = document.createElement("div");
+            line.style.whiteSpace = "pre-wrap";
+            line.style.overflowWrap = "anywhere";
+            line.style.wordBreak = "break-word";
+            if (color) line.style.color = color;
+            line.textContent = text;
+            hist.appendChild(line);
+            while (hist.children.length > 1000) hist.removeChild(hist.firstChild);
+            hist.scrollTop = hist.scrollHeight;
+            hist.scrollLeft = 0;
+            return true;
+          }
+          if (window.term && typeof window.term.write === "function") {
+            window.term.write("\r\n" + text + "\r\n");
+            return true;
+          }
+          return false;
+        }
 
-
-
-        // For each selected command, push it into the new terminal input and run it
-
+        // For each selected command, run it and show output in the terminal UI
         checks.forEach(function (c, index) {
           setTimeout(function() {
             var cmd = c.value;
             var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b|dir\b)/i.test(cmd);
             if (isLong) {
-              fetch('http://127.0.0.1:5000/run', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+              aceAppendTerminalLine("PS C:\\Users\\chris\\LipSyncStudent> " + cmd, "#ff9d00");
+              fetch("/run", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({command: cmd})
               }).then(function(r) { return r.json(); }).then(function(d) {
-                if (window.term) { window.term.write('\r\n\x1b[33m[RUN] ' + (d.output || '') + '\x1b[0m\r\n'); }
+                var out = (d && (d.output || d.error)) || "";
+                if (/^\s*explorer\b/i.test(cmd) && !out.trim() && !(d && d.error)) {
+                  out = "Opened project folder in File Explorer.";
+                }
+                if (!out) out = "(no output)";
+                aceAppendTerminalLine(out, d && d.error ? "red" : "#ff9d00");
               }).catch(function(e) {
-                if (window.term) { window.term.write('\r\n\x1b[31m[ERROR] ' + e.message + '\x1b[0m\r\n'); }
+                aceAppendTerminalLine("Error: " + e.message, "red");
               });
             } else {
               if (window.term && window.termSocket) {
-                window.term.write(cmd + '\r\n');
-                window.termSocket.emit('terminal_input', cmd);
+                window.term.write(cmd + "\r\n");
+                window.termSocket.emit("terminal_input", cmd);
+              } else {
+                aceAppendTerminalLine("PS C:\\Users\\chris\\LipSyncStudent> " + cmd, "#ff9d00");
+                aceAppendTerminalLine("Terminal session not connected for this command.", "red");
               }
             }
           }, index * 1500);
