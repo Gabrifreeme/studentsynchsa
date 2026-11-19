@@ -1220,6 +1220,94 @@
 
 
 
+
+@keyframes acesiLineFlipUp {
+  0% {
+    opacity: 0;
+    transform: perspective(700px) rotateX(-55deg) translateY(10px);
+  }
+  65% {
+    opacity: 1;
+    transform: perspective(700px) rotateX(8deg) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(700px) rotateX(0deg) translateY(0px);
+  }
+}
+.acesi-3d-line-flip {
+  animation: acesiLineFlipUp 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+
+
+#chat-messages [data-live-id],
+#chat-messages .live-line {
+  display: none !important;
+}
+
+
+/* Continuous unboxed text inside Conversation / Live System Feed */
+#chat-messages,
+#chat-messages > *,
+#chat-messages .acesi-3d-box,
+#chat-messages .acesi-3d-line-block,
+#acesi-3d-notif-stage,
+#acesi-3d-notif-stage .acesi-3d-box,
+#acesi-3d-notif-stage .acesi-3d-line-block {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+#chat-messages > *,
+#acesi-3d-notif-stage .acesi-3d-line-block {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+
+/* Brightest amber border on Live System Feed box + new-line flash */
+@keyframes acesiNewLineFlash {
+  0% {
+    color: #fff3a1;
+    text-shadow: 0 0 10px #ffcc00, 0 0 18px #ffaa00;
+  }
+  45% {
+    color: #ffcc00;
+    text-shadow: 0 0 8px #ffaa00;
+  }
+  100% {
+    color: inherit;
+    text-shadow: none;
+  }
+}
+
+#acesi-3d-notif-stage [data-notif-id="live-stream-box"] {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+#acesi-3d-notif-stage [data-notif-id="live-stream-box"] .acesi-3d-line-block.acesi-new-line-flash {
+  animation: acesiNewLineFlash 0.65s ease-out forwards !important;
+}
+
+
+/* Nudge Live System Feed slightly inward from the left edge */
+#acesi-3d-notif-stage,
+#acesi-3d-notif-stage [data-notif-id="live-stream-box"] {
+  padding-left: 14px !important;
+  box-sizing: border-box !important;
+}
+
 </style>
 
 
@@ -4223,17 +4311,21 @@
         <div class="panel-header">CONVERSATION</div>
 <style id="acesi-3d-notif-styles">
 #acesi-3d-notif-wrap {
-  perspective: 900px;
+perspective: 900px;
   padding: 8px 10px 4px 10px;
   flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
 }
 .acesi-3d-stage {
   position: relative;
-  min-height: 56px;
-  max-height: 148px;
-  overflow-y: auto;
   transform-style: preserve-3d;
   transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  
+  
+
+  max-height: none;
+  overflow: visible;
 }
 .acesi-3d-box {
   background: #1a1a1a;
@@ -9014,7 +9106,11 @@
           row.className = "live-activity";
           row.setAttribute("data-live-id", activeRowId);
           row.innerHTML = '<div class="live-history"></div><div class="live-line"></div>';
-          chat.appendChild(row);
+          if (row && /ACEsi:/i.test(row.textContent || "")) {
+        chat.insertBefore(row, chat.firstChild);
+      } else {
+        chat.appendChild(row);
+      }
           scrollChat();
           return row;
         }
@@ -9320,8 +9416,7 @@ const res = await fetch("/chat", {
 
             const command = execMatch[1].trim();
 
-            chatContainer.innerHTML +=
-
+            chatContainer.insertAdjacentHTML("afterbegin",
               '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply.split("[EXEC:")[0].trim() +
@@ -9330,7 +9425,8 @@ const res = await fetch("/chat", {
 
               command +
 
-              "]</span></div>";
+              "]</span></div>"
+                          );
 
 
 
@@ -9412,23 +9508,23 @@ const res = await fetch("/chat", {
 
             const followData = await followRes.json();
 
-            chatContainer.innerHTML +=
-
+            chatContainer.insertAdjacentHTML("afterbegin",
               '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               followData.reply +
 
-              "</div>";
+              "</div>"
+            );
 
           } else {
 
-            chatContainer.innerHTML +=
-
+            chatContainer.insertAdjacentHTML("afterbegin",
               '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply +
 
-              "</div>";
+              "</div>"
+            );
 
           }
 
@@ -10670,7 +10766,7 @@ const res = await fetch("/chat", {
 
         div.style.borderRadius = "6px";
 
-        div.style.border = "1px solid #ff9d00";
+        div.style.border = "none";
 
         div.style.marginBottom = "8px";
 
@@ -10678,7 +10774,7 @@ const res = await fetch("/chat", {
 
         div.innerHTML = "<b>ACEsi:</b> " + escapeHtml(message);
 
-        container.appendChild(div);
+        container.insertBefore(div, container.firstChild);
 
         container.scrollTop = container.scrollHeight;
 
@@ -14152,6 +14248,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function syncRollUp() {
+    if (typeof window.acesiPlaceFeedAboveTimer === 'function') window.acesiPlaceFeedAboveTimer();
     var stage = stageEl();
     if (!stage) return;
     var boxes = Array.prototype.slice.call(stage.querySelectorAll(".acesi-3d-box"));
@@ -14234,12 +14331,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!stage) return;
     var liveId = "live-stream-box";
     var box = stage.querySelector('[data-notif-id="' + liveId + '"]');
+    var isNewBox = false;
     if (!box) {
+    if (cls === "done" || cls === "stopped") {
+      stage.style.display = "none";
+      stage.innerHTML = "";
+      return;
+    }
+    stage.style.display = "";
+
       box = document.createElement("div");
       box.className = "acesi-3d-box";
       box.setAttribute("data-notif-id", liveId);
       box.innerHTML = '<div style="font-weight:700;color:#ffb833;margin-bottom:4px;">Live System Feed</div><div class="acesi-3d-lines"></div>';
       stage.insertBefore(box, stage.firstChild);
+      isNewBox = true;
     }
     var container = box.querySelector(".acesi-3d-lines");
     if (!container) return;
@@ -14247,31 +14353,135 @@ document.addEventListener('DOMContentLoaded', function() {
     var clean = String(text || "").trim();
     if (!clean) return;
 
-    var lastLine = container.lastElementChild;
-    var block = document.createElement("div");
-    block.className = "acesi-3d-line-block";
-    block.textContent = clean;
-    if (cls === "done") block.style.borderLeftColor = "#2ecc71";
-    if (cls === "stopped") block.style.borderLeftColor = "#e74c3c";
+    var normKey = function (s) {
+      return String(s || "")
+        .replace(/^[^a-zA-Z0-9]+/, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    };
 
-    if (lastLine && lastLine.textContent && lastLine.textContent.endsWith("...") && !clean.endsWith("...")) {
-      container.replaceChild(block, lastLine);
-    } else if (!lastLine || lastLine.textContent !== clean) {
+    
+    function triggerLineFlip(el) {
+      if (!el) return;
+      el.classList.remove("acesi-3d-line-flip");
+      void el.offsetWidth;
+      el.classList.add("acesi-3d-line-flip");
+    }
+
+    var borderCol = cls === "done" ? "#2ecc71" : (cls === "stopped" ? "#e74c3c" : "#ff9d00");
+    var lastLine = container.lastElementChild;
+    var lastKey = lastLine ? normKey(lastLine.textContent) : "";
+    var nextKey = normKey(clean);
+    var statusChanged = box.dataset.lastCls !== (cls || "");
+
+    if (lastLine && (lastLine.textContent === clean || (lastKey && lastKey === nextKey))) {
+      lastLine.textContent = clean;
+      lastLine.style.borderLeftColor = borderCol;
+    } else if (lastLine && lastLine.textContent && lastLine.textContent.endsWith("...") && !clean.endsWith("...")) {
+      var replaced = document.createElement("div");
+      replaced.className = "acesi-3d-line-block";
+      replaced.textContent = clean;
+      replaced.style.borderLeftColor = borderCol;
+      container.replaceChild(replaced, lastLine);
+      triggerLineFlip(replaced);
+    } else {
+      var block = document.createElement("div");
+      block.className = "acesi-3d-line-block";
+      block.textContent = clean;
+      block.style.borderLeftColor = borderCol;
       container.appendChild(block);
+      triggerLineFlip(block);
     }
 
     while (container.children.length > 6) {
       container.removeChild(container.firstChild);
     }
 
-    box.style.animation = "none";
-    void box.offsetWidth;
-    box.style.animation = "acesiAmberFlash 0.65s ease-out";
+    
+
+    if (isNewBox || (statusChanged && (cls === "done" || cls === "stopped"))) {
+      box.style.animation = "none";
+      void box.offsetWidth;
+      box.style.animation = "acesiAmberFlash 0.65s ease-out";
+    }
+    box.dataset.lastCls = cls || "";
     syncRollUp();
   };
 })();
+
+(function () {
+  function placeFeedAboveTimer() {
+    var stage = document.getElementById("acesi-3d-notif-stage");
+    if (!stage) return;
+    var chat = document.getElementById("chat-messages");
+    var pane = (chat && chat.parentElement) || stage.parentElement;
+    if (!pane) return;
+
+    var defaultBox = document.getElementById("acesi-3d-default-box");
+    if (defaultBox && chat && (defaultBox.parentElement !== chat || chat.firstElementChild !== defaultBox)) {
+      chat.insertBefore(defaultBox, chat.firstElementChild);
+    }
+
+    var timerEl = null;
+    var candidates = pane.querySelectorAll("div, span, p, small");
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (el === stage || stage.contains(el)) continue;
+      if (chat && chat.contains(el)) continue;
+      var txt = (el.textContent || "").trim();
+      if (/^\d+(\.\d+)?s$/.test(txt)) {
+        timerEl = el;
+        break;
+      }
+    }
+
+    if (timerEl && timerEl.parentElement) {
+      if (stage.parentElement !== timerEl.parentElement || stage.nextElementSibling !== timerEl) {
+        timerEl.parentElement.insertBefore(stage, timerEl);
+      }
+    } else if (chat && chat.parentElement === pane && chat.nextElementSibling !== stage) {
+      pane.insertBefore(stage, chat.nextElementSibling);
+    }
+  }
+
+  window.acesiPlaceFeedAboveTimer = placeFeedAboveTimer;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", placeFeedAboveTimer);
+  } else {
+    placeFeedAboveTimer();
+  }
+  setInterval(placeFeedAboveTimer, 1000);
+})();
+
 </script>
 
+<script>
+(function () {
+  var stage = document.getElementById("acesi-3d-notif-stage");
+  if (!stage || stage.dataset.flashObserverBound) return;
+  stage.dataset.flashObserverBound = "1";
+
+  var observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (m) {
+      m.addedNodes.forEach(function (node) {
+        if (node && node.nodeType === 1 && node.classList && node.classList.contains("acesi-3d-line-block")) {
+          if (node.closest && node.closest('[data-notif-id="live-stream-box"]')) {
+            node.classList.remove("acesi-new-line-flash");
+            void node.offsetWidth;
+            node.classList.add("acesi-new-line-flash");
+            setTimeout(function () {
+              node.classList.remove("acesi-new-line-flash");
+            }, 700);
+          }
+        }
+      });
+    });
+  });
+
+  observer.observe(stage, { childList: true, subtree: true });
+})();
+</script>
 </body>
 
 </html>
