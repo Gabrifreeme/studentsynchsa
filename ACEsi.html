@@ -2433,6 +2433,61 @@
   box-shadow: 0 0 10px rgba(255, 191, 0, 0.25) !important;
 }
 </style>
+
+<style id="live-system-indicator-style">
+/* Live System Real Time indicator - bottom right, just above the timer. */
+#chat-panel { position: relative !important; }
+#live-system-indicator {
+  position: absolute;
+  right: 10px;
+  bottom: 88px;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  max-width: calc(100% - 20px);
+  pointer-events: none;
+  font: 11px/1.35 "Roboto Mono", monospace;
+  transition: opacity 0.35s ease-out;
+}
+#live-system-indicator .lsi-line {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 3px 7px;
+  color: #ff9d00;
+  background: rgba(0, 0, 0, 0.88);
+  border: 1px solid #ffbf00;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#live-system-indicator .lsi-line.lsi-flash {
+  animation: lsiBrightFlash 0.7s ease-out;
+}
+@keyframes lsiBrightFlash {
+  0% {
+    color: #fff6c2;
+    text-shadow: 0 0 10px #ffd54a, 0 0 18px #ffb300;
+    border-color: #fff3a1;
+    background: rgba(120, 72, 0, 0.55);
+  }
+  60% {
+    color: #ffd54a;
+    text-shadow: 0 0 7px #ffb300;
+    border-color: #ffd54a;
+  }
+  100% {
+    color: #ff9d00;
+    text-shadow: none;
+    border-color: #ffbf00;
+    background: rgba(0, 0, 0, 0.88);
+  }
+}
+/* Green tick at the start of every Live System Feed line. */
+.acesi-3d-line-block .lsf-tick { color: #2ecc71; font-weight: bold; }
+</style>
 </head>
 
 
@@ -4422,6 +4477,8 @@ perspective: 900px;
 
 
         </div>
+
+        <div id="live-system-indicator" aria-live="polite"></div>
 
         <div
 
@@ -9410,13 +9467,14 @@ async function sendMessage() {
 
 
 
-        chatContainer.innerHTML +=
+        window.aceChatInsertUser(
 
           '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #333;margin-bottom:8px;margin-left:20px;"><b>You:</b> ' +
 
           text +
 
-          "</div>";
+          "</div>"
+        );
 
         input.value = "";
 
@@ -9451,7 +9509,7 @@ const res = await fetch("/chat", {
 
             const command = execMatch[1].trim();
 
-            chatContainer.insertAdjacentHTML("afterbegin",
+            window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply.split("[EXEC:")[0].trim() +
@@ -9503,13 +9561,14 @@ const res = await fetch("/chat", {
 
 
 
-            chatContainer.innerHTML +=
+            window.aceChatInsertReply(
 
               '<div style="background:#0a0a0a;padding:8px 12px;border-radius:6px;border:1px solid #333;margin-bottom:8px;font-family:monospace;font-size:11px;color:#00ff00;white-space:pre-wrap;max-height:200px;overflow-y:auto;"><b>Terminal Output:</b><br>' +
 
               output +
 
-              "</div>";
+              "</div>"
+            );
 
 
 
@@ -9543,7 +9602,7 @@ const res = await fetch("/chat", {
 
             const followData = await followRes.json();
 
-            chatContainer.insertAdjacentHTML("afterbegin",
+            window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               followData.reply +
@@ -9553,7 +9612,7 @@ const res = await fetch("/chat", {
 
           } else {
 
-            chatContainer.insertAdjacentHTML("afterbegin",
+            window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply +
@@ -9573,13 +9632,14 @@ const res = await fetch("/chat", {
 
           } else {
 
-            chatContainer.innerHTML +=
+            window.aceChatInsertReply(
 
               '<div style="color:red;padding:8px;">Server error: ' +
 
               e.message +
 
-              "</div>";
+              "</div>"
+            );
 
           }
 
@@ -10811,7 +10871,12 @@ const res = await fetch("/chat", {
 
         div.innerHTML = "<b>ACEsi:</b> " + escapeHtml(message);
 
-        container.insertBefore(div, container.firstChild);
+        var _userRow = container.querySelector(".ace-user-msg");
+        if (_userRow && _userRow.parentNode) {
+          _userRow.parentNode.insertBefore(div, _userRow.nextSibling);
+        } else {
+          container.insertBefore(div, container.firstChild);
+        }
 
         container.scrollTop = container.scrollHeight;
 
@@ -14370,13 +14435,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var box = stage.querySelector('[data-notif-id="' + liveId + '"]');
     var isNewBox = false;
     if (!box) {
-    if (cls === "done" || cls === "stopped") {
-      stage.style.display = "none";
-      stage.innerHTML = "";
-      return;
-    }
-    stage.style.display = "";
-
+      if (cls === "done" || cls === "stopped") {
+        stage.style.display = "none";
+        stage.innerHTML = "";
+        return;
+      }
+      stage.style.display = "";
       box = document.createElement("div");
       box.className = "acesi-3d-box";
       box.setAttribute("data-notif-id", liveId);
@@ -14389,16 +14453,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var clean = String(text || "").trim();
     if (!clean) return;
+    // Every feed line is prefixed with a green tick. Strip any tick the caller
+    // already supplied (e.g. the "✔ Done." glyph) so we never double it.
+    var body = clean.replace(/^\s*[\u2714\u2713\u2705]\s*/, "");
 
     var normKey = function (s) {
       return String(s || "")
+        .replace(/^\s*[\u2714\u2713\u2705]\s*/, "")
         .replace(/^[^a-zA-Z0-9]+/, "")
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
     };
-
-    
+    function setLineText(el) {
+      el.textContent = "";
+      var tick = document.createElement("span");
+      tick.className = "lsf-tick";
+      tick.textContent = "\u2714 ";
+      el.appendChild(tick);
+      el.appendChild(document.createTextNode(body));
+    }
     function triggerLineFlip(el) {
       if (!el) return;
       el.classList.remove("acesi-3d-line-flip");
@@ -14409,23 +14483,23 @@ document.addEventListener('DOMContentLoaded', function() {
     var borderCol = cls === "done" ? "#2ecc71" : (cls === "stopped" ? "#e74c3c" : "#ff9d00");
     var lastLine = container.lastElementChild;
     var lastKey = lastLine ? normKey(lastLine.textContent) : "";
-    var nextKey = normKey(clean);
+    var nextKey = normKey(body);
     var statusChanged = box.dataset.lastCls !== (cls || "");
 
-    if (lastLine && (lastLine.textContent === clean || (lastKey && lastKey === nextKey))) {
-      lastLine.textContent = clean;
+    if (lastLine && (lastKey && lastKey === nextKey)) {
+      setLineText(lastLine);
       lastLine.style.borderLeftColor = borderCol;
-    } else if (lastLine && lastLine.textContent && lastLine.textContent.endsWith("...") && !clean.endsWith("...")) {
+    } else if (lastLine && lastKey && lastKey.endsWith("...") && !nextKey.endsWith("...")) {
       var replaced = document.createElement("div");
       replaced.className = "acesi-3d-line-block";
-      replaced.textContent = clean;
+      setLineText(replaced);
       replaced.style.borderLeftColor = borderCol;
       container.replaceChild(replaced, lastLine);
       triggerLineFlip(replaced);
     } else {
       var block = document.createElement("div");
       block.className = "acesi-3d-line-block";
-      block.textContent = clean;
+      setLineText(block);
       block.style.borderLeftColor = borderCol;
       container.appendChild(block);
       triggerLineFlip(block);
@@ -14435,8 +14509,6 @@ document.addEventListener('DOMContentLoaded', function() {
       container.removeChild(container.firstChild);
     }
 
-    
-
     if (isNewBox || (statusChanged && (cls === "done" || cls === "stopped"))) {
       box.style.animation = "none";
       void box.offsetWidth;
@@ -14444,6 +14516,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     box.dataset.lastCls = cls || "";
     syncRollUp();
+
+    // Once the response is finished, keep the green-ticked lines briefly, then
+    // clear the whole Live System Feed.
+    if (cls === "done" || cls === "stopped") {
+      clearTimeout(stage._lsfHideTimer);
+      stage._lsfHideTimer = setTimeout(function () {
+        var live = stage.querySelector('[data-notif-id="' + liveId + '"]');
+        if (live && live.parentNode) live.parentNode.removeChild(live);
+        if (!stage.querySelector('[data-notif-id]')) stage.style.display = "none";
+      }, 2800);
+    }
   };
 })();
 
@@ -14517,6 +14600,138 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   observer.observe(stage, { childList: true, subtree: true });
+})();
+</script>
+
+<script>
+/* ===== Live System Real Time indicator ===== */
+(function () {
+  var BOX_ID = "live-system-indicator";
+  var hideTimer = null;
+
+  function box() { return document.getElementById(BOX_ID); }
+
+  function addLine(text) {
+    var el = box();
+    if (!el) return null;
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    el.style.display = "flex";
+    el.style.opacity = "1";
+    var line = document.createElement("div");
+    line.className = "lsi-line lsi-flash";
+    line.textContent = text;
+    el.appendChild(line);
+    while (el.children.length > 6) el.removeChild(el.firstChild);
+    setTimeout(function () { line.classList.remove("lsi-flash"); }, 750);
+    return line;
+  }
+
+  function hideSoon(delay) {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      var el = box();
+      if (!el) return;
+      el.style.opacity = "0";
+      setTimeout(function () {
+        el.innerHTML = "";
+        el.style.display = "none";
+        el.style.opacity = "1";
+      }, 380);
+    }, delay || 2400);
+  }
+
+  function commandFrom(body) {
+    try {
+      var d = typeof body === "string" ? JSON.parse(body) : body;
+      return d && d.command ? String(d.command) : "";
+    } catch (e) { return ""; }
+  }
+
+  // Chat ordering: the "You:" message stays directly above ACEsi's reply.
+  window.aceChatInsertUser = function (html) {
+    var chat = document.getElementById("chat-messages");
+    if (!chat) return;
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    var node = wrap.firstElementChild;
+    if (!node) return;
+    node.classList.add("ace-user-msg");
+    var greeting = document.getElementById("acesi-3d-default-box");
+    if (greeting && greeting.parentNode === chat) {
+      chat.insertBefore(node, greeting.nextSibling);
+    } else {
+      chat.insertBefore(node, chat.firstChild);
+    }
+    chat.scrollTop = chat.scrollHeight;
+  };
+
+  window.aceChatInsertReply = function (html) {
+    var chat = document.getElementById("chat-messages");
+    if (!chat) return;
+    var user = chat.querySelector(".ace-user-msg");
+    if (user && user.parentNode) {
+      user.insertAdjacentHTML("afterend", html);
+    } else {
+      chat.insertAdjacentHTML("afterbegin", html);
+    }
+    chat.scrollTop = chat.scrollHeight;
+  };
+
+  window.LiveSystem = {
+    sending: function (cmd, endpoint) {
+      addLine("\u23F3 Sending: " + cmd + " -> " + endpoint);
+    },
+    running: function (cmd, seconds) {
+      return addLine("\u2699\uFE0F Running: " + cmd + " (" + Number(seconds).toFixed(1) + "s)");
+    },
+    done: function (cmd, exitCode) {
+      addLine("\u2705 Done: " + cmd + " (exit " + exitCode + ")");
+      hideSoon(2400);
+    }
+  };
+
+  // Drive the indicator for every /api/system/exec request, wherever it is made.
+  var nativeFetch = window.fetch;
+  if (typeof nativeFetch === "function") {
+    window.fetch = function (url, opts) {
+      var u = String(url || "");
+      if (!/\/api\/system\/exec(?:[?#]|$)/.test(u)) {
+        return nativeFetch.apply(window, arguments);
+      }
+      var cmd = opts && opts.body ? commandFrom(opts.body) : "";
+      var endpoint = "/api/system/exec";
+      window.LiveSystem.sending(cmd, endpoint);
+      var started = Date.now();
+      var runLine = window.LiveSystem.running(cmd, 0);
+      if (runLine) runLine.dataset.lsiRunning = "1";
+      var tick = setInterval(function () {
+        if (runLine && runLine.parentNode) {
+          runLine.textContent = "\u2699\uFE0F Running: " + cmd + " (" +
+            ((Date.now() - started) / 1000).toFixed(1) + "s)";
+        }
+      }, 100);
+
+      return nativeFetch.apply(window, arguments).then(function (res) {
+        clearInterval(tick);
+        if (res && typeof res.clone === "function") {
+          return res.clone().json().then(function (d) {
+            var code = d && typeof d.exit_code === "number" ? d.exit_code : (res.ok ? 0 : 1);
+            window.LiveSystem.done(cmd, code);
+            return res;
+          }).catch(function () {
+            window.LiveSystem.done(cmd, res.ok ? 0 : 1);
+            return res;
+          });
+        }
+        window.LiveSystem.done(cmd, res && res.ok ? 0 : 1);
+        return res;
+      }).catch(function (err) {
+        clearInterval(tick);
+        window.LiveSystem.done(cmd, 1);
+        throw err;
+      });
+    };
+  }
 })();
 </script>
 </body>
