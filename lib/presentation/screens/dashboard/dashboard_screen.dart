@@ -80,9 +80,9 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             profile?.contact.email ?? '',
-                            style:  TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.primary.withValues(alpha: 0.6),
+                              color: AppColors.primary.withOpacity(0.6),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -133,7 +133,7 @@ class DashboardScreen extends ConsumerWidget {
             return SyncStatusBadge(status: label);
           },
           loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
         );
   }
 
@@ -198,7 +198,7 @@ class DashboardScreen extends ConsumerWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.4),
+                    color: AppColors.primary.withOpacity(0.4),
                     blurRadius: 16,
                     spreadRadius: 3,
                   ),
@@ -269,9 +269,9 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style:  TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.primary.withValues(alpha: 0.6),
+                          color: AppColors.primary.withOpacity(0.6),
                           height: 1.4,
                         ),
                         children: [
@@ -319,7 +319,7 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                         'I have read and consent to the privacy policy',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.primary.withValues(alpha: 0.6),
+                          color: AppColors.primary.withOpacity(0.6),
                         ),
                       ),
                     ),
