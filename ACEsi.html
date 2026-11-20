@@ -8084,15 +8084,12 @@ perspective: 900px;
 
 <style id="ace-term-dashboard-style">
   #ace-term-heartbeat {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 5;
     font-family: monospace;
-    font-size: 16px;
+    font-size: 13px;
     font-weight: bold;
     color: #00ff88;
+    line-height: 1;
+    user-select: none;
     pointer-events: none;
   }
 </style>    
@@ -15256,13 +15253,13 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   window.aceTermHeartbeatInit = function () {
-    var out = document.getElementById('terminal-output');
-    if (!out) return;
+    var hdr = document.getElementById('terminal-header');
+    if (!hdr) return;
     var el = document.getElementById('ace-term-heartbeat');
     if (!el) {
       el = document.createElement('div');
       el.id = 'ace-term-heartbeat';
-      out.appendChild(el);
+      hdr.insertBefore(el, hdr.firstChild); // far-left spot in the terminal header
     }
     window.__aceTermHeartbeatEl = el;
     var frames = ['|', '/', '-', '\\']; // ASCII spinner frames
@@ -15275,7 +15272,6 @@ document.addEventListener('DOMContentLoaded', function() {
     tick();
     if (window.__aceTermHeartbeatTimer) clearInterval(window.__aceTermHeartbeatTimer);
     window.__aceTermHeartbeatTimer = setInterval(tick, 140);
-    el.style.display = 'block';
   };
 
   // Track the last HTTP status of every fetch so the heartbeat can show
