@@ -6475,6 +6475,12 @@ def chat():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
     save_conversation("user", user_message)
 
+    import location_tool as _lt
+    _loc_reply = _lt.handle_location_query(user_message, data)
+    if _loc_reply:
+        save_conversation("assistant", _loc_reply)
+        return jsonify({"reply": _loc_reply})
+
     # Emotional memory: notice tiredness/frustration/sadness in what Chris says
     # and remember it for the day (and soften the reply if he's low).
     _mood = detect_mood(user_message)
@@ -19101,6 +19107,26 @@ def api_ai_chat():
         return jsonify({"ok": False, "error": "prompt required"}), 400
     if len(prompt) > 8000:
         return jsonify({"ok": False, "error": "prompt too long (max 8000)"}), 400
+
+    _p_low = prompt.lower()
+    if any(k in _p_low for k in ("my location", "where am i", "how far", "distance", "drive time", "travel time", "mabula", "bela-bela", "bela bela")):
+        _origin = _acesi_get_origin(data)
+        _dest = _acesi_extract_destination(prompt)
+        if not _dest and ("mabula" in _p_low or "bela-bela" in _p_low or "bela bela" in _p_low):
+            _dest = "Mabula Game Lodge, Bela-Bela, Limpopo, South Africa"
+        _ctx_lines = [
+            f"[Location Tool Result] Current Location: {_origin['label']} ({_origin['lat']:.4f}, {_origin['lon']:.4f}) [source={_origin['source']}]"
+        ]
+        if _dest:
+            _res = _acesi_resolve_distance(_origin, _dest)
+            if _res.get("ok"):
+                _ctx_lines.append(
+                    f"Destination: {_res['destination']['name']} | "
+                    f"Road Distance: {_res['road_distance_km']} km | "
+                    f"Straight-line: {_res['straight_line_km']} km | "
+                    f"Est. Driving Time: {_res['estimated_drive_time']}"
+                )
+        prompt = prompt + (chr(10) * 2) + chr(10).join(_ctx_lines)
 
     def generate():
         # Groq -> Gemini fallback. OpenRouter/SambaNova keys exist but have no

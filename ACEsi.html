@@ -9639,13 +9639,33 @@ async function sendMessage() {
         try {
 
           startLiveActivity();
-const res = await fetch("/chat", {
+let _geoPayload = {};
+          try {
+            if (navigator.geolocation) {
+              const _pos = await new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                  (p) => resolve(p),
+                  () => resolve(null),
+                  { enableHighAccuracy: false, timeout: 2500, maximumAge: 300000 }
+                );
+              });
+              if (_pos && _pos.coords) {
+                _geoPayload = {
+                  lat: _pos.coords.latitude,
+                  lon: _pos.coords.longitude,
+                  location_label: "Browser Geolocation"
+                };
+              }
+            }
+          } catch (_e) {}
+
+          const res = await fetch("/chat", {
 
             method: "POST",
 
             headers: { "Content-Type": "application/json" },
 
-            body: JSON.stringify({ message: text, model: getSelectedModel() }),
+            body: JSON.stringify(Object.assign({ message: text, model: getSelectedModel() }, _geoPayload)),
 
             signal: signal
           });
