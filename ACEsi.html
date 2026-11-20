@@ -4863,7 +4863,7 @@ perspective: 900px;
 
               class="status-ok"
 
-              title="Model status: OK"
+              title="Checking server health..."
 
             ></span>
 
@@ -7504,7 +7504,7 @@ perspective: 900px;
 
         class="status-ok"
 
-        title="Model status: OK"
+        title="Checking server health..."
 
       ></span>
 
@@ -10443,57 +10443,85 @@ let _geoPayload = {};
 
       }
 
-      /* ===== Check Model Status ===== */
+      /* ===== Server health spinners (bottom-left + bottom-right) =====
+         Green = the ACEsi server answered its lightweight health probe.
+         Red   = the server is unreachable or reported a problem. Both
+         spinners are driven by the same result so they can never disagree. */
 
-      function checkModelStatus() {
+      window.aceServerHealth = {
+        ok: null,
+        lastCheck: 0,
+        timer: null,
+        url: "http://127.0.0.1:5000/api/health"
+      };
 
-        var provider = document.getElementById("settings-provider").value;
-
-        var model = document.getElementById("settings-model").value;
-
-        var spinner = document.getElementById("model-spinner");
-
-
-
-        // Quick test: send a minimal chat request to see if the model responds
-
-        fetch("http://127.0.0.1:5000/chat", {
-
-          method: "POST",
-
-          headers: { "Content-Type": "application/json" },
-
-          body: JSON.stringify({ message: "ping", model: getSelectedModel() }),
-
-        })
-
-          .then(function (r) {
-
-            if (r.ok) {
-
-              spinner.className = "status-ok";
-
-              spinner.title = "Model status: OK (" + model + ")";
-
-            } else {
-
-              spinner.className = "status-dead";
-
-              spinner.title = "Model status: ERROR (" + r.status + ")";
-
-            }
-
-          })
-
-          .catch(function (e) {
-
-            spinner.className = "status-dead";
-
-            spinner.title = "Model status: UNREACHABLE";
-
-          });
-
+      function aceSetServerHealth(ok, detail) {
+        ["model-spinner", "mobile-model-spinner"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.className = ok ? "status-ok" : "status-dead";
+          el.title = (ok ? "Server healthy/running" : "SERVER PROBLEM - investigate")
+            + (detail ? " (" + detail + ")" : "");
+        });
+        window.aceServerHealth.ok = !!ok;
+        window.aceServerHealth.lastCheck = Date.now();
       }
+
+      function checkServerHealth() {
+        var h = window.aceServerHealth;
+        var controller = ("AbortController" in window) ? new AbortController() : null;
+        var timedOut = false;
+        var timer = setTimeout(function () {
+          timedOut = true;
+          if (controller) controller.abort();
+        }, 3000);
+
+        fetch(h.url, {
+          cache: "no-store",
+          signal: controller ? controller.signal : undefined
+        })
+          .then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (d) {
+              return { status: r.status, data: d };
+            });
+          })
+          .then(function (res) {
+            if (timedOut) return;
+            var ok = res.status === 200 && res.data && res.data.ok === true;
+            var detail = ok
+              ? ("pid " + res.data.pid + ", up " + res.data.uptime_s + "s")
+              : (((res.data && res.data.problems && res.data.problems.join(", "))
+                  || ("HTTP " + res.status)));
+            aceSetServerHealth(ok, detail);
+          })
+          .catch(function (e) {
+            if (timedOut) e = new Error("timeout");
+            aceSetServerHealth(false, e.message || "unreachable");
+          })
+          .finally(function () { clearTimeout(timer); });
+      }
+
+      function startServerHealthPolling() {
+        var h = window.aceServerHealth;
+        if (h.timer) return;
+        checkServerHealth();
+        h.timer = setInterval(checkServerHealth, 5000);
+        if (window.socket) {
+          window.socket.on("connect", function () { checkServerHealth(); });
+          window.socket.on("connect_error", function () {
+            aceSetServerHealth(false, "socket connect error");
+          });
+          window.socket.on("disconnect", function () {
+            aceSetServerHealth(false, "socket disconnected");
+          });
+        }
+      }
+
+      // Older code paths call this name; keep it working without the expensive
+      // chat "ping" that used to insert a fake message into the conversation.
+      function checkModelStatus() { checkServerHealth(); }
+
+      document.addEventListener("DOMContentLoaded", startServerHealthPolling);
 
 
 

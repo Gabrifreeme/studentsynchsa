@@ -7333,6 +7333,36 @@ def _ide_path(rel):
     return full
 
 
+# Fast liveness probe for the two green status spinners in the UI. It must not
+# require a token, call a provider, or scan files: the browser polls it every
+# few seconds, so it has to answer instantly whenever this server is healthy.
+_HEALTH_BOOT_TS = time.time()
+
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    problems = []
+    try:
+        if not _ACE_CONFIG:
+            problems.append('config not loaded')
+    except Exception as e:
+        problems.append('config: %s' % e)
+    try:
+        if get_config('model') is None and not GROQ_MODEL:
+            problems.append('no model configured')
+    except Exception as e:
+        problems.append('database: %s' % e)
+    body = {
+        'ok': not problems,
+        'server': 'acesi',
+        'pid': os.getpid(),
+        'uptime_s': round(time.time() - _HEALTH_BOOT_TS, 1),
+        'python': sys.version.split()[0],
+        'problems': problems,
+    }
+    return jsonify(body), (200 if body['ok'] else 500)
+
+
 @app.route('/api/ai/usage', methods=['GET'])
 @require_token
 def api_ai_usage():
