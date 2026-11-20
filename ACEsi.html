@@ -2213,7 +2213,8 @@
 
         #current-model-indicator,
 
-        #model-spinner {
+        #model-spinner,
+        #model-spinner-right {
 
           display: none !important;
 
@@ -2361,7 +2362,8 @@
 
       /* Model status spinner */
 
-      #model-spinner {
+      #model-spinner,
+      #model-spinner-right {
 
         display: inline-block;
 
@@ -2389,7 +2391,8 @@
 
 
 
-      #model-spinner.status-ok {
+      #model-spinner.status-ok,
+      #model-spinner-right.status-ok {
 
         border-color: #00ff00 #00ff00 #00ff00 #007a00;
 
@@ -2397,7 +2400,8 @@
 
 
 
-      #model-spinner.status-dead {
+      #model-spinner.status-dead,
+      #model-spinner-right.status-dead {
 
         border-color: #ff0000 #ff0000 #ff0000 #7a0000;
 
@@ -7499,6 +7503,7 @@ perspective: 900px;
 
           >openai/gpt-oss-120b</span
         >
+        <span id="model-spinner-right" class="status-ok" title="Checking server health..."></span>
       </span>
 
     </div>
@@ -10510,7 +10515,7 @@ let _geoPayload = {};
       };
 
       function aceSetServerHealth(ok, detail) {
-        ["model-spinner", "mobile-model-spinner"].forEach(function (id) {
+        ["model-spinner", "model-spinner-right", "mobile-model-spinner"].forEach(function (id) {
           var el = document.getElementById(id);
           if (!el) return;
           el.className = ok ? "status-ok" : "status-dead";
