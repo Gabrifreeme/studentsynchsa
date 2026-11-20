@@ -4550,7 +4550,7 @@ perspective: 900px;
   <div id="acesi-3d-notif-stage" class="acesi-3d-stage" data-single="1">
     <div id="acesi-3d-default-box" class="acesi-3d-box acesi-msg" data-notif-id="default">
       <b>ACEsi:</b>
-      <span id="ace-greeting">Chris, I'm here. Active and ready.</span><span
+      <span id="ace-greeting">Chris, I'm here. Ready and waiting.</span><span
         id="ace-session"
         style="display: block; color: #9a9a9a; font-size: 12px; margin-top: 4px;"
       ></span>
@@ -7470,8 +7470,14 @@ perspective: 900px;
 
       >
 
-      <span style="flex: 1"></span>
+      <span>|</span>
+      <span id="ace-last-change" style="position: relative; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #ff9d00;">
+        <span id="ace-last-change-short">ℹ️ —</span>
+        <button id="ace-last-change-toggle" type="button" style="background: none; border: none; color: #ff9d00; cursor: pointer; font: inherit; font-size: 11px; padding: 0; text-decoration: underline;">[Expand]</button>
+        <div id="ace-last-change-popup" style="display: none; position: absolute; left: 0; bottom: calc(100% + 8px); width: min(520px, 70vw); max-width: 520px; background: #111; border: 1px solid #ff9d00; color: #ff9d00; padding: 8px 10px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); font-size: 11px; line-height: 1.4; white-space: normal; z-index: 30000;"></div>
+      </span>
 
+      <span style="flex: 1"></span>
       <span>Model:</span>
 
       <span
@@ -7813,13 +7819,67 @@ perspective: 900px;
 
 
         function greetingText() {
+          // Keep the chat panel compact; last-change details live in the bottom status bar.
+          return FALLBACK;
+        }
 
+        function aceRelShort(phrase) {
+          var m = String(phrase || "").match(/(?:committed|saved)\s+(.+?)\s+ago/i);
+          if (!m) return "just now";
+          var t = m[1].trim();
+          if (/less than a minute/i.test(t)) return "<1m ago";
+          var n = (t.match(/(\d+)/) || [])[1] || "";
+          if (/hour/i.test(t)) return (n || "?") + "h ago";
+          if (/minute/i.test(t)) return (n || "?") + "m ago";
+          if (/day/i.test(t)) return (n || "?") + "d ago";
+          if (/second/i.test(t)) return (n || "?") + "s ago";
+          return t + " ago";
+        }
+
+        function aceLastChangeFullText(e) {
+          if (!e || !e.ok || !e.phrase) return "No recent change info available.";
+          var p = String(e.phrase);
+          if (/^commit\b/i.test(p)) p = "Commit " + p.slice(7);
+          else if (p) p = p.charAt(0).toUpperCase() + p.slice(1);
+          return p;
+        }
+
+        function aceRenderLastChangeStatus() {
+          var shortEl = document.getElementById("ace-last-change-short");
+          var pop = document.getElementById("ace-last-change-popup");
+          if (!shortEl || !pop) return;
           var e = window.__lastEdit;
+          if (!e || !e.ok || !e.phrase) {
+            shortEl.textContent = "ℹ️ —";
+            pop.textContent = "No recent change info available.";
+            shortEl.removeAttribute("title");
+            return;
+          }
+          var hash = e.commit || (e.source === "working-tree" ? "unsaved" : "—");
+          shortEl.textContent = "ℹ️ " + hash + " (" + aceRelShort(e.phrase) + ")";
+          shortEl.title = e.detail || "";
+          pop.textContent = aceLastChangeFullText(e);
+        }
 
-          if (!e || !e.ok || !e.phrase) return FALLBACK;
-
-          return "Chris, our last change was " + e.phrase + ".";
-
+        function aceBindLastChangeStatus() {
+          if (window.__aceLastChangeBound) return;
+          var toggle = document.getElementById("ace-last-change-toggle");
+          var pop = document.getElementById("ace-last-change-popup");
+          var wrap = document.getElementById("ace-last-change");
+          if (!toggle || !pop || !wrap) return;
+          window.__aceLastChangeBound = true;
+          toggle.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            var open = pop.style.display !== "block";
+            pop.style.display = open ? "block" : "none";
+            toggle.textContent = open ? "[Hide]" : "[Expand]";
+          });
+          document.addEventListener("click", function (ev) {
+            if (!wrap.contains(ev.target)) {
+              pop.style.display = "none";
+              toggle.textContent = "[Expand]";
+            }
+          });
         }
 
 
@@ -7897,6 +7957,8 @@ perspective: 900px;
               window.__lastEdit = d;
 
               renderGreeting();
+              aceBindLastChangeStatus();
+              aceRenderLastChangeStatus();
 
             })
 
@@ -7910,9 +7972,15 @@ perspective: 900px;
 
 
 
+        aceBindLastChangeStatus();
+        aceRenderLastChangeStatus();
         window.aceLoadLastEdit();
 
-        document.addEventListener("DOMContentLoaded", window.aceLoadLastEdit);
+        document.addEventListener("DOMContentLoaded", function () {
+          aceBindLastChangeStatus();
+          aceRenderLastChangeStatus();
+          window.aceLoadLastEdit();
+        });
 
       })();
 
