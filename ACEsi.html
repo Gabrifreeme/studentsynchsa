@@ -927,6 +927,66 @@
       }
 
 
+      /* Terminal Ctrl+F find popup (PowerShell-style) */
+      #term-find {
+        display: none;
+        position: absolute;
+        top: 34px;
+        right: 12px;
+        z-index: 1000;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 7px;
+        background: #111;
+        border: 1px solid #ff9d00;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.85);
+        color: #ff9d00;
+        font-family: 'Roboto Mono', monospace;
+        font-size: 11px;
+      }
+      #term-find input[type="text"] {
+        width: 210px;
+        padding: 3px 5px;
+        background: #000;
+        color: #ff9d00;
+        border: 1px solid #ff9d00;
+        font-family: 'Roboto Mono', monospace;
+        font-size: 11px;
+        outline: none;
+      }
+      #term-find label {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #term-find button {
+        min-width: 22px;
+        padding: 2px 5px;
+        background: #000;
+        color: #ff9d00;
+        border: 1px solid #ff9d00;
+        font-family: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      #term-find button:hover {
+        background: #ff9d00;
+        color: #000;
+      }
+      #term-history mark.ace-term-hit {
+        background: #5a3b00;
+        color: #ffd479;
+        border-radius: 2px;
+      }
+      #term-history mark.ace-term-hit-current {
+        background: #ffbf00;
+        color: #000;
+        outline: 1px solid #fff2b2;
+      }
+
+
 
       ::-webkit-scrollbar {
 
@@ -7716,12 +7776,22 @@ perspective: 900px;
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #333; flex: 0 0 auto; box-sizing: border-box;">
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
       <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" title="Toggle live server logs" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
+      <span id="terminal-find-btn" onclick="window.aceTerminalFindOpen && window.aceTerminalFindOpen()" title="Find in terminal (Ctrl+F)" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">🔍 Find</span>
       <span id="terminal-min-btn" onclick="window.toggleMinimize()" title="Minimize" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">&ndash;</span>
       <span id="terminal-close-btn" onclick="window.closeAceTerminal()" title="Close" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">X Close</span>
     </div>
 
         
 
+
+    <div id="term-find" role="dialog" aria-label="Find in terminal">
+      <input id="term-find-input" type="text" placeholder="Find in terminal..." autocomplete="off" spellcheck="false">
+      <label title="Match case"><input id="term-find-case" type="checkbox"> Aa</label>
+      <button id="term-find-prev" type="button" title="Previous match (Shift+Enter)">&#8249;</button>
+      <span id="term-find-count" style="min-width:52px; text-align:center; color:#888;">0 / 0</span>
+      <button id="term-find-next" type="button" title="Next match (Enter)">&#8250;</button>
+      <button id="term-find-close" type="button" title="Close (Esc)">&#10005;</button>
+    </div>
 
     <div id="terminal-output" style="flex: 1; overflow: hidden; padding: 0; margin: 0; background: #000; display: block; width: 100%; height: 100%; position: relative;"></div>    
 
@@ -13290,15 +13360,31 @@ document.addEventListener('keydown', function(e) {
 
 
 
-    // Ctrl+F - Open the Code Editor word search
+    // Ctrl+F - terminal find when working in the terminal, editor search otherwise
 
     if (e.ctrlKey && key === 'f' && !e.shiftKey) {
+
+        var aceFocus = document.activeElement;
+        var aceTermPanel = document.getElementById('terminal-panel');
+        var aceTermVisible = aceTermPanel && window.getComputedStyle(aceTermPanel).display !== 'none';
+        var aceInTerminal = aceTermVisible && (
+          window.__aceTerminalActive ||
+          window.__aceTermFindActive ||
+          (aceFocus && aceTermPanel.contains && aceTermPanel.contains(aceFocus))
+        );
 
         e.preventDefault();
 
         e.stopPropagation();
 
-        if (typeof window.editorSearchOpen === 'function') window.editorSearchOpen();
+        if (aceInTerminal && typeof window.aceTerminalFindOpen === 'function') {
+            window.aceTerminalFindOpen();
+        } else {
+            if (typeof window.aceTerminalFindClose === 'function' && window.__aceTermFindActive) {
+                window.aceTerminalFindClose();
+            }
+            if (typeof window.editorSearchOpen === 'function') window.editorSearchOpen();
+        }
 
         return;
 
@@ -14218,7 +14304,9 @@ document.addEventListener('DOMContentLoaded', function() {
           line.style.wordBreak = 'break-word';
           if (color) line.style.color = color;
           line.textContent = text;
+          line.setAttribute('data-ace-text', text);
           termHistory.appendChild(line);
+          if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
           // Live logs also stream into this element; keep the DOM bounded so a
           // long session plus a big dir listing cannot stall the terminal.
           while (termHistory.children.length > 1000) {
@@ -14227,6 +14315,152 @@ document.addEventListener('DOMContentLoaded', function() {
           termHistory.scrollTop = termHistory.scrollHeight;
           termHistory.scrollLeft = 0;
         }
+
+        // ---- Terminal Find (Ctrl+F) -------------------------------------
+        // PowerShell-style pop-up that searches the terminal history and
+        // highlights every hit. It never hijacks the editor's Ctrl+F.
+        var termFind = document.getElementById('term-find');
+        var termFindInput = document.getElementById('term-find-input');
+        var termFindCase = document.getElementById('term-find-case');
+        var termFindCount = document.getElementById('term-find-count');
+        var findMarks = [];
+        var findIndex = 0;
+
+        function termFindNeedle() {
+          return termFindInput ? (termFindInput.value || '') : '';
+        }
+
+        function clearFindHighlights() {
+          if (!termHistory) return;
+          Array.prototype.forEach.call(termHistory.children, function (line) {
+            var raw = line.getAttribute('data-ace-text');
+            if (raw !== null) line.textContent = raw;
+          });
+          findMarks = [];
+          findIndex = 0;
+        }
+
+        function highlightFindLine(line) {
+          var needle = termFindNeedle();
+          if (!needle || !line) return 0;
+          var raw = line.getAttribute('data-ace-text');
+          if (raw === null) {
+            raw = line.textContent;
+            line.setAttribute('data-ace-text', raw);
+          }
+          var matchCase = !!(termFindCase && termFindCase.checked);
+          var hay = matchCase ? raw : raw.toLowerCase();
+          var find = matchCase ? needle : needle.toLowerCase();
+          var pos = 0;
+          var at;
+          var added = 0;
+          line.textContent = '';
+          while ((at = hay.indexOf(find, pos)) !== -1) {
+            if (at > pos) line.appendChild(document.createTextNode(raw.slice(pos, at)));
+            var mark = document.createElement('mark');
+            mark.className = 'ace-term-hit';
+            mark.textContent = raw.slice(at, at + find.length);
+            line.appendChild(mark);
+            findMarks.push(mark);
+            added++;
+            pos = at + find.length;
+          }
+          if (pos < raw.length) line.appendChild(document.createTextNode(raw.slice(pos)));
+          if (!added) line.textContent = raw;
+          return added;
+        }
+
+        function updateFindCount() {
+          if (!termFindCount) return;
+          termFindCount.textContent = (findMarks.length ? findIndex + 1 : 0) + ' / ' + findMarks.length;
+        }
+
+        function scrollFindMarkIntoView(mark) {
+          if (!mark || !termHistory) return;
+          var markRect = mark.getBoundingClientRect();
+          var boxRect = termHistory.getBoundingClientRect();
+          var target = termHistory.scrollTop + (markRect.top - boxRect.top) - (termHistory.clientHeight / 2) + (markRect.height / 2);
+          termHistory.scrollTop = Math.max(0, target);
+        }
+
+        function stepFind(dir) {
+          if (!findMarks.length) return;
+          if (findMarks[findIndex]) findMarks[findIndex].classList.remove('ace-term-hit-current');
+          findIndex = (findIndex + dir + findMarks.length) % findMarks.length;
+          var mark = findMarks[findIndex];
+          mark.classList.add('ace-term-hit-current');
+          scrollFindMarkIntoView(mark);
+          updateFindCount();
+        }
+
+        function refreshFind() {
+          clearFindHighlights();
+          var needle = termFindNeedle();
+          if (needle && termHistory) {
+            Array.prototype.forEach.call(termHistory.children, highlightFindLine);
+          }
+          findIndex = 0;
+          if (findMarks.length) {
+            findMarks[0].classList.add('ace-term-hit-current');
+            scrollFindMarkIntoView(findMarks[0]);
+          }
+          updateFindCount();
+        }
+
+        window.aceTerminalFindAddLine = function (line) {
+          if (!window.__aceTermFindActive || !termFindNeedle()) return;
+          highlightFindLine(line);
+          updateFindCount();
+        };
+
+        window.aceTerminalFindOpen = function () {
+          if (!termFind || !termFindInput) return;
+          if (typeof window.editorSearchClose === 'function') window.editorSearchClose();
+          termFind.style.setProperty('display', 'flex', 'important');
+          window.__aceTermFindActive = true;
+          termFindInput.focus();
+          termFindInput.select();
+          refreshFind();
+        };
+
+        window.aceTerminalFindClose = function () {
+          if (!termFind) return;
+          termFind.style.setProperty('display', 'none', 'important');
+          window.__aceTermFindActive = false;
+          clearFindHighlights();
+          updateFindCount();
+          if (termInput) termInput.focus();
+        };
+
+        if (termFindInput) {
+          termFindInput.addEventListener('input', refreshFind);
+          termFindInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              stepFind(e.shiftKey ? -1 : 1);
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              window.aceTerminalFindClose();
+            }
+          });
+        }
+        if (termFindCase) termFindCase.addEventListener('change', refreshFind);
+        var findPrev = document.getElementById('term-find-prev');
+        var findNext = document.getElementById('term-find-next');
+        var findClose = document.getElementById('term-find-close');
+        if (findPrev) findPrev.onclick = function () { stepFind(-1); };
+        if (findNext) findNext.onclick = function () { stepFind(1); };
+        if (findClose) findClose.onclick = function () { window.aceTerminalFindClose(); };
+
+        // Track whether the user is working in the terminal so Ctrl+F can pick
+        // the right search box even when focus is on a non-focusable output line.
+        var termPanel = document.getElementById('terminal-panel');
+        if (termPanel) {
+          termPanel.addEventListener('mousedown', function () { window.__aceTerminalActive = true; });
+        }
+        document.addEventListener('mousedown', function (e) {
+          if (termPanel && e.target && !termPanel.contains(e.target)) window.__aceTerminalActive = false;
+        }, true);
 
         termInput.addEventListener("keydown", function(e) {
             if (e.key === "Enter") {
@@ -14470,7 +14704,9 @@ document.addEventListener('DOMContentLoaded', function() {
     line.style.wordBreak = 'break-word';
     line.style.color = color || '#8fd3ff';
     line.textContent = text;
+    line.setAttribute('data-ace-text', text);
     history.appendChild(line);
+    if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
     // Same bound as the command-output helper: live logs must not grow the
     // terminal DOM without limit.
     while (history.children.length > 1000) {
