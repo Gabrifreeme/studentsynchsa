@@ -1809,6 +1809,16 @@
 
         text-align: center;
 
+        padding: 4px 8px;
+
+      }
+
+      #code-panel .panel-header > div .btn {
+
+        white-space: nowrap;
+
+        flex: 0 0 auto;
+
       }
 
 
@@ -1821,7 +1831,7 @@
 
         margin-left: 0 !important;
 
-        margin-top: 6px;
+        margin-top: 2px;
 
         justify-content: center !important;
 
@@ -4903,9 +4913,9 @@ perspective: 900px;
 
               align-items: center;
 
-              gap: 8px;
+              gap: 6px;
 
-              flex-wrap: wrap;
+              flex-wrap: nowrap;
 
               justify-content: flex-end;
 
@@ -4930,17 +4940,17 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
             >
 
-              💾 Save
+              💾
 
             </button>
 
@@ -4958,11 +4968,11 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
@@ -4970,7 +4980,7 @@ perspective: 900px;
 
             >
 
-              🔧 Auto Fix
+              🔧
 
             </button>
 
@@ -4988,11 +4998,11 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
@@ -5000,7 +5010,7 @@ perspective: 900px;
 
             >
 
-              ✨ Format
+              ✨
 
             </button>
 
@@ -5020,17 +5030,17 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
             >
 
-              🧹 Clear
+              🧹
 
             </button>
 
@@ -5050,17 +5060,17 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
             >
 
-              📋 Copy
+              📋
 
             </button>
 
@@ -5080,17 +5090,17 @@ perspective: 900px;
 
                 border: 1px solid #ff9d00;
 
-                padding: 4px 8px;
+                padding: 3px 7px;
 
-                font-size: 11px;
+                font-size: 13px;
 
-                margin-bottom: 2px;
+                margin-bottom: 0px;
 
               "
 
             >
 
-              📄 Paste
+              📄
 
             </button>
 
@@ -5106,16 +5116,16 @@ perspective: 900px;
                 background: #000;
                 color: #ff9d00;
                 border: 1px solid #ff9d00;
-                padding: 4px 8px;
-                font-size: 11px;
-                margin-bottom: 2px;
+                padding: 3px 7px;
+                font-size: 13px;
+                margin-bottom: 0px;
               "
 
               onclick="window.toggleDevToolPlus && window.toggleDevToolPlus()"
 
             >
 
-              🧰 DevTool+
+              🧰
 
             </button>
 
@@ -12718,11 +12728,11 @@ window.loadFile = function(filename) {
 
 #explorer-panel {
 
-  flex: 0 0 20%;
+  flex: 0 0 248px;
 
-  min-width: 150px;
+  min-width: 200px;
 
-  max-width: 40%;
+  max-width: 320px;
 
 }
 
@@ -12818,7 +12828,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     editorContainer.style.flex = '1';
 
-    explorer.style.flex = '0 0 20%';
+    explorer.style.flex = '0 0 248px';
 
 
 
