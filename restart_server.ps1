@@ -16,6 +16,7 @@
 .EXAMPLE
   .\restart_server.ps1
   .\restart_server.ps1 -Tail        # leave a live Get-Content -Wait open
+  .\restart_server.ps1 -Visible     # show the server console so closing it stops the server
 #>
 [CmdletBinding()]
 param(
@@ -23,7 +24,8 @@ param(
   [string]$Python = "",
   [string]$Root,
   [switch]$Tail,
-  [switch]$NoRotate
+  [switch]$NoRotate,
+  [switch]$Visible
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,7 +111,8 @@ if (-not $NoRotate) {
   }
 }
 
-Write-Host "==> starting: $Python server.py"
+$winStyle = if ($Visible) { 'Normal' } else { 'Hidden' }
+Write-Host "==> starting: $Python server.py  (window: $winStyle)"
 Write-Host "    stdout -> $out"
 Write-Host "    stderr -> $err  (Werkzeug access log; app errors appear here too)"
 # Belt and braces: server.py also forces UTF-8 on its own streams, but set it
@@ -121,7 +124,7 @@ Start-Process -FilePath $Python -ArgumentList 'server.py' `
   -WorkingDirectory $Root `
   -RedirectStandardOutput $out `
   -RedirectStandardError $err `
-  -WindowStyle Hidden | Out-Null
+  -WindowStyle $winStyle | Out-Null
 
 # Only accept a NEW process. A listener that survived Stop-Listener (because it
 # runs elevated and this shell cannot stop it) must not be reported as "UP":
