@@ -8087,6 +8087,58 @@ def api_user_file_raw():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 
+
+def _resolve_server_file_path(filename):
+    """Resolve a /serve or /download URL segment to an absolute file path.
+
+    Accepts project-relative paths ("lib/presentation/providers/sync_provider.dart")
+    and absolute paths ("D:/Users/Gabriel/Pictures/photo.png"). Returns the
+    absolute file path, or None when it does not resolve to an existing file."""
+    if not filename:
+        return None
+    p = filename.replace("/", os.sep)
+    if os.path.isabs(p):
+        return p if os.path.isfile(p) else None
+    # Absolute-looking drive paths captured from the URL ("D:/Users/...").
+    if re.match(r"^[A-Za-z]:[/\\]", p) and os.path.isfile(p):
+        return p
+    full = os.path.join(PROJECT_ROOT, p)
+    if os.path.isfile(full):
+        return full
+    return None
+
+
+@app.route('/serve/<path:filename>')
+@require_token
+def serve_file_from_disk(filename):
+    """Serve a file from disk as a real, stable HTTP URL (no blob: pointers).
+
+    The Code Editor used to hand out blob: URLs from URL.createObjectURL(); those
+    die on refresh/reopen. This route lets the editor preview load images/PDFs
+    from a normal http://127.0.0.1:5000/serve/... URL."""
+    full = _resolve_server_file_path(filename)
+    if not full:
+        return jsonify({"ok": False, "error": "file not found"}), 404
+    base = os.path.dirname(os.path.abspath(full))
+    return send_from_directory(base, os.path.basename(full), as_attachment=False)
+
+
+@app.route('/download/<path:filename>')
+@require_token
+def download_file_from_disk(filename):
+    """Real, server-side download URL (as_attachment=True).
+
+    Browsers get a standard <a href="/download/..."> link, not a temporary
+    blob: pointer, so the URL stays valid after refreshes."""
+    full = _resolve_server_file_path(filename)
+    if not full:
+        return jsonify({"ok": False, "error": "file not found"}), 404
+    base = os.path.dirname(os.path.abspath(full))
+    return send_from_directory(
+        base, os.path.basename(full),
+        as_attachment=True, download_name=os.path.basename(full))
+
+
 def _ps_quote(value):
     """Quote a path for PowerShell -Command using single quotes."""
     return "'" + str(value).replace("'", "''") + "'"

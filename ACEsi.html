@@ -14585,10 +14585,11 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('/api/user-file-raw?path=' + encodeURIComponent(data.path))
           .then(function(r) {
             if (!r.ok) throw new Error('Could not load ' + label);
-            return r.blob();
+            return r;
           })
-          .then(function(blob) {
-            var url = URL.createObjectURL(blob);
+          .then(function() {
+            // Real, server-side URL - no blob: pointer that dies on refresh.
+            var url = '/serve/' + encodeURIComponent(data.path);
             window.loadImageInEditor(data.path, label, url, data.kind);
             finish('Opened ' + (data.kind === 'pdf' ? 'PDF' : 'image') + ' in Code Editor: ' + label);
           })
