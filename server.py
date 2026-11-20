@@ -19,6 +19,7 @@ import shutil
 import time
 import tempfile
 import threading
+import queue
 import sys
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus
@@ -193,7 +194,10 @@ GEMINI_FALLBACK_MODELS = ("gemini-3.5-flash-lite",)
 # and image requests give each Gemini attempt only 10s so the fast fallback
 # still gets a turn before the deadline.
 CHAT_SOFT_DEADLINE_S = 20.0
-IMAGE_CALL_TIMEOUT = (5, 10)
+# Image requests race Flash and Lite in parallel and take the first answer.
+# Either one can hang for 15s+, so a sequential chain spends the whole 20s
+# budget before the healthy model gets a turn.
+IMAGE_CALL_TIMEOUT = (5, 17)
 
 # FreeLLMAPI (Railway)
 FREELLM_ENDPOINT = "https://freellmapi-production-1394.up.railway.app/v1"
@@ -5287,10 +5291,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     names = list(_explorer_names)
     last_text = None
     last_screen = None
+    # Computed once up front: an attached photo is an image question, never a
+    # device-navigation task (even when the file is called "Screenshot.png").
+    _image_request = _has_image_content(llm_messages)
     dead_rounds = 0
     last_batch_sig = None
     repeat_count = 0
     _already_reasked = False
+    _img_raced = False
     _call_counts = {}
     _call_arg_sigs = {}
     # Form-submission guard: set once a password field has been filled, cleared
@@ -5322,7 +5330,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # for the app, open it now and feed the resulting screen state back so the
     # model's first ui_dump reads the real app screen.
     opened_app = False
-    if _ui_task(user_message) and not _ui_situational_ask(user_message) and (
+    if not _image_request and _ui_task(user_message) and not _ui_situational_ask(user_message) and (
             re.search(r'\bui_app_open\b', user_message, re.IGNORECASE)):
         try:
             _aok, _atxt = _call_tool("ui_app_open", {})
@@ -5406,11 +5414,64 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         _want = (_wanted[0], _wanted[3])
                         providers.sort(key=lambda p: 0 if (p[0], p[3]) == _want else 1)
                 if _image_request:
-                    # For a photo + one-line question, latency is the whole
-                    # experience. Try the fast Lite model first and keep the
-                    # bigger Flash model as the fallback.
-                    providers.sort(key=lambda p: 0 if p[3] in GEMINI_FALLBACK_MODELS else 1)
+                    # Flash answers images accurately; Lite is only the fallback
+                    # if Flash misses the request deadline. Lite-first produced
+                    # "I couldn't find that" for a simple photo question.
+                    providers.sort(key=lambda p: 0 if p[3] == GEMINI_MODEL else 1)
                     print("[image-route] order: %s" % [p[3] for p in providers])
+
+                if _image_request and not _img_raced:
+                    # Race both Gemini models at once. A stuck Flash call used to
+                    # consume the entire 20s budget before Lite was even tried,
+                    # and sometimes both were slow when called one after another.
+                    _img_raced = True
+                    _img_q = queue.Queue()
+                    _deadline = (getattr(g, "chat_deadline", None)
+                                 if has_request_context() else None)
+                    if _deadline is None:
+                        _deadline = time.monotonic() + CHAT_SOFT_DEADLINE_S
+
+                    def _img_worker(provider):
+                        try:
+                            _left = max(1.0, _deadline - time.monotonic() - 0.5)
+                            _to = (IMAGE_CALL_TIMEOUT[0],
+                                   min(IMAGE_CALL_TIMEOUT[1], _left))
+                            _res = _chat_one(provider[0], provider[1], provider[2],
+                                             provider[3], llm_messages,
+                                             tools_schema=[], tool_choice="none",
+                                             timeout=_to)
+                            if _res is not None:
+                                _img_q.put(("ok", provider, _res))
+                            else:
+                                _img_q.put(("fail", provider, "no response in time"))
+                        except Exception as _exc:
+                            _img_q.put(("fail", provider, str(_exc)[:160]))
+
+                    _img_threads = [
+                        threading.Thread(target=_img_worker, args=(p,), daemon=True)
+                        for p in providers
+                    ]
+                    for _t in _img_threads:
+                        _t.start()
+                    _winner = None
+                    while time.monotonic() < _deadline - 0.3:
+                        try:
+                            _kind, _p, _payload = _img_q.get(timeout=0.25)
+                        except queue.Empty:
+                            continue
+                        if _kind == "ok":
+                            _winner = _p
+                            got = _payload
+                            print("[image-race] answered by %s/%s"
+                                  % (_p[0], _p[3]), flush=True)
+                            break
+                        _prov_record(_p[0], _p[3], "timeout", str(_payload))
+                    if _winner is not None:
+                        active = _winner
+                    # The race already used the whole request budget. Do not run
+                    # the sequential chain afterwards or the reply blows past 20s.
+                    providers = []
+
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
@@ -6117,7 +6178,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
             _advance_indicator()
     # Rounds exhausted (or all providers returned None). If we actually did real
     # work, report it honestly instead of the misleading "no models available".
-    if not names and _ui_task(user_message) and not (last_text and "FINAL" in last_text.upper()):
+    if not names and not _image_request and _ui_task(user_message) and not (last_text and "FINAL" in last_text.upper()):
         # The model stalled without a single tool call (narrated a plan). For a
         # screen-read/nav ask, fall back to an automatic ui_dump so Chris still
         # gets REAL on-device state instead of the monologue.
@@ -7020,9 +7081,22 @@ def chat():
                         _m = _mime if str(_mime).startswith("image/") else "image/png"
                         _img_blocks.append({"type": "image_url", "image_url": {"url": f"data:{_m};base64,{_clean_b64}"}})
         if _img_blocks:
-            _user_content = [{"type": "text", "text": prompt_user_message}] + _img_blocks
+            g.chat_has_image = True
+            # An attachment-only message has no question for the model to anchor
+            # on. Give it a short, explicit job so the fast fallback does not
+            # answer with a fragment like "Still Miles falling."
+            _img_text = prompt_user_message
+            if not re.search(r"[A-Za-z0-9]", re.sub(r"\[Attached:[^\]]*\]", "",
+                                                    prompt_user_message or "")):
+                _img_text = (
+                    "Look at the attached image and identify what is in it. "
+                    "Answer in one or two short sentences. If it shows a character, "
+                    "name the character and the film or show."
+                )
+            _user_content = [{"type": "text", "text": _img_text}] + _img_blocks
             llm_messages.append({"role": "user", "content": _user_content})
         else:
+            g.chat_has_image = False
             llm_messages.append({"role": "user", "content": prompt_user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
@@ -14324,8 +14398,20 @@ def _explicit_device_diag_requested(user_message):
         "screencap", "emulator", "device ui", "connect to the device"
     ))
 
+def _request_has_image():
+    """True when the current /chat request carries an image attachment.
+
+    The old check read a non-existent global `llm_messages`, so a filename like
+    'Screenshot 2026-11-19.png' was treated as a device-navigation request.
+    """
+    if not has_request_context():
+        return False
+    return bool(getattr(g, "chat_has_image", False))
+
+
 def _nav_task(user_message):
-    if _has_image_content(globals().get("llm_messages")) and not _explicit_device_diag_requested(user_message):
+    if (_request_has_image() or _has_image_content(globals().get("llm_messages"))) \
+            and not _explicit_device_diag_requested(user_message):
         return False
     m = (user_message or "").lower()
     return any(k in m for k in (
@@ -14369,6 +14455,10 @@ def _ui_task(user_message):
     the user expects real device actions on. Distinct from _nav_task (narrower
     keyword list used for time-budget sizing)."""
     m = (user_message or "").lower()
+    # A photo attachment is not a request to inspect the phone screen, even if
+    # the uploaded file happens to be named "Screenshot ...png".
+    if _request_has_image() and not _explicit_device_diag_requested(user_message):
+        return False
     # Code-file fixes are never UI work, even when they say "open" or "find".
     if _looks_like_code_file_request(user_message):
         return False

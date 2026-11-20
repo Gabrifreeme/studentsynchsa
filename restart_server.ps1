@@ -20,7 +20,7 @@
 [CmdletBinding()]
 param(
   [int]$Port = 5000,
-  [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python314\python.exe",
+  [string]$Python = "",
   [string]$Root,
   [switch]$Tail,
   [switch]$NoRotate
@@ -34,6 +34,24 @@ if (-not $Root) {
   $Root = if ($self) { Split-Path -Parent $self } else { (Get-Location).Path }
 }
 Set-Location $Root
+
+# Resolve Python at run time. The old hard-coded Python314 path does not exist
+# on this PC, so a restart killed the server and then silently failed to start
+# it again (empty log files, no listener).
+if (-not $Python -or -not (Test-Path -LiteralPath $Python)) {
+  $cmd = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+  $candidates = @(
+    if ($cmd) { $cmd.Source },
+    "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+    "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+    "$env:LOCALAPPDATA\Programs\Python\Python314\python.exe",
+    "C:\Python312\python.exe",
+    "C:\Python313\python.exe"
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+  if (-not $candidates) { throw "No python.exe found; pass -Python <path>." }
+  $Python = $candidates[0]
+}
+
 $out = Join-Path $Root 'server_stdout.txt'
 $err = Join-Path $Root 'server_stderr.txt'
 
