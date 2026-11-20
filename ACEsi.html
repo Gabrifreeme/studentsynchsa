@@ -242,11 +242,11 @@
 
         border-radius: 6px;
 
-        border: 1px solid #ff9d00;
+        border: none;
 
         color: #ff9d00;
 
-        background: #1a1a1a;
+        background: #1E1E1E;
 
         word-wrap: break-word;
 
@@ -2499,9 +2499,9 @@
    rules above (1,0,0 / 1,1,0), so this survives a hard reload. */
 #chat-messages > .acesi-msg,
 #chat-messages > div.acesi-msg {
-  border: 4px double #ff9d00 !important;
+  border: none !important;
   border-radius: 6px !important;
-  background: #1a1a1a !important;
+  background: #1E1E1E !important;
   padding: 8px 12px !important;
   margin: 8px 0 !important;
   box-shadow: 0 0 10px rgba(255, 157, 0, 0.25) !important;
@@ -4703,9 +4703,9 @@ perspective: 900px;
 
             onmousedown="console.log('Send clicked')"
 
-            onmouseover="this.style.backgroundColor='rgba(255, 157, 0, 0.12)'"
+            onmouseover="this.style.backgroundColor='#ff9d00'; this.style.color='#000';"
 
-            onmouseout="this.style.backgroundColor='transparent'"
+            onmouseout="this.style.backgroundColor='transparent'; this.style.color='#ff9d00';"
 
           >
 
@@ -9861,7 +9861,7 @@ let _geoPayload = {};
             const command = execMatch[1].trim();
 
             window.aceChatInsertReply(
-              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply.split("[EXEC:")[0].trim() +
 
@@ -9954,7 +9954,7 @@ let _geoPayload = {};
             const followData = await followRes.json();
 
             window.aceChatInsertReply(
-              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               followData.reply +
 
@@ -9964,7 +9964,7 @@ let _geoPayload = {};
           } else {
 
             window.aceChatInsertReply(
-              '<div class="acesi-msg" style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ff9d00;margin-bottom:8px;"><b>ACEsi:</b> ' +
+              '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
               aiReply +
 
