@@ -5646,28 +5646,39 @@ perspective: 900px;
       };
 
       window.aceSwitchToBuildFromWarning = function (btn) {
+        if (!btn || btn.disabled) return;
         var prompt = window.__acePlanBlockedPrompt || "";
         window.__acePlanBlockedPrompt = "";
-        aceSetMode("build");
-        // Hide the warning bubble: it was only needed until the user clicked.
-        var _wb = btn ? btn.closest(".ace-mode-warning") : document.querySelector("#chat-messages > .ace-mode-warning");
-        if (_wb) _wb.style.display = "none";
+        // 1) Visually disable the button immediately (double-click guard).
         if (btn) {
           btn.textContent = "\u2713 Switched to Build";
           btn.disabled = true;
           btn.style.opacity = "0.75";
           btn.style.cursor = "default";
         }
+        // 2) Header toggle changes to Build.
+        aceSetMode("build");
+        // 3) Hide the warning bubble: it was only needed until the user clicked.
+        var _wb = btn.closest(".ace-mode-warning") || document.querySelector("#chat-messages > .ace-mode-warning");
+        if (_wb) _wb.style.display = "none";
+        // 4) Confirmation message.
         window.aceChatInsertReply(
           '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Proceeding with your request...</div>'
         );
-        // Immediately execute the original action without the user retyping it.
+        // 5) Immediately execute the original action without the user retyping it.
         if (prompt) {
           var input = document.getElementById("chat-input");
           if (input) {
             input.value = prompt;
             if (typeof aceAutoResizeChatInput === "function") aceAutoResizeChatInput();
           }
+          // If a request is somehow still in flight, stop it so we start clean.
+          try {
+            if (window.currentAbortController) {
+              window.currentAbortController.abort();
+              window.currentAbortController = null;
+            }
+          } catch (e) {}
           try {
             if (typeof sendMessage === "function") sendMessage();
           } catch (e) {}
