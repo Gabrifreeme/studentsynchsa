@@ -184,8 +184,8 @@ HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen3-32B")
 # Google Gemini - OpenAI-compatible endpoint. The free quota is per model, so
 # flash-lite keeps working when flash has spent its own daily allowance.
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai"
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_FALLBACK_MODELS = ("gemini-2.5-flash-lite",)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_FALLBACK_MODELS = ("gemini-3.5-flash-lite",)
 
 # FreeLLMAPI (Railway)
 FREELLM_ENDPOINT = "https://freellmapi-production-1394.up.railway.app/v1"
@@ -2025,7 +2025,7 @@ def _ntfy_inbox_reply(text):
         r = requests.post(
             f"http://127.0.0.1:{SERVER_PORT}/chat",
             json={"message": text},
-            timeout=(15, 300),
+            timeout=(10, 45),
         )
         if r.status_code != 200:
             return None
@@ -5336,9 +5336,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # bigger budget and more rounds than a quick screenshot task.
     if _test_task(user_message):
         max_rounds = max(max_rounds, 40)
-        time_budget = 600
+        time_budget = 180
     else:
-        time_budget = 300 if _nav_task(user_message) else 240
+        time_budget = 90 if _nav_task(user_message) else 60
     # Bug-report mode: cap rounds so the model cannot burn the Groq TPM budget
     # on repeated identical calls. 4 rounds = connect, inspect, read network,
     # summarize. If it needs more, the tail summary runs instead of a 429.
@@ -5365,6 +5365,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 got = None
                 tc = "required" if ((_ui_task(user_message) or _code_file_intent) and not names) else "auto"
                 providers = _chat_providers(active_domain)
+                _image_request = _has_image_content(llm_messages)
+                if _image_request:
+                    providers = [p for p in providers if p[0] == "Gemini"]
+                    print("[image-route] image request: Gemini only, tools disabled")
                 # Honour the model picked in Settings: rotate that provider/model
                 # to the front, but keep the rest of the chain as fallback. This
                 # is what makes selecting Gemini actually reach Gemini first.
@@ -5435,6 +5439,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         tc2 = tc
                         if p[0] in ("OpenRouter", "Groq", "Gemini") and net_domain_schema:
                             schema = net_domain_schema
+                    if _image_request:
+                        msgs = llm_messages
+                        schema = []
+                        tc2 = "none"
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2)
                     if _no_cdp:
@@ -5455,7 +5463,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         break
                 # OpenRouter fallback removed: that key has no credits. Both
                 # Groq and Gemini model variants are already in the chain above.
-                if got is None and OLLAMA_ENABLED:
+                if got is None and OLLAMA_ENABLED and not _image_request:
                     # Ollama warm-up probe first: cheap tiny call that forces the
                     # model to LOAD (with keep_alive persisted in Ollama) so the
                     # heavy first round reuses the loaded model instead of eating
@@ -5465,14 +5473,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
                                   OLLAMA_CHAT_MODEL,
                                   [{"role": "user", "content": "ok"}],
-                                  timeout=(15, 300),
+                                  timeout=(10, 45),
                                   tools_schema=OLLAMA_TOOLS_SCHEMA)
                     except Exception:
                         pass
                     got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
                                     OLLAMA_CHAT_MODEL, _ollama_local_messages(
                                         llm_messages, system=_fix_sys),
-                                    timeout=(15, 300),
+                                    timeout=(10, 45),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                     if got is not None:
                         active = ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
@@ -5488,7 +5496,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     _ollama_local_messages(
                                         llm_messages, system=_fix_sys),
-                                    timeout=(15, 300),
+                                    timeout=(10, 45),
                                     tools_schema=ollama_domain_schema, tool_choice=tc)
                 else:
                     fwd_schema = full_domain_schema
@@ -5516,6 +5524,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                             extra_protected=_fix_tools)
                     else:
                         fwd_msgs = llm_messages
+                    if _image_request:
+                        fwd_msgs = llm_messages
+                        fwd_schema = []
+                        tc = "none"
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
                                     tool_choice=tc)
@@ -6950,7 +6962,30 @@ def chat():
             ctx_str += "]"
             prompt_user_message += ctx_str
 
-        llm_messages.append({"role": "user", "content": prompt_user_message})
+        _raw_atts = []
+        if "data" in locals() and isinstance(data, dict):
+            for _k in ("attachments", "images", "files"):
+                _v = data.get(_k)
+                if isinstance(_v, list):
+                    _raw_atts.extend(_v)
+        _img_blocks = []
+        for _att in _raw_atts:
+            if isinstance(att := _att, dict):
+                _mime = (att.get("mime") or att.get("type") or att.get("mimeType") or "image/png")
+                _b64 = att.get("data") or att.get("base64") or att.get("content") or ""
+                _url = att.get("url") or att.get("dataUrl") or att.get("data_url") or ""
+                if isinstance(_url, str) and _url.startswith(("data:image/", "http://", "https://")):
+                    _img_blocks.append({"type": "image_url", "image_url": {"url": _url}})
+                elif isinstance(_b64, str) and _b64.strip():
+                    _clean_b64 = _b64.split(",", 1)[-1] if _b64.startswith("data:") else _b64
+                    if str(_mime).startswith("image/") or not str(_mime).startswith("text/"):
+                        _m = _mime if str(_mime).startswith("image/") else "image/png"
+                        _img_blocks.append({"type": "image_url", "image_url": {"url": f"data:{_m};base64,{_clean_b64}"}})
+        if _img_blocks:
+            _user_content = [{"type": "text", "text": prompt_user_message}] + _img_blocks
+            llm_messages.append({"role": "user", "content": _user_content})
+        else:
+            llm_messages.append({"role": "user", "content": prompt_user_message})
 
         # Agent-style dispatch (see _chat_dispatch): ACEsi executes emitted tool
         # calls (ui_*, git_*, flutter_*, ...) and feeds results back — it never
@@ -9606,6 +9641,9 @@ def tool_ui_connect(target=None, wait=10):
                         if host.count(":") == 1 and not host.endswith(":"):
                             candidates.append(host)
         env = (os.environ.get("ACE_ADB_TARGETS") or "").replace(";", ",")
+    if not shutil.which("adb") and not env.strip():
+        return False, ("NOT CONNECTED - adb is not in PATH and ACE_ADB_TARGETS is unset.\n"
+                       "diagnosis: Install Android platform-tools or set ACE_ADB_TARGETS.")
         for part in env.split(","):
             part = part.strip()
             if part and ":" in part:
@@ -14240,7 +14278,17 @@ def _auto_bypass_cert_warning(dump_text):
     return msgs
 
 
+
+def _explicit_device_diag_requested(user_message):
+    m = (user_message or "").lower()
+    return any(k in m for k in (
+        "adb", "cdp", "devtools", "webview", "uiautomator",
+        "screencap", "emulator", "device ui", "connect to the device"
+    ))
+
 def _nav_task(user_message):
+    if _has_image_content(globals().get("llm_messages")) and not _explicit_device_diag_requested(user_message):
+        return False
     m = (user_message or "").lower()
     return any(k in m for k in (
         "screenshot", "portal", "navigate", "navigation", "open the app",
@@ -14308,6 +14356,8 @@ def _ui_task(user_message):
 
 
 def _test_task(user_message):
+    if _has_image_content(globals().get("llm_messages")) and not _explicit_device_diag_requested(user_message):
+        return False
     """True when the request is a UI validation/test run (assertions, ui_expect,
     ui_test_run, 'validate', 'test the', 'check the ui', 'verify'). These need
     more rounds/time than a quick navigation+screenshot."""
@@ -18620,7 +18670,9 @@ def api_terminal():
     if not cmd:
         return jsonify({'ok': False, 'error': 'No command provided'}), 400
     try:
-        result = subprocess.run(cmd, shell=True, cwd=_IDE_ROOT, capture_output=True, text=True, timeout=60)
+        if isinstance(cmd, str) and cmd.strip().lower() in ("q", "quit", "exit"):
+            return jsonify({'ok': True, 'stdout': '', 'stderr': 'Skipped interactive quit input: ' + cmd.strip()})
+        result = subprocess.run(cmd, shell=True, cwd=_IDE_ROOT, capture_output=True, text=True, timeout=20)
         return jsonify({'ok': True, 'stdout': result.stdout, 'stderr': result.stderr})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
@@ -19109,7 +19161,7 @@ def api_ai_chat():
         return jsonify({"ok": False, "error": "prompt too long (max 8000)"}), 400
 
     _p_low = prompt.lower()
-    if any(k in _p_low for k in ("my location", "where am i", "how far", "distance", "drive time", "travel time", "mabula", "bela-bela", "bela bela")):
+    if False:  # Disabled automatic location/Mabula lookup on every prompt
         _origin = _acesi_get_origin(data)
         _dest = _acesi_extract_destination(prompt)
         if not _dest and ("mabula" in _p_low or "bela-bela" in _p_low or "bela bela" in _p_low):
@@ -19128,7 +19180,88 @@ def api_ai_chat():
                 )
         prompt = prompt + (chr(10) * 2) + chr(10).join(_ctx_lines)
 
+    import re as _acesi_re
+    import time as _acesi_time
+
+def _has_image_content(messages):
+    for m in (messages or []):
+        c = m.get("content") if isinstance(m, dict) else None
+        if isinstance(c, list):
+            for blk in c:
+                if isinstance(blk, dict) and blk.get("type") in ("image_url", "input_image", "image"):
+                    return True
+    return False
+
+def _explicit_device_diag_requested(user_message):
+    m = (user_message or "").lower()
+    return any(k in m for k in (
+        "adb", "cdp", "devtools", "webview", "uiautomator",
+        "screencap", "emulator", "device ui", "connect to the device"
+    ))
+
+    _ACESI_STREAM_BUDGET = 25.0
+    class _AcesiThoughtFilter:
+        def __init__(self):
+            self.in_thought = False
+            self.buf = ""
+        def feed(self, chunk: str) -> str:
+            if not chunk:
+                return ""
+            self.buf += chunk
+            out = []
+            while self.buf:
+                low = self.buf.lower()
+                if not self.in_thought:
+                    idx = low.find("<thought")
+                    tidx = low.find("<thinking")
+                    if tidx != -1 and (idx == -1 or tidx < idx):
+                        idx = tidx
+                        close_tag = "</thinking>"
+                    else:
+                        close_tag = "</thought>"
+                    if idx == -1:
+                        keep = min(len(self.buf), 12)
+                        if keep > 0 and self.buf[-keep:].find("<") != -1:
+                            pos = self.buf.rfind("<")
+                            out.append(self.buf[:pos])
+                            self.buf = self.buf[pos:]
+                        else:
+                            out.append(self.buf)
+                            self.buf = ""
+                        break
+                    else:
+                        out.append(self.buf[:idx])
+                        self.buf = self.buf[idx:]
+                        gt = self.buf.find(">")
+                        if gt == -1:
+                            break
+                        self.buf = self.buf[gt + 1:]
+                        self.in_thought = True
+                        self._close_tag = close_tag
+                else:
+                    close_tag = getattr(self, "_close_tag", "</thought>")
+                    end_idx = low.find(close_tag)
+                    if end_idx == -1:
+                        keep = len(close_tag) + 2
+                        if len(self.buf) > keep:
+                            self.buf = self.buf[-keep:]
+                        break
+                    else:
+                        self.buf = self.buf[end_idx + len(close_tag):]
+                        self.in_thought = False
+            return "".join(out)
+        def flush(self) -> str:
+            if self.in_thought:
+                self.buf = ""
+                self.in_thought = False
+                return ""
+            rem = _acesi_re.sub(r"<(thought|thinking)[^>]*>[\s\S]*$", "", self.buf, flags=_acesi_re.I)
+            self.buf = ""
+            return rem
+
     def generate():
+        _acesi_t_start = _acesi_time.monotonic()
+        _acesi_t_filter = _AcesiThoughtFilter()
         # Groq -> Gemini fallback. OpenRouter/SambaNova keys exist but have no
         # credits, so they are deliberately not in this chain.
         providers = [
@@ -19147,7 +19280,11 @@ def api_ai_chat():
                 for tok in _ai_stream_provider(endpoint, key, model, prompt, None,
                                                 system_prompt=_AI_SYSTEM_PROMPT):
                     emitted = True
-                    yield "data: " + json.dumps({"token": tok}) + "\n\n"
+                    if _acesi_time.monotonic() - _acesi_t_start > _ACESI_STREAM_BUDGET:
+                        break
+                    _clean_tok = _acesi_t_filter.feed(tok)
+                    if _clean_tok:
+                        yield "data: " + json.dumps({"token": _clean_tok}) + "\n\n"
                 if emitted:
                     yield "data: " + json.dumps({"provider": name}) + "\n\n"
                     yield "data: [DONE]\n\n"

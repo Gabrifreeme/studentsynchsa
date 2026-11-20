@@ -9631,6 +9631,34 @@ async function sendMessage() {
 
           "</div>"
         );
+        var _acesiImages = (window.__acesiAttachments || []).filter(function (f) {
+          return f && f.isImage && typeof f.dataUrl === "string";
+        });
+        if (_acesiImages.length) {
+          var _acesiUserCards = document.querySelectorAll("#chat-messages .ace-user-msg");
+          var _acesiUserCard = _acesiUserCards[_acesiUserCards.length - 1];
+          if (_acesiUserCard) {
+            var _acesiPreview = document.createElement("div");
+            _acesiPreview.className = "acesi-user-image-preview";
+            _acesiPreview.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;";
+            _acesiImages.forEach(function (f) {
+              var _link = document.createElement("a");
+              _link.href = f.dataUrl;
+              _link.target = "_blank";
+              _link.rel = "noopener noreferrer";
+              _link.title = f.name || "Open image";
+
+              var _img = document.createElement("img");
+              _img.src = f.dataUrl;
+              _img.alt = f.name || "Attached image";
+              _img.style.cssText = "display:block;max-width:240px;max-height:180px;object-fit:contain;border-radius:6px;";
+
+              _link.appendChild(_img);
+              _acesiPreview.appendChild(_link);
+            });
+            _acesiUserCard.appendChild(_acesiPreview);
+          }
+        }
 
         input.value = "";
 
@@ -9665,7 +9693,13 @@ let _geoPayload = {};
 
             headers: { "Content-Type": "application/json" },
 
-            body: JSON.stringify(Object.assign({ message: text, model: getSelectedModel() }, _geoPayload)),
+            body: JSON.stringify(Object.assign({
+                message: text,
+                model: getSelectedModel(),
+                attachments: (window.__acesiAttachments || [])
+                  .filter(function (f) { return f && f.isImage && typeof f.dataUrl === "string"; })
+                  .map(function (f) { return { name: f.name, dataUrl: f.dataUrl }; })
+              }, _geoPayload)),
 
             signal: signal
           });
@@ -10121,7 +10155,7 @@ let _geoPayload = {};
 
         // Only models behind the two verified working keys.
         var models = provider === "gemini"
-          ? ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+          ? ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
           : ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
 
         models.forEach(function (m) {
@@ -14918,6 +14952,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var ttsEnabled = false;
   var activeRec = null;
+  window.__acesiAttachments = window.__acesiAttachments || [];
 
   function toast(msg) {
     if (typeof window.showAceToast === "function") {
@@ -14933,6 +14968,39 @@ document.addEventListener('DOMContentLoaded', function() {
     );
   }
 
+  function readFilePayload(file) {
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      var isImage = /^image\//i.test(file.type || "") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name || "");
+      reader.onload = function () {
+        resolve({
+          name: file.name,
+          type: file.type || (isImage ? "image/png" : "application/octet-stream"),
+          size: file.size || 0,
+          isImage: isImage,
+          dataUrl: isImage ? reader.result : null,
+          textContent: !isImage && typeof reader.result === "string" ? reader.result.slice(0, 20000) : null
+        });
+      };
+      reader.onerror = function () {
+        resolve({
+          name: file.name,
+          type: file.type || "application/octet-stream",
+          size: file.size || 0,
+          isImage: isImage,
+          dataUrl: null,
+          textContent: null,
+          error: reader.error ? reader.error.message : "read failed"
+        });
+      };
+      if (isImage) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
+  }
+
   function getFileInput() {
     var inp = document.getElementById("chat-file");
     if (!inp) {
@@ -14945,9 +15013,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (!inp.dataset.acesiBound) {
       inp.dataset.acesiBound = "1";
-      inp.addEventListener("change", function () {
+      inp.addEventListener("change", async function () {
         if (!inp.files || !inp.files.length) return;
-        var names = Array.prototype.map.call(inp.files, function (f) { return f.name; });
+        var files = Array.prototype.slice.call(inp.files);
+        var loaded = await Promise.all(files.map(readFilePayload));
+        window.__acesiAttachments = window.__acesiAttachments.concat(loaded);
+        window.dispatchEvent(new CustomEvent("acesi:attachments-changed", {
+          detail: { attachments: window.__acesiAttachments.slice() }
+        }));
+
+        var names = loaded.map(function (f) { return f.name; });
         var box = getChatInput();
         if (box) {
           var prefix = box.value && !box.value.endsWith(" ") && !box.value.endsWith("\n") ? " " : "";
@@ -14955,10 +15030,25 @@ document.addEventListener('DOMContentLoaded', function() {
           box.focus();
           box.dispatchEvent(new Event("input", { bubbles: true }));
         }
-        toast("Attached: " + names.join(", "));
+        toast("Loaded " + loaded.length + " file(s): " + names.join(", "));
       });
     }
     return inp;
+  }
+
+  function extractLatestReplyText() {
+    var selectors = [
+      ".message", ".chat-message", ".assistant-message",
+      "[data-role='assistant']", ".msg", ".response", ".bot-message"
+    ];
+    var nodes = document.querySelectorAll(selectors.join(","));
+    for (var i = nodes.length - 1; i >= 0; i--) {
+      var raw = (nodes[i].innerText || "").trim();
+      if (!raw || /^You:/i.test(raw)) continue;
+      if (raw.indexOf("acesi-mic-btn") !== -1) continue;
+      return raw.replace(/^ACEsi:\s*/i, "").slice(0, 800);
+    }
+    return "Speaker active.";
   }
 
   function speakLatestReply() {
@@ -14966,20 +15056,36 @@ document.addEventListener('DOMContentLoaded', function() {
       toast("Speech synthesis not supported in this browser");
       return;
     }
-    var msgs = document.querySelectorAll(".message, .chat-message, .assistant-message, [data-role='assistant'], .msg");
-    var text = "";
-    for (var i = msgs.length - 1; i >= 0; i--) {
-      var raw = (msgs[i].innerText || "").trim();
-      if (raw && !/^You:/i.test(raw)) {
-        text = raw.replace(/^ACEsi:\s*/i, "").slice(0, 800);
-        break;
-      }
+    var text = extractLatestReplyText();
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+    } catch (e) {
+      console.warn("[ACEsi TTS reset]", e);
     }
-    if (!text) return;
-    window.speechSynthesis.cancel();
     var utter = new SpeechSynthesisUtterance(text);
     utter.rate = 1.0;
+    var voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+    if (voices && voices.length) {
+      var enVoice = voices.find(function (v) { return /^en/i.test(v.lang); });
+      if (enVoice) utter.voice = enVoice;
+    }
+    utter.onerror = function (e) {
+      console.warn("[ACEsi TTS error]", e.error || e);
+      toast("Speaker error: " + (e.error || "audio blocked"));
+    };
     window.speechSynthesis.speak(utter);
+  }
+
+  function applySpeakerVisual(btn, enabled) {
+    if (!btn) btn = document.getElementById("acesi-spk-btn");
+    if (!btn) return;
+    btn.dataset.tts = enabled ? "on" : "off";
+    btn.setAttribute("aria-pressed", enabled ? "true" : "false");
+    btn.style.setProperty("background", enabled ? "#ff9d00" : "#000", "important");
+    btn.style.setProperty("color", enabled ? "#000" : "#ff9d00", "important");
+    btn.style.setProperty("box-shadow", enabled ? "0 0 10px #ff9d00" : "none", "important");
+    btn.title = enabled ? "Speaker (ON - click to mute)" : "Speaker (OFF - click to speak)";
   }
 
   window.acesiToggleMic = function (btn) {
@@ -15018,7 +15124,8 @@ document.addEventListener('DOMContentLoaded', function() {
     rec.onerror = function (ev) {
       activeRec = null;
       if (btn) btn.style.boxShadow = "";
-      toast("Mic error: " + (ev.error || "unknown"));
+      console.warn("[ACEsi Mic error]", ev.error || ev);
+      toast("Mic error: " + (ev.error || "permission or network error"));
     };
     rec.onend = function () {
       activeRec = null;
@@ -15029,6 +15136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       activeRec = null;
       if (btn) btn.style.boxShadow = "";
+      console.warn("[ACEsi Mic start error]", err);
       toast("Could not start mic: " + err.message);
     }
   };
@@ -15036,12 +15144,9 @@ document.addEventListener('DOMContentLoaded', function() {
   window.acesiToggleSpeaker = function (btn) {
     ttsEnabled = !ttsEnabled;
     if (!ttsEnabled && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+      try { window.speechSynthesis.cancel(); } catch (_) {}
     }
-    if (btn) {
-      btn.style.background = ttsEnabled ? "#ff9d00" : "#000";
-      btn.style.color = ttsEnabled ? "#000" : "#ff9d00";
-    }
+    applySpeakerVisual(btn, ttsEnabled);
     toast(ttsEnabled ? "Speaker ON: reading latest reply" : "Speaker OFF");
     if (ttsEnabled) speakLatestReply();
   };
@@ -15052,9 +15157,13 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", getFileInput);
+    document.addEventListener("DOMContentLoaded", function () {
+      getFileInput();
+      applySpeakerVisual(null, false);
+    });
   } else {
     getFileInput();
+    applySpeakerVisual(null, false);
   }
 })();
 </script>
