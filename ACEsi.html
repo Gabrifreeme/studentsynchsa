@@ -4936,7 +4936,7 @@ perspective: 900px;
 
             >
 
-              Save
+              💾 Save
 
             </button>
 
@@ -4966,7 +4966,7 @@ perspective: 900px;
 
             >
 
-              Auto Fix
+              🔧 Auto Fix
 
             </button>
 
@@ -4996,7 +4996,7 @@ perspective: 900px;
 
             >
 
-              Format
+              ✨ Format
 
             </button>
 
@@ -5056,7 +5056,7 @@ perspective: 900px;
 
             >
 
-              Copy
+              📋 Copy
 
             </button>
 
@@ -5086,7 +5086,7 @@ perspective: 900px;
 
             >
 
-              Paste
+              📄 Paste
 
             </button>
 
@@ -5099,13 +5099,12 @@ perspective: 900px;
               title="Open DevTool+ (Ctrl+Alt+D) - local developer utility toolkit"
 
               style="
-                background: #ff9d00;
-                color: #000;
+                background: #000;
+                color: #ff9d00;
                 border: 1px solid #ff9d00;
                 padding: 4px 8px;
                 font-size: 11px;
                 margin-bottom: 2px;
-                font-weight: bold;
               "
 
               onclick="window.toggleDevToolPlus && window.toggleDevToolPlus()"
@@ -11516,7 +11515,11 @@ let _geoPayload = {};
 
 
 
-          var text = btn.innerText.trim();
+          // Toolbar buttons now carry leading emojis; strip them so the
+          // emergency text-based fallback still recognises Save/Clear/Copy/Paste.
+          var text = btn.innerText.trim().replace(
+            /^[\s\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]+/gu,
+            '').trim();
 
 
 
