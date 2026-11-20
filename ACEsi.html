@@ -5628,6 +5628,7 @@ perspective: 900px;
 
       // --- Plan Mode: Plan-mode action intercept warning bubble ---
       window.aceShowPlanModeWarning = function (promptText) {
+        window.__aceBlockedMsgId = window.__aceLastUserMsgId || null;
         window.__acePlanBlockedPrompt = promptText || "";
         window.aceChatInsertReply(
           '<div class="ace-mode-warning" role="alert">' +
@@ -5648,6 +5649,8 @@ perspective: 900px;
       window.aceSwitchToBuildFromWarning = function (btn) {
         if (!btn || btn.disabled) return;
         var prompt = window.__acePlanBlockedPrompt || "";
+        var reuseMsgId = window.__aceBlockedMsgId;
+        window.__aceBlockedMsgId = null;
         window.__acePlanBlockedPrompt = "";
         // 1) Visually disable the button immediately (double-click guard).
         if (btn) {
@@ -5680,7 +5683,7 @@ perspective: 900px;
             }
           } catch (e) {}
           try {
-            if (typeof sendMessage === "function") sendMessage();
+            if (typeof sendMessage === "function") sendMessage(reuseMsgId);
           } catch (e) {}
         }
       };
@@ -10003,7 +10006,7 @@ perspective: 900px;
         aceAutoResizeChatInput();
       }
 
-async function sendMessage() {
+async function sendMessage(reuseMsgId) {
         var sendBtn = document.querySelector('button[onclick="sendMessage()"]');
 
         if (currentAbortController) {
@@ -10063,13 +10066,17 @@ async function sendMessage() {
 
 
 
+        const sendMsgId = reuseMsgId || aceNewMsgId();
+        window.__aceLastUserMsgId = sendMsgId;
         window.aceChatInsertUser(
 
           '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #333;margin-bottom:8px;margin-left:20px;"><b>You:</b> ' +
 
           text +
 
-          "</div>"
+          "</div>",
+
+          sendMsgId
         );
         var _acesiImages = (window.__acesiAttachments || []).filter(function (f) {
           return f && f.isImage && typeof f.dataUrl === "string";
@@ -10166,6 +10173,14 @@ let _geoPayload = {};
           }
 
           const aiReply = data.reply;
+
+          // Hard rule: the AI must never output the mode-switch confirmation
+          // phrase as a standard chat message. If it does, show the amber
+          // warning bubble instead (execution still only happens on click).
+          if (!window.isBuildMode && /switched\s+to\s+build\s+mode\b/i.test(String(aiReply || ""))) {
+            aceShowPlanModeWarning(text);
+            return;
+          }
 
           const execMatch = aiReply.match(/\[EXEC:\s*(.+?)\]/i);
 
@@ -15535,22 +15550,41 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) { return ""; }
   }
 
+  // Message identity: unique message_id per send. Before adding a message
+  // to the chat, check if that message_id already exists; if it does, drop it.
+  window.__aceChatMsgIds = new Set();
+  window.__aceMsgIdCtr = 0;
+  window.__aceLastUserMsgId = null;
+  window.__aceBlockedMsgId = null;
+
+  window.aceNewMsgId = function () {
+    if (window.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    var c = ++window.__aceMsgIdCtr;
+    return "m" + c + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  }
+  window.aceMsgIdSeen = function (id) { return !!id && window.__aceChatMsgIds.has(id); };
+  window.aceMsgIdAdd = function (id) { if (id) window.__aceChatMsgIds.add(id); };
+
   // Chat ordering: the "You:" message stays directly above ACEsi's reply.
-  window.aceChatInsertUser = function (html) {
+  window.aceChatInsertUser = function (html, messageId) {
     var chat = document.getElementById("chat-messages");
     if (!chat) return;
+    if (aceMsgIdSeen(messageId)) return; // drop duplicate: one Send = one message
     var wrap = document.createElement("div");
     wrap.innerHTML = html;
     var node = wrap.firstElementChild;
     if (!node) return;
     node.classList.add("ace-user-msg");
+    if (messageId) { node.setAttribute("data-msg-id", messageId); aceMsgIdAdd(messageId); }
     chat.insertBefore(node, chat.firstChild);
     chat.scrollTop = chat.scrollHeight;
   };
 
-  window.aceChatInsertReply = function (html) {
+  window.aceChatInsertReply = function (html, replyId) {
     var chat = document.getElementById("chat-messages");
     if (!chat) return;
+    if (aceMsgIdSeen(replyId)) return; // drop duplicate reply
+    aceMsgIdAdd(replyId);
     var user = chat.querySelector(".ace-user-msg");
     if (user && user.parentNode) {
       user.insertAdjacentHTML("afterend", html);
