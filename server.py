@@ -1,7 +1,7 @@
 ﻿
 
 # -*- coding: utf-8 -*-
-from flask import Flask, request, jsonify, send_from_directory, Response, redirect
+from flask import Flask, request, jsonify, send_from_directory, Response, redirect, has_request_context
 from flask_socketio import SocketIO
 from winpty import PtyProcess
 from flask_cors import CORS
@@ -186,6 +186,14 @@ HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen3-32B")
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai"
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_FALLBACK_MODELS = ("gemini-3.5-flash-lite",)
+
+# Chat responses must feel immediate. One slow provider call used to burn 30s+
+# (the timer showed 36s for a one-line image answer). Every provider call made
+# while handling a /chat request is now clipped to the remainder of this budget,
+# and image requests give each Gemini attempt only 10s so the fast fallback
+# still gets a turn before the deadline.
+CHAT_SOFT_DEADLINE_S = 20.0
+IMAGE_CALL_TIMEOUT = (5, 10)
 
 # FreeLLMAPI (Railway)
 FREELLM_ENDPOINT = "https://freellmapi-production-1394.up.railway.app/v1"
@@ -3731,8 +3739,22 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
     attempt = 0
     shrunk = False
     cut = 0
+    # Per-request deadline (set by /chat). Calls made outside a request are
+    # unaffected, so tools/autofix keep their existing timeouts.
+    _deadline = None
+    if has_request_context():
+        _deadline = getattr(g, "chat_deadline", None)
     while True:
         attempt += 1
+        if _deadline is not None:
+            _left = _deadline - time.monotonic()
+            if _left <= 1.0:
+                _prov_record(name, model, "deadline", "chat 20s budget reached")
+                return None
+            _use_timeout = (min(timeout[0], max(0.5, _left)),
+                            min(timeout[1], max(0.5, _left)))
+        else:
+            _use_timeout = timeout
         try:
             # Pre-flight: the provider re-validates every recorded tool call on
             # every request, so a null left in the history by an earlier turn
@@ -3745,12 +3767,12 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
             r = requests.post(f"{endpoint}/chat/completions",
                 headers=headers,
                 json=body,
-                timeout=timeout)
+                timeout=_use_timeout)
             _live_log("%s <- HTTP %d %s" % (name, r.status_code, 
     "😊" if r.status_code in (200, 204) else "❌"))
         except requests.exceptions.Timeout:
             _prov_record(name, model, "timeout", "no response in time",
-                         "timeout=%s" % (timeout,))
+                         "timeout=%s" % (_use_timeout,))
             return None
         except Exception as e:
             # Connection-level failures: name the host, because "connection
@@ -3852,6 +3874,12 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
                 _prov_record(name, model, 429, reason, "retry budget exhausted")
                 return None
             wait = _prov_retry_wait(getattr(r, "headers", None), r.text, attempt)
+            if _deadline is not None:
+                _left = _deadline - time.monotonic() - 1.0
+                if _left <= 0:
+                    _prov_record(name, model, "deadline", "no time left for 429 backoff")
+                    return None
+                wait = min(wait, _left)
             try:
                 audit_write("provider", name,
                             {"model": model, "status": 429, "note": "retry in %.1fs" % wait},
@@ -5377,6 +5405,12 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if _wanted:
                         _want = (_wanted[0], _wanted[3])
                         providers.sort(key=lambda p: 0 if (p[0], p[3]) == _want else 1)
+                if _image_request:
+                    # For a photo + one-line question, latency is the whole
+                    # experience. Try the fast Lite model first and keep the
+                    # bigger Flash model as the fallback.
+                    providers.sort(key=lambda p: 0 if p[3] in GEMINI_FALLBACK_MODELS else 1)
+                    print("[image-route] order: %s" % [p[3] for p in providers])
                 for p in providers:
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
@@ -5444,7 +5478,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         schema = []
                         tc2 = "none"
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
-                                     tools_schema=schema, tool_choice=tc2)
+                                     tools_schema=schema, tool_choice=tc2,
+                                     timeout=IMAGE_CALL_TIMEOUT if _image_request else (8, 30))
                     if _no_cdp:
                         # Log what the model can actually see, not what the
                         # domain filter intended. A device task reported "I
@@ -5530,7 +5565,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         tc = "none"
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
-                                    tool_choice=tc)
+                                    tool_choice=tc,
+                                    timeout=IMAGE_CALL_TIMEOUT if _image_request else (8, 30))
                 if got is None:
                     active = None
                     continue
@@ -6471,6 +6507,8 @@ def _youtube_reply(user_message):
 @require_token
 def chat():
     global _LAST_TOKEN_USAGE
+    # One deadline for the whole response (provider calls, fallbacks, summary).
+    g.chat_deadline = time.monotonic() + CHAT_SOFT_DEADLINE_S
     data = request.json
     user_message = data.get('message', '')
     # Keep the user's actual request intact. The file-read path below and the
@@ -19196,7 +19234,7 @@ def api_ai_chat():
     import time as _acesi_time
 
 
-    _ACESI_STREAM_BUDGET = 25.0
+    _ACESI_STREAM_BUDGET = CHAT_SOFT_DEADLINE_S
     class _AcesiThoughtFilter:
         def __init__(self):
             self.in_thought = False
