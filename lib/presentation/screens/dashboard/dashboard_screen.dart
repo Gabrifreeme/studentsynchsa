@@ -112,10 +112,10 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildSyncStatus(WidgetRef ref) {
     return ref
-        .watch(syncStatusProvider)
+        .watch(syncStatusNotifierProvider)
         .when(
           data: (status) {
-            String label = '';
+            String label;
             switch (status) {
               case sync_service.SyncStatus.syncing:
                 label = 'syncing';
