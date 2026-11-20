@@ -1920,6 +1920,44 @@
       .ace-mode-warning-btn:hover { background: #ff9d00; color: #000; }
       .ace-mode-warning-btn:disabled { opacity: 0.75; cursor: default; }
 
+      /* ===== Auto-Fix ephemeral toast (flashes amber, fades after ~5s) ===== */
+      #ace-autofix-toast {
+        position: fixed;
+        right: 16px;
+        bottom: 60px;
+        z-index: 10050;
+        background: #0a0a0a;
+        color: #ff9d00;
+        border: 2px solid #ff9d00;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: bold;
+        max-width: 360px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        box-shadow: 0 0 12px rgba(255, 157, 0, 0.35);
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.4s ease, transform 0.4s ease;
+        pointer-events: none;
+        display: none;
+      }
+      #ace-autofix-toast.visible {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+      }
+      @keyframes aceAutofixToastFlash {
+        0%, 100% { box-shadow: 0 0 8px rgba(255, 157, 0, 0.2); color: #ff9d00; }
+        50% { box-shadow: 0 0 16px rgba(255, 157, 0, 0.7); color: #fff3a1; }
+      }
+      #ace-autofix-toast.visible {
+        animation: aceAutofixToastFlash 1.6s ease-in-out infinite alternate;
+      }
+
     </style>
 
     <style>
@@ -5608,6 +5646,8 @@ perspective: 900px;
       };
 
       window.aceSwitchToBuildFromWarning = function (btn) {
+        var prompt = window.__acePlanBlockedPrompt || "";
+        window.__acePlanBlockedPrompt = "";
         aceSetMode("build");
         if (btn) {
           btn.textContent = "\u2713 Switched to Build";
@@ -5616,16 +5656,68 @@ perspective: 900px;
           btn.style.cursor = "default";
         }
         window.aceChatInsertReply(
-          '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Let me proceed with that.</div>'
+          '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Proceeding with your request...</div>'
         );
-        var input = document.getElementById("chat-input");
-        var prompt = window.__acePlanBlockedPrompt || "";
-        window.__acePlanBlockedPrompt = "";
-        if (input && prompt && !input.value.trim()) {
-          input.value = prompt;
-          if (typeof aceAutoResizeChatInput === "function") aceAutoResizeChatInput();
-          input.focus();
+        // Immediately execute the original action without the user retyping it.
+        if (prompt) {
+          var input = document.getElementById("chat-input");
+          if (input) {
+            input.value = prompt;
+            if (typeof aceAutoResizeChatInput === "function") aceAutoResizeChatInput();
+          }
+          try {
+            if (typeof sendMessage === "function") sendMessage();
+          } catch (e) {}
         }
+      };
+
+      // --- Auto-Fix ephemeral toast + Live System Feed log ---
+      window.aceAutoFixStamp = function () {
+        function pad(n) { return String(n).padStart(2, "0"); }
+        var d = new Date();
+        return "[" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + "]";
+      };
+
+      window.aceLiveSystemLog = function (text) {
+        var el = document.getElementById("live-system-indicator");
+        if (!el) return null;
+        var div = document.createElement("div");
+        div.className = "lsi-line";
+        div.textContent = window.aceAutoFixStamp() + " " + String(text || "");
+        el.appendChild(div);
+        while (el.children.length > 8) el.removeChild(el.children[0]);
+        el.style.display = "flex";
+        el.style.opacity = "1";
+        return div;
+      };
+
+      window.aceAutoFixToastSet = function (text) {
+        var el = document.getElementById("ace-autofix-toast");
+        if (!el) return null;
+        el.textContent = String(text || "");
+        if (el.classList.contains("visible")) {
+          el.style.opacity = "1";
+          if (el.__aceToastTimer) clearTimeout(el.__aceToastTimer);
+        }
+        return el;
+      };
+
+      window.aceAutoFixToast = function (text) {
+        var el = document.getElementById("ace-autofix-toast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "ace-autofix-toast";
+          el.className = "ace-autofix-toast";
+          document.body.appendChild(el);
+        }
+        window.aceAutoFixToastSet(text);
+        el.classList.add("visible");
+        if (el.__aceToastTimer) clearTimeout(el.__aceToastTimer);
+        el.__aceToastTimer = setTimeout(function () {
+          el.style.opacity = "0";
+          setTimeout(function () { el.classList.remove("visible"); }, 600);
+        }, 5000);
+        return el;
       };
 
 
@@ -6674,6 +6766,7 @@ perspective: 900px;
 
         var notif = window.aceExplorerNotify(
           "ACEsi found " + errs + " Explorer error(s) and is fixing them now... Restart to take effect.");
+        window.aceAutoFixToast("Running Explorer auto-fix...");
         try {
           var res = await fetch("/api/explorer/autofix", {
             method: "POST",
@@ -6692,6 +6785,8 @@ perspective: 900px;
           }
           msg += " Restart to take effect.";
           window.aceExplorerNotify(msg, notif, true);
+          window.aceAutoFixToast(msg);
+          window.aceLiveSystemLog(msg);
           // Apply the fresh scan returned by the fix endpoint immediately so
           // the red badge/tree markers clear in the same response.
           if (out.problems) {
@@ -6704,8 +6799,10 @@ perspective: 900px;
           // Then confirm with a normal fresh read shortly afterwards.
           setTimeout(function () { window.loadExplorerProblems(true); }, 800);
         } catch (e) {
-          window.aceExplorerNotify(
-            "ACEsi could not finish the Explorer auto-fix: " + e.message, notif);
+          var aceErrText = "ACEsi could not finish the Explorer auto-fix: " + e.message;
+          window.aceExplorerNotify(aceErrText, notif);
+          window.aceAutoFixToast(aceErrText);
+          window.aceLiveSystemLog(aceErrText);
         } finally {
           window._aceAutoFixRunning = false;
         }
