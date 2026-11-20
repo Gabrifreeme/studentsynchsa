@@ -4547,15 +4547,7 @@ perspective: 900px;
 </style>
 
 <div id="acesi-3d-notif-wrap">
-  <div id="acesi-3d-notif-stage" class="acesi-3d-stage" data-single="1">
-    <div id="acesi-3d-default-box" class="acesi-3d-box acesi-msg" data-notif-id="default">
-      <b>ACEsi:</b>
-      <span id="ace-greeting">Chris, I'm here. Ready and waiting.</span><span
-        id="ace-session"
-        style="display: block; color: #9a9a9a; font-size: 12px; margin-top: 4px;"
-      ></span>
-    </div>
-  </div>
+  <div id="acesi-3d-notif-stage" class="acesi-3d-stage" data-single="1"></div>
 </div>
 
 
@@ -7472,7 +7464,7 @@ perspective: 900px;
 
       <span>|</span>
       <span id="ace-last-change" style="position: relative; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #ff9d00;">
-        <span id="ace-last-change-short">ℹ️ —</span>
+        <span id="ace-last-change-short">🔔 —</span>
         <button id="ace-last-change-toggle" type="button" style="background: none; border: none; color: #ff9d00; cursor: pointer; font: inherit; font-size: 11px; padding: 0; text-decoration: underline;">[Expand]</button>
         <div id="ace-last-change-popup" style="display: none; position: absolute; left: 0; bottom: calc(100% + 8px); width: min(520px, 70vw); max-width: 520px; background: #111; border: 1px solid #ff9d00; color: #ff9d00; padding: 8px 10px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); font-size: 11px; line-height: 1.4; white-space: normal; z-index: 30000;"></div>
       </span>
@@ -7814,14 +7806,8 @@ perspective: 900px;
 
       (function () {
 
-        var FALLBACK = "Chris, I'm here. Ready and waiting.";
-
-
-
-        function greetingText() {
-          // Keep the chat panel compact; last-change details live in the bottom status bar.
-          return FALLBACK;
-        }
+        // Chat panel welcome removed; last-change details live in the bottom status bar.
+        function greetingText() { return ""; }
 
         function aceRelShort(phrase) {
           var m = String(phrase || "").match(/(?:committed|saved)\s+(.+?)\s+ago/i);
@@ -7849,14 +7835,16 @@ perspective: 900px;
           var pop = document.getElementById("ace-last-change-popup");
           if (!shortEl || !pop) return;
           var e = window.__lastEdit;
+          var icons = ["🔔", "⚡", "🚩", "📦", "🔧"];
+          var icon = icons[Math.floor(Date.now() / 1200) % icons.length];
           if (!e || !e.ok || !e.phrase) {
-            shortEl.textContent = "ℹ️ —";
+            shortEl.textContent = icon + " —";
             pop.textContent = "No recent change info available.";
             shortEl.removeAttribute("title");
             return;
           }
           var hash = e.commit || (e.source === "working-tree" ? "unsaved" : "—");
-          shortEl.textContent = "ℹ️ " + hash + " (" + aceRelShort(e.phrase) + ")";
+          shortEl.textContent = icon + " " + hash + " (" + aceRelShort(e.phrase) + ")";
           shortEl.title = e.detail || "";
           pop.textContent = aceLastChangeFullText(e);
         }
@@ -7880,6 +7868,9 @@ perspective: 900px;
               toggle.textContent = "[Expand]";
             }
           });
+          if (!window.__aceLastChangeRotate) {
+            window.__aceLastChangeRotate = setInterval(aceRenderLastChangeStatus, 1200);
+          }
         }
 
 
@@ -15106,10 +15097,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var pane = (chat && chat.parentElement) || stage.parentElement;
     if (!pane) return;
 
-    var defaultBox = document.getElementById("acesi-3d-default-box");
-    if (defaultBox && chat && (defaultBox.parentElement !== chat || chat.firstElementChild !== defaultBox)) {
-      chat.insertBefore(defaultBox, chat.firstElementChild);
-    }
+    // Welcome box removed; keep stage placement logic only.
 
     var timerEl = null;
     var candidates = pane.querySelectorAll("div, span, p, small");
@@ -15224,12 +15212,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var node = wrap.firstElementChild;
     if (!node) return;
     node.classList.add("ace-user-msg");
-    var greeting = document.getElementById("acesi-3d-default-box");
-    if (greeting && greeting.parentNode === chat) {
-      chat.insertBefore(node, greeting.nextSibling);
-    } else {
-      chat.insertBefore(node, chat.firstChild);
-    }
+    chat.insertBefore(node, chat.firstChild);
     chat.scrollTop = chat.scrollHeight;
   };
 
