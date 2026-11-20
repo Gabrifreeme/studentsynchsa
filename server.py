@@ -7384,7 +7384,10 @@ def _build_mode_direct_fix(user_message):
         _log_change(rp, content, fixed, source="direct_fix")
     except Exception as e:
         return ("Read %s and generated the fix, but saving it failed: %s" % (rel, e), target)
-    return ("Read %s and fixed the syntax error directly - the file was updated." % rel, target)
+    # Be honest: we write the model's output when it differs from the file.
+    # We do not claim a "fixed syntax error" - only "the file was updated" -
+    # because nothing was verified as broken.
+    return ("Read %s - the file was updated." % rel, target)
 
 
 @app.route('/api/autofix', methods=['POST', 'OPTIONS'])
