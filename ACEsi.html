@@ -5649,6 +5649,9 @@ perspective: 900px;
         var prompt = window.__acePlanBlockedPrompt || "";
         window.__acePlanBlockedPrompt = "";
         aceSetMode("build");
+        // Hide the warning bubble: it was only needed until the user clicked.
+        var _wb = btn ? btn.closest(".ace-mode-warning") : document.querySelector("#chat-messages > .ace-mode-warning");
+        if (_wb) _wb.style.display = "none";
         if (btn) {
           btn.textContent = "\u2713 Switched to Build";
           btn.disabled = true;
@@ -10308,7 +10311,15 @@ let _geoPayload = {};
           // The request is done (or was cancelled): release the controller and
           // restore the Send button so the next message submits on one click.
           currentAbortController = null;
-          if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
+          if (sendBtn) {
+            sendBtn.textContent = "Send";
+            sendBtn.style.background = "#000";
+            sendBtn.style.color = "#ff9d00";
+            sendBtn.style.border = "1px solid #ff9d00";
+            sendBtn.style.padding = "6px 12px";
+            sendBtn.style.borderRadius = "3px";
+            sendBtn.style.fontWeight = "bold";
+          }
 
           chatContainer.scrollTop = chatContainer.scrollHeight;
 

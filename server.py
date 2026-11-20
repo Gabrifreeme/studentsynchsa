@@ -6614,6 +6614,16 @@ def chat():
             "action_prompt": user_message,
         })
 
+    # Build Mode: when the user asks to fix something in a file, do the work
+    # directly - read the file, generate the fix, write it - instead of
+    # opening the Auto-Fix tool. The auto-fix backend is only the fallback.
+    if _mode == "build":
+        _direct = _build_mode_direct_fix(request_text)
+        if _direct:
+            _reply, _target = _direct
+            save_conversation("assistant", _reply)
+            return jsonify({"reply": _reply, "direct_fix": True, "file": _target})
+
     import location_tool as _lt
     _loc_reply = _lt.handle_location_query(user_message, data)
     if _loc_reply:
@@ -7199,17 +7209,11 @@ def _strip_code_fences(text):
 
 
 
-@app.route('/api/autofix', methods=['POST', 'OPTIONS'])
-@require_token
-def autofix():
-    if request.method == 'OPTIONS':
-        return jsonify({}), 200
-        
-    data = request.json or {}
-    code = data.get('code', '')
-    if not code.strip():
-        return jsonify({"ok": False, "error": "No code provided"})
+def _generate_autofix_fix(code):
+    """Fallback: the dedicated auto-fix backend (expert Dart code fixer).
 
+    Returns (ok, fixed_code, provider) - ok is False when no provider returned
+    a non-empty fix."""
     msgs = [
         {
             "role": "system",
@@ -7220,7 +7224,6 @@ def autofix():
             "content": code
         }
     ]
-
     try:
         # Force Groq directly
         if GROQ_API_KEY:
@@ -7228,22 +7231,147 @@ def autofix():
             if result:
                 reply, _, _ = result
                 if reply:
-                    return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": "Groq"})
-        
+                    return True, strip_code_fences(reply), "Groq"
         # Fallback to the first provider that works
         for name, endpoint, api_key, model in _chat_providers():
-            if not api_key: continue
+            if not api_key:
+                continue
             try:
                 result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
                 if result:
                     reply, _, _ = result
                     if reply:
-                        return jsonify({"ok": True, "fixed_code": strip_code_fences(reply), "provider": name})
-            except: pass
-            
-        return jsonify({"ok": False, "error": "All providers failed or returned empty."})
+                        return True, strip_code_fences(reply), name
+            except Exception:
+                pass
+        return False, "", ""
+    except Exception:
+        return False, "", ""
+
+
+def _resolve_direct_fix_path(target):
+    """Resolve a file target (e.g. "sync_provider.dart" or a path) to an
+    absolute path inside the project."""
+    cand = (target or "").strip()
+    if not cand:
+        return None
+    cands = (os.path.join(PROJECT_ROOT, cand), os.path.join(os.getcwd(), cand), cand)
+    for c in cands:
+        try:
+            if os.path.isfile(c):
+                return os.path.abspath(c)
+        except Exception:
+            pass
+    base = os.path.basename(cand).lower()
+    if not base:
+        return None
+    stem = base.rsplit(".", 1)[0] if "." in base else base
+    matches = []
+    try:
+        for dirpath, dirnames, filenames in os.walk(PROJECT_ROOT):
+            dirnames[:] = [d for d in dirnames if d.lower() not in {
+                ".git", ".dart_tool", "build", "node_modules", "__pycache__"}]
+            for fn in filenames:
+                low = fn.lower()
+                if low == base or low.endswith("/" + base) or low == stem or low.endswith("/" + stem):
+                    matches.append(os.path.join(dirpath, fn))
+    except Exception:
+        matches = []
+    if not matches:
+        return None
+    root_matches = [m for m in matches if os.path.dirname(m) == os.path.abspath(PROJECT_ROOT)]
+    return os.path.abspath(root_matches[0] if root_matches else matches[0])
+
+
+def _generate_direct_syntax_fix(user_message, content):
+    """Primary Build-Mode action: ACEsi reads the file; the model analyzes it
+    and returns the raw fixed code. Returns the fixed code or None."""
+    msgs = [
+        {
+            "role": "system",
+            "content": (
+                "You are ACEsi. The user asked: %r. The file content is:\n%s\n"
+                "Analyze the code and return ONLY the raw fixed code. "
+                "No markdown, no explanations, no backticks."
+            ) % (user_message, content)
+        },
+        {"role": "user", "content": "Return the fixed code now."},
+    ]
+    for name, endpoint, api_key, model in _chat_providers():
+        if not api_key:
+            continue
+        try:
+            result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
+            if result:
+                reply, _, _ = result
+                if reply:
+                    return strip_code_fences(reply)
+        except Exception:
+            continue
+    return None
+
+
+def _build_mode_direct_fix(user_message):
+    """Build Mode: when the user asks ACEsi to fix something in a file, do it
+    directly - read the file, analyze the syntax error, generate the fix and
+    write it - instead of opening the Auto-Fix tool. The auto-fix backend
+    (_generate_autofix_fix) is only the fallback. Returns
+    (reply, file_target) or None when the message isn't a file-action."""
+    target = _extract_file_target(user_message or "")
+    if not target or not _plan_mode_blocks_action(user_message):
+        return None
+    rp = _resolve_direct_fix_path(target)
+    if not rp:
+        return None
+    try:
+        with open(rp, encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except Exception:
+        return None
+    if not content.strip():
+        return None
+    rel = os.path.relpath(rp, PROJECT_ROOT).replace("\\", "/")
+    # Primary: generate the fix directly from the file content.
+    fixed = None
+    try:
+        fixed = _generate_direct_syntax_fix(user_message, content)
+    except Exception:
+        fixed = None
+    # Fallback: the dedicated auto-fix backend.
+    if not fixed:
+        try:
+            ok, fc, _prov = _generate_autofix_fix(content)
+            if ok and fc:
+                fixed = fc
+        except Exception:
+            fixed = None
+    fixed = (fixed or "").strip() if isinstance(fixed, str) else ""
+    if not fixed or fixed == content.strip():
+        return ("Read %s - no syntax error detected." % rel, target)
+    try:
+        with open(rp, "w") as f:
+            f.write(fixed)
+        _log_change(rp, content, fixed, source="direct_fix")
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)})
+        return ("Read %s and generated the fix, but saving it failed: %s" % (rel, e), target)
+    return ("Read %s and fixed the syntax error directly - the file was updated." % rel, target)
+
+
+@app.route('/api/autofix', methods=['POST', 'OPTIONS'])
+@require_token
+def autofix():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    data = request.json or {}
+    code = data.get('code', '')
+    if not code.strip():
+        return jsonify({"ok": False, "error": "No code provided"})
+
+    ok, fixed_code, provider = _generate_autofix_fix(code)
+    if ok:
+        return jsonify({"ok": True, "fixed_code": fixed_code, "provider": provider})
+    return jsonify({"ok": False, "error": "All providers failed or returned empty."})
 @app.route('/history', methods=['GET'])
 @require_token
 def history():
