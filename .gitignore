@@ -99,6 +99,7 @@ timers.json
 sessions.json
 summary_config.json
 *.ace_bak
+*.bak*
 
 ui_screenshots/
 

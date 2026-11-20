@@ -9642,19 +9642,26 @@ async function sendMessage() {
             _acesiPreview.className = "acesi-user-image-preview";
             _acesiPreview.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;";
             _acesiImages.forEach(function (f) {
-              var _link = document.createElement("a");
-              _link.href = f.dataUrl;
-              _link.target = "_blank";
-              _link.rel = "noopener noreferrer";
-              _link.title = f.name || "Open image";
+              var _btn = document.createElement("button");
+              _btn.type = "button";
+              _btn.className = "acesi-chat-image-btn";
+              _btn.title = "Preview " + (f.name || "image");
+              _btn.style.cssText = "display:block;padding:0;border:0;background:none;cursor:zoom-in;";
+              _btn.addEventListener("click", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window._aceShowChatImagePreview === "function") {
+                  window._aceShowChatImagePreview(f.dataUrl, f.name || "Attached image");
+                }
+              });
 
               var _img = document.createElement("img");
               _img.src = f.dataUrl;
               _img.alt = f.name || "Attached image";
               _img.style.cssText = "display:block;max-width:240px;max-height:180px;object-fit:contain;border-radius:6px;";
 
-              _link.appendChild(_img);
-              _acesiPreview.appendChild(_link);
+              _btn.appendChild(_img);
+              _acesiPreview.appendChild(_btn);
             });
             _acesiUserCard.appendChild(_acesiPreview);
           }
@@ -13848,9 +13855,19 @@ document.addEventListener('DOMContentLoaded', function() {
         el.style.display = 'none';
       });
     };
+    // Images attached in chat open in this same overlay - never in a browser tab.
+    window._aceShowChatImagePreview = function(url, label) {
+      window.__acesiChatPreviewOpen = true;
+      var menu = document.getElementById('image-preview-menu');
+      if (menu) menu.style.display = 'none';
+      window._aceShowImagePreview(url, label || 'Chat image', 'image');
+    };
     window._aceHideImagePreview = function() {
       var ov = document.getElementById('image-preview-overlay');
       if (ov) ov.style.display = 'none';
+      window.__acesiChatPreviewOpen = false;
+      var menu = document.getElementById('image-preview-menu');
+      if (menu) menu.style.display = '';
       document.querySelectorAll('#open-editors-list .acesi-tab-menu').forEach(function(el) {
         el.style.display = '';
       });
@@ -14023,6 +14040,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var closeImgBtn = document.getElementById('image-preview-close');
     if (closeImgBtn) {
       closeImgBtn.onclick = function() {
+        // A chat attachment has no editor tab: just close the overlay, do not
+        // close whatever text tab happens to be active.
+        if (window.__acesiChatPreviewOpen) {
+          window._aceHideImagePreview();
+          return;
+        }
         var idx = window.openTabs.findIndex(function(t) { return t.active; });
         if (idx >= 0) {
           window._aceReleaseTabUrl(window.openTabs[idx]);

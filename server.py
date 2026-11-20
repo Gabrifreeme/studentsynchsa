@@ -19148,6 +19148,18 @@ def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
         if not got_any:
             raise RuntimeError("provider returned no tokens")
 
+
+def _has_image_content(messages):
+    """True when any message carries an image block (chat attachments)."""
+    for m in (messages or []):
+        c = m.get("content") if isinstance(m, dict) else None
+        if isinstance(c, list):
+            for blk in c:
+                if isinstance(blk, dict) and blk.get("type") in ("image_url", "input_image", "image"):
+                    return True
+    return False
+
+
 @app.route("/api/ai/chat", methods=["POST", "OPTIONS"])
 def api_ai_chat():
     """Stream ACEsi responses, falling back from Groq to Gemini."""
@@ -19183,21 +19195,6 @@ def api_ai_chat():
     import re as _acesi_re
     import time as _acesi_time
 
-def _has_image_content(messages):
-    for m in (messages or []):
-        c = m.get("content") if isinstance(m, dict) else None
-        if isinstance(c, list):
-            for blk in c:
-                if isinstance(blk, dict) and blk.get("type") in ("image_url", "input_image", "image"):
-                    return True
-    return False
-
-def _explicit_device_diag_requested(user_message):
-    m = (user_message or "").lower()
-    return any(k in m for k in (
-        "adb", "cdp", "devtools", "webview", "uiautomator",
-        "screencap", "emulator", "device ui", "connect to the device"
-    ))
 
     _ACESI_STREAM_BUDGET = 25.0
     class _AcesiThoughtFilter:
