@@ -2369,15 +2369,21 @@
 
         height: 10px;
 
-        margin-left: 6px;
+        margin: 0;
 
         border-radius: 50%;
 
         border: 3px solid;
 
+        background: #111;
+
+        box-shadow: 0 0 0 2px #111;
+
         animation: model-spin 1s linear infinite;
 
         vertical-align: middle;
+
+        flex: 0 0 auto;
 
       }
 
@@ -7455,6 +7461,7 @@ perspective: 900px;
     >
 
       <span style="flex: 1; display: flex; align-items: center; gap: 6px; background: #ff9d00; color: #000; border: none; padding: 4px 10px; border-radius: 3px; font-family: inherit; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 0;">
+        <span id="model-spinner" class="status-ok" title="Checking server health..."></span>
         <span>ACEsi</span>
         <span>|</span>
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
@@ -7493,15 +7500,6 @@ perspective: 900px;
           >openai/gpt-oss-120b</span
         >
       </span>
-      <span
-
-        id="model-spinner"
-
-        class="status-ok"
-
-        title="Checking server health..."
-
-      ></span>
 
     </div>
 
