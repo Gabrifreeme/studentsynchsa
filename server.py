@@ -6564,6 +6564,18 @@ def _youtube_reply(user_message):
     return reply
 
 
+_PLAN_ACTION_RE = re.compile(
+    r"(?i)\b(?:edit|create|write|fix|run|build|delete|modify|update|change|add|remove|rename|move|refactor|implement|execute|install|generate|patch|apply|save|deploy)\b"
+)
+
+
+def _plan_mode_blocks_action(text):
+    """True when a Plan-mode prompt looks like it wants to change or run something."""
+    if not text:
+        return False
+    return bool(_PLAN_ACTION_RE.search(text))
+
+
 @app.route('/chat', methods=['POST'])
 @require_token
 def chat():
@@ -6585,6 +6597,22 @@ def chat():
     if _kill_armed():
         return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
     save_conversation("user", user_message)
+
+    # Plan Mode is read-only: intercept action-oriented prompts so the UI can
+    # offer a one-click switch to Build Mode instead of executing them.
+    _mode = str(data.get("mode") or "").strip().lower()
+    if _mode == "plan" and _plan_mode_blocks_action(request_text):
+        _warning = (
+            "I am currently in Plan Mode and cannot execute file edits. "
+            "Would you like to switch to Build Mode to perform this action?"
+        )
+        return jsonify({
+            "type": "mode_warning",
+            "mode": "plan",
+            "reply": _warning,
+            "message": _warning,
+            "action_prompt": user_message,
+        })
 
     import location_tool as _lt
     _loc_reply = _lt.handle_location_query(user_message, data)

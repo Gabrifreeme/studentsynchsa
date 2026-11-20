@@ -1895,6 +1895,31 @@
         outline-offset: -2px;
       }
 
+      /* ===== Conversation: Plan Mode action-intercept bubble ===== */
+      #chat-messages > .ace-mode-warning {
+        background: #2A1700 !important;
+        border: 1px solid #ff9d00 !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+        padding: 10px 12px !important;
+        margin: 8px 0 !important;
+        color: #ffd8a8 !important;
+      }
+      .ace-mode-warning-title { color: #ff9d00; font-weight: bold; margin-bottom: 2px; }
+      .ace-mode-warning-btn {
+        background: #000;
+        color: #ff9d00;
+        border: 1px solid #ff9d00;
+        border-radius: 3px;
+        padding: 3px 10px;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .ace-mode-warning-btn:hover { background: #ff9d00; color: #000; }
+      .ace-mode-warning-btn:disabled { opacity: 0.75; cursor: default; }
+
     </style>
 
     <style>
@@ -5562,6 +5587,46 @@ perspective: 900px;
         }
         aceSetMode("plan");
       })();
+
+      // --- Plan Mode: Plan-mode action intercept warning bubble ---
+      window.aceShowPlanModeWarning = function (promptText) {
+        window.__acePlanBlockedPrompt = promptText || "";
+        window.aceChatInsertReply(
+          '<div class="ace-mode-warning" role="alert">' +
+            '<div style="display:flex;align-items:flex-start;gap:8px;">' +
+              '<span aria-hidden="true" style="font-size:16px;line-height:1.2;color:#ff9d00;">\u26A0\uFE0F</span>' +
+              '<div style="font-size:12px;line-height:1.45;">' +
+                '<div class="ace-mode-warning-title">Plan Mode</div>' +
+                'I am currently in Plan Mode and cannot execute file edits. Would you like to switch to Build Mode to perform this action?' +
+              '</div>' +
+            '</div>' +
+            '<div style="margin-top:8px;">' +
+              '<button type="button" class="ace-mode-warning-btn" onclick="aceSwitchToBuildFromWarning(this)">Switch to Build</button>' +
+            '</div>' +
+          '</div>'
+        );
+      };
+
+      window.aceSwitchToBuildFromWarning = function (btn) {
+        aceSetMode("build");
+        if (btn) {
+          btn.textContent = "\u2713 Switched to Build";
+          btn.disabled = true;
+          btn.style.opacity = "0.75";
+          btn.style.cursor = "default";
+        }
+        window.aceChatInsertReply(
+          '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Let me proceed with that.</div>'
+        );
+        var input = document.getElementById("chat-input");
+        var prompt = window.__acePlanBlockedPrompt || "";
+        window.__acePlanBlockedPrompt = "";
+        if (input && prompt && !input.value.trim()) {
+          input.value = prompt;
+          if (typeof aceAutoResizeChatInput === "function") aceAutoResizeChatInput();
+          input.focus();
+        }
+      };
 
 
       document.addEventListener("DOMContentLoaded", function () {
@@ -9968,6 +10033,7 @@ let _geoPayload = {};
 
             body: JSON.stringify(Object.assign({
                 message: text,
+                mode: (window.aceMode || "plan"),
                 model: getSelectedModel(),
                 attachments: (window.__acesiAttachments || [])
                   .filter(function (f) { return f && f.isImage && typeof f.dataUrl === "string"; })
@@ -9981,6 +10047,12 @@ let _geoPayload = {};
           console.log("ACEsi raw response:", data);
           // Hold the live tool row briefly so the steps can actually be seen.
           await stopLiveActivity();
+
+          // Plan Mode action intercept: show the warning bubble instead of a normal reply.
+          if (data && data.type === "mode_warning") {
+            aceShowPlanModeWarning(text);
+            return;
+          }
 
           const aiReply = data.reply;
 
@@ -10062,6 +10134,8 @@ let _geoPayload = {};
               headers: { "Content-Type": "application/json" },
 
               body: JSON.stringify({
+
+                mode: (window.aceMode || "plan"),
 
                 message:
 
