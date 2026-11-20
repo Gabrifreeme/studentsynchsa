@@ -7442,9 +7442,9 @@ perspective: 900px;
 
         gap: 8px;
 
-        padding: 8px 12px;
+        padding: 4px 16px;
 
-        background: #000;
+        background: #1E1E1E;
 
         border-top: 1px solid #ff9d00;
 
@@ -7460,15 +7460,15 @@ perspective: 900px;
 
     >
 
-      <span style="flex: 1; display: flex; align-items: center; gap: 6px; background: #ff9d00; color: #000; border: none; padding: 4px 10px; border-radius: 3px; font-family: inherit; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 0;">
+      <span style="flex: 1; display: flex; align-items: center; gap: 6px; background: #1E1E1E; color: #ff9d00; border: none; padding: 4px 10px; border-radius: 3px; font-family: inherit; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 0;">
         <span id="model-spinner" class="status-ok" title="Checking server health..."></span>
         <span>ACEsi</span>
         <span>|</span>
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
         <span>|</span>
-        <span id="ace-last-change" style="position: relative; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #000;">
+        <span id="ace-last-change" style="position: relative; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #ff9d00;">
           <span id="ace-last-change-short">| —</span>
-          <button id="ace-last-change-toggle" type="button" style="background: none; border: none; color: #000; cursor: pointer; font: inherit; font-size: 11px; font-weight: bold; padding: 0; text-decoration: underline;">[Expand]</button>
+          <button id="ace-last-change-toggle" type="button" style="background: none; border: none; color: #ff9d00; cursor: pointer; font: inherit; font-size: 11px; font-weight: bold; padding: 0; text-decoration: underline;">[Expand]</button>
           <div id="ace-last-change-popup" style="display: none; position: absolute; left: 0; bottom: calc(100% + 8px); width: min(520px, 70vw); max-width: 520px; background: #111; border: 1px solid #ff9d00; color: #ff9d00; padding: 8px 10px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); font-size: 11px; line-height: 1.4; white-space: normal; z-index: 30000; font-weight: normal;"></div>
         </span>
         <span style="flex: 1"></span>
@@ -7481,7 +7481,7 @@ perspective: 900px;
 
             background: transparent;
 
-            color: #000;
+            color: #ff9d00;
 
             border: none;
 
@@ -7833,7 +7833,7 @@ perspective: 900px;
           var shortEl = document.getElementById("ace-last-change-short");
           var pop = document.getElementById("ace-last-change-popup");
           if (!shortEl || !pop) return;
-          shortEl.style.color = "#000";
+          shortEl.style.color = "#ff9d00";
           var e = window.__lastEdit;
           var icon = iconChars[iconIdx % iconChars.length];
           if (!e || !e.ok || !e.phrase) {
