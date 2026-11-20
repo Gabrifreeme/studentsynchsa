@@ -1837,6 +1837,64 @@
 
       }
 
+      /* ===== Conversation header: title left, Plan/Build switch right ===== */
+      #chat-panel .panel-header.chat-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px !important;
+      }
+
+      .ace-mode-switch {
+        display: inline-flex;
+        align-items: stretch;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        height: 26px;
+        border: 1px solid #ff9d00;
+        border-radius: 4px;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      .ace-mode-btn {
+        appearance: none;
+        -webkit-appearance: none;
+        margin: 0;
+        padding: 0 10px;
+        height: 100%;
+        background: transparent;
+        color: #ff9d00;
+        border: 0;
+        border-radius: 0;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: bold;
+        line-height: 24px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+
+      .ace-mode-btn + .ace-mode-btn {
+        border-left: 1px solid #ff9d00;
+      }
+
+      .ace-mode-btn:hover {
+        background: rgba(255, 157, 0, 0.18);
+      }
+
+      .ace-mode-btn.active,
+      .ace-mode-btn.active:hover {
+        background: #ff9d00;
+        color: #000;
+      }
+
+      .ace-mode-btn:focus-visible {
+        outline: 1px solid #ff9d00;
+        outline-offset: -2px;
+      }
+
     </style>
 
     <style>
@@ -4510,7 +4568,13 @@ git add -u (stage tracked)</label
 
       <div id="chat-panel" class="panel" style="flex: 0 0 30%; min-width: 200px; max-width: 60%; display: flex; flex-direction: column;">
 
-        <div class="panel-header">CONVERSATION</div>
+        <div class="panel-header chat-panel-header">
+          <span class="chat-panel-title">CONVERSATION</span>
+          <div class="ace-mode-switch" role="group" aria-label="Agent mode">
+            <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" title="Plan mode: reason and outline before changing files">Plan</button>
+            <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" title="Build mode: apply changes directly">Build</button>
+          </div>
+        </div>
 <style id="acesi-3d-notif-styles">
 #acesi-3d-notif-wrap {
 perspective: 900px;
@@ -5464,6 +5528,41 @@ perspective: 900px;
   var currentAbortController = null;
 
       window.currentFile = null; // Track the currently opened file
+
+      // --- Plan vs Build mode (default: Plan) ---
+      var isBuildMode = false;
+      window.isBuildMode = false;
+      window.aceMode = "plan";
+
+      function aceSetMode(mode) {
+        isBuildMode = (mode === "build");
+        window.isBuildMode = isBuildMode;
+        window.aceMode = isBuildMode ? "build" : "plan";
+        var btns = document.querySelectorAll("#chat-panel .ace-mode-btn");
+        for (var i = 0; i < btns.length; i++) {
+          var on = btns[i].getAttribute("data-mode") === window.aceMode;
+          btns[i].classList.toggle("active", on);
+          btns[i].setAttribute("aria-pressed", on ? "true" : "false");
+        }
+        try {
+          document.dispatchEvent(new CustomEvent("acesi:modechange", {
+            detail: { mode: window.aceMode, isBuildMode: isBuildMode }
+          }));
+        } catch (e) {}
+      }
+      window.aceSetMode = aceSetMode;
+
+      (function aceWireModeSwitch() {
+        var btns = document.querySelectorAll("#chat-panel .ace-mode-btn");
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener("click", function (ev) {
+            ev.preventDefault();
+            aceSetMode(this.getAttribute("data-mode"));
+          });
+        }
+        aceSetMode("plan");
+      })();
+
 
       document.addEventListener("DOMContentLoaded", function () {
 
