@@ -8080,7 +8080,22 @@ perspective: 900px;
       <button id="term-find-close" type="button" title="Close (Esc)">&#10005;</button>
     </div>
 
-    <div id="terminal-output" style="flex: 1; overflow: hidden; padding: 0; margin: 0; background: #000; display: block; width: 100%; height: 100%; position: relative;"></div>    
+    <div id="terminal-output" style="flex: 1; overflow: hidden; padding: 0; margin: 0; background: #000; display: block; width: 100%; height: 100%; position: relative;"></div>
+
+<style id="ace-term-dashboard-style">
+  #ace-term-heartbeat {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    color: #00ff88;
+    pointer-events: none;
+  }
+</style>    
 
 
 
@@ -14727,6 +14742,7 @@ document.addEventListener('DOMContentLoaded', function() {
           '</div>' +
           '<div id="term-history" style="white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; overflow-x:hidden; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
 
+        window.aceTermHeartbeatInit && window.aceTermHeartbeatInit();
         var termInput = document.getElementById("term-input");
         var termHistory = document.getElementById("term-history");
 
@@ -15132,18 +15148,90 @@ document.addEventListener('DOMContentLoaded', function() {
     return String(text == null ? '' : text).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
   };
 
+  // ===== Neon log syntax highlighting + typewriter animation =====
+  // Timestamps -> dim grey; [SERVER]/[ACESi] tags -> neon magenta/cyan;
+  // HTTP status -> bright green (2xx) / amber (4xx) / red (5xx).
+  window.aceColorizeLogLine = function (text) {
+    var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, ''); // smiley is redundant: color is enough
+    var segs = [];
+    var push = function (start, end, color) {
+      if (end > start) segs.push({ text: s.slice(start, end), color: color });
+    };
+    var rx = /\[SERVER\]|\[ACESi\]|\[[^\]]+\]|"\s*(\d{3})(?!\d)/g;
+    var m, cursor = 0;
+    while ((m = rx.exec(s))) {
+      var i = m.index;
+      push(cursor, i, null);
+      if (m[1] !== undefined) {
+        var st = i + m[0].length - m[1].length;
+        push(i, st, null);
+        push(st, st + m[1].length, '#00ff88'); // bright green: HTTP status
+        cursor = st + m[1].length;
+      } else {
+        var tok = m[0];
+        if (tok.indexOf('[SERVER]') === 0) push(i, i + tok.length, '#ff00ff'); // neon magenta
+        else if (tok.indexOf('[ACESi]') === 0) push(i, i + tok.length, '#00ffff'); // neon cyan
+        else push(i, i + tok.length, '#777777'); // dim grey (timestamps)
+        cursor = i + tok.length;
+      }
+    }
+    push(cursor, s.length, null);
+    return segs;
+  };
+
+  window.aceFillTerminalLine = function (line, segs) {
+    try {
+      line.textContent = "";
+      (segs || []).forEach(function (sg) {
+        var sp = document.createElement("span");
+        if (sg.color) sp.style.color = sg.color;
+        sp.textContent = sg.text;
+        line.appendChild(sp);
+      });
+      if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
+    } catch (e) {}
+  };
+
+  // Typewriter effect: log lines print character by character, in real time.
+  window.aceTypingEnabled = true;
+  window.aceTerminalTypeSpeed = 14;
+  window.aceTypeTerminalLine = function (line, text, segs) {
+    try {
+      if (!line || !line.parentNode) return;
+      if (!window.aceTypingEnabled) {
+        window.aceFillTerminalLine(line, segs);
+        return;
+      }
+      var len = text.length;
+      var idx = 0;
+      var spd = (len > 400) ? 2 : 12;
+      (function step() {
+        if (!line || !line.parentNode) return;
+        idx += 1;
+        if (idx > len) {
+          window.aceFillTerminalLine(line, segs);
+          return;
+        }
+        line.textContent = text.slice(0, idx);
+        setTimeout(step, spd);
+      })();
+    } catch (e) {}
+  };
+
   window.aceAppendTerminalLine = function (text, color) {
+    try { if (typeof window.aceTermHeartbeatInit === 'function') window.aceTermHeartbeatInit(); } catch (e) {}
     var history = document.getElementById('term-history');
     if (!history) return;
+    var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, ''); // smiley is redundant: color is enough
+    var segs = window.aceColorizeLogLine ? window.aceColorizeLogLine(s) : [{ text: s, color: color || '#8fd3ff' }];
     var line = document.createElement('div');
     line.style.whiteSpace = 'pre-wrap';
     line.style.overflowWrap = 'anywhere';
     line.style.wordBreak = 'break-word';
     line.style.color = color || '#8fd3ff';
-    line.textContent = text;
-    line.setAttribute('data-ace-text', text);
+    line.setAttribute('data-ace-text', s);
     history.appendChild(line);
-    if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
+    window.aceTypeTerminalLine(line, s, segs);
     // Same bound as the command-output helper: live logs must not grow the
     // terminal DOM without limit.
     while (history.children.length > 1000) {
@@ -15152,6 +15240,61 @@ document.addEventListener('DOMContentLoaded', function() {
     history.scrollTop = history.scrollHeight;
     history.scrollLeft = 0;
   };
+
+  // ===== Dynamic heartbeat margin (ASCII spinner) =====
+  window.__aceTermHTTP = { status: null, at: 0 };
+  window.__aceTermHeartbeatEl = null;
+  window.__aceTermHeartbeatTimer = null;
+
+  window.aceTermHeartbeatColor = function () {
+    var st = (window.__aceTermHTTP || {}).status;
+    if (st == null) return '#00ff88';             // idle: green
+    if (st >= 200 && st < 300) return '#00ff88';  // Green when a request returns 200 OK
+    if (st >= 400 && st < 500) return '#ff9d00';  // Amber for warnings (404 etc.)
+    if (st >= 500) return '#ff5555';              // Red for errors (500 etc.)
+    return '#00ff88';
+  };
+
+  window.aceTermHeartbeatInit = function () {
+    var out = document.getElementById('terminal-output');
+    if (!out) return;
+    var el = document.getElementById('ace-term-heartbeat');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ace-term-heartbeat';
+      out.appendChild(el);
+    }
+    window.__aceTermHeartbeatEl = el;
+    var frames = ['|', '/', '-', '\\']; // ASCII spinner frames
+    var idx = 0;
+    function tick() {
+      el.textContent = frames[idx % frames.length];
+      idx++;
+      el.style.color = window.aceTermHeartbeatColor();
+    }
+    tick();
+    if (window.__aceTermHeartbeatTimer) clearInterval(window.__aceTermHeartbeatTimer);
+    window.__aceTermHeartbeatTimer = setInterval(tick, 140);
+    el.style.display = 'block';
+  };
+
+  // Track the last HTTP status of every fetch so the heartbeat can show
+  // Green (2xx) / Amber (4xx) / Red (5xx).
+  (function () {
+    var orig = window.fetch;
+    if (typeof orig !== 'function') return;
+    window.fetch = function (input, init) {
+      var p = orig.apply(this, arguments);
+      try {
+        p.then(function (r) {
+          window.__aceTermHTTP = { status: (r && typeof r.status === 'number') ? r.status : null, at: Date.now() };
+        }).catch(function () {
+          window.__aceTermHTTP = { status: null, at: Date.now() };
+        });
+      } catch (e) {}
+      return p;
+    };
+  })();
 
   function setLiveLogButton(on) {
     var btn = document.getElementById('terminal-logs-btn');
@@ -15174,6 +15317,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (parsed && parsed.log !== undefined) text = parsed.log;
       } catch (err) {}
       text = window.aceStripAnsi(text);
+      // The static "[SERVER]" heartbeat lines are replaced by the animated
+      // heartbeat spinner (see aceTermHeartbeatInit) - drop them from the feed.
+      if (/^\s*\[SERVER\]/.test(text)) return;
       if (!text.trim()) return;
       window.aceAppendTerminalLine(text);
     };
