@@ -4609,6 +4609,8 @@ perspective: 900px;
 
             gap: 6px;
 
+            align-items: flex-end;
+
             padding: 8px;
 
             border-top: 1px solid #ff9d00;
@@ -4645,7 +4647,7 @@ perspective: 900px;
 
               outline: none;
 
-              resize: vertical;
+              resize: none;
 
               min-height: 44px;
 
@@ -9697,13 +9699,32 @@ perspective: 900px;
 
       var currentAbortController = null;
 
+      function aceAutoResizeChatInput() {
+        var el = document.getElementById("chat-input");
+        if (!el) return;
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        var lineH = cs ? (parseFloat(cs.lineHeight) || 18) : 18;
+        var minH = Math.round(3 * lineH);
+        var maxH = Math.round(8 * lineH);
+        el.style.height = "auto";
+        var h = el.scrollHeight;
+        el.style.height = Math.max(minH, Math.min(h, maxH)) + "px";
+        el.style.overflowY = el.scrollHeight > maxH ? "auto" : "hidden";
+      }
+
+      var aceChatInputEl = document.getElementById("chat-input");
+      if (aceChatInputEl) {
+        aceChatInputEl.addEventListener("input", aceAutoResizeChatInput);
+        aceAutoResizeChatInput();
+      }
+
 async function sendMessage() {
         var sendBtn = document.querySelector('button[onclick="sendMessage()"]');
 
         if (currentAbortController) {
             currentAbortController.abort();
             currentAbortController = null;
-            if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#ff9d00"; }
+            if (sendBtn) { sendBtn.textContent = "Send"; sendBtn.style.background = "#000"; }
             return;
         }
 
@@ -9802,6 +9823,8 @@ async function sendMessage() {
         }
 
         input.value = "";
+
+        aceAutoResizeChatInput();
 
         chatContainer.scrollTop = chatContainer.scrollHeight;
 
