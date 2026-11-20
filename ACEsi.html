@@ -1018,7 +1018,7 @@
 
       .spinner {
 
-        /* Keep the X visible at all times (dimmed when idle) so it never looks
+        /* Keep visible at all times (dimmed when idle) so it never looks
            "mia"; sendMessage() adds .active to brighten and spin it. */
         display: block;
 
@@ -1026,13 +1026,17 @@
 
         height: 16px;
 
-        /* Amber X spinner: two crossed bars. Same footprint and animation as
-           the old ring, but drawn as an X so it reads as a loading cross. */
+        /* Amber star spinner: four crossed bars (X + plus) for a fuller
+           loading indicator. Same footprint and spin animation as before. */
         background:
 
           linear-gradient(45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%),
 
-          linear-gradient(-45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%);
+          linear-gradient(-45deg, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%),
+
+          linear-gradient(to right, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%),
+
+          linear-gradient(to bottom, transparent 43%, #ff9d00 43%, #ff9d00 57%, transparent 57%);
 
         opacity: 0.35;
 
