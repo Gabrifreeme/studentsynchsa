@@ -2475,22 +2475,22 @@
 </style>
 
 <style id="acesi-prompt-amber-style">
-/* Chat prompt keeps the original double-thickness amber border. */
+/* Chat prompt border matches the Send button (#ff9d00). */
 #chat-input,
 #chat-input:focus {
-  border: 2px solid #ffbf00 !important;
+  border: 2px solid #ff9d00 !important;
 }
-/* Double-thick bright amber border wrapping every ACEsi message row.
+/* Double-thick Send-button-colour border wrapping every ACEsi message row.
    Specificity (1,1,1) beats the generic "unboxed text" border:none !important
    rules above (1,0,0 / 1,1,0), so this survives a hard reload. */
 #chat-messages > .acesi-msg,
 #chat-messages > div.acesi-msg {
-  border: 4px double #ffbf00 !important;
+  border: 4px double #ff9d00 !important;
   border-radius: 6px !important;
   background: #1a1a1a !important;
   padding: 8px 12px !important;
   margin: 8px 0 !important;
-  box-shadow: 0 0 10px rgba(255, 191, 0, 0.25) !important;
+  box-shadow: 0 0 10px rgba(255, 157, 0, 0.25) !important;
 }
 </style>
 
@@ -2554,15 +2554,15 @@
 @keyframes aceExplorerFlash {
   0%, 100% {
     background: rgba(25, 25, 25, 0.95);
-    border-color: #ffbf00;
-    color: #ffbf00;
-    box-shadow: 0 0 0 rgba(255, 191, 0, 0);
+    border-color: #ff9d00;
+    color: #ff9d00;
+    box-shadow: 0 0 0 rgba(255, 157, 0, 0);
   }
   50% {
     background: rgba(120, 78, 0, 0.95);
     border-color: #fff2a8;
     color: #fff2a8;
-    box-shadow: 0 0 16px rgba(255, 191, 0, 0.85);
+    box-shadow: 0 0 16px rgba(255, 157, 0, 0.85);
   }
 }
 .ace-explorer-notif.ace-notif-leaving {
@@ -2577,7 +2577,7 @@
   animation: aceRestartFlash 0.5s ease-in-out 4;
 }
 @keyframes aceRestartFlash {
-  0%, 100% { color: #ffbf00; text-shadow: none; }
+  0%, 100% { color: #ff9d00; text-shadow: none; }
   50% { color: #fffbe0; text-shadow: 0 0 10px #ffd54a, 0 0 18px #ff9d00; }
 }
 </style>
@@ -6432,7 +6432,7 @@ perspective: 900px;
           div.style.background = "#191919";
           div.style.padding = "8px 12px";
           div.style.borderRadius = "6px";
-          div.style.border = "2px solid #ffbf00";
+          div.style.border = "2px solid #ff9d00";
           div.style.marginBottom = "8px";
           div.style.marginLeft = "20px";
           var label = document.createElement("b");
