@@ -7264,8 +7264,12 @@ def _find_dart():
     return best
 
 
-def _scan_dart_problems(files, counts):
-    """Read `dart analyze --format=machine` (the badge's own source of truth)."""
+def _scan_dart_problems(files, counts, details=None):
+    """Read `dart analyze --format=machine` (the badge's own source of truth).
+
+    When *details* is supplied, per-file diagnostic messages are collected too
+    so the Explorer auto-fix path works from the exact same analyzer output.
+    """
     dart = _find_dart()
     if not dart:
         print("[problems] dart executable not found; skipping dart analyze")
@@ -7289,10 +7293,19 @@ def _scan_dart_problems(files, counts):
                     or not parts[i + 2].isdigit()):
                 continue
             _problems_add(files, counts, cand, sev)
+            if details is not None:
+                message = ""
+                for j in range(i + 4, len(parts)):
+                    if parts[j]:
+                        message = parts[j]
+                        break
+                details.setdefault(cand, []).append(
+                    "%s:%s:%s: %s" % (cand, parts[i + 1], parts[i + 2],
+                                      message or "syntax error"))
             break
 
 
-def _scan_python_problems(files, counts):
+def _scan_python_problems(files, counts, details=None):
     """Syntax-check only first-party Python modules; never scratch scripts."""
     try:
         names = sorted(os.listdir(PROJECT_ROOT))
@@ -7310,13 +7323,16 @@ def _scan_python_problems(files, counts):
             with open(full, "r", encoding="utf-8-sig", errors="replace") as f:
                 source = f.read()
             compile(source, name, "exec")
-        except SyntaxError:
+        except SyntaxError as e:
             _problems_add(files, counts, name, "error")
+            if details is not None:
+                details.setdefault(name, []).append(
+                    "%s:%s:%s: %s" % (name, e.lineno, e.offset, e.msg))
         except Exception:
             pass
 
 
-def _node_check(full, rel, files, counts):
+def _node_check(full, rel, files, counts, details=None):
     try:
         r = subprocess.run(["node", "--check", full], cwd=PROJECT_ROOT,
                            capture_output=True, text=True, timeout=30,
@@ -7325,9 +7341,14 @@ def _node_check(full, rel, files, counts):
         return
     if r.returncode != 0:
         _problems_add(files, counts, rel, "error")
+        if details is not None:
+            detail = (r.stderr or r.stdout or "syntax error").strip()
+            # Keep only the meaningful first lines of a node --check error.
+            detail = " | ".join(x.strip() for x in detail.splitlines() if x.strip())[:400]
+            details.setdefault(rel, []).append(detail or "syntax error")
 
 
-def _scan_js_problems(files, counts):
+def _scan_js_problems(files, counts, details=None):
     """Syntax-check first-party JS and inline HTML scripts.
 
     JSON/ld+json data blocks are skipped: they are data, not executable script,
@@ -7341,7 +7362,7 @@ def _scan_js_problems(files, counts):
             rel = _problems_rel(os.path.relpath(full, PROJECT_ROOT))
             ext = os.path.splitext(name)[1].lower()
             if ext in (".js", ".mjs", ".cjs"):
-                _node_check(full, rel, files, counts)
+                _node_check(full, rel, files, counts, details)
             elif ext in (".html", ".htm"):
                 try:
                     with open(full, "r", encoding="utf-8", errors="replace") as f:
@@ -7369,7 +7390,7 @@ def _scan_js_problems(files, counts):
                                 encoding="utf-8", newline="") as f:
                             f.write(code)
                             tmp = f.name
-                        _node_check(tmp, rel, files, counts)
+                        _node_check(tmp, rel, files, counts, details)
                     except Exception:
                         pass
                     finally:
@@ -7378,6 +7399,20 @@ def _scan_js_problems(files, counts):
                                 os.unlink(tmp)
                             except Exception:
                                 pass
+
+
+def _compute_problems():
+    """Run the Explorer problem scanners and return a fresh payload."""
+    data = _problems_blank()
+    files, counts = data["files"], data["counts"]
+    for scanner in (_scan_dart_problems, _scan_python_problems, _scan_js_problems):
+        try:
+            scanner(files, counts)
+        except Exception as e:
+            print("[problems] %s failed: %s" % (scanner.__name__, e), flush=True)
+    data["total"] = counts.get("error", 0)
+    data["generated"] = int(time.time())
+    return data
 
 
 @app.route('/api/problems', methods=['GET'])
@@ -7390,19 +7425,221 @@ def api_problems():
             cached = _PROBLEMS_CACHE.get("data")
             if cached is not None and now - _PROBLEMS_CACHE.get("ts", 0) < _PROBLEMS_TTL:
                 return jsonify(cached)
-    data = _problems_blank()
-    files, counts = data["files"], data["counts"]
-    for scanner in (_scan_dart_problems, _scan_python_problems, _scan_js_problems):
-        try:
-            scanner(files, counts)
-        except Exception as e:
-            print("[problems] %s failed: %s" % (scanner.__name__, e), flush=True)
-    data["total"] = counts.get("error", 0)
-    data["generated"] = int(time.time())
+    data = _compute_problems()
     with _PROBLEMS_LOCK:
         _PROBLEMS_CACHE["ts"] = time.time()
         _PROBLEMS_CACHE["data"] = data
     return jsonify(data)
+
+
+# ===== Explorer auto-fix: fix what the Explorer badge actually reports =====
+_EXPLORER_AUTOFIX_LOCK = threading.Lock()
+_EXPLORER_AUTOFIX_MAX_FILES = 25
+
+
+def _explorer_error_tasks():
+    """Collect per-file diagnostics from the exact scanners /api/problems uses."""
+    details = {}
+    probe_files = {}
+    probe_counts = {"error": 0, "warning": 0, "info": 0}
+    for scanner in (_scan_dart_problems, _scan_python_problems, _scan_js_problems):
+        try:
+            scanner(probe_files, probe_counts, details)
+        except Exception as e:
+            print("[autofix] %s failed: %s" % (scanner.__name__, e), flush=True)
+    return [{"path": path, "errors": messages}
+            for path, messages in details.items() if messages]
+
+
+def _file_has_errors(rel):
+    """Re-check one file with the same analyzers the Explorer badge uses."""
+    target = rel if os.path.isabs(rel) else os.path.join(PROJECT_ROOT, rel)
+    ext = os.path.splitext(target)[1].lower()
+    try:
+        if ext == ".dart":
+            dart = _find_dart()
+            if not dart:
+                return True  # cannot verify => do not claim success
+            r = subprocess.run([dart, "analyze", "--format=machine", target],
+                               cwd=PROJECT_ROOT, capture_output=True, text=True,
+                               timeout=300, errors="replace")
+            for line in ((r.stdout or "") + "\n" + (r.stderr or "")).splitlines():
+                parts = [p.strip() for p in line.split("|")]
+                if parts and parts[0].lower() == "error":
+                    return True
+            return False
+        if ext == ".py":
+            with open(target, "r", encoding="utf-8-sig", errors="replace") as f:
+                compile(f.read(), rel, "exec")
+            return False
+        if ext in (".js", ".mjs", ".cjs"):
+            r = subprocess.run(["node", "--check", target], cwd=PROJECT_ROOT,
+                               capture_output=True, text=True, timeout=30,
+                               errors="replace")
+            return r.returncode != 0
+    except Exception:
+        return True  # cannot verify => do not claim success
+    return False
+
+
+@app.route('/api/explorer/autofix', methods=['POST', 'OPTIONS'])
+@require_token
+def api_explorer_autofix():
+    """Automatically fix Explorer error markers and report what changed."""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    if not _EXPLORER_AUTOFIX_LOCK.acquire(blocking=False):
+        return jsonify({"ok": False, "error": "An Explorer auto-fix is already running."}), 409
+
+    try:
+        tasks = _explorer_error_tasks()
+        if not tasks:
+            fresh = _compute_problems()
+            with _PROBLEMS_LOCK:
+                _PROBLEMS_CACHE["ts"] = time.time()
+                _PROBLEMS_CACHE["data"] = fresh
+            return jsonify({
+                "ok": True, "fixed": [], "failed": [], "attempted": 0,
+                "remaining": 0, "problems": fresh,
+                "message": "Explorer is already clean; nothing needed fixing.",
+            })
+
+        providers = [
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+            ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_FALLBACKS[0]),
+            ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_MODEL),
+            ("Gemini", GEMINI_ENDPOINT, GEMINI_API_KEY, GEMINI_FALLBACK_MODELS[0]),
+        ]
+        fixed, failed = [], []
+
+        for task in tasks[:_EXPLORER_AUTOFIX_MAX_FILES]:
+            rel = task["path"]
+            target = rel if os.path.isabs(rel) else os.path.join(PROJECT_ROOT, rel)
+            try:
+                with open(target, "r", encoding="utf-8", errors="replace") as f:
+                    original = f.read()
+            except Exception as e:
+                failed.append({"path": rel, "error": "read failed: %s" % e})
+                continue
+            if not original.strip() or len(original) > 500000:
+                failed.append({"path": rel, "error": "file empty or too large to auto-fix"})
+                continue
+
+            error_text = "\n".join(task["errors"])
+            fix_messages = [
+                {"role": "system", "content": (
+                    "You are ACEsi, an expert code fixer. The file below has errors "
+                    "that a static analyzer reports. Return ONLY the complete corrected "
+                    "file contents — no explanations, no markdown, no code fences. "
+                    "You MUST actually change the offending lines so the analyzer reports "
+                    "no errors. Returning the same broken code is not acceptable. "
+                    "Preserve all other working code exactly."
+                )},
+                {"role": "user", "content": (
+                    "File: %s\nAnalyzer errors:\n%s\n\nFile contents:\n%s" %
+                    (rel, error_text, original)
+                )},
+            ]
+
+            backup_dir = os.path.join(PROJECT_ROOT, ".ace_autofix_backups")
+            backup = os.path.join(backup_dir, rel.replace("/", "__") + ".bak")
+            provider = ""
+            verified = False
+            last_reason = "all providers failed"
+
+            for name, endpoint, api_key, model in providers:
+                if not api_key:
+                    continue
+                fixed_code = None
+                try:
+                    resp = requests.post(
+                        "%s/chat/completions" % endpoint,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer %s" % api_key,
+                            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                           "AppleWebKit/537.36 Chrome/120 Safari/537.36"),
+                        },
+                        json={"model": model, "messages": fix_messages,
+                              "temperature": 0.2, "max_tokens": 8000},
+                        timeout=(10, 180),
+                    )
+                    if resp.status_code == 200:
+                        fixed_code = resp.json()["choices"][0]["message"]["content"]
+                except Exception as e:
+                    print("[autofix] %s/%s failed: %s" % (name, model, e), flush=True)
+                    last_reason = "%s/%s failed: %s" % (name, model, str(e)[:120])
+                    continue
+
+                if not fixed_code:
+                    last_reason = "%s/%s returned no code" % (name, model)
+                    continue
+                cleaned = strip_code_fences(fixed_code)
+                if (not cleaned.strip()
+                        or cleaned.strip() == original.strip()
+                        or abs(len(cleaned) - len(original)) > max(len(original), 1000)):
+                    last_reason = "%s/%s returned unchanged or invalid code" % (name, model)
+                    continue
+
+                try:
+                    os.makedirs(backup_dir, exist_ok=True)
+                    if not os.path.exists(backup):
+                        with open(backup, "w", encoding="utf-8") as f:
+                            f.write(original)
+                    with open(target, "w", encoding="utf-8", newline="") as f:
+                        f.write(cleaned)
+                except Exception as e:
+                    last_reason = "write failed: %s" % e
+                    continue
+
+                if _file_has_errors(rel):
+                    # Model claimed a fix but the analyzer still disagrees: undo it
+                    # and let the next provider take a turn from the original code.
+                    try:
+                        with open(target, "w", encoding="utf-8", newline="") as f:
+                            f.write(original)
+                    except Exception:
+                        pass
+                    last_reason = "%s/%s fix did not clear the analyzer errors" % (name, model)
+                    continue
+
+                provider = "%s/%s" % (name, model)
+                verified = True
+                break
+
+            if verified:
+                fixed.append({"path": rel, "errors": len(task["errors"]),
+                              "provider": provider})
+            else:
+                failed.append({"path": rel, "error": last_reason})
+
+        # Return a freshly computed problem payload so the UI can clear the
+        # Explorer badge/tree immediately, without waiting for another fetch.
+        # A short retry protects against a just-written file being reported
+        # stale by the analyzer for a moment.
+        fixed_paths = set(f["path"] for f in fixed)
+        fresh = _compute_problems()
+        for _ in range(3):
+            still = [p for p in fixed_paths if p in (fresh.get("files") or {})]
+            if not still:
+                break
+            time.sleep(1.0)
+            fresh = _compute_problems()
+        with _PROBLEMS_LOCK:
+            _PROBLEMS_CACHE["ts"] = time.time()
+            _PROBLEMS_CACHE["data"] = fresh
+
+        return jsonify({
+            "ok": True,
+            "fixed": fixed,
+            "failed": failed,
+            "attempted": min(len(tasks), _EXPLORER_AUTOFIX_MAX_FILES),
+            "remaining": fresh.get("total", 0),
+            "problems": fresh,
+            "message": "Explorer auto-fix finished.",
+        })
+    finally:
+        _EXPLORER_AUTOFIX_LOCK.release()
 
 
 @app.route('/api/files', methods=['GET'])

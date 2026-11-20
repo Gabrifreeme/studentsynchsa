@@ -2487,6 +2487,39 @@
 }
 /* Green tick at the start of every Live System Feed line. */
 .acesi-3d-line-block .lsf-tick { color: #2ecc71; font-weight: bold; }
+/* Explorer auto-fix chat notification: flashes, then disappears. */
+.ace-explorer-notif {
+  animation: aceExplorerFlash 0.65s ease-in-out 3;
+}
+@keyframes aceExplorerFlash {
+  0%, 100% {
+    background: rgba(25, 25, 25, 0.95);
+    border-color: #ffbf00;
+    color: #ffbf00;
+    box-shadow: 0 0 0 rgba(255, 191, 0, 0);
+  }
+  50% {
+    background: rgba(120, 78, 0, 0.95);
+    border-color: #fff2a8;
+    color: #fff2a8;
+    box-shadow: 0 0 16px rgba(255, 191, 0, 0.85);
+  }
+}
+.ace-explorer-notif.ace-notif-leaving {
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+}
+.ace-notif-restart {
+  display: block;
+  margin-top: 4px;
+  color: #fff2a8;
+  font-weight: bold;
+  animation: aceRestartFlash 0.5s ease-in-out 4;
+}
+@keyframes aceRestartFlash {
+  0%, 100% { color: #ffbf00; text-shadow: none; }
+  50% { color: #fffbe0; text-shadow: 0 0 10px #ffd54a, 0 0 18px #ff9d00; }
+}
 </style>
 </head>
 
@@ -6292,6 +6325,14 @@ perspective: 900px;
 
           explorerUpdateProblemBadge(data);
 
+          // If Explorer is showing errors, fix them automatically and flash a
+          // short notification in the chat panel. The signature/attempt guards
+          // stop the follow-up re-scan from starting an endless fix loop.
+          if (data.counts && data.counts.error > 0 && !data.running &&
+              typeof window.aceAutoFixExplorerProblems === "function") {
+            window.aceAutoFixExplorerProblems(data);
+          }
+
           if (window.ACE_EXPLORER_TREE) {
 
             explorerRenderTree(window.ACE_EXPLORER_TREE);
@@ -6316,6 +6357,121 @@ perspective: 900px;
 
         }
 
+      };
+
+      // Flash a short ACEsi notification in the chat panel, then remove it.
+      // Passing an existing element updates that notification instead of
+      // stacking a second one (used for "fixing..." -> "fixed").
+      window.aceExplorerNotify = function (message, existing, highlightTail) {
+        var chat = document.getElementById("chat-messages");
+        if (!chat) return null;
+        var div = existing;
+        if (!div) {
+          div = document.createElement("div");
+          div.className = "acesi-msg ace-explorer-notif";
+          div.style.background = "#191919";
+          div.style.padding = "8px 12px";
+          div.style.borderRadius = "6px";
+          div.style.border = "2px solid #ffbf00";
+          div.style.marginBottom = "8px";
+          div.style.marginLeft = "20px";
+          var label = document.createElement("b");
+          label.textContent = "ACEsi: ";
+          div.appendChild(label);
+          var msgSpan = document.createElement("span");
+          msgSpan.className = "ace-notif-text";
+          div.appendChild(msgSpan);
+          var user = chat.querySelector(".ace-user-msg");
+          if (user && user.parentNode) {
+            user.parentNode.insertBefore(div, user.nextSibling);
+          } else {
+            chat.insertBefore(div, chat.firstChild);
+          }
+        }
+        var msgSpan = div.querySelector(".ace-notif-text");
+        if (!msgSpan) {
+          msgSpan = document.createElement("span");
+          msgSpan.className = "ace-notif-text";
+          div.appendChild(msgSpan);
+        }
+        var text = String(message);
+        var tail = "";
+        if (text.slice(-24) === " Restart to take effect.") {
+          tail = " Restart to take effect.";
+          text = text.slice(0, -tail.length);
+        }
+        msgSpan.textContent = text;
+        if (tail) {
+          var flash = document.createElement("span");
+          flash.className = "ace-notif-restart";
+          flash.textContent = tail;
+          msgSpan.appendChild(flash);
+        }
+        div.classList.remove("ace-notif-leaving");
+        div.style.opacity = "1";
+        div.style.animation = "none";
+        void div.offsetWidth;
+        div.style.animation = "";
+        clearTimeout(div._aceNotifTimer);
+        div._aceNotifTimer = setTimeout(function () {
+          div.classList.add("ace-notif-leaving");
+          setTimeout(function () {
+            if (div.parentNode) div.parentNode.removeChild(div);
+          }, 400);
+        }, 5000);
+        return div;
+      };
+
+      window.aceAutoFixExplorerProblems = async function (data) {
+        if (window._aceAutoFixRunning) return;
+        var counts = (data && data.counts) || {};
+        var errs = counts.error || 0;
+        if (!errs || (data && data.running)) return;
+        if ((window._aceAutoFixAttempts || 0) >= 6) return;
+        var fileNames = Object.keys((data && data.files) || {}).sort();
+        var sig = fileNames.join("|") + "#" + errs;
+        if (window._aceAutoFixSignature === sig) return;
+        window._aceAutoFixSignature = sig;
+        window._aceAutoFixAttempts = (window._aceAutoFixAttempts || 0) + 1;
+        window._aceAutoFixRunning = true;
+
+        var notif = window.aceExplorerNotify(
+          "ACEsi found " + errs + " Explorer error(s) and is fixing them now... Restart to take effect.");
+        try {
+          var res = await fetch("/api/explorer/autofix", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          });
+          var out = await res.json();
+          if (!out.ok) throw new Error(out.error || ("HTTP " + res.status));
+          var fixed = out.fixed || [];
+          var msg = fixed.length
+            ? "ACEsi auto-fixed " + fixed.length + " file(s): " +
+              fixed.map(function (f) { return f.path; }).join(", ") + "."
+            : (out.message || "ACEsi checked Explorer; nothing needed fixing.");
+          if ((out.failed || []).length) {
+            msg += " " + out.failed.length + " file(s) still need attention.";
+          }
+          msg += " Restart to take effect.";
+          window.aceExplorerNotify(msg, notif, true);
+          // Apply the fresh scan returned by the fix endpoint immediately so
+          // the red badge/tree markers clear in the same response.
+          if (out.problems) {
+            window.ACE_PROBLEMS = out.problems.files || {};
+            explorerUpdateProblemBadge(out.problems);
+            if (window.ACE_EXPLORER_TREE) {
+              explorerRenderTree(window.ACE_EXPLORER_TREE);
+            }
+          }
+          // Then confirm with a normal fresh read shortly afterwards.
+          setTimeout(function () { window.loadExplorerProblems(true); }, 800);
+        } catch (e) {
+          window.aceExplorerNotify(
+            "ACEsi could not finish the Explorer auto-fix: " + e.message, notif);
+        } finally {
+          window._aceAutoFixRunning = false;
+        }
       };
 
       function explorerRenderTree(tree) {

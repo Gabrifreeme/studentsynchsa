@@ -87,6 +87,8 @@ server_stderr.txt.*
 ace_memory.json
 
 .ace_keys.local
+.ace_token_usage.json
+.ace_autofix_backups/
 
 tasks.json
 
