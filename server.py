@@ -7341,6 +7341,33 @@ def _generate_direct_syntax_fix(user_message, content):
     return None
 
 
+def _dart_analyze_file_errors(path):
+    """Best-effort list of `dart analyze` issues for a single file.
+
+    Returns a list of issue strings (empty when the file is clean), or None
+    when the analysis could not run (dart missing, timeout, ...)."""
+    try:
+        dart = _find_dart()
+        if not dart:
+            return None
+        try:
+            out = _check_output(
+                [dart, "analyze", os.path.abspath(path)],
+                stderr=subprocess.STDOUT, text=True, timeout=90)
+        except subprocess.CalledProcessError as e:
+            # dart analyze exits nonzero when the file has issues; its output
+            # still lists them, so parse the exception output.
+            out = e.output or ""
+    except Exception:
+        return None
+    issues = []
+    for ln in (out or "").splitlines():
+        s = ln.strip()
+        if s.startswith("error") or s.startswith("warning"):
+            issues.append(s)
+    return issues
+
+
 def _build_mode_direct_fix(user_message):
     """Build Mode: when the user asks ACEsi to fix something in a file, do it
     directly - read the file, analyze the syntax error, generate the fix and
@@ -7378,16 +7405,30 @@ def _build_mode_direct_fix(user_message):
     fixed = (fixed or "").strip() if isinstance(fixed, str) else ""
     if not fixed or fixed == content.strip():
         return ("Read %s - no syntax error detected." % rel, target)
+    # Honest verification (fast): check the file's analyze issues BEFORE
+    # writing; only if there were issues do we analyze again AFTER writing,
+    # so we only claim a "fixed syntax error" when something was broken and
+    # is now clean. Otherwise we say the file was updated without claiming a
+    # fix that was never verified.
+    errors_before = _dart_analyze_file_errors(rp)
     try:
         with open(rp, "w") as f:
             f.write(fixed)
         _log_change(rp, content, fixed, source="direct_fix")
     except Exception as e:
         return ("Read %s and generated the fix, but saving it failed: %s" % (rel, e), target)
-    # Be honest: we write the model's output when it differs from the file.
-    # We do not claim a "fixed syntax error" - only "the file was updated" -
-    # because nothing was verified as broken.
-    return ("Read %s - the file was updated." % rel, target)
+    if not errors_before:
+        # File is clean (or analysis unavailable): say "the file was updated"
+        # and never claim a "fixed syntax error" that wasn't verified.
+        return ("Read %s - the file was updated." % rel, target)
+    errors_after = _dart_analyze_file_errors(rp)
+    if errors_after is None:
+        return ("Read %s - the file was updated." % rel, target)
+    if not errors_after:
+        # errors existed before the write and the file is clean after:
+        # this claim is now backed by our own verification.
+        return ("Read %s and fixed the syntax error directly." % rel, target)
+    return ("Read %s - the file was updated, but %d error(s) remain." % (rel, len(errors_after)), target)
 
 
 @app.route('/api/autofix', methods=['POST', 'OPTIONS'])
