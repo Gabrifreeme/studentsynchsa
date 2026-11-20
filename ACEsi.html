@@ -4691,9 +4691,9 @@ perspective: 900px;
 
           >
 
-            <button
+            <button id="acesi-mic-btn"
 
-              onclick="document.getElementById('chat-input').focus()"
+              onclick="window.acesiToggleMic && window.acesiToggleMic(this)"
 
               title="Mic"
 
@@ -4719,9 +4719,9 @@ perspective: 900px;
 
             </button>
 
-            <button
+            <button id="acesi-spk-btn"
 
-              onclick="if (window.showAceToast) window.showAceToast('Speaker: audio feedback on')"
+              onclick="window.acesiToggleSpeaker && window.acesiToggleSpeaker(this)"
 
               title="Speaker"
 
@@ -4747,9 +4747,9 @@ perspective: 900px;
 
             </button>
 
-            <button
+            <button id="acesi-upl-btn"
 
-              onclick="document.getElementById('chat-file').click()"
+              onclick="window.acesiTriggerUpload && window.acesiTriggerUpload()"
 
               title="Upload"
 
@@ -14910,6 +14910,155 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 })();
 </script>
+
+<script id="acesi-toolbar-media-fix">
+(function () {
+  if (window.__acesiToolbarMediaFixInstalled) return;
+  window.__acesiToolbarMediaFixInstalled = true;
+
+  var ttsEnabled = false;
+  var activeRec = null;
+
+  function toast(msg) {
+    if (typeof window.showAceToast === "function") {
+      try { window.showAceToast(msg); return; } catch (_) {}
+    }
+    console.log("[ACEsi]", msg);
+  }
+
+  function getChatInput() {
+    return (
+      document.getElementById("chat-input") ||
+      document.querySelector("textarea#prompt, textarea[name='message'], textarea, input[type='text']")
+    );
+  }
+
+  function getFileInput() {
+    var inp = document.getElementById("chat-file");
+    if (!inp) {
+      inp = document.createElement("input");
+      inp.type = "file";
+      inp.id = "chat-file";
+      inp.multiple = true;
+      inp.style.display = "none";
+      document.body.appendChild(inp);
+    }
+    if (!inp.dataset.acesiBound) {
+      inp.dataset.acesiBound = "1";
+      inp.addEventListener("change", function () {
+        if (!inp.files || !inp.files.length) return;
+        var names = Array.prototype.map.call(inp.files, function (f) { return f.name; });
+        var box = getChatInput();
+        if (box) {
+          var prefix = box.value && !box.value.endsWith(" ") && !box.value.endsWith("\n") ? " " : "";
+          box.value = (box.value || "") + prefix + "[Attached: " + names.join(", ") + "] ";
+          box.focus();
+          box.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        toast("Attached: " + names.join(", "));
+      });
+    }
+    return inp;
+  }
+
+  function speakLatestReply() {
+    if (!("speechSynthesis" in window)) {
+      toast("Speech synthesis not supported in this browser");
+      return;
+    }
+    var msgs = document.querySelectorAll(".message, .chat-message, .assistant-message, [data-role='assistant'], .msg");
+    var text = "";
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      var raw = (msgs[i].innerText || "").trim();
+      if (raw && !/^You:/i.test(raw)) {
+        text = raw.replace(/^ACEsi:\s*/i, "").slice(0, 800);
+        break;
+      }
+    }
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    var utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1.0;
+    window.speechSynthesis.speak(utter);
+  }
+
+  window.acesiToggleMic = function (btn) {
+    var box = getChatInput();
+    if (box) box.focus();
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      toast("Mic focused (SpeechRecognition unavailable in this browser)");
+      return;
+    }
+    if (activeRec) {
+      try { activeRec.stop(); } catch (_) {}
+      activeRec = null;
+      if (btn) btn.style.boxShadow = "";
+      toast("Mic stopped");
+      return;
+    }
+    var rec = new SR();
+    rec.lang = navigator.language || "en-ZA";
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    activeRec = rec;
+    if (btn) btn.style.boxShadow = "0 0 8px #ff9d00";
+    toast("Listening...");
+
+    rec.onresult = function (ev) {
+      var transcript = "";
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        transcript += ev.results[i][0].transcript;
+      }
+      if (box) {
+        box.value = transcript;
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    };
+    rec.onerror = function (ev) {
+      activeRec = null;
+      if (btn) btn.style.boxShadow = "";
+      toast("Mic error: " + (ev.error || "unknown"));
+    };
+    rec.onend = function () {
+      activeRec = null;
+      if (btn) btn.style.boxShadow = "";
+    };
+    try {
+      rec.start();
+    } catch (err) {
+      activeRec = null;
+      if (btn) btn.style.boxShadow = "";
+      toast("Could not start mic: " + err.message);
+    }
+  };
+
+  window.acesiToggleSpeaker = function (btn) {
+    ttsEnabled = !ttsEnabled;
+    if (!ttsEnabled && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (btn) {
+      btn.style.background = ttsEnabled ? "#ff9d00" : "#000";
+      btn.style.color = ttsEnabled ? "#000" : "#ff9d00";
+    }
+    toast(ttsEnabled ? "Speaker ON: reading latest reply" : "Speaker OFF");
+    if (ttsEnabled) speakLatestReply();
+  };
+
+  window.acesiTriggerUpload = function () {
+    var inp = getFileInput();
+    inp.click();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", getFileInput);
+  } else {
+    getFileInput();
+  }
+})();
+</script>
+
 </body>
 
 </html>
