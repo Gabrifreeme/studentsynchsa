@@ -3707,8 +3707,12 @@ git add -u (stage tracked)</label
         overflow-y: auto;
 
       "
-
+    
     >
+
+      <div style="position: sticky; top: 0; z-index: 5; display: flex; justify-content: flex-end; background: #000; padding: 2px 0;">
+        <button title="Close Settings" onclick="document.getElementById('settings-panel').style.display='none'" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;width:26px;height:26px;font-size:14px;cursor:pointer;">✕</button>
+      </div>
 
       <div style="margin-bottom: 12px">
 
@@ -4528,7 +4532,7 @@ git add -u (stage tracked)</label
 
         title="Run Execution"
 
-        onclick="var sp=document.getElementById('settings-panel');if(sp)sp.style.display='none';document.getElementById('run-panel').style.display = 'block'"
+        onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'"
 
         style="
 
@@ -4556,7 +4560,7 @@ git add -u (stage tracked)</label
 
         title="Open Terminal"
 
-        onclick="window.toggleAceTerminal()"
+        onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()"
 
         style="
 
@@ -11929,6 +11933,8 @@ let _geoPayload = {};
 
       window.openSettings = function () {
 
+        if (window.aceCloseAllPanels) window.aceCloseAllPanels('settings-panel');
+
         var panel = document.getElementById("settings-panel");
 
         if (panel) {
@@ -16367,6 +16373,26 @@ document.addEventListener('DOMContentLoaded', function() {
     applySpeakerVisual(null, false);
   }
 })();
+
+// Close every overlay/view except the one named. Keeps panels mutually exclusive.
+window.aceCloseAllPanels = function (exceptId) {
+  var ids = ['run-panel','settings-panel','inspect-panel','messily-panel','portal-panel',
+             'scrcpy-panel','acesi-goto-modal','autofix-modal','terminal-panel',
+             'mem-manager','history-log-modal','skill-manager'];
+  ids.forEach(function (id) {
+    if (id === exceptId) return;
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'terminal-panel') {
+      try { el.style.setProperty('display','none','important'); } catch (e) {}
+      try { el.setAttribute('hidden',''); } catch (e) {}
+    } else if (el.remove && ['mem-manager','history-log-modal','skill-manager'].indexOf(id) !== -1) {
+      try { el.remove(); } catch (e) {}
+    } else {
+      try { el.style.display = 'none'; } catch (e) {}
+    }
+  });
+};
 </script>
 
 </body>
