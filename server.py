@@ -1236,6 +1236,65 @@ def set_config(key, value):
     conn.commit()
     conn.close()
 
+
+# ===== Named system prompts (library with keyword auto-selection) =====
+_PROMPTS_KEY = "system_prompts_library"
+
+
+def get_prompt_library():
+    """Return the list of saved prompts: [{name, keywords, content}, ...]."""
+    try:
+        raw = get_config(_PROMPTS_KEY, "") or ""
+        data = json.loads(raw) if raw else []
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_prompt_library(prompts):
+    """Persist the named-prompt library and invalidate the prompt cache."""
+    try:
+        set_config(_PROMPTS_KEY, json.dumps(prompts or [], ensure_ascii=False))
+        _SAVED_PROMPT_CACHE["at"] = 0.0
+        _SAVED_PROMPT_CACHE["text"] = ""
+        return True
+    except Exception:
+        return False
+
+
+def choose_prompt_for_message(message):
+    """Pick the saved prompt whose keywords best match the request; set it as
+    the active system prompt and return (content, name). Returns ("", "") when
+    there is no match so the caller keeps the current prompt."""
+    prompts = get_prompt_library()
+    if not prompts:
+        return "", ""
+    msg = (message or "").lower()
+    words = set(re.findall(r"[a-z0-9_]+", msg))
+    best, best_score = None, 0
+    for p in prompts:
+        if not isinstance(p, dict):
+            continue
+        kws = str(p.get("keywords", "") or "")
+        kws = [k.strip().lower() for k in re.split(r"[,;|\n]", kws) if k.strip()]
+        score = 0
+        for kw in kws:
+            if kw in msg:
+                score += 3
+            elif any(kw in w or w in kw for w in words if len(kw) > 2):
+                score += 1
+        if score > best_score:
+            best_score, best = score, p
+    if not best or best_score == 0:
+        return "", ""
+    content = str(best.get("content", "") or "")
+    name = str(best.get("name", "") or "unnamed")
+    set_config("system_prompt", content)
+    _SAVED_PROMPT_CACHE["at"] = 0.0
+    _SAVED_PROMPT_CACHE["text"] = ""
+    return content, name
+
+
 # ===== JSON data layer (tasks / events / timers / alarms / sessions / notifications) =====
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 _data_lock = threading.RLock()
@@ -7141,7 +7200,15 @@ def chat():
         # Append the user-saved system prompt from Settings if present.
         # (This was appended twice - the same block appeared back to back, which
         # wasted tokens and repeated every rule to the model.)
-        _saved_sys_prompt = get_config("system_prompt", "")
+        # Auto-select a named prompt by keyword match on the clean request, then
+        # use it AS the system prompt (and persist it as the active one).
+        try:
+            _matched, _matched_name = choose_prompt_for_message(request_text)
+            if _matched:
+                _live_log("prompt selected: %s" % _matched_name)
+        except Exception:
+            _matched = ""
+        _saved_sys_prompt = _matched or get_config("system_prompt", "")
         if _saved_sys_prompt and str(_saved_sys_prompt).strip():
             system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
 
@@ -19197,6 +19264,22 @@ sys.stdout = SimpleLogger(sys.stdout, _LOG_QUEUE)
 for _h in logging.getLogger('werkzeug').handlers:
     if isinstance(_h, logging.StreamHandler):
         _h.stream = sys.stdout
+
+@app.route('/api/prompts', methods=['GET', 'POST', 'OPTIONS'])
+@require_token
+def api_prompts():
+    """Named system-prompt library: list/save prompts with keyword routing."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        prompts = data.get('prompts')
+        if not isinstance(prompts, list):
+            return jsonify({"ok": False, "message": "prompts must be a list"}), 400
+        ok = save_prompt_library(prompts)
+        return jsonify({"ok": bool(ok), "count": len(prompts)})
+    return jsonify({"ok": True, "prompts": get_prompt_library()})
+
 
 @app.route('/api/settings', methods=['GET', 'POST', 'OPTIONS'])
 @require_token
