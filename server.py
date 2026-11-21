@@ -10978,6 +10978,47 @@ def tool_cdp_status():
     return True, d.status()
 
 
+def tool_cdp_screenshot(save_path=""):
+    """Self-verification: screenshot the current CDP page to a PNG on disk.
+    Returns (ok, saved_path). Use with cdp_connect to look at ACEsi's own UI."""
+    return d.capture_screenshot(save_path=(save_path or "").strip() or None)
+
+
+def tool_ui_selfcheck(checks="", expr=""):
+    """Inspect ACEsi's OWN rendered page via CDP: screenshot + console errors +
+    DOM + optional JS expression (computed styles, element positions, etc).
+    Use after changing ACEsi.html to SEE whether the result actually works."""
+    wanted = set(x.strip().lower() for x in str(checks or "").split(",") if x.strip())
+    if not wanted:
+        wanted = {"status", "dom", "console", "screenshot"}
+    lines, ok_all = [], True
+    # Always attach to ACEsi's own tab (title match), like need_verify_in_browser.
+    ok, res = _call_tool("cdp_connect", {"target": _ACE_VERIFY_TARGET})
+    ok_all = ok_all and ok
+    lines.append("connect: %s" % str(res)[:200])
+    if "screenshot" in wanted:
+        ok, res = _call_tool("cdp_screenshot", {})
+        ok_all = ok_all and ok
+        lines.append("screenshot: %s" % str(res)[:300])
+    if "console" in wanted:
+        ok, res = _call_tool("cdp_console_logs", {})
+        ok_all = ok_all and ok
+        lines.append("console: %s" % str(res)[:1200])
+    if "dom" in wanted:
+        ok, res = _call_tool("cdp_dom_state", {})
+        ok_all = ok_all and ok
+        lines.append("dom: %s" % str(res)[:1200])
+    if "status" in wanted:
+        ok, res = _call_tool("cdp_status", {})
+        ok_all = ok_all and ok
+        lines.append("status: %s" % str(res)[:300])
+    if (expr or "").strip():
+        ok, res = _call_tool("cdp_evaluate", {"expr": expr})
+        ok_all = ok_all and ok
+        lines.append("eval: %s" % str(res)[:1500])
+    return bool(ok_all), "\n".join(lines)
+
+
 # "Verify in Browser" always inspects ACEsi's own, already-open page. The old
 # tool accepted a model-supplied `url` and navigated to it; the model invented
 # paths like /explorer, got a 404, then asked for a Flask route that does not
@@ -11825,6 +11866,50 @@ def tool_delegate(task, scope="code"):
     return True, report[:12000]
 
 
+def tool_delegate_parallel(tasks, scope="code"):
+    """Run several focused sub-agent investigations in PARALLEL, each with its
+    own isolated context, and return all reports together. Use for independent
+    questions that can be answered at the same time (much faster than serial)."""
+    if _kill_armed():
+        return False, "E-STOP is armed — no delegate."
+    try:
+        items = json.loads(tasks) if isinstance(tasks, str) else tasks
+    except Exception:
+        items = None
+    if not isinstance(items, list) or not items:
+        return False, "delegate_parallel needs a JSON list of task strings"
+    items = [str(t).strip() for t in items if str(t).strip()][:8]
+    if not items:
+        return False, "no valid tasks supplied"
+    results = [None] * len(items)
+
+    def _worker(i, task):
+        # Each thread needs its own Flask app context so has_request_context()/g
+        # inside tool_delegate are safe and don't touch the parent's deadline.
+        try:
+            with app.app_context():
+                results[i] = tool_delegate(task, scope=scope)
+        except Exception as e:
+            results[i] = (False, "task error: %s" % e)
+
+    threads = [threading.Thread(target=_worker, args=(i, t), daemon=True)
+               for i, t in enumerate(items)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=120)
+
+    out = []
+    for i, r in enumerate(results):
+        label = "TASK %d: %s" % (i + 1, items[i][:80])
+        if r is None:
+            out.append(label + "\n(timed out)")
+        else:
+            okv, rep = r
+            out.append(label + "\n" + ("OK" if okv else "FAILED") + ": " + str(rep)[:6000])
+    return True, "\n\n".join(out)[:20000]
+
+
 TOOLS = {
     "list_files": (tool_list_files, ("path",)),
     "read_file": (tool_read_file, ("path",)),
@@ -11835,6 +11920,7 @@ TOOLS = {
     "view_user_file": (tool_view_user_file, ("path",)),
     "grep": (tool_grep, ("pattern", "path")),
     "delegate": (tool_delegate, ("task", "scope")),
+    "delegate_parallel": (tool_delegate_parallel, ("tasks", "scope")),
     "write_file": (tool_write_file, ("path", "content")),
     "open_in_vscode": (tool_open_in_vscode, ("path", "content")),
     "edit_file": (tool_edit_file, ("path", "old", "new")),
@@ -11873,6 +11959,8 @@ TOOLS = {
     "cdp_network_requests": (tool_cdp_network_requests, ()),
     "cdp_get_response_body": (tool_cdp_get_response_body, ()),
     "cdp_status": (tool_cdp_status, ()),
+    "cdp_screenshot": (tool_cdp_screenshot, ("save_path",)),
+    "ui_selfcheck": (tool_ui_selfcheck, ("checks", "expr")),
     "need_verify_in_browser": (tool_need_verify_in_browser, ("target", "url", "checks")),
     "devtool_list": (tool_devtool_list, ("tool", "category", "query")),
     "devtool_run": (tool_devtool_run, ("tool", "input", "values")),
@@ -11933,6 +12021,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "delegate",
         "description": "Run a focused SUB-AGENT task in isolation: it explores with read-only tools (list_files, read_file, grep) and returns a detailed written report. Use for deep investigations (e.g. 'map every overlay panel and its openers', 'find where X is defined'). It cannot modify files. Args: task (what to investigate), scope optional ('read'|'code'|'web', default 'code').",
         "parameters": {"type": "object", "properties": {"task": {"type": "string"}, "scope": {"type": "string"}}, "required": ["task"]}}},
+    {"type": "function", "function": {"name": "delegate_parallel",
+        "description": "Run SEVERAL independent sub-agent investigations in PARALLEL, each isolated, and return all reports. Much faster than calling delegate repeatedly for separate questions. Args: tasks (JSON list of task strings), scope optional.",
+        "parameters": {"type": "object", "properties": {"tasks": {"type": "string"}, "scope": {"type": "string"}}, "required": ["tasks"]}}},
     {"type": "function", "function": {"name": "write_file",
         "description": "Create/overwrite a file. Args: path, content.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
@@ -12103,6 +12194,13 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "cdp_status",
         "description": "Current CDP connection status (connected, ws_url, console/network event counts).",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "cdp_screenshot",
+        "description": "Self-verification: screenshot the current CDP page to a PNG on disk and return its path. Connect to ACEsi's own tab first with cdp_connect(target='ACESi'). Args: save_path optional.",
+        "parameters": {"type": "object", "properties": {"save_path": {"type": "string"}}, "required": []}}},
+    {"type": "function", "function": {"name": "ui_selfcheck",
+        "description": "SEE your own work: inspect ACEsi's rendered page via CDP in one call. Attaches to the current ACEsi tab, then reports status, a DOM snapshot, console messages, a screenshot path, and optionally evaluates a JS expression (for computed styles, element positions, etc). Use after changing ACEsi.html to confirm it actually renders correctly. Args: checks (comma list of status,dom,console,screenshot), expr (optional JS expression).",
+        "parameters": {"type": "object", "properties": {
+            "checks": {"type": "string"}, "expr": {"type": "string"}}, "required": []}}},
     {"type": "function", "function": {"name": "need_verify_in_browser",
         "description": "One-shot browser verification of ACEsi's own already-open page via CDP in a single call: attach to the current ACEsi tab, then report connection status, DOM snapshot, console messages and network requests. Inspects the current page only - IT DOES NOT NAVIGATE, so never supply a url or invent a route like /explorer; there is no such page and a 404 proves nothing. Args: checks (optional comma list of status,dom,console,network).",
         "parameters": {"type": "object", "properties": {
@@ -12341,7 +12439,7 @@ OLLAMA_SYS_PROMPT = (
 )
 
 _ICONS = {
-    "list_files": "📂", "read_file": "📄", "grep": "🔍", "delegate": "🤖",
+    "list_files": "📂", "read_file": "📄", "grep": "🔍", "delegate": "🤖", "delegate_parallel": "🤖", "cdp_screenshot": "📷", "ui_selfcheck": "🔍",
     "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
     "run_command": "▶", "notify": "🔔", "notify_gabriel": "👨‍👦", "web_search": "🔎", "webfetch": "🌐",
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
@@ -12647,7 +12745,7 @@ _index_tool_param_types()
 # dispatch loop consults ALLOWED_DOMAINS per request.
 _TOOL_DOMAINS = {
     # isolated sub-agent (read-only exploration)
-    "delegate": "code",
+    "delegate": "code", "delegate_parallel": "code", "ui_selfcheck": "ui", "cdp_screenshot": "ui",
     # device UI work
     "ui_device": "ui", "ui_connect": "ui",
     "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
@@ -13900,6 +13998,9 @@ _SHORT_DESCRIPTIONS = {
     "write_file": "Create or overwrite a file. Args: path, content.",
     "grep": "Regex search file contents. Args: pattern, path.",
     "delegate": "Run an isolated read-only sub-agent to investigate a task and report back. Args: task, scope.",
+    "delegate_parallel": "Run several sub-agent investigations in parallel. Args: tasks (JSON list), scope.",
+    "ui_selfcheck": "Inspect ACEsi own UI via CDP: screenshot, console, DOM, JS. Args: checks, expr.",
+    "cdp_screenshot": "Screenshot the current CDP page to a PNG. Args: save_path.",
     "list_files": "List files and folders in a directory. Args: path.",
     "flutter_analyze": "Run flutter analyze and return every diagnostic. No args.",
     "git_status": "Short git status including the current branch. No args.",
@@ -13944,7 +14045,7 @@ _SHORT_DESCRIPTIONS = {
 # network-inspection tools lead because reading a POST is the task that was
 # blocked; screen tools follow; shell and file access trail.
 _REDUCED_TOOL_ORDER = [
-    "delegate",
+    "delegate", "delegate_parallel", "ui_selfcheck", "cdp_screenshot",
     # Research / internet — a planner must be able to look things up before it
     # can produce a real plan. These were missing from reduced mode, so Groq/
     # Gemini never got offered web search and claimed "I cannot search".

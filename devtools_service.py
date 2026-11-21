@@ -246,9 +246,11 @@ def _ensure_local_browser():
         candidate = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
         if not os.path.exists(candidate):
             return False
-    profile = r"C:\Users\chris\AppData\Local\Temp\ace_cdp_browser"
+    import tempfile as _tf
+    _tmp = _tf.gettempdir()  # user-neutral temp dir (was hardcoded C:\Users\chris)
+    profile = os.path.join(_tmp, "ace_cdp_browser")
     os.makedirs(profile, exist_ok=True)
-    logf = open(r"C:\Users\chris\AppData\Local\Temp\ace_cdp.log", "a")
+    logf = open(os.path.join(_tmp, "ace_cdp.log"), "a")
     try:
         subprocess.Popen([candidate, "--headless=new", "--disable-gpu",
                           f"--remote-debugging-port={port}", "--remote-allow-origins=*",
@@ -853,6 +855,34 @@ def get_dom_state():
         return True, _format_js_value(val, indent=2)[:3000]
     except Exception:
         return False, "evaluate failed: %s" % json.dumps(resp)[:400]
+
+
+def capture_screenshot(save_path=None):
+    """Capture a screenshot of the current CDP page via Page.captureScreenshot.
+
+    Returns (ok, result) where result is the saved PNG path on success, or an
+    error string. Used by ACEsi to VERIFY its own rendered UI after a change.
+    """
+    import base64 as _b64
+    s = _get_session()
+    if not s:
+        return False, "no reachable CDP target"
+    try:
+        mid = s._send("Page.captureScreenshot", {
+            "format": "png", "fromSurface": True, "captureBeyondViewport": True})
+        resp = s._wait(mid, timeout=12)
+        data = (resp.get("result") or {}).get("data")
+        if not data:
+            return False, "screenshot returned no data: %s" % json.dumps(resp)[:300]
+        raw = _b64.b64decode(data)
+        if not save_path:
+            save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "acesi_selfcheck.png")
+        with open(save_path, "wb") as _f:
+            _f.write(raw)
+        return True, save_path
+    except Exception as e:
+        return False, "screenshot failed: %s" % e
 
 
 def evaluate_js(expr):
