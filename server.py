@@ -11557,6 +11557,120 @@ def tool_trigger_auto_fix(path):
     socketio.emit('ai_action', {'tool': 'trigger_auto_fix', 'path': path})
     return True, "Auto Fix triggered for %s" % path
 
+
+def tool_delegate(task, scope="code"):
+    """Run a focused sub-agent task in an ISOLATED loop (no global _AGENT state,
+    no socket emissions). Uses only read-only tools so it can investigate code
+    safely, then returns a written report to the main agent."""
+    if _kill_armed():
+        return False, "E-STOP is armed — no delegate."
+    task = (task or "").strip()
+    if not task:
+        return False, "delegate requires a 'task' description."
+
+    # Read-only toolset. 'code' scope can also read git history; 'web' adds fetch.
+    base = {"list_files", "read_file", "grep"}
+    allowed = {
+        "read": set(base),
+        "code": set(base) | {"git_log", "git_status"},
+        "web": set(base) | {"web_search", "webfetch"},
+    }.get((scope or "code").strip().lower(), set(base))
+    schema = _filter_tools_schema(TOOLS_SCHEMA, allowed)
+
+    system = (
+        "You are ACEsi's exploration sub-agent. Complete the task using ONLY the "
+        "provided tools. Be thorough: report exact file paths, line numbers, function "
+        "names and code snippets. Do NOT modify any files. When finished, write a "
+        "clear, self-contained final report and stop calling tools.\n"
+        "Allowed tools: " + ", ".join(sorted(allowed))
+    )
+    msgs = [{"role": "system", "content": system},
+            {"role": "user", "content": task}]
+
+    chain = [p for p in _chat_providers() if p[2]]  # (name, endpoint, key, model)
+    if not chain:
+        return False, "No provider configured — delegate cannot run."
+
+    saved_deadline = None
+    had_ctx = has_request_context()
+    if had_ctx:
+        saved_deadline = getattr(g, "chat_deadline", None)
+        g.chat_deadline = None  # isolated run: don't inherit the caller's 20s clip
+
+    def _clean(t):
+        """Strip any stray tool-call markup the model may emit as prose."""
+        import re as _re
+        t = t or ""
+        t = _re.sub(r"<tool_call>.*?</tool_call>", "", t, flags=_re.S)
+        t = _re.sub(r"<function=.*?</function>", "", t, flags=_re.S)
+        t = _re.sub(r"```(?:json)?.*?```", "", t, flags=_re.S)
+        return t.strip()
+
+    report = "(sub-agent produced no report)"
+    final_sys = system + ("\nIMPORTANT: write ONLY a plain-text final report. "
+                          "Do NOT call tools or emit <tool_call> markup in your answer.")
+    try:
+        for rnd in range(6):  # bounded independent step cap
+            got = None
+            used = None
+            for p in chain:
+                name, endpoint, api_key, model = p
+                # Gemini strips tool messages; our loop needs them, so prefer
+                # non-Gemini providers. Fall back to Gemini only if nothing else.
+                got = _chat_one(name, endpoint, api_key, model, list(msgs),
+                                tools_schema=schema, tool_choice="auto",
+                                timeout=(8, 45))
+                if got:
+                    used = p
+                    break
+            if not got:
+                return False, "delegate: no provider answered."
+            text, tcs, finish = got
+            tcs = [(nm, a) for (nm, a) in tcs if nm in allowed]
+            if not tcs:
+                c = _clean(text)
+                if c:
+                    report = c
+                break
+            calls = []
+            for j, (nm, args) in enumerate(tcs[:6]):
+                calls.append({"id": "del_%d_%d" % (rnd, j), "type": "function",
+                              "function": {"name": nm, "arguments": json.dumps(args)}})
+            msgs.append({"role": "assistant", "content": text or "", "tool_calls": calls})
+            for j, (nm, args) in enumerate(tcs[:6]):
+                tcid = "del_%d_%d" % (rnd, j)
+                try:
+                    ok, res = _call_tool(nm, args)
+                    result = ("" if ok else "ERROR: ") + str(res)
+                except Exception as e:
+                    result = "ERROR: %s" % e
+                msgs.append({"role": "tool", "tool_call_id": tcid,
+                             "name": nm, "content": str(result)[:2500]})
+        else:
+            # Step cap reached — insist on a clean final report, no tools.
+            summary_msgs = [{"role": "system", "content": final_sys}] + \
+                           [m for m in msgs if m.get("role") != "system"] + \
+                           [{"role": "user", "content":
+                             "STOP. Do not call any tools. Write your final report now "
+                             "as plain prose with exact paths, line numbers and snippets."}]
+            summary = None
+            for p in chain:
+                name, endpoint, api_key, model = p
+                summary = _chat_one(name, endpoint, api_key, model, list(summary_msgs),
+                                    tools_schema=[], tool_choice="none", timeout=(8, 45))
+                if summary:
+                    break
+            if summary:
+                c = _clean(summary[0])
+                if c:
+                    report = c
+    finally:
+        if had_ctx:
+            g.chat_deadline = saved_deadline
+
+    return True, report[:12000]
+
+
 TOOLS = {
     "list_files": (tool_list_files, ("path",)),
     "read_file": (tool_read_file, ("path",)),
@@ -11566,6 +11680,7 @@ TOOLS = {
     "open_user_file": (tool_open_user_file, ("path",)),
     "view_user_file": (tool_view_user_file, ("path",)),
     "grep": (tool_grep, ("pattern", "path")),
+    "delegate": (tool_delegate, ("task", "scope")),
     "write_file": (tool_write_file, ("path", "content")),
     "open_in_vscode": (tool_open_in_vscode, ("path", "content")),
     "edit_file": (tool_edit_file, ("path", "old", "new")),
@@ -11661,6 +11776,9 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "grep",
         "description": "Regex search file contents. Args: pattern, path.",
         "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern", "path"]}}},
+    {"type": "function", "function": {"name": "delegate",
+        "description": "Run a focused SUB-AGENT task in isolation: it explores with read-only tools (list_files, read_file, grep) and returns a detailed written report. Use for deep investigations (e.g. 'map every overlay panel and its openers', 'find where X is defined'). It cannot modify files. Args: task (what to investigate), scope optional ('read'|'code'|'web', default 'code').",
+        "parameters": {"type": "object", "properties": {"task": {"type": "string"}, "scope": {"type": "string"}}, "required": ["task"]}}},
     {"type": "function", "function": {"name": "write_file",
         "description": "Create/overwrite a file. Args: path, content.",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
@@ -12069,7 +12187,7 @@ OLLAMA_SYS_PROMPT = (
 )
 
 _ICONS = {
-    "list_files": "📂", "read_file": "📄", "grep": "🔍",
+    "list_files": "📂", "read_file": "📄", "grep": "🔍", "delegate": "🤖",
     "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
     "run_command": "▶", "notify": "🔔", "notify_gabriel": "👨‍👦", "web_search": "🔎", "webfetch": "🌐",
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
@@ -12374,6 +12492,8 @@ _index_tool_param_types()
 # MAY be a tuple when a tool is legitimately reachable from two of them - the
 # dispatch loop consults ALLOWED_DOMAINS per request.
 _TOOL_DOMAINS = {
+    # isolated sub-agent (read-only exploration)
+    "delegate": "code",
     # device UI work
     "ui_device": "ui", "ui_connect": "ui",
     "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
@@ -13571,6 +13691,7 @@ _SHORT_DESCRIPTIONS = {
     "edit_file": "Replace exact text in a file; old must match once. Args: path, old, new.",
     "write_file": "Create or overwrite a file. Args: path, content.",
     "grep": "Regex search file contents. Args: pattern, path.",
+    "delegate": "Run an isolated read-only sub-agent to investigate a task and report back. Args: task, scope.",
     "list_files": "List files and folders in a directory. Args: path.",
     "flutter_analyze": "Run flutter analyze and return every diagnostic. No args.",
     "git_status": "Short git status including the current branch. No args.",
@@ -13615,6 +13736,7 @@ _SHORT_DESCRIPTIONS = {
 # network-inspection tools lead because reading a POST is the task that was
 # blocked; screen tools follow; shell and file access trail.
 _REDUCED_TOOL_ORDER = [
+    "delegate",
     "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
     "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
     "cdp_status", "need_verify_in_browser",
