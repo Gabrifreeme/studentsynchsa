@@ -5,7 +5,7 @@ import 'package:lipsyncstudent/services/sync_service.dart' as sync_service;
 class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatus>> {
   StreamSubscription? _sub;
 
-  SyncStatusNotifier() : super(const AsyncLoading<sync_service.SyncStatus>()) {
+  SyncStatusNotifier() : super(const AsyncLoading()) {
     _sub = sync_service.SyncService.statusStream.listen((status) {
       state = AsyncData(status);
     });
