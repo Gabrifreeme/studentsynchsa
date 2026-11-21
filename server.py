@@ -7966,6 +7966,36 @@ def _compute_problems():
     return data
 
 
+def tool_project_doctor(refresh="1"):
+    """Structured project health check: run all analyzers (Dart/Python/JS) and
+    return a clean, file-by-file checklist of errors with exact path:line:col:
+    message. Use this to find ALL errors before fixing, then re-run after edits
+    to verify they are gone. Returns (ok, report_text)."""
+    if _kill_armed():
+        return False, "E-STOP is armed — no analyzers."
+    try:
+        files, counts, details = {}, {"error": 0, "warning": 0, "info": 0}, {}
+        for scanner in (_scan_dart_problems, _scan_python_problems, _scan_js_problems):
+            try:
+                scanner(files, counts, details=details)
+            except Exception as e:
+                print("[doctor] %s failed: %s" % (scanner.__name__, e), flush=True)
+        total = counts.get("error", 0)
+        if total == 0:
+            return True, "project_doctor: No issues found — project is clean."
+        lines = ["project_doctor: %d error(s) across %d file(s):" % (total, len(files))]
+        for path in sorted(files.keys(), key=lambda p: (-files[p].get("error", 0), p)):
+            n = files[path].get("error", 0)
+            if not n:
+                continue
+            lines.append("\n%s  (%d error%s)" % (path, n, "" if n == 1 else "s"))
+            for d in (details.get(path) or [])[:40]:
+                lines.append("  - " + d)
+        return True, "\n".join(lines)[:12000]
+    except Exception as e:
+        return False, "project_doctor failed: %s" % e
+
+
 @app.route('/api/problems', methods=['GET'])
 @require_token
 def api_problems():
@@ -11936,6 +11966,7 @@ TOOLS = {
     "pub_upgrade": (tool_pub_upgrade, ()),
     "flutter_test": (tool_flutter_test, ("path",)),
     "flutter_analyze": (tool_flutter_analyze, ()),
+    "project_doctor": (tool_project_doctor, ("refresh",)),
     "ui_device": (tool_ui_device, ()),
     "ui_connect": (tool_ui_connect, ("target", "wait")),
     "ui_app_open": (tool_ui_app_open, ()),
@@ -12069,6 +12100,10 @@ TOOLS_SCHEMA = [
     {"type": "function", "function": {"name": "flutter_analyze",
         "description": "Static analysis via `flutter analyze`. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {"name": "project_doctor",
+        "description": "Structured project health check: run all analyzers (Dart/Python/JS) and return a clean file-by-file checklist of errors with exact path:line:col: message. Use to find ALL errors before fixing, and re-run after edits to verify. Args: refresh optional.",
+        "parameters": {"type": "object", "properties": {"refresh": {"type": "string"}}, "required": []}}},
+
     {"type": "function", "function": {"name": "ui_device",
         "description": "Report the connected Android device: device id, screen size, density, foreground app, and whether it is USB or TCP/IP. If no device is connected this FAILS and explains whether it is a cable, driver, or authorization problem. Args: none.",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -12439,7 +12474,7 @@ OLLAMA_SYS_PROMPT = (
 )
 
 _ICONS = {
-    "list_files": "📂", "read_file": "📄", "grep": "🔍", "delegate": "🤖", "delegate_parallel": "🤖", "cdp_screenshot": "📷", "ui_selfcheck": "🔍",
+    "list_files": "📂", "read_file": "📄", "grep": "🔍", "delegate": "🤖", "project_doctor": "🩺", "delegate_parallel": "🤖", "cdp_screenshot": "📷", "ui_selfcheck": "🔍",
     "write_file": "✏️", "edit_file": "✏️", "open_in_vscode": "📤",
     "run_command": "▶", "notify": "🔔", "notify_gabriel": "👨‍👦", "web_search": "🔎", "webfetch": "🌐",
     "todo_add": "📋", "todo_list": "📋", "todo_done": "✅",
@@ -12745,7 +12780,7 @@ _index_tool_param_types()
 # dispatch loop consults ALLOWED_DOMAINS per request.
 _TOOL_DOMAINS = {
     # isolated sub-agent (read-only exploration)
-    "delegate": "code", "delegate_parallel": "code", "ui_selfcheck": "ui", "cdp_screenshot": "ui",
+    "delegate": "code", "delegate_parallel": "code", "ui_selfcheck": "ui", "cdp_screenshot": "ui", "project_doctor": "code",
     # device UI work
     "ui_device": "ui", "ui_connect": "ui",
     "ui_app_open": "ui", "ui_tap": "ui", "ui_swipe": "ui",
@@ -14001,6 +14036,7 @@ _SHORT_DESCRIPTIONS = {
     "delegate_parallel": "Run several sub-agent investigations in parallel. Args: tasks (JSON list), scope.",
     "ui_selfcheck": "Inspect ACEsi own UI via CDP: screenshot, console, DOM, JS. Args: checks, expr.",
     "cdp_screenshot": "Screenshot the current CDP page to a PNG. Args: save_path.",
+    "project_doctor": "Structured checklist of ALL project errors (path:line: message). Use to find and verify fixes.",
     "list_files": "List files and folders in a directory. Args: path.",
     "flutter_analyze": "Run flutter analyze and return every diagnostic. No args.",
     "git_status": "Short git status including the current branch. No args.",
@@ -14056,7 +14092,7 @@ _REDUCED_TOOL_ORDER = [
     "ui_connect", "ui_device",
     "ui_dump", "ui_app_open", "ui_tap", "ui_type", "ui_swipe", "ui_key",
     "ui_screenshot",
-    "run_command", "read_file",
+    "project_doctor", "run_command", "read_file",
     "devtool_list", "devtool_run",
 ]
 # Explorer fixes need a DIFFERENT reduced schema: the browser-shaped order
