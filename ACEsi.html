@@ -14296,6 +14296,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.socket.on('ai_action', function(data) {
       console.log("Raw data:", JSON.stringify(data));
       if (!data) return;
+      // Console / F12 tool call -> yellow line in the terminal log
+      if (data.tool && /\bcdp_console_logs\b|\bcdp_evaluate\b|\bneed_verify_in_browser\b|\bcdp_status\b|\bF12\b/i.test(data.tool)) {
+        if (window.aceAppendTerminalLine) window.aceAppendTerminalLine('tool ' + data.tool + ' -> called', '#ffd54a');
+      }
       if (window.pushLiveActivity) window.pushLiveActivity(data.tool, data.path);
       if (data.path) {
 
