@@ -15195,6 +15195,44 @@ document.addEventListener('DOMContentLoaded', function() {
           line.appendChild(lineHr);
         }
       }
+      // Animate the "|" after "200 -" so it runs across the screen every second
+      var pipeText = line.getAttribute('data-ace-text');
+      if (pipeText && /200\s*-\s*\|/.test(pipeText)) {
+        var pipeSpan = null;
+        var allSpans = line.querySelectorAll('span');
+        for (var pi = allSpans.length - 1; pi >= 0; pi--) {
+          if (allSpans[pi].textContent.indexOf('|') !== -1) { pipeSpan = allSpans[pi]; break; }
+        }
+        if (pipeSpan) {
+          var pt = pipeSpan.textContent;
+          var pidx = pt.indexOf('|');
+          var frag = document.createDocumentFragment();
+          if (pidx > 0) {
+            var bsp = document.createElement('span');
+            bsp.textContent = pt.slice(0, pidx);
+            bsp.style.color = pipeSpan.style.color;
+            frag.appendChild(bsp);
+          }
+          var psp = document.createElement('span');
+          psp.className = 'ace-pipe-run';
+          psp.textContent = '|';
+          frag.appendChild(psp);
+          if (pidx + 1 < pt.length) {
+            var asp = document.createElement('span');
+            asp.textContent = pt.slice(pidx + 1);
+            asp.style.color = pipeSpan.style.color;
+            frag.appendChild(asp);
+          }
+          pipeSpan.parentNode.replaceChild(frag, pipeSpan);
+          // Add the keyframe/style once
+          if (!document.getElementById('acePipeRunKeyframe')) {
+            var pstyle = document.createElement('style');
+            pstyle.id = 'acePipeRunKeyframe';
+            pstyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(0);}}';
+            document.head.appendChild(pstyle);
+          }
+        }
+      }
       if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
     } catch (e) {}
   };
