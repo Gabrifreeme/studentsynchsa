@@ -2897,16 +2897,9 @@
       }
     });
 
-    // Remove "Save All Settings"; keep "Save Prompt" only in the System Prompt tab
-    // (not in the shared bottom row that shows on the AI Engine tab).
-    var saveAllBtn = null, closeBtn = null;
-    panel.querySelectorAll('button').forEach(function (btn) {
-      var oc = btn.getAttribute('onclick') || '';
-      if (oc.indexOf('saveSettings()') !== -1) saveAllBtn = btn;
-      if (oc.indexOf('settings-panel') !== -1 && oc.indexOf("display = 'none'") !== -1) closeBtn = btn;
-    });
-    if (saveAllBtn && saveAllBtn.parentNode) saveAllBtn.parentNode.removeChild(saveAllBtn);
-    if (closeBtn && closeBtn.parentNode) closeBtn.parentNode.classList.add('ace-bottom-row');
+    // "Save All Settings" and the bottom "Close" button were removed from the
+    // HTML (Close is now the sticky X at the top-right); "Save Prompt" lives
+    // only in the System Prompt tab. Nothing to relocate here.
   };
   document.addEventListener('DOMContentLoaded', window.aceInitSettingsOverhaul);
 
@@ -4434,67 +4427,6 @@ git add -u (stage tracked)</label
 
 
 
-      <div style="text-align: center; margin-top: 16px">
-
-        <button
-
-          onclick="saveSettings()"
-
-          style="
-
-            background: #ff9d00;
-
-            color: #000;
-
-            border: none;
-
-            padding: 8px 16px;
-
-            font-size: 11px;
-
-            font-weight: bold;
-
-            cursor: pointer;
-
-          "
-
-        >
-
-          Save All Settings
-
-        </button>
-
-        <button
-
-          onclick="
-
-            document.getElementById('settings-panel').style.display = 'none'
-
-          "
-
-          style="
-
-            width: 100%;
-
-            background: #000;
-
-            color: #ff9d00;
-
-            border: 1px solid #ff9d00;
-
-            padding: 8px;
-
-            font-size: 11px;
-
-          "
-
-        >
-
-          Close
-
-        </button>
-
-      </div>
 
     </div>
 
