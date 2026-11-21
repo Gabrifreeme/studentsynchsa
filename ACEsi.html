@@ -11264,9 +11264,9 @@ let _geoPayload = {};
       // History Log: show persisted conversation history in an ACEsi-styled modal
       window.showHistoryLog = async function () {
         try {
-          var r = await fetch("http://127.0.0.1:5000/history?limit=200");
+          var r = await fetch("http://127.0.0.1:5000/conversations?limit=200");
           var d = await r.json();
-          var msgs = (d && d.messages) || [];
+          var msgs = (d && d.conversations) || (d && d.messages) || [];
           var body = "";
           if (!msgs.length) {
             body = '<div style="color:#888;font-size:11px;">No history yet.</div>';
@@ -11275,8 +11275,17 @@ let _geoPayload = {};
               var role = (m.role || "").toLowerCase();
               var isUser = role === "user";
               var col = isUser ? "#00ffff" : "#00ff88";
+              // Format timestamp (ISO string) into a readable local time
+              var ts = "";
+              if (m.timestamp) {
+                var dt = new Date(m.timestamp);
+                ts = isNaN(dt.getTime()) ? String(m.timestamp) : dt.toLocaleString();
+              }
               body += '<div style="border:1px solid ' + col + ';padding:6px;margin:4px 0;background:#0a0a0a;">';
-              body += '<div style="color:' + col + ';font-size:10px;font-weight:bold;">' + (isUser ? "You" : "ACEsi") + "</div>";
+              body += '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<span style="color:' + col + ';font-size:10px;font-weight:bold;">' + (isUser ? "You" : "ACEsi") + "</span>" +
+                (ts ? '<span style="color:#888;font-size:9px;">' + escapeHtml(ts) + "</span>" : "") +
+                "</div>";
               body += '<div style="color:#ddd;font-size:11px;white-space:pre-wrap;margin-top:2px;">' + escapeHtml(m.content || "") + "</div>";
               body += "</div>";
             });
