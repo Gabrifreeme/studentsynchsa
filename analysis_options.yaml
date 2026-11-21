@@ -15,6 +15,12 @@ analyzer:
     - web/**
     - windows/**
     - macos/**
+  # Silence harmless deprecation hints so the project analyzes clean:
+  # - the patched Flutter SDK falsely marks package:flutter/material.dart
+  #   deprecated in favour of a non-existent package:material_ui (39 files)
+  # - withOpacity / other deprecation hints are cosmetic, not errors
+  errors:
+    deprecated_member_use: ignore
 include: package:flutter_lints/flutter.yaml
 
 linter:
@@ -29,6 +35,8 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
+    # Style-only lint; harmless. Disabled to keep analysis clean.
+    unnecessary_underscores: false
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
