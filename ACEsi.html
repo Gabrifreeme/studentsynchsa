@@ -4991,8 +4991,8 @@ perspective: 900px;
 
           </textarea>
 
-          <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
-          <span id="send-spinner" class="spinner" style="width:18px; height:18px;"></span>
+          <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-height:64px;">
+          <span id="send-spinner" class="spinner" style="position:absolute; top:4px; left:50%; margin-left:-9px; width:18px; height:18px;"></span>
           <button
 
             onclick="sendMessage()"
