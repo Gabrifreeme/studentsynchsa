@@ -2804,6 +2804,8 @@
   #settings-panel button.ace-ico-memory::before { content:"🧠"; }
   #settings-panel button.ace-ico-skills::before { content:"🛠️"; }
   #settings-panel button.ace-ico-trash::before  { content:"🗑️"; }
+  #settings-panel button.ace-ico-history::before { content:"📜"; }
+  #settings-panel button.ace-ico-browser::before { content:"🌐"; }
 
   /* 2-column utility grid */
   .ace-tools-grid {
@@ -2851,6 +2853,8 @@
       'saveSettings()': ['ace-btn-primary'],
       'saveSystemPrompt()': ['ace-btn-secondary'],
       'clearChatHistory()': ['ace-btn-danger', 'ace-ico-trash'],
+      'showHistoryLog()': ['ace-btn-utility', 'ace-ico-history'],
+      'needVerifyInBrowser()': ['ace-btn-utility', 'ace-ico-browser'],
       'fetchNotifications()': ['ace-btn-utility', 'ace-ico-bell'],
       'triggerPing()': ['ace-btn-utility', 'ace-ico-ping'],
       'connectGoogleDrive()': ['ace-btn-utility', 'ace-ico-drive'],
@@ -4242,6 +4246,58 @@ git add -u (stage tracked)</label
 
         <button
 
+          onclick="window.showHistoryLog && window.showHistoryLog()"
+
+          style="
+
+            width: 100%;
+
+            background: #000;
+
+            color: #ff9d00;
+
+            border: 1px solid #ff9d00;
+
+            padding: 6px;
+
+            font-size: 11px;
+
+          "
+
+        >
+
+          History Log
+
+        </button>
+
+        <button
+
+          onclick="window.needVerifyInBrowser && window.needVerifyInBrowser()"
+
+          style="
+
+            width: 100%;
+
+            background: #000;
+
+            color: #ff9d00;
+
+            border: 1px solid #ff9d00;
+
+            padding: 6px;
+
+            font-size: 11px;
+
+          "
+
+        >
+
+          Verify in Browser
+
+        </button>
+
+        <button
+
           onclick="fetchNotifications()"
 
           style="
@@ -4551,22 +4607,6 @@ git add -u (stage tracked)</label
       <button class="btn" title="Restart App" onclick="restartAcesi()">
 
         Restart
-
-      </button>
-
-      <button
-
-        class="btn"
-
-        title="Need verify in browser"
-
-        onclick="window.needVerifyInBrowser && window.needVerifyInBrowser()"
-
-        style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:5px 10px;font-weight:bold;"
-
-      >
-
-        Verify in Browser
 
       </button>
 
@@ -11220,6 +11260,40 @@ let _geoPayload = {};
         }
 
       }
+
+      // History Log: show persisted conversation history in an ACEsi-styled modal
+      window.showHistoryLog = async function () {
+        try {
+          var r = await fetch("http://127.0.0.1:5000/history?limit=200");
+          var d = await r.json();
+          var msgs = (d && d.messages) || [];
+          var body = "";
+          if (!msgs.length) {
+            body = '<div style="color:#888;font-size:11px;">No history yet.</div>';
+          } else {
+            msgs.forEach(function (m) {
+              var role = (m.role || "").toLowerCase();
+              var isUser = role === "user";
+              var col = isUser ? "#00ffff" : "#00ff88";
+              body += '<div style="border:1px solid ' + col + ';padding:6px;margin:4px 0;background:#0a0a0a;">';
+              body += '<div style="color:' + col + ';font-size:10px;font-weight:bold;">' + (isUser ? "You" : "ACEsi") + "</div>";
+              body += '<div style="color:#ddd;font-size:11px;white-space:pre-wrap;margin-top:2px;">' + escapeHtml(m.content || "") + "</div>";
+              body += "</div>";
+            });
+          }
+          var old = document.getElementById("history-log-modal");
+          if (old) old.remove();
+          var dlg = document.createElement("div");
+          dlg.id = "history-log-modal";
+          dlg.style.cssText = 'position:fixed;top:8%;left:10%;width:80%;max-width:720px;max-height:80vh;overflow-y:auto;background:#000;border:2px solid #ff9d00;padding:16px;z-index:20000;font-family:"Roboto Mono",monospace;color:#ff9d00;';
+          dlg.innerHTML = '<div style="font-weight:bold;font-size:13px;margin-bottom:10px;color:#ff9d00;">📜 History Log</div>' +
+            '<div style="max-height:60vh;overflow-y:auto;margin-bottom:8px;">' + body + "</div>" +
+            '<div style="text-align:right;"><button onclick="document.getElementById(\'history-log-modal\').remove()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:6px 12px;font-size:11px;">Close</button></div>';
+          document.body.appendChild(dlg);
+        } catch (e) {
+          if (window.showAceToast) window.showAceToast("History Log error: " + e.message, 'error', 5000);
+        }
+      };
 
       function fetchNotifications() {
 
