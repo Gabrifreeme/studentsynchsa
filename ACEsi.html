@@ -2876,6 +2876,23 @@
     });
   };
   document.addEventListener('DOMContentLoaded', window.aceInitSettingsOverhaul);
+
+  // Convert Run Commands checkboxes into the same sliding toggles (keep inputs for runSelected())
+  window.aceInitRunPanelToggles = function () {
+    var panel = document.getElementById('run-panel');
+    if (!panel) return;
+    panel.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+      var lbl = cb.closest('label');
+      if (!lbl) return;
+      lbl.classList.add('ace-toggle');
+      if (!lbl.querySelector('.ace-switch')) {
+        var sw = document.createElement('span');
+        sw.className = 'ace-switch';
+        cb.parentNode.insertBefore(sw, cb.nextSibling);
+      }
+    });
+  };
+  document.addEventListener('DOMContentLoaded', window.aceInitRunPanelToggles);
 </script>
 </head>
 
