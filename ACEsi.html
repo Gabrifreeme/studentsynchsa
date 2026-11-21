@@ -4897,6 +4897,7 @@ perspective: 900px;
 
           style="
 
+            position: relative;
             text-align: center;
 
             font-size: 12px;
@@ -4911,7 +4912,8 @@ perspective: 900px;
 
           "
 
-        ></div>
+        >
+        </div>
 
         <div
 
@@ -4989,6 +4991,8 @@ perspective: 900px;
 
           </textarea>
 
+          <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+          <span id="send-spinner" class="spinner" style="width:18px; height:18px;"></span>
           <button
 
             onclick="sendMessage()"
@@ -5026,6 +5030,7 @@ perspective: 900px;
             Send
 
           </button>
+          </div>
 
         </div>
 
@@ -5053,7 +5058,7 @@ perspective: 900px;
 
         >
 
-          <div id="spinner-left" class="spinner" style="width: 20px"></div>
+
 
 
 
@@ -5069,7 +5074,7 @@ perspective: 900px;
 
               flex: 1;
 
-              justify-content: center;
+              justify-content: flex-start;
 
             "
 
@@ -5175,7 +5180,7 @@ perspective: 900px;
 
                 border-radius: 3px;
 
-                margin-left: 8px;
+                margin-left: auto;
 
               "
 
@@ -5187,7 +5192,7 @@ perspective: 900px;
 
 
 
-          <div id="spinner-right" class="spinner" style="width: 20px"></div>
+
 
         </div>
 
@@ -10217,6 +10222,7 @@ async function sendMessage(reuseMsgId) {
 
         const timerEl = document.getElementById("response-timer");
 
+        const sendSpinner = document.getElementById("send-spinner");
         const spinnerLeft = document.getElementById("spinner-left");
 
         const spinnerRight = document.getElementById("spinner-right");
@@ -10233,6 +10239,7 @@ async function sendMessage(reuseMsgId) {
 
         }
 
+        if (sendSpinner) sendSpinner.classList.add("active");
         if (spinnerLeft) spinnerLeft.classList.add("active");
 
         if (spinnerRight) spinnerRight.classList.add("active");
@@ -10517,6 +10524,7 @@ let _geoPayload = {};
 
           if (window._timerInterval) clearInterval(window._timerInterval);
 
+          if (sendSpinner) sendSpinner.classList.remove("active");
           if (spinnerLeft) spinnerLeft.classList.remove("active");
 
           if (spinnerRight) spinnerRight.classList.remove("active");
