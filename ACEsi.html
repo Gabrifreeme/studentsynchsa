@@ -7660,7 +7660,7 @@ perspective: 900px;
               var msg = (msgEl && msgEl.value ? msgEl.value.trim() : "") || ("ACEsi update " + new Date().toISOString().slice(0, 19).replace("T", " "));
               cmd = 'git commit -m "' + msg.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
             }
-            var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b|dir\b)/i.test(cmd);
+            var isLong = /^\s*(flutter\s+run|dart\s+run|python\s+server|npm\s+start|explorer\b)/i.test(cmd);
             if (isLong) {
               aceAppendTerminalLine("PS D:\\projects\\acesi> " + cmd, "#ff9d00");
               fetch("/run", {

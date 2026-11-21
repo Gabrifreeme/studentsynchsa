@@ -7674,7 +7674,15 @@ def run_command():
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
                 f'on the device. Logs: {log_path}')})
-        result = _run(command, shell=True, capture_output=True, text=True)
+        # Use PowerShell (same as /api/system/exec): the terminal advertises a
+        # "PS ...>" prompt and cmd.exe's `dir` writes nothing to the pipe when
+        # this server runs headless. PowerShell makes dir/ls/Get-Location work.
+        ps = os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
+                          "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+        if not os.path.isfile(ps):
+            ps = "powershell.exe"
+        result = _run([ps, "-NoProfile", "-NonInteractive", "-Command", command],
+                      capture_output=True, text=True, timeout=60)
         output = result.stdout if result.stdout else result.stderr
         return jsonify({'output': output})
     except Exception as e:
