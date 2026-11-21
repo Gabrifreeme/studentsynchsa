@@ -8528,20 +8528,29 @@ def api_system_exec():
     cwd = project_root if os.path.isdir(cwd_candidate := project_root) else os.getcwd()
     
     try:
-        # Run the command, capture output, set timeout to 30 seconds
+        # Run the command via PowerShell (the terminal prompt says "PS ...>" so
+        # users expect PowerShell cmdlets like Get-Location, and plain `dir` in
+        # cmd.exe writes to the console buffer instead of the pipe when this
+        # server runs headless -> empty output). Force stdout/stderr to UTF-8
+        # strings so output is reliably captured.
+        ps = os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
+                          "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+        if not os.path.isfile(ps):
+            ps = "powershell.exe"
+        args = [ps, "-NoProfile", "-NonInteractive", "-Command", cmd]
         result = subprocess.run(
-            cmd,
-            shell=True,
+            args,
             cwd=cwd,
             capture_output=True,
-            text=True,
             timeout=30
         )
-        
+        out = result.stdout.decode("utf-8", "replace")
+        err = result.stderr.decode("utf-8", "replace")
+
         return jsonify({
             'ok': True,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
+            'stdout': out,
+            'stderr': err,
             'exit_code': result.returncode
         })
     except subprocess.TimeoutExpired:
