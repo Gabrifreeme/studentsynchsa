@@ -2738,8 +2738,10 @@
     padding:7px 14px !important; font-size:11px !important;
     font-family:"Roboto Mono", monospace !important;
   }
-  #settings-panel button[data-tab]:hover { background:#2a1e00 !important; }
-  #settings-panel button[data-tab].active { background:#ff9d00 !important; color:#000 !important; }
+  /* Hover: keep the label bright amber on the dark hover background. Active (incl. hovered) stays solid amber. */
+  #settings-panel button[data-tab]:hover { background:#2a1e00 !important; color:#ff9d00 !important; }
+  #settings-panel button[data-tab].active,
+  #settings-panel button[data-tab].active:hover { background:#ff9d00 !important; color:#000 !important; }
 
   /* Dropdowns */
   #settings-provider, #settings-model {
@@ -2749,6 +2751,9 @@
   }
   #settings-provider:hover, #settings-model:hover { background:#2a1e00 !important; }
   #settings-provider option, #settings-model option { background:#000 !important; color:#ff9d00 !important; }
+  /* Selected option in open dropdown -> amber highlight instead of Windows blue */
+  #settings-provider option:checked, #settings-model option:checked { background:#ff9d00 !important; color:#000 !important; }
+  #settings-provider option:hover, #settings-model option:hover { background:#2a1e00 !important; color:#ff9d00 !important; }
 
   /* System prompt textarea */
   #settings-prompt {
@@ -2820,6 +2825,19 @@
   }
   .ace-toggle input:checked + .ace-switch { background:#ff9d00; border-color:#ff9d00; }
   .ace-toggle input:checked + .ace-switch::after { transform:translateX(18px); background:#000; }
+
+  /* Run Commands panel: scroll when tall; keep the action row (Run/Close) visible at bottom */
+  #run-panel { max-height: 80vh !important; overflow-y: auto !important; }
+  #run-panel > div:last-child { position: sticky; bottom: -12px; background:#000; padding: 8px 0 2px; z-index: 2; }
+
+  /* Bottom action row of Settings: boxed Close button + Save Prompt beside it */
+  #settings-panel button.ace-btn-close {
+    background:#000 !important; color:#ff9d00 !important;
+    border:1px solid #ff9d00 !important; padding:8px 16px !important;
+    text-decoration:none !important; border-radius:2px !important;
+  }
+  #settings-panel button.ace-btn-secondary.ace-bottom-save { margin: 0 8px 0 0; }
+  #settings-panel .ace-bottom-row { display:flex; gap:8px; justify-content:center; align-items:center; }
 </style>
 <script>
   window.aceInitSettingsOverhaul = function () {
@@ -2874,6 +2892,24 @@
         cb.parentNode.insertBefore(sw, cb.nextSibling);
       }
     });
+
+    // Bottom action row: remove "Save All Settings", move "Save Prompt" beside Close.
+    var saveAllBtn = null, savePromptBtn = null, closeBtn = null;
+    panel.querySelectorAll('button').forEach(function (btn) {
+      var oc = btn.getAttribute('onclick') || '';
+      if (oc.indexOf('saveSettings()') !== -1) saveAllBtn = btn;
+      if (oc.indexOf('saveSystemPrompt()') !== -1) savePromptBtn = btn;
+      if (oc.indexOf('settings-panel') !== -1 && oc.indexOf("display = 'none'") !== -1) closeBtn = btn;
+    });
+    if (saveAllBtn && saveAllBtn.parentNode) saveAllBtn.parentNode.removeChild(saveAllBtn);
+    if (savePromptBtn && closeBtn && closeBtn.parentNode) {
+      // Move Save Prompt into the bottom row, right before Close
+      closeBtn.parentNode.insertBefore(savePromptBtn, closeBtn);
+      savePromptBtn.classList.add('ace-bottom-save');
+      // Keep API-key/provider saving available: Save Prompt also saves all settings
+      savePromptBtn.setAttribute('onclick', 'saveSystemPrompt(); saveSettings();');
+      closeBtn.parentNode.classList.add('ace-bottom-row');
+    }
   };
   document.addEventListener('DOMContentLoaded', window.aceInitSettingsOverhaul);
 
