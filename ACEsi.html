@@ -15150,6 +15150,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // HTTP status -> bright green (2xx) / amber (4xx) / red (5xx).
   window.aceColorizeLogLine = function (text) {
     var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, ''); // smiley is redundant: color is enough
+    // Console / F12 (DevTools CDP) tool calls -> highlight the whole log line yellow
+    if (/\bcdp_console_logs\b|\/cdp\/console\b|\bcdp_evaluate\b|\bF12\b/i.test(s)) {
+      return [{ text: s, color: '#ffd54a' }];
+    }
     var segs = [];
     var push = function (start, end, color) {
       if (end > start) segs.push({ text: s.slice(start, end), color: color });
