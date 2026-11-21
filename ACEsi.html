@@ -15245,9 +15245,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {}
   };
 
-  // Typewriter effect: log lines print character by character, in real time.
+  // Typewriter effect: only the bottom 2 lines animate; older lines fill instantly.
   window.aceTypingEnabled = true;
-  window.aceTerminalTypeSpeed = 14;
+  window.aceTerminalTypeSpeed = 3;
   window.aceTypeTerminalLine = function (line, text, segs) {
     try {
       if (!line || !line.parentNode) return;
@@ -15257,9 +15257,21 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       var len = text.length;
       var idx = 0;
-      var spd = (len > 400) ? 2 : 12;
+      var spd = (len > 400) ? 1 : window.aceTerminalTypeSpeed;
       (function step() {
         if (!line || !line.parentNode) return;
+        // If this line is no longer one of the bottom 2, finish it instantly
+        var hist = document.getElementById('term-history');
+        if (hist && hist.children.length > 2) {
+          var pos = -1;
+          for (var i = 0; i < hist.children.length; i++) {
+            if (hist.children[i] === line) { pos = i; break; }
+          }
+          if (pos >= 0 && pos < hist.children.length - 2) {
+            window.aceFillTerminalLine(line, segs);
+            return;
+          }
+        }
         idx += 1;
         if (idx > len) {
           window.aceFillTerminalLine(line, segs);
