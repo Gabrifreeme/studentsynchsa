@@ -3547,6 +3547,31 @@ def _chat_providers(domain=""):
     ]
 
 
+def _ollama_chain_entry():
+    """The local Ollama provider as a 'compact' 5-tuple for the chat dispatch
+    loop. Returns None when Ollama is unavailable."""
+    if not OLLAMA_ENABLED:
+        return None
+    return ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL, "compact")
+
+
+def _ollama_task_too_big(user_message, llm_messages=None):
+    """Heuristic: tasks that are clearly too large for the local 7B CPU model.
+    Heavy research / very long payloads go straight to cloud providers, which
+    also protects the 20s request budget from a slow local prefill."""
+    msg = str(user_message or "")
+    if len(msg) > 2500:
+        return True
+    # Explicit deep-research / big-analysis phrasing -> let the big cloud models
+    # handle it first; Ollama remains available as fallback in the chain.
+    if re.search(
+        r"\b(?:research (?:deeply|thoroughly)|in[- ]depth|comprehensive|"
+        r"whole codebase|entire project|all files|refactor the (?:whole|entire))\b",
+        msg, re.IGNORECASE):
+        return True
+    return False
+
+
 def _find_provider_for_model(preferred_model):
     """Find which provider hosts the given model name.
     Returns (name, endpoint, api_key, model) or None.
@@ -3812,6 +3837,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
 
     body = {"model": model, "messages": msgs, "temperature": 0.4,
             "max_tokens": max_tokens}
+    if extra_options:
+        body.update(extra_options)  # e.g. Ollama keep_alive
     if tools_schema:
         body["tools"] = tools_schema
         body["tool_choice"] = tool_choice
@@ -5512,6 +5539,35 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # "I couldn't find that" for a simple photo question.
                     providers.sort(key=lambda p: 0 if p[3] == GEMINI_MODEL else 1)
                     print("[image-route] order: %s" % [p[3] for p in providers])
+                # LOCAL-FIRST: Ollama (qwen2.5:7b) is the FIRST choice. Cloud
+                # providers stay in the chain as automatic fallback. If Ollama
+                # times out or returns None, the loop just advances to the next
+                # provider (Groq -> Gemini). Skip Ollama for image tasks and for
+                # clearly-too-big jobs (handled by the cloud models instead).
+                _ollama_entry = None
+                if OLLAMA_ENABLED and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
+                    _ollama_entry = _ollama_chain_entry()
+                    if _ollama_entry and any(p[0] == "Ollama" for p in providers):
+                        _ollama_entry = None  # already present via preferred model
+                    if _ollama_entry:
+                        # Warm up the local model once so the compact time slice
+                        # isn't consumed by a cold load. Uses a generous timeout;
+                        # keep_alive keeps it resident for follow-up rounds.
+                        try:
+                            # No tools on the warm-up: a 22-tool schema makes the
+                            # CPU prefill far too slow. We only want to load the
+                            # model weights into memory (keep_alive).
+                            _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
+                                      OLLAMA_CHAT_MODEL,
+                                      [{"role": "user", "content": "ok"}],
+                                      timeout=(10, 90),
+                                      tools_schema=[], tool_choice="none",
+                                      extra_options={"keep_alive": "30m"})
+                        except Exception:
+                            pass
+                        providers = [_ollama_entry] + providers
+                        print("[local-first] Ollama first; cloud fallback: %s"
+                              % [p[0] for p in providers[1:]])
 
                 if _image_request and not _img_raced:
                     # Race both Gemini models at once. A stuck Flash call used to
@@ -5577,13 +5633,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _want_device = _needs_phone_link(user_message)
                     _no_cdp = _is_device_task(user_message) or _code_file_intent
                     if len(p) > 4 and p[4] == "compact":
-                        # Ollama chosen via the model picker: use the compact schema
-                        # and always route the pared-down local messages so the slow
-                        # CPU model gets a small prefill.
-                        schema = ollama_domain_schema
+                        # Ollama (local CPU): pared-down messages so the slow model
+                        # gets a small prefill. For plain conversational questions
+                        # with no tool intent, drop the tool schema entirely — the
+                        # 7B answers those in ~5s; with tools the CPU prefill blows
+                        # the slice and we fall back to cloud anyway.
                         msgs = _ollama_local_messages(
                             llm_messages, system=_fix_sys)
-                        tc2 = tc
+                        _needs_tools = (tc == "required" or _want_files or
+                                        _want_device or _code_file_intent or
+                                        _bug_intent or bool(_file_fix_intent))
+                        schema = ollama_domain_schema if _needs_tools else []
+                        tc2 = tc if _needs_tools else "none"
                     elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
                         # Reduced payload: the full one is rejected outright by
                         # these free tiers (measured 8866-9541 input tokens vs a
@@ -5638,15 +5699,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _n_left = len(providers) - providers.index(p)
                     _budget = (getattr(g, "chat_deadline", None)
                                if has_request_context() else None)
-                    if _budget is not None:
+                    if p[0] == "Ollama":
+                        # Local CPU model: bounded slice so cloud fallbacks keep
+                        # budget. A 7B answers simple questions in ~5s; complex
+                        # questions fall through to Groq/Gemini instead.
+                        _read_to = 30.0
+                    elif _budget is not None:
                         _left_s = max(1.0, _budget - time.monotonic() - 0.5)
                         _slice = max(3.0, min(12.0, _left_s / max(1, _n_left)))
                         _read_to = _slice
                     else:
                         _read_to = 12.0
+                    _extra = ({"keep_alive": "30m"} if p[0] == "Ollama" else None)
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2,
-                                     timeout=IMAGE_CALL_TIMEOUT if _image_request else (5, _read_to))
+                                     timeout=IMAGE_CALL_TIMEOUT if _image_request else (5, _read_to),
+                                     extra_options=_extra)
                     if _no_cdp:
                         # Log what the model can actually see, not what the
                         # domain filter intended. A device task reported "I
@@ -5665,8 +5733,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         break
                 # OpenRouter fallback removed: that key has no credits. Both
                 # Groq and Gemini model variants are already in the chain above.
-                if got is None and OLLAMA_ENABLED and not _image_request:
-                    # Ollama warm-up probe first: cheap tiny call that forces the
+                if (got is None and OLLAMA_ENABLED and not _image_request
+                        and not any(p[0] == "Ollama" for p in providers)):
+                    # Legacy last-resort Ollama (only when it is NOT already the
+                    # first choice in the chain). Ollama warm-up probe first: cheap tiny call that forces the
                     # model to LOAD (with keep_alive persisted in Ollama) so the
                     # heavy first round reuses the loaded model instead of eating
                     # the whole timeout on a cold swap. MUST use the same /v1
@@ -6687,7 +6757,10 @@ def _plan_mode_blocks_action(text):
 def chat():
     global _LAST_TOKEN_USAGE
     # One deadline for the whole response (provider calls, fallbacks, summary).
-    g.chat_deadline = time.monotonic() + CHAT_SOFT_DEADLINE_S
+    # When Ollama is the first choice on CPU, allow more time for the local
+    # model (it is slow but free), otherwise keep the snappy cloud deadline.
+    _deadline_s = 65.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
+    g.chat_deadline = time.monotonic() + _deadline_s
     data = request.json
     user_message = data.get('message', '')
     # Keep the user's actual request intact. The file-read path below and the
