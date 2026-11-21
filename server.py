@@ -13945,6 +13945,10 @@ _SHORT_DESCRIPTIONS = {
 # blocked; screen tools follow; shell and file access trail.
 _REDUCED_TOOL_ORDER = [
     "delegate",
+    # Research / internet — a planner must be able to look things up before it
+    # can produce a real plan. These were missing from reduced mode, so Groq/
+    # Gemini never got offered web search and claimed "I cannot search".
+    "web_search", "webfetch", "curl", "view_web_image", "weather", "get_time",
     "cdp_network_requests", "cdp_get_response_body", "cdp_navigate",
     "cdp_evaluate", "cdp_dom_state", "cdp_connect", "cdp_console_logs",
     "cdp_status", "need_verify_in_browser",
@@ -13969,7 +13973,8 @@ _EXPLORER_FIX_TOOLS = {"read_file", "edit_file", "write_file",
 # all, so losing them would turn a working reduced schema into a useless one.
 _REDUCED_MUST_KEEP = {"cdp_connect", "cdp_navigate", "cdp_evaluate",
                       "cdp_network_requests", "cdp_get_response_body", "cdp_console_logs", "cdp_dom_state", "cdp_status",
-                      "need_verify_in_browser"}
+                      "need_verify_in_browser",
+                      "web_search", "webfetch", "curl"}
 
 # The toolset a reduced browser task is actually required to carry. These are
 # protected from budget shedding for the same reason: a schema that silently

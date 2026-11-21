@@ -58,7 +58,7 @@ tool_caps:
             "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
              "curl", "restart", "notify",
-             "get_time", "web_search", "weather", "note",
+             "get_time", "web_search", "webfetch", "curl", "weather", "note",
              "devtool_list", "devtool_run"]
   generic:
 
@@ -68,7 +68,7 @@ tool_caps:
             "git_merge", "cdp_connect", "cdp_navigate", "cdp_evaluate", "cdp_console_logs",
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
              "curl", "restart", "notify",
-             "get_time", "web_search", "weather", "note",
+             "get_time", "web_search", "webfetch", "curl", "weather", "note",
              "devtool_list", "devtool_run"]
   web_only:
 
@@ -77,7 +77,7 @@ tool_caps:
              "cdp_dom_state", "cdp_network_requests", "cdp_get_response_body", "cdp_status",
 
             "curl", "restart", "notify",
-            "get_time", "web_search", "weather", "note"]
+            "get_time", "web_search", "webfetch", "curl", "weather", "note"]
 
 contexts:
   # ── Default: StudentSyncSA (full backward compatibility) ─────────────────────
@@ -142,3 +142,4 @@ contexts:
     tool_caps: "generic"   # has code + net tools, no ui_*
     known_structure: null
     prompt_overlay: null
+
