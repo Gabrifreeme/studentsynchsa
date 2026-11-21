@@ -4967,7 +4967,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         # Binding enforcement, not just prompt advice: remove every UI/browser
         # tool and guarantee the file-editing/analyzer tools are present.
         _code_tools = {
-            "list_files", "read_file", "grep", "write_file", "edit_file",
+            "delegate", "list_files", "read_file", "grep", "write_file", "edit_file",
             "flutter_analyze", "run_command", "git_status",
             "devtool_list", "devtool_run",
         } & _registered
@@ -4981,7 +4981,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         # Reading/searching a named file must not offer device or browser tools.
         # Without this, providers picked devtool_list with an empty path and
         # wasted the whole run on argument errors.
-        _read_only = {"list_files", "read_file", "grep"} & _registered
+        _read_only = {"list_files", "read_file", "grep", "delegate"} & _registered
         allowed_names = (allowed_names & _read_only) | _read_only
         print("[file-read] read-only file tools only: %s" % sorted(_read_only),
               flush=True)
@@ -13575,7 +13575,7 @@ _LLM_INPUT_TOKEN_BUDGET = 6200
 # find things on the web/file system. Everything else is droppable when the
 # payload is too big for the provider.
 _LLM_CORE_TOOLS = {
-    "run_command", "execute_command", "exec",
+    "delegate", "run_command", "execute_command", "exec",
     "web_search", "view_web_image", "webfetch", "curl",
     "view_user_file", "list_user_files", "read_file", "grep", "list_files",
     "open_in_vscode", "edit_file", "get_notifications", "check_email", "notify",
@@ -13761,7 +13761,7 @@ _REDUCED_TOOL_ORDER = [
 # above omits edit_file and flutter_analyze entirely, so a rate-limited model
 # was told to fix files but was never offered a tool that can change one.
 _EXPLORER_TOOL_ORDER = [
-    "read_file", "edit_file", "write_file", "grep", "list_files",
+    "delegate", "read_file", "edit_file", "write_file", "grep", "list_files",
     "flutter_analyze", "git_status", "run_command",
     "devtool_list", "devtool_run",
 ]
