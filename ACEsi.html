@@ -15185,6 +15185,16 @@ document.addEventListener('DOMContentLoaded', function() {
         sp.textContent = sg.text;
         line.appendChild(sp);
       });
+      // Add a small horizontal blue-ish line after "200 -" on log lines
+      var originalText = line.getAttribute('data-ace-text');
+      if (originalText && /200\s*-/.test(originalText)) {
+        var alreadyHasLine = line.querySelector('div[style*="background: #00d4ff"]');
+        if (!alreadyHasLine) {
+          var lineHr = document.createElement('div');
+          lineHr.style.cssText = 'background: #00d4ff; height: 1px; width: 100%; margin: 4px 0; border: 0;';
+          line.appendChild(lineHr);
+        }
+      }
       if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
     } catch (e) {}
   };
