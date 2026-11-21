@@ -14931,10 +14931,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     // the header report the stale Groq default every 5 seconds.
                     var activeModel = (typeof getSelectedModel === 'function' && getSelectedModel()) || data.model || "";
                     var text = activeModel + "/" + data.last_total_tokens + "/" + data.limit;
+                    // Append ACTUAL remaining quota scraped from provider response headers
+                    var rate = data.rate_limits || {};
+                    var providerKey = null;
+                    if (/gemini/i.test(activeModel)) providerKey = 'Gemini';
+                    else if (/groq|qwen|gpt-oss/i.test(activeModel)) providerKey = 'Groq';
+                    var rl = providerKey ? rate[providerKey] : null;
+                    if (!rl) {
+                        for (var pk in rate) { rl = rate[pk]; providerKey = pk; break; }
+                    }
+                    if (rl) {
+                        var remT = rl.remaining_tokens || rl.remaining_requests;
+                        var limT = rl.limit_tokens || rl.limit_requests;
+                        if (remT != null) text += " | " + (providerKey || 'API') + " rem " + remT + (limT != null ? "/" + limT : "");
+                        if (rl.retry_after != null) text += " retry " + rl.retry_after + "s";
+                    }
                     var el1 = document.getElementById("current-model-indicator");
-                    if (el1) el1.textContent = text;
+                    if (el1) { el1.textContent = text; el1.title = JSON.stringify(rate, null, 2); }
                     var el2 = document.getElementById("mobile-model-indicator");
-                    if (el2) el2.textContent = text;
+                    if (el2) { el2.textContent = text; el2.title = JSON.stringify(rate, null, 2); }
                 }
             })
             .catch(function(e) {});

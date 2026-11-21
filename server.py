@@ -151,6 +151,39 @@ try:
     _DAILY_TOKEN_LIMIT = int(_j.get('limit') or 200000)
 except Exception:
     pass
+
+# Live rate-limit info scraped from provider response headers so the header
+# display shows the ACTUAL remaining quota instead of a static daily counter.
+import threading as _rl_threading
+_RATE_LIMIT_INFO = {}
+_RATE_LIMIT_LOCK = _rl_threading.Lock()
+
+
+def _record_rate_headers(name, headers):
+    """Capture x-ratelimit-* / retry-after headers from a provider response."""
+    try:
+        wanted = {
+            'x-ratelimit-limit-requests': 'limit_requests',
+            'x-ratelimit-remaining-requests': 'remaining_requests',
+            'x-ratelimit-reset-requests': 'reset_requests',
+            'x-ratelimit-limit-tokens': 'limit_tokens',
+            'x-ratelimit-remaining-tokens': 'remaining_tokens',
+            'x-ratelimit-reset-tokens': 'reset_tokens',
+            'ratelimit-limit': 'limit_requests',
+            'ratelimit-remaining': 'remaining_requests',
+            'retry-after': 'retry_after',
+        }
+        found = {}
+        for k, v in dict(headers).items():
+            key = k.lower()
+            if key in wanted:
+                found[wanted[key]] = str(v)
+        if found:
+            with _RATE_LIMIT_LOCK:
+                _RATE_LIMIT_INFO[name] = found
+    except Exception:
+        pass
+
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-120b"
 # Browser tasks (ui/net) get a different Groq model. qwen3.8-27b fills a login
@@ -3772,6 +3805,7 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
                 headers=headers,
                 json=body,
                 timeout=_use_timeout)
+            _record_rate_headers(name, r.headers)
             _live_log("%s <- HTTP %d %s" % (name, r.status_code, 
     "😊" if r.status_code in (200, 204) else "❌"))
         except requests.exceptions.Timeout:
@@ -7073,6 +7107,11 @@ def chat():
             "Example: [EXEC: ffmpeg -i \"C:\\path\\input.mp4\" -c copy -map 0 -segment_time 5 -f segment -reset_timestamps 1 \"C:\\path\\out_%03d.mp4\"]. "
             "If Chris asks to split, cut, trim, or convert a video, never write Flutter/Dart code and never say you cannot do it: emit the ffmpeg [EXEC] line, or call run_command. "
             "Plain video-split requests are handled before you are called, so don't duplicate that work."
+            " DELEGATION: For any deep investigation — locating where something is defined, mapping "
+            "structure, tracing a bug across files, or a multi-step codebase search — use the delegate "
+            "tool proactively WITHOUT being asked. Give it a clear task and scope='code'. It runs a "
+            "focused read-only sub-agent and returns a report; relay that report to Chris. Use it "
+            "instead of burning many rounds doing the search yourself."
         )
         # Hard rule: in Plan Mode the agent must not pretend to switch modes
         # or output the confirmation phrase.
@@ -7601,11 +7640,14 @@ def api_ai_usage():
     # claimed "openai/gpt-oss-120b" even while chat was routed to Gemini, and
     # the UI repainted that stale value every five seconds.
     active_model = get_config('model') or GROQ_MODEL
+    with _RATE_LIMIT_LOCK:
+        rate_limits = {k: dict(v) for k, v in _RATE_LIMIT_INFO.items()}
     return jsonify({
         'ok': True,
         'model': active_model,
         'last_total_tokens': _LAST_TOKEN_USAGE,
-        'limit': _DAILY_TOKEN_LIMIT
+        'limit': _DAILY_TOKEN_LIMIT,
+        'rate_limits': rate_limits
     })
 
 
@@ -11584,6 +11626,11 @@ def tool_delegate(task, scope="code"):
         "provided tools. Be thorough: report exact file paths, line numbers, function "
         "names and code snippets. Do NOT modify any files. When finished, write a "
         "clear, self-contained final report and stop calling tools.\n"
+        "PROJECT ROOT = " + PROJECT_ROOT + "\n"
+        "Path rules: all file paths are relative to the project root (e.g. 'ACEsi.html', "
+        "'server.py', 'lib/app.dart'). Use '.' for the root directory. Do NOT use empty "
+        "paths and do NOT invent absolute paths. If you do not know a file's location, "
+        "first call list_files with path='.' to find it, then grep/read it.\n"
         "Allowed tools: " + ", ".join(sorted(allowed))
     )
     msgs = [{"role": "system", "content": system},
@@ -14167,6 +14214,12 @@ _REDUCED_SYS = (
     "AFTER A TOOL RETURNS: read the actual values in the result and report THEM - "
     "the real status codes, error strings, URLs, console lines. Never describe what "
     "should happen or what to do next; only state what you actually observed."
+    "\n"
+    "DEEP INVESTIGATIONS: when a task needs locating where something is defined, mapping "
+    "code structure, tracing a bug across files, or a multi-step search, USE the delegate "
+    "tool proactively (scope='code') without waiting to be told. It runs a focused read-only "
+    "sub-agent and returns a report - relay that report. Do not waste many rounds searching "
+    "by hand when delegate can do it in one call."
 )
 
 
@@ -16931,6 +16984,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                     json={"model": model, "messages": messages, "temperature": temperature,
                           "max_tokens": max_tokens, "tools": tools_schema, "tool_choice": tool_choice},
                     timeout=(10, 120))
+                _record_rate_headers(name, r.headers)
                 if r.status_code == 200:
                     msg = r.json()["choices"][0]["message"]
                     text = (msg.get("content") or "").strip()
