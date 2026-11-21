@@ -45,6 +45,19 @@ print("  reduced prompt hint:", PASS if has_reduced else FAIL)
 
 print()
 print("=" * 64)
+print("TEST 2b: typo-tolerant fuzzy path resolution")
+print("=" * 64)
+try:
+    resolved = server.fuzzy_resolve_path("sync_providr.dart", want_file=True)
+    ok2b = bool(resolved) and resolved.lower().endswith("sync_provider.dart")
+    print("  sync_providr.dart ->", resolved)
+    print("  result:", PASS if ok2b else FAIL)
+except Exception as e:
+    print("  result: FAIL", e)
+    ok2b = False
+
+print()
+print("=" * 64)
 print("TEST 3: delegate sub-agent (live LLM call - needs providers up)")
 print("=" * 64)
 try:
@@ -59,6 +72,6 @@ except Exception as e:
 
 print()
 print("=" * 64)
-allok = ok1 and ok1b and has_full and has_reduced and ok3
+allok = ok1 and ok1b and has_full and has_reduced and ok2b and ok3
 print("OVERALL:", PASS if allok else "PARTIAL (providers may be down)")
 print("=" * 64)

@@ -6823,6 +6823,14 @@ def chat():
     # Handle file read requests via the strict matcher above.
     global LAST_FILE_PATH
     is_file_req, candidate, vague = _match_file_request(user_message)
+    # Typo tolerance: correct a misspelled filename before the open() attempt so
+    # a typo like sync_providr.dart never wastes an LLM round on a FileNotFoundError.
+    _typo_corrected = None
+    if is_file_req and not vague and candidate and not os.path.exists(candidate):
+        _fixed = fuzzy_resolve_path(candidate, want_file=True)
+        if _fixed:
+            _typo_corrected = (candidate, _fixed)
+            candidate = _fixed
     if is_file_req:
         if vague and LAST_FILE_PATH:
             file_path = LAST_FILE_PATH
@@ -6920,6 +6928,8 @@ def chat():
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
             LAST_FILE_PATH = file_path
+            if _typo_corrected:
+                print("🔤 typo corrected: %s -> %s" % (_typo_corrected[0], _typo_corrected[1]))
             socketio.emit('ai_action', {'tool': 'read_file', 'path': file_path})
             # If the user said "open", physically launch the file (default viewer)
             if False:
@@ -7095,6 +7105,12 @@ def chat():
             "Never invent personal history, memories, or references to past events that are not in the context below. "
             "Use the facts and journal entries below naturally when they are relevant — not every message. "
             "Keep replies short unless Chris asks for more.\n\n"
+            "TYPO TOLERANCE: Chris types fast and messages often contain spelling mistakes. "
+            "Read charitably and infer what he MEANT. If a filename looks slightly misspelled "
+            "(e.g. 'sync_providr.dart' -> 'sync_provider.dart'), resolve the closest real file "
+            "or use the delegate/file tools to find it — do NOT fail, ask for clarification, or "
+            "waste a round reporting 'file not found' over a harmless typo. Judge intent from "
+            "context and 'read between the lines' rather than taking every word literally.\n\n"
             "TIME: The [Current time: ...] line in the context below is the real current date and time. "
             "Use it for any date or time question; never say you don't have a clock.\n\n"
             "YOUR MEMORY: You DO have persistent memory. The bracketed blocks below are it — "
@@ -12842,7 +12858,7 @@ _NON_FILE_TOKENS = {
     "and", "the", "for", "with", "this", "that", "error", "errors", "fix",
     "find", "open", "read", "edit", "syntax", "file", "code", "dart", "flutter",
 }
-_PROJECT_FILE_INDEX = {"at": 0.0, "stems": set(), "names": set()}
+_PROJECT_FILE_INDEX = {"at": 0.0, "stems": set(), "names": set(), "paths": []}
 
 
 def _project_file_index():
@@ -12853,17 +12869,71 @@ def _project_file_index():
     root = os.path.dirname(os.path.abspath(__file__))
     skip = {".git", ".dart_tool", "build", "node_modules", "deepseek-desktop",
             "__pycache__"}
-    names, stems = set(), set()
+    names, stems, paths = set(), set(), []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d.lower() not in skip]
         for fn in filenames:
             low = fn.lower()
             names.add(low)
             stems.add(os.path.splitext(low)[0])
+            try:
+                paths.append(os.path.relpath(os.path.join(dirpath, fn), root).replace("\\", "/"))
+            except Exception:
+                pass
     _PROJECT_FILE_INDEX["names"] = names
     _PROJECT_FILE_INDEX["stems"] = stems
+    _PROJECT_FILE_INDEX["paths"] = paths
     _PROJECT_FILE_INDEX["at"] = now
     return _PROJECT_FILE_INDEX
+
+
+def fuzzy_resolve_path(token, want_file=True):
+    """Resolve a possibly-misspelled file/dir token to the closest real project path.
+
+    Returns a real path (string) when a close match exists, else None. Handles a
+    typo like 'sync_providr.dart' -> 'lib/presentation/providers/sync_provider.dart'
+    without spending an LLM round on a FileNotFoundError.
+    """
+    import difflib
+    if not token:
+        return None
+    raw = str(token).strip().strip('"\'')
+    if not raw:
+        return None
+    root = os.path.dirname(os.path.abspath(__file__))
+    # If it already exists (absolute, or relative to root), nothing to fix.
+    for cand in (raw if os.path.isabs(raw) else os.path.join(root, raw),):
+        if os.path.exists(cand) and (os.path.isfile(cand) == want_file or not want_file):
+            return cand
+    base = os.path.basename(raw.replace("\\", "/")).lower()
+    if not base:
+        return None
+    idx = _project_file_index()
+    paths = idx["paths"]
+    stem = os.path.splitext(base)[0]
+    # A typo affects the FILENAME, so compare basename-to-basename, then map the
+    # winning basename back to its full relative path. Guard with the extension
+    # when the token had one so we don't resolve sync_providr.dart to a .yaml.
+    basenames = [os.path.basename(p).lower() for p in paths]
+    pairs = list(zip(basenames, paths))
+    if "." in base:
+        ext = os.path.splitext(base)[1].lower()
+        pairs = [(b, p) for (b, p) in pairs if os.path.splitext(b)[1].lower() == ext] or pairs
+    for needle, use_pairs in (
+        (base, pairs),
+        (stem, [(os.path.splitext(b)[0], p) for (b, p) in pairs]),
+    ):
+        choices = [c for (c, _) in use_pairs]
+        try:
+            close = difflib.get_close_matches(needle, choices, n=1, cutoff=0.6)
+        except Exception:
+            close = []
+        if close:
+            hit = close[0]
+            for choice, p in use_pairs:
+                if choice == hit:
+                    return os.path.join(root, p)
+    return None
 
 
 def _stem_variants(stem):
@@ -14798,6 +14868,19 @@ def _call_tool(name, args):
     for k in keys:
         if k in args and args[k] is not None:
             kwargs[k] = args[k]
+    # Typo tolerance for project file tools: resolve a misspelled path to the
+    # closest real project file/dir before the tool reports "not found".
+    if name in ("read_file", "grep", "list_files") and "path" in kwargs:
+        p = kwargs.get("path")
+        want_file = name != "list_files"
+        _p = str(p).strip() if p is not None else ""
+        _exists = os.path.isabs(_p) if _p else False
+        if not _exists and _p:
+            _exists = os.path.exists(os.path.join(PROJECT_ROOT, _p))
+        if not _exists:
+            _fixed = fuzzy_resolve_path(_p, want_file=want_file)
+            if _fixed:
+                kwargs["path"] = _fixed
     try:
         res = fn(**kwargs)
     except Exception as e:
