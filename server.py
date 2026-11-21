@@ -5631,9 +5631,22 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         msgs = llm_messages
                         schema = []
                         tc2 = "none"
+                    # Per-provider time slice: cap each provider's read timeout so
+                    # one hanging provider cannot consume the entire 20s budget and
+                    # starve every fallback (Gemini used to eat ~19s, leaving Groq
+                    # with ~1s -> instant "deadline" failures for all fallbacks).
+                    _n_left = len(providers) - providers.index(p)
+                    _budget = (getattr(g, "chat_deadline", None)
+                               if has_request_context() else None)
+                    if _budget is not None:
+                        _left_s = max(1.0, _budget - time.monotonic() - 0.5)
+                        _slice = max(3.0, min(12.0, _left_s / max(1, _n_left)))
+                        _read_to = _slice
+                    else:
+                        _read_to = 12.0
                     got = _chat_one(p[0], p[1], p[2], p[3], msgs,
                                      tools_schema=schema, tool_choice=tc2,
-                                     timeout=IMAGE_CALL_TIMEOUT if _image_request else (8, 30))
+                                     timeout=IMAGE_CALL_TIMEOUT if _image_request else (5, _read_to))
                     if _no_cdp:
                         # Log what the model can actually see, not what the
                         # domain filter intended. A device task reported "I
