@@ -7200,6 +7200,16 @@ def chat():
             "tool proactively WITHOUT being asked. Give it a clear task and scope='code'. It runs a "
             "focused read-only sub-agent and returns a report; relay that report to Chris. Use it "
             "instead of burning many rounds doing the search yourself."
+            " MANDATORY ERROR-WORKFLOW (do this automatically, no need to be told how): when Chris "
+            "reports a bug, an error, a 404, or asks you to find/fix/check problems — do not guess "
+            "and do not just answer from memory. (1) Call project_doctor FIRST to get the exact "
+            "structured checklist of errors (file:line:col: message). For web/ITS/network issues, "
+            "also use cdp_network_requests(filter_status='404'), cdp_get_response_body, curl and "
+            "web research to find the real cause. (2) Fix the root cause with edit_file / write_file "
+            "(or the Auto-Fix UI). (3) Call project_doctor AGAIN to verify. NEVER claim an error is "
+            "fixed unless project_doctor reports it clean — cannot verify means NOT fixed. Report "
+            "only what the analyzers actually show. You do NOT need Chris to give you special "
+            "phrasing: any request about an error, bug, 404 or 'fix it' triggers this loop."
         )
         # Hard rule: in Plan Mode the agent must not pretend to switch modes
         # or output the confirmation phrase.
@@ -13293,7 +13303,13 @@ _explorer_fix_re = re.compile(
     r"|\bflutter\s+analy(?:ze|sis)\b"
     # "fix all 13 problems" with no other keyword.
     r"|\b(?:fix|clear|resolve|repair)\b.{0,30}\b\d+\s+"
-    r"(?:problems?|errors?|issues?|warnings?)\b",
+    r"(?:problems?|errors?|issues?|warnings?)\b"
+    # "are there any errors in this project?" / "check the code for errors" —
+    # a static project/codebase diagnostic, NOT a page bug report. Without this
+    # the _bug_re 'errors in ...' pattern hijacks it into the browser path.
+    r"|\b(?:error|issue|problem)s?\b.{0,40}\b(?:in|on|with|across)\b.{0,20}"
+    r"\b(?:project|codebase|code|source|files?|app)\b"
+    r"|\b(?:check|find|scan|look\s+for|any)\b.{0,30}\b(?:error|issue|problem)s?\b",
     re.IGNORECASE,
 )
 
@@ -14565,6 +14581,15 @@ _REDUCED_SYS = (
     "tool proactively (scope='code') without waiting to be told. It runs a focused read-only "
     "sub-agent and returns a report - relay that report. Do not waste many rounds searching "
     "by hand when delegate can do it in one call."
+    "\n"
+    "MANDATORY ERROR-WORKFLOW (do it automatically, no special phrasing needed): whenever Chris "
+    "reports a bug, error, 404, or asks to find/fix/check problems - do NOT guess or answer from "
+    "memory. (1) Call project_doctor FIRST for the exact structured error checklist "
+    "(file:line:col: message). For web/ITS/404 issues also use cdp_network_requests "
+    "(filter_status='404'), cdp_get_response_body, curl and web research to find the root cause. "
+    "(2) Fix it with edit_file / write_file. (3) Call project_doctor AGAIN to verify - NEVER say "
+    "it is fixed unless the analyzer reports clean. Cannot verify means NOT fixed. Report only "
+    "what the analyzers actually show."
 )
 
 
