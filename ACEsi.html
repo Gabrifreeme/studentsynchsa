@@ -15228,7 +15228,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!document.getElementById('acePipeRunKeyframe')) {
             var pstyle = document.createElement('style');
             pstyle.id = 'acePipeRunKeyframe';
-            pstyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(0);}}';
+            pstyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(100vw);}}';
             document.head.appendChild(pstyle);
           }
         }
