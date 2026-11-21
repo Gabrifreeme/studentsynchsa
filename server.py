@@ -8878,6 +8878,8 @@ def _walk_files(root):
 def tool_list_files(path="."):
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
+    if not path or not str(path).strip():
+        path = "."  # models sometimes emit an empty path
     rp = _safe_path(path)
     if not rp or not os.path.isdir(rp):
         return False, "dir not found: %s" % path
@@ -11626,8 +11628,17 @@ def tool_delegate(task, scope="code"):
             if not got:
                 return False, "delegate: no provider answered."
             text, tcs, finish = got
+            raw_calls = list(tcs)
             tcs = [(nm, a) for (nm, a) in tcs if nm in allowed]
             if not tcs:
+                if raw_calls:
+                    # Model tried disallowed tools — tell it and keep going instead
+                    # of mistaking its "I'll use tools" preamble for a final report.
+                    bad = ", ".join(sorted({nm for (nm, _) in raw_calls}))
+                    msgs.append({"role": "user", "content":
+                        "Those tools are not available: %s. Use ONLY these: %s. Continue."
+                        % (bad, ", ".join(sorted(allowed)))})
+                    continue
                 c = _clean(text)
                 if c:
                     report = c
