@@ -7503,6 +7503,37 @@ def _dart_analyze_file_errors(path):
     return issues
 
 
+def doctor_verify_file(path):
+    """Wire project_doctor's verify step into the fix flow: return the errors
+    the doctor's analyzers report for ONE file.
+
+    Returns (verified, errors): verified=True means the file is clean,
+    verified=False means errors remain (or verification was impossible, in
+    which case we do NOT claim success). Works for dart/py/js files."""
+    if not path or not os.path.isfile(path):
+        return False, ["file not found: %s" % path]
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == ".dart":
+            issues = _dart_analyze_file_errors(path)
+            if issues is None:
+                return False, ["verification unavailable (dart not found / timeout)"]
+            return (not issues), issues
+        if ext == ".py":
+            with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
+                compile(f.read(), path, "exec")
+            return True, []
+        if ext in (".js", ".mjs", ".cjs"):
+            r = subprocess.run(["node", "--check", path], cwd=PROJECT_ROOT,
+                               capture_output=True, text=True, timeout=30,
+                               errors="replace")
+            return (r.returncode == 0), ([r.stderr.strip()] if r.returncode else [])
+        # Unknown type: cannot verify, so do not claim success.
+        return False, ["no analyzer for extension %s" % ext]
+    except Exception as e:
+        return False, ["verification error: %s" % e]
+
+
 def _build_mode_direct_fix(user_message):
     """Build Mode: when the user asks ACEsi to fix something in a file, do it
     directly - read the file, analyze the syntax error, generate the fix and
@@ -7574,12 +7605,29 @@ def autofix():
 
     data = request.json or {}
     code = data.get('code', '')
+    filename = str(data.get('filename') or '').strip()
     if not code.strip():
         return jsonify({"ok": False, "error": "No code provided"})
 
-    ok, fixed_code, provider = _generate_autofix_fix(code)
+    # Wire project_doctor's diagnostics into the fix: give the model the exact
+    # analyzer errors for this file, not just raw code, so it fixes the real
+    # problem instead of guessing.
+    errors_before = []
+    if filename:
+        rp = _ide_path(filename)
+        if rp and os.path.isfile(rp):
+            verified_before, errors_before = doctor_verify_file(rp)
+    prompt = code
+    if errors_before:
+        prompt = ("The analyzer reports these errors in %s:\n%s\n\nFix the code below "
+                  "so ALL of them are resolved:\n%s" %
+                  (filename, "\n".join(errors_before[:20]), code))
+
+    ok, fixed_code, provider = _generate_autofix_fix(prompt)
     if ok:
-        return jsonify({"ok": True, "fixed_code": fixed_code, "provider": provider})
+        return jsonify({"ok": True, "fixed_code": fixed_code, "provider": provider,
+                        "errors_before": errors_before[:20],
+                        "filename": filename})
     return jsonify({"ok": False, "error": "All providers failed or returned empty."})
 @app.route('/history', methods=['GET'])
 @require_token
@@ -8513,7 +8561,12 @@ def api_save_file():
             f.write(content)
         _log_change(full, old, content, source='explorer')
         print("💾 Explorer: saved %s (%d chars)" % (filename, len(content)))
-        return jsonify({'ok': True, 'message': 'Saved!'})
+        # Wire project_doctor's verify step: prove the saved file is clean.
+        # Only claim success when the analyzer agrees; never claim "fixed" over
+        # remaining errors.
+        verified, errors = doctor_verify_file(full)
+        return jsonify({'ok': True, 'message': 'Saved!',
+                        'verified': bool(verified), 'errors': errors[:20]})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

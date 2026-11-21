@@ -8785,7 +8785,7 @@ perspective: 900px;
 
           headers: { "Content-Type": "application/json" },
 
-          body: JSON.stringify({ code: code }),
+          body: JSON.stringify({ code: code, filename: window.currentFile || "" }),
 
         })
 
@@ -8807,9 +8807,10 @@ perspective: 900px;
 
               if (res)
 
+                var before = (d.errors_before && d.errors_before.length)
+                  ? ' <span style="color:#888;">(' + d.errors_before.length + ' analyzer error(s) targeted)</span>' : '';
                 res.innerHTML =
-
-                  '<span style="color:#00ff00;">Review the fix, then click Save to File.</span>';
+                  '<span style="color:#00ff00;">Review the fix, then click Save to File (verified on save).</span>' + before;
 
               var fb = document.getElementById("autofix-fix-btn");
 
@@ -8927,19 +8928,20 @@ perspective: 900px;
 
             var res = document.getElementById("autofix-result");
 
-            if (res)
-
-              res.innerHTML =
-
-                d && d.ok
-
-                  ? '<span style="color:#00ff00;">Saved.</span>'
-
-                  : '<span style="color:#ff0000;">Save failed: ' +
-
-                    ((d && d.error) || "unknown") +
-
-                    "</span>";
+            if (res) {
+              if (d && d.ok) {
+                if (d.verified === true) {
+                  res.innerHTML = '<span style="color:#00ff00;">Saved & verified — no errors remain.</span>';
+                } else {
+                  var errs = (d.errors || []).slice(0, 3).join(' | ');
+                  res.innerHTML = '<span style="color:#ff9d00;">Saved, but ' + (d.errors ? d.errors.length : '?') +
+                    ' error(s) remain' + (errs ? ': ' + errs : '') + '.</span>';
+                }
+              } else {
+                res.innerHTML = '<span style="color:#ff0000;">Save failed: ' +
+                  ((d && d.error) || "unknown") + "</span>";
+              }
+            }
 
           })
 
