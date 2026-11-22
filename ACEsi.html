@@ -2883,6 +2883,7 @@ button[title="Run Execution"], button[title="Open Terminal"], button[onclick="op
   display: inline-flex !important;
   align-items: stretch !important;
   gap: 0 !important;
+  overflow: visible !important;
   height: 26px !important;
   min-height: 26px !important;
   max-height: 26px !important;
@@ -2890,7 +2891,6 @@ button[title="Run Execution"], button[title="Open Terminal"], button[onclick="op
   border: 1px solid #ffa500 !important;
   border-radius: 4px !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
-  overflow: hidden !important;
 }
 .ace-mode-btn {
   display: inline-flex !important;
@@ -2912,12 +2912,21 @@ button[title="Run Execution"], button[title="Open Terminal"], button[onclick="op
   background: rgba(255, 165, 0, 0.2) !important;
   color: #ffa500 !important;
 }
-/* Settings button - bright amber tooltip */
-button[onclick="openSettings()"] { position: relative !important; }
-button[onclick="openSettings()"]::after {
-  content: attr(data-tooltip);
+/* Header button tooltips - open downward so they stay in the viewport */
+#chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header {
+  overflow: visible !important;
+}
+#chat-panel .panel-header button, #code-panel .panel-header button,
+#explorer-panel .panel-header button {
+  position: relative !important;
+}
+#chat-panel .panel-header button::after,
+#code-panel .panel-header button::after,
+#explorer-panel .panel-header button::after {
+  content: attr(title);
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   background: #ffa500 !important;
@@ -2931,9 +2940,11 @@ button[onclick="openSettings()"]::after {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
-  z-index: 30000;
+  z-index: 9999;
 }
-button[onclick="openSettings()"]:hover::after { opacity: 1; }
+#chat-panel .panel-header button:hover::after,
+#code-panel .panel-header button:hover::after,
+#explorer-panel .panel-header button:hover::after { opacity: 1; }
 /* Conversation header buttons - bright amber text */
 button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
   color: #ffa500 !important;
