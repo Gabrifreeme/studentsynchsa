@@ -8441,13 +8441,13 @@ perspective: 900px;
 
     <div id="terminal-split" style="display:flex; flex-direction:row; flex:1 1 auto; min-height:0; width:100%;">
       <div id="terminal-output" style="flex:0 0 70%; width:70%; overflow:hidden; padding:0; margin:0; background:#000; display:block; height:100%; position:relative;"></div>
-      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; overflow:hidden; background:#050505; border-left:1px solid #ffa500; box-sizing:border-box; padding:6px; font-family:'Roboto Mono',monospace; color:#ffa500;">
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">CPU</div><div class="ace-dash-value" id="ace-dash-cpu">--</div><div class="ace-dash-sub" id="ace-dash-cpu-sub">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Memory</div><div class="ace-dash-value" id="ace-dash-mem">--</div><div class="ace-dash-sub" id="ace-dash-mem-sub">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 0 (C:)</div><div class="ace-dash-value" id="ace-dash-diskc">--</div><div class="ace-dash-sub" id="ace-dash-diskc-sub">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 1 (D:)</div><div class="ace-dash-value" id="ace-dash-diskd">--</div><div class="ace-dash-sub" id="ace-dash-diskd-sub">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Ethernet</div><div class="ace-dash-value" id="ace-dash-net">--</div><div class="ace-dash-sub" id="ace-dash-net-sub">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">GPU 0</div><div class="ace-dash-value" id="ace-dash-gpu">--</div><div class="ace-dash-sub" id="ace-dash-gpu-sub">--</div></div></div>
+      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #ffa500; font-family:'Roboto Mono',monospace; color:#ffa500;">
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-cpu">CPU · --</div><div class="ace-dash-sub" id="ace-dash-cpu-sub"></div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-mem">Memory · --</div><div class="ace-dash-sub" id="ace-dash-mem-sub"></div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-diskc">Disk 0 (C:) --</div><div class="ace-dash-sub" id="ace-dash-diskc-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-diskd">Disk 1 (D:) --</div><div class="ace-dash-sub" id="ace-dash-diskd-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-net">Ethernet --</div><div class="ace-dash-sub" id="ace-dash-net-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-gpu">GPU 0 --</div><div class="ace-dash-sub" id="ace-dash-gpu-sub">--</div></div></div>
       </div>
     </div>
 
@@ -16867,21 +16867,33 @@ window.aceCloseAllPanels = function (exceptId) {
   #ace-term-dashboard {
     flex: 0 0 30% !important;
     width: 30% !important;
+    height: 100% !important;
     min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    padding: 6px !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
     background: #050505 !important;
     border-left: 1px solid #ffa500 !important;
-    box-sizing: border-box !important;
-    padding: 6px !important;
     color: #ffa500 !important;
   }
   .ace-dash-card {
-    display: flex; align-items: center; gap: 6px;
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 4px 8px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
     background: #0a0a0a; border: 1px solid #ffa500;
-    border-radius: 6px; padding: 3px 6px; margin-bottom: 4px;
+    border-radius: 6px;
   }
   .ace-dash-graph {
-    width: 48px; height: 30px; flex: 0 0 48px;
+    width: 56px; height: 100%; max-height: 36px; flex: 0 0 56px;
     border: 1px solid #ffa500; border-radius: 3px;
     display: flex; align-items: flex-end; overflow: hidden;
     background: #000;
@@ -16891,8 +16903,8 @@ window.aceCloseAllPanels = function (exceptId) {
   }
   .ace-dash-info { min-width: 0; }
   .ace-dash-label { color: #ffa500; font-weight: bold; font-size: 12px; white-space: nowrap; }
-  .ace-dash-value { color: #ffa500; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ace-dash-sub { color: #ffa500; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-value { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-sub { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
 </style>
 <script>
@@ -16983,17 +16995,15 @@ window.aceCloseAllPanels = function (exceptId) {
     var cpu = m.cpu || {}, ram = m.ram || {};
     var dc = (m.disks || {})['C:'] || {}, dd = (m.disks || {})['D:'] || {};
     var net = m.network || {}, gpu = m.gpu || {};
-    setText('ace-dash-cpu', (cpu.percent || 0) + '%');
-    setText('ace-dash-cpu-sub', (cpu.freq_ghz || 0) + ' GHz');
-    setText('ace-dash-mem', (ram.percent || 0) + '%');
-    setText('ace-dash-mem-sub', (ram.used_gb || 0) + ' / ' + (ram.total_gb || 0) + ' GB');
-    setText('ace-dash-diskc', 'SSD (NVMe) · Active: ' + (dc.active_pct || 0) + '%');
-    setText('ace-dash-diskc-sub', 'R: ' + (dc.read_mb_s || 0).toFixed(1) + ' MB/s · W: ' + (dc.write_mb_s || 0).toFixed(1) + ' MB/s · Free: ' + (dc.free_gb || 0) + ' GB');
-    setText('ace-dash-diskd', 'Removable (USB) · Free: ' + (dd.free_gb || 0) + ' GB');
-    setText('ace-dash-diskd-sub', 'R: ' + (dd.read_mb_s || 0).toFixed(1) + ' MB/s · W: ' + (dd.write_mb_s || 0).toFixed(1) + ' MB/s');
-    setText('ace-dash-net', 'S: ' + (net.sent_kbps || 0) + ' Kbps · R: ' + (net.recv_kbps || 0) + ' Kbps');
-    setText('ace-dash-net-sub', 'Local: 127.0.0.1:5000 (UP)');
-    setText('ace-dash-gpu', gpu.name || 'GPU 0');
+    setText('ace-dash-cpu', 'CPU · ' + (cpu.percent || 0) + '% · ' + (cpu.freq_ghz || 0) + ' GHz');
+    setText('ace-dash-mem', 'Memory · ' + (ram.percent || 0) + '% (' + (ram.used_gb || 0) + ' / ' + (ram.total_gb || 0) + ' GB)');
+    setText('ace-dash-diskc', 'Disk 0 (C:) SSD · Free: ' + (dc.free_gb || 0) + ' GB');
+    setText('ace-dash-diskc-sub', 'Active: ' + (dc.active_pct || 0) + '% · R: ' + (dc.read_mb_s || 0).toFixed(1) + ' · W: ' + (dc.write_mb_s || 0).toFixed(1) + ' MB/s');
+    setText('ace-dash-diskd', 'Disk 1 (D:) USB · Free: ' + (dd.free_gb || 0) + ' GB');
+    setText('ace-dash-diskd-sub', 'R: ' + (dd.read_mb_s || 0).toFixed(1) + ' · W: ' + (dd.write_mb_s || 0).toFixed(1) + ' MB/s');
+    setText('ace-dash-net', 'Ethernet · 127.0.0.1:5000 (UP)');
+    setText('ace-dash-net-sub', 'S: ' + (net.sent_kbps || 0) + ' Kbps · R: ' + (net.recv_kbps || 0) + ' Kbps');
+    setText('ace-dash-gpu', 'GPU 0 · ' + (gpu.name || 'GPU'));
     setText('ace-dash-gpu-sub', 'Load: ' + (gpu.load_pct || 0) + '% · Mem: ' + (gpu.shared_mem_gb || 0).toFixed(1) + ' GB');
     push(0, cpu.percent || 0);
     push(1, ram.percent || 0);
