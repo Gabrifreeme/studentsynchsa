@@ -10435,7 +10435,6 @@ async function sendMessage(reuseMsgId) {
 
         }
 
-        if (sendSpinner) sendSpinner.classList.add("active");
         if (spinnerLeft) spinnerLeft.classList.add("active");
 
         if (spinnerRight) spinnerRight.classList.add("active");
@@ -10720,7 +10719,6 @@ let _geoPayload = {};
 
           if (window._timerInterval) clearInterval(window._timerInterval);
 
-          if (sendSpinner) sendSpinner.classList.remove("active");
           if (spinnerLeft) spinnerLeft.classList.remove("active");
 
           if (spinnerRight) spinnerRight.classList.remove("active");
