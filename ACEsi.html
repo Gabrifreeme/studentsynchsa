@@ -2857,10 +2857,34 @@ button[title="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !im
   box-shadow: inset 0 0 0 1px #ffa500 !important;
 }
 /* Conversation header buttons + Plan/Build - bright amber borders */
-button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"],
-.ace-mode-switch, .ace-mode-btn + .ace-mode-btn {
+button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
   border: 1px solid #ffa500 !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
+}
+/* Plan|Build toggle: one outer frame, one divider, no inner button borders */
+.ace-mode-switch {
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  box-sizing: border-box !important;
+  border: 1px solid #ffa500 !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+.ace-mode-btn {
+  border: none !important;
+  box-shadow: none !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+.ace-mode-btn + .ace-mode-btn {
+  border: none !important;
+  border-left: 1px solid #ffa500 !important;
+}
+.ace-mode-btn.active, .ace-mode-btn.active:hover {
+  background: rgba(255, 165, 0, 0.2) !important;
+  color: #ffa500 !important;
 }
 /* Conversation header buttons - bright amber text */
 button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
@@ -2916,6 +2940,70 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
   display: flex !important;
   align-items: center !important;
   border-bottom: 1px solid #ffa500 !important;
+}
+/* Keep the whole UI (including the right border) inside the viewport */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+#main-container, #bottom-status {
+  width: 100% !important;
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+  border-right: 1px solid #ffa500 !important;
+}
+/* Guaranteed bright right edge at the exact viewport boundary */
+html::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ffa500;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+/* Header contents: single row, compact buttons, no wrapping or overlap */
+#chat-panel .panel-header.chat-panel-header,
+#code-panel .panel-header,
+#explorer-panel .panel-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+}
+#chat-panel .panel-header.chat-panel-header > div,
+#code-panel .panel-header > div,
+#explorer-panel .panel-header > div {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"],
+button[title="Restart App"], #explorer-refresh-btn, .ace-mode-btn {
+  white-space: nowrap !important;
+  padding: 3px 7px !important;
+  font-size: 11px !important;
+  flex-shrink: 0 !important;
+}
+.code-panel-title {
+  position: static !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  margin-right: 8px !important;
+}
+#code-panel .panel-header > div .btn {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
 }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
