@@ -2850,6 +2850,19 @@ button[title="Restart App"], #explorer-refresh-btn {
 button[title="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !important; }
 /* Bottom-left corner of the status bar */
 #bottom-status { border-left: 1px solid #ffa500 !important; }
+/* Code Editor header: title left, action buttons centered */
+#code-panel .panel-header {
+  justify-content: center !important;
+  position: relative !important;
+}
+#code-panel .panel-header > .code-panel-title {
+  position: absolute !important;
+  left: 8px !important;
+}
+#code-panel .panel-header > div {
+  margin: 0 auto !important;
+  justify-content: center !important;
+}
 /* Code Editor toolbar buttons - bright amber borders */
 #save-btn, button[title="Auto Fix"], #format-btn, #clear-btn,
 #copy-btn, #paste-btn, #devtool-plus-btn {
