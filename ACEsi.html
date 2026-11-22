@@ -1854,11 +1854,14 @@
 
       /* ===== Conversation header: title left, Plan/Build switch right ===== */
       #chat-panel .panel-header.chat-panel-header {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         align-items: center;
-        justify-content: space-between;
         gap: 8px;
         padding: 6px 10px !important;
+      }
+      #chat-panel .panel-header.chat-panel-header > .ace-mode-switch {
+        justify-self: end;
       }
 
       .ace-mode-switch {
@@ -4811,10 +4814,10 @@ git add -u (stage tracked)</label
             <button class="btn" title="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
             <button class="btn" title="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
             <button class="btn" onclick="openSettings()">Settings</button>
-            <div class="ace-mode-switch" role="group" aria-label="Agent mode">
-              <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" title="Plan mode: reason and outline before changing files">Plan</button>
-              <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" title="Build mode: apply changes directly">Build</button>
-            </div>
+          </div>
+          <div class="ace-mode-switch" role="group" aria-label="Agent mode">
+            <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" title="Plan mode: reason and outline before changing files">Plan</button>
+            <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" title="Build mode: apply changes directly">Build</button>
           </div>
         </div>
 <style id="acesi-3d-notif-styles">
