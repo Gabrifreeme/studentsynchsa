@@ -8898,6 +8898,9 @@ def api_save_file():
     full = _ide_path(filename)
     if not full or content is None:
         return jsonify({'ok': False, 'error': 'Missing filename or content'}), 400
+    _bad = _reject_markdown_write(content, full)
+    if _bad:
+        return jsonify({'ok': False, 'error': _bad}), 400
     try:
         old = ''
         try:
@@ -8954,6 +8957,9 @@ def write_file():
     data = request.json
     path = data.get('path', '')
     content = data.get('content', '')
+    _bad = _reject_markdown_write(content, path)
+    if _bad:
+        return jsonify({'error': _bad}), 400
     try:
         old = ''
         try:
@@ -9465,14 +9471,9 @@ def tool_read_file(path):
         return False, "file not found: %s" % path
     if _kill_protected_path(rp):
         return False, "blocked: that file is protected."
-    if _looks_like_chat_answer(content):
-        return False, ("BLOCKED: content looks like a chat answer / markdown, not file "
-                       "contents. Use edit_file with exact old/new text, or pass the "
-                       "raw file contents only.")
-    if os.path.basename(rp).lower() == "acesi.html" and len(str(content)) < 100000:
-        return False, ("BLOCKED: refusing to replace ACEsi.html with a %d-char "
-                       "snippet; the full file is ~449k chars. Use edit_file for "
-                       "targeted changes." % len(str(content)))
+    _bad = _reject_markdown_write(content, rp)
+    if _bad:
+        return False, _bad
     try:
         with open(rp, 'r', encoding='utf-8', errors='replace') as f:
             c = f.read()
@@ -10071,6 +10072,19 @@ def _looks_like_chat_answer(content):
     return False
 
 
+def _reject_markdown_write(content, path=""):
+    """Return an error string if content looks like a chat answer, else None.
+    Used by EVERY file-writing path so no route/tool can wipe the UI with prose."""
+    s = str(content or "")
+    if _looks_like_chat_answer(s):
+        return ("BLOCKED: content looks like a chat answer / markdown, not file "
+                "contents. Use edit_file with exact old/new text.")
+    if os.path.basename(str(path or "")).lower() == "acesi.html" and len(s) < 100000:
+        return ("BLOCKED: refusing to replace ACEsi.html with a %d-char snippet; "
+                "the full UI is ~449k chars." % len(s))
+    return None
+
+
 def tool_write_file(path, content):
     if _kill_armed():
         return False, "E-STOP is armed — no file tools."
@@ -10216,6 +10230,9 @@ def tool_edit_file(path, old, new):
             c = f.read()
     except Exception as e:
         return False, str(e)
+    _bad = _reject_markdown_write(new, rp)
+    if _bad:
+        return False, _bad
     if old not in c:
         return False, "old_string not found in file"
     count = c.count(old)
@@ -10246,6 +10263,11 @@ def tool_run_command(command, timeout=120):
     lb = (command or '').lower()
     if 'kill_switch.json' in lb or '.ace_kill.local' in lb:
         return False, "blocked (protected file): %s" % command
+    if 'acesi.html' in lb and re.search(
+            r'set-content|out-file|\btee\b|>>?\s*["\']?acesi|open\([^)]*["\']w["\']|'
+            r'write(_text|_file)?\(|copy-item|move-item', lb):
+        return False, ("blocked: ACEsi.html can only be edited with edit_file; "
+                       "shell writes would replace the full UI with prose")
     try:
         # `flutter run` / `dart run` are long-lived dev sessions — stream to a
         # log file and return immediately instead of blocking forever.
