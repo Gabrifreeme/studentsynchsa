@@ -3122,6 +3122,16 @@ button[data-tooltip="Restart App"], #explorer-refresh-btn, .ace-mode-btn {
   background: #ffa500; color: #000; border: 1px solid #ffa500;
 }
 .ace-confirm-actions button.ace-confirm-ok:hover { background: #ffbf00; border-color: #ffbf00; }
+/* All placeholders and inputs - bright amber, no gray */
+input::placeholder, textarea::placeholder {
+  color: #ffa500 !important;
+  opacity: 1 !important;
+}
+#ace-git-commit-msg {
+  color: #ffa500 !important;
+  background: #0a0a0a !important;
+  border: 1px solid #ffa500 !important;
+}
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
