@@ -2809,9 +2809,9 @@ body { padding: 0 !important; }
 .file { border: 1px solid #ffa500 !important; }
 button[title="Add prompt"], #acesi-mic-btn, #acesi-spk-btn,
 #mobile-model-picker-btn, #bottom-model-picker, button[title="Send"],
-button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"],
-#save-btn, button[title="Auto Fix"], #format-btn, #clear-btn, #copy-btn, #paste-btn, #devtool-plus-btn,
-button[title="Restart App"], #explorer-refresh-btn, #explorer-search {
+button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], button[onclick="openSettings()"],
+#save-btn, button[data-tooltip="Auto Fix"], #format-btn, #clear-btn, #copy-btn, #paste-btn, #devtool-plus-btn,
+button[data-tooltip="Restart App"], #explorer-refresh-btn, #explorer-search {
   border: 1px solid #ffa500 !important;
   box-shadow: none !important;
 }
@@ -2845,13 +2845,13 @@ button[title="Restart App"], #explorer-refresh-btn, #explorer-search {
   box-shadow: inset 0 -1px 0 #ffa500 !important;
 }
 /* Explorer header buttons - bright amber */
-button[title="Restart App"], #explorer-refresh-btn {
+button[data-tooltip="Restart App"], #explorer-refresh-btn {
   border: 1px solid #ffa500 !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
   color: #ffa500 !important;
   font-weight: bold;
 }
-button[title="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !important; }
+button[data-tooltip="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !important; }
 /* Bottom-left corner of the status bar */
 #bottom-status { border-left: 1px solid #ffa500 !important; }
 /* Code Editor header: title left, action buttons centered */
@@ -2868,13 +2868,13 @@ button[title="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !im
   justify-content: center !important;
 }
 /* Code Editor toolbar buttons - bright amber borders */
-#save-btn, button[title="Auto Fix"], #format-btn, #clear-btn,
+#save-btn, button[data-tooltip="Auto Fix"], #format-btn, #clear-btn,
 #copy-btn, #paste-btn, #devtool-plus-btn {
   border: 1px solid #ffa500 !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
 }
 /* Conversation header buttons + Plan/Build - bright amber borders */
-button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
+button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], button[onclick="openSettings()"] {
   border: 1px solid #ffa500 !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
 }
@@ -2923,7 +2923,7 @@ button[title="Run Execution"], button[title="Open Terminal"], button[onclick="op
 #chat-panel .panel-header button::after,
 #code-panel .panel-header button::after,
 #explorer-panel .panel-header button::after {
-  content: attr(title);
+  content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 6px);
   bottom: auto;
@@ -2946,10 +2946,10 @@ button[title="Run Execution"], button[title="Open Terminal"], button[onclick="op
 #code-panel .panel-header button:hover::after,
 #explorer-panel .panel-header button:hover::after { opacity: 1; }
 /* Conversation header buttons - bright amber text */
-button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
+button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], button[onclick="openSettings()"] {
   color: #ffa500 !important;
 }
-button[title="Run Execution"]:hover, button[title="Open Terminal"]:hover,
+button[data-tooltip="Run Execution"]:hover, button[data-tooltip="Open Terminal"]:hover,
 button[onclick="openSettings()"]:hover {
   color: #000 !important;
 }
@@ -3046,8 +3046,8 @@ html::after {
   flex: 0 1 auto !important;
   min-width: 0 !important;
 }
-button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"],
-button[title="Restart App"], #explorer-refresh-btn, .ace-mode-btn {
+button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], button[onclick="openSettings()"],
+button[data-tooltip="Restart App"], #explorer-refresh-btn, .ace-mode-btn {
   white-space: nowrap !important;
   padding: 3px 7px !important;
   font-size: 11px !important;
@@ -5134,13 +5134,13 @@ git add -u (stage tracked)</label
         <div class="panel-header chat-panel-header">
           <span class="chat-panel-title">CONVERSATION</span>
           <div style="display:flex; align-items:center; gap:6px;">
-            <button class="btn" title="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
-            <button class="btn" title="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
-            <button class="btn" onclick="openSettings()" title="Settings" data-tooltip="Open Settings">Settings</button>
+            <button class="btn" data-tooltip="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
+            <button class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
+            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
           </div>
           <div class="ace-mode-switch" role="group" aria-label="Agent mode">
-            <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" title="Plan mode: reason and outline before changing files">Plan</button>
-            <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" title="Build mode: apply changes directly">Build</button>
+            <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" data-tooltip="Plan Mode">Plan</button>
+            <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" data-tooltip="Build Mode">Build</button>
           </div>
         </div>
 <style id="acesi-3d-notif-styles">
@@ -5319,7 +5319,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Save current file"
+              data-tooltip="Save"
 
               style="
 
@@ -5347,7 +5347,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Auto Fix"
+              data-tooltip="Auto Fix"
 
               style="
 
@@ -5377,7 +5377,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Format code with autopep8/black"
+              data-tooltip="Format"
 
               style="
 
@@ -5409,7 +5409,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Clear editor"
+              data-tooltip="Clear"
 
               style="
 
@@ -5439,7 +5439,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Copy to clipboard"
+              data-tooltip="Copy"
 
               style="
 
@@ -5469,7 +5469,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Paste from clipboard"
+              data-tooltip="Paste"
 
               style="
 
@@ -5499,7 +5499,7 @@ perspective: 900px;
 
               class="btn"
 
-              title="Open DevTool+ (Ctrl+Alt+D) - local developer utility toolkit"
+              data-tooltip="DevTool+"
 
               style="
                 background: #000;
@@ -5827,7 +5827,7 @@ perspective: 900px;
 
       <div id="explorer-panel" class="panel">
 
-        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;"><button class="btn" title="Restart App" onclick="restartAcesi()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button><button class="btn" id="explorer-refresh-btn" title="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
+        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;"><button class="btn" data-tooltip="Restart App" onclick="restartAcesi()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
 
         <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
 
