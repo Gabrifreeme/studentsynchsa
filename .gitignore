@@ -63,7 +63,11 @@ reminders.json
 
 # ACE admin key (never commit)
 ace_admin_key.txt
-ace_memory.db
+# Local databases (never commit)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 
 drive_credentials.json
 drive_token.json
