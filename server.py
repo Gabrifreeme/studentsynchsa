@@ -5593,11 +5593,15 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # "I couldn't find that" for a simple photo question.
                     providers.sort(key=lambda p: 0 if p[3] == GEMINI_MODEL else 1)
                     print("[image-route] order: %s" % [p[3] for p in providers])
+                # LOCAL-ONLY when Ollama is up (or ACESI_OFFLINE is set): no
+                # Groq/Gemini/other cloud calls at all. That is the whole point of
+                # running Ollama locally - chats must stay on this machine.
+                # Cloud providers remain a fallback only when no local model runs.
+                _local_only = ((OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")
+                               or os.environ.get("ACESI_OFFLINE", "0") != "0")
                 # LOCAL-FIRST: Ollama (qwen2.5:7b) is the FIRST choice. Cloud
-                # providers stay in the chain as automatic fallback. If Ollama
-                # times out or returns None, the loop just advances to the next
-                # provider (Groq -> Gemini). Skip Ollama for image tasks and for
-                # clearly-too-big jobs (handled by the cloud models instead).
+                # providers stay in the chain as automatic fallback ONLY when
+                # Ollama is unavailable or local-only mode is disabled.
                 _ollama_entry = None
                 if OLLAMA_ENABLED and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
                     _ollama_entry = _ollama_chain_entry()
@@ -5611,6 +5615,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         providers = [_ollama_entry] + providers
                         print("[local-first] Ollama first; cloud fallback: %s"
                               % [p[0] for p in providers[1:]])
+                if _local_only:
+                    _local_providers = [p for p in providers if p[0] == "Ollama"]
+                    if _local_providers:
+                        providers = _local_providers
+                        print("[local-only] cloud providers disabled; using Ollama only")
 
                 if _image_request and not _img_raced:
                     # Race both Gemini models at once. A stuck Flash call used to
@@ -5800,7 +5809,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # web_search, etc.), let the fast cloud model Groq finish
                         # the synthesis. Ollama is free local; Groq’s reduced‑mode
                         # calls use ~2–4k tokens and never hit the 20s budget hard.
-                        if p[0] == "Ollama" and got[1]:  # Ollama and it had tool calls
+                        if p[0] == "Ollama" and got[1] and not _local_only:  # hand off to Groq only when allowed
                             active = ("Groq", GROQ_ENDPOINT,
                                       GROQ_API_KEY,
                                       GROQ_MODEL_BROWSER if domain in _BROWSER_DOMAINS
@@ -7050,10 +7059,10 @@ def _answer_after_pc_file_open(file_path, question):
         {"role": "user", "content": str(question or "")},
         {"role": "system", "content": tool_result},
     ]
-    chain = [
-        ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL),
-        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
-    ]
+    chain = [("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)]
+    if not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
+            and os.environ.get("ACESI_OFFLINE", "0") == "0":
+        chain.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL))
     for name, endpoint, api_key, model in chain:
         try:
             got = _chat_one(name, endpoint, api_key, model, follow_msgs,
