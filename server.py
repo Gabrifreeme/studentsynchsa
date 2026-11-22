@@ -7944,6 +7944,101 @@ def api_health():
     return jsonify(body), (200 if body['ok'] else 500)
 
 
+_ACESI_METRICS_STATE = {'t': 0.0, 'disk': None, 'net': None, 'gpu': None, 'gpu_t': 0.0}
+
+
+@app.route('/api/system/metrics', methods=['GET'])
+def api_system_metrics():
+    """Lightweight live system metrics for the terminal dashboard."""
+    try:
+        import psutil
+    except Exception:
+        psutil = None
+
+    def _safe(fn, default=0):
+        try:
+            return fn()
+        except Exception:
+            return default
+
+    cpu = {'percent': 0, 'freq_ghz': 0}
+    ram = {'used_gb': 0, 'total_gb': 0, 'percent': 0}
+    disks = {
+        'C:': {'read_mb_s': 0, 'write_mb_s': 0, 'active_pct': 0, 'free_gb': 0},
+        'D:': {'read_mb_s': 0, 'write_mb_s': 0, 'active_pct': 0, 'free_gb': 0},
+    }
+    network = {'sent_kbps': 0, 'recv_kbps': 0}
+    gpu = {'name': 'Intel(R) UHD Graphics', 'load_pct': 0, 'shared_mem_gb': 0}
+
+    if psutil is None:
+        return jsonify({'ok': True, 'cpu': cpu, 'ram': ram,
+                        'disks': disks, 'network': network, 'gpu': gpu})
+
+    now = time.time()
+    prev = _ACESI_METRICS_STATE
+    dt = max(now - prev['t'], 0.001) if prev['t'] else 0
+
+    cpu['percent'] = _safe(lambda: psutil.cpu_percent(interval=None), 0)
+    freq = _safe(lambda: psutil.cpu_freq(), None)
+    if freq:
+        cpu['freq_ghz'] = round((freq.current or 0) / 1000.0, 2)
+
+    vm = _safe(lambda: psutil.virtual_memory(), None)
+    if vm:
+        ram['used_gb'] = round(vm.used / (1024 ** 3), 1)
+        ram['total_gb'] = round(vm.total / (1024 ** 3), 1)
+        ram['percent'] = int(vm.percent)
+
+    for letter in ('C:', 'D:'):
+        usage = _safe(lambda L=letter: psutil.disk_usage(L), None)
+        if usage:
+            disks[letter]['free_gb'] = round(usage.free / (1024 ** 3), 1)
+
+    dio = _safe(lambda: psutil.disk_io_counters(), None)
+    if dio and dt:
+        read_rate = max(0, dio.read_bytes - (prev['disk'].read_bytes if prev['disk'] else dio.read_bytes)) / dt / 1048576.0
+        write_rate = max(0, dio.write_bytes - (prev['disk'].write_bytes if prev['disk'] else dio.write_bytes)) / dt / 1048576.0
+        busy_ms = 0
+        if hasattr(dio, 'read_time') and hasattr(dio, 'write_time'):
+            pr = prev['disk']
+            busy_ms = max(0, (dio.read_time + dio.write_time) - ((pr.read_time + pr.write_time) if pr else (dio.read_time + dio.write_time)))
+        active = min(100, int(busy_ms / (dt * 1000.0) * 100)) if busy_ms else 0
+        for letter in ('C:', 'D:'):
+            disks[letter]['read_mb_s'] = round(read_rate, 1)
+            disks[letter]['write_mb_s'] = round(write_rate, 1)
+            disks[letter]['active_pct'] = active
+    prev['disk'] = dio
+
+    nio = _safe(lambda: psutil.net_io_counters(), None)
+    if nio and dt:
+        network['sent_kbps'] = int(max(0, nio.bytes_sent - (prev['net'].bytes_sent if prev['net'] else nio.bytes_sent)) / dt / 1024.0)
+        network['recv_kbps'] = int(max(0, nio.bytes_recv - (prev['net'].bytes_recv if prev['net'] else nio.bytes_recv)) / dt / 1024.0)
+    prev['net'] = nio
+    prev['t'] = now
+
+    # GPU: psutil has no GPU API - query WMI via PowerShell, cached for 30s.
+    if not prev['gpu'] or (now - prev['gpu_t']) > 30:
+        name = gpu['name']
+        mem_gb = 0.0
+        try:
+            ps_exe = os.path.join(os.environ.get('WINDIR', r'C:\Windows'),
+                                  'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+            cmd = [ps_exe, '-NoProfile', '-NonInteractive', '-Command',
+                   "Get-CimInstance Win32_VideoController | Select-Object -First 1 Name,AdapterRAM | ConvertTo-Json -Compress"]
+            r = subprocess.run(cmd, capture_output=True, timeout=6)
+            info = json.loads(r.stdout.decode('utf-8', 'replace').strip())
+            name = info.get('Name') or name
+            mem_gb = round((info.get('AdapterRAM') or 0) / (1024 ** 3), 1)
+        except Exception:
+            pass
+        prev['gpu'] = {'name': name, 'load_pct': 0, 'shared_mem_gb': mem_gb}
+        prev['gpu_t'] = now
+    gpu = dict(prev['gpu'])
+
+    return jsonify({'ok': True, 'cpu': cpu, 'ram': ram,
+                    'disks': disks, 'network': network, 'gpu': gpu})
+
+
 @app.route('/api/ai/usage', methods=['GET'])
 @require_token
 def api_ai_usage():

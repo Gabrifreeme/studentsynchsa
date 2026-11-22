@@ -8441,13 +8441,13 @@ perspective: 900px;
 
     <div id="terminal-split" style="display:flex; flex-direction:row; flex:1 1 auto; min-height:0; width:100%;">
       <div id="terminal-output" style="flex:0 0 70%; width:70%; overflow:hidden; padding:0; margin:0; background:#000; display:block; height:100%; position:relative;"></div>
-      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; overflow-y:auto; background:#050505; border-left:1px solid #ffa500; box-sizing:border-box; padding:8px; font-family:'Roboto Mono',monospace; color:#ffa500;">
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:35%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">CPU</div><div class="ace-dash-value" id="ace-dash-cpu">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:52%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Memory</div><div class="ace-dash-value" id="ace-dash-mem">--</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:4%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 0 (C:)</div><div class="ace-dash-value">SSD (NVMe)</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:2%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 1 (D:)</div><div class="ace-dash-value">Removable (USB)</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:18%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Ethernet</div><div class="ace-dash-value">S: 0 R: 0</div></div></div>
-        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:9%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">GPU 0</div><div class="ace-dash-value">Intel(R) UHD Graphics</div></div></div>
+      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; overflow:hidden; background:#050505; border-left:1px solid #ffa500; box-sizing:border-box; padding:6px; font-family:'Roboto Mono',monospace; color:#ffa500;">
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">CPU</div><div class="ace-dash-value" id="ace-dash-cpu">--</div><div class="ace-dash-sub" id="ace-dash-cpu-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Memory</div><div class="ace-dash-value" id="ace-dash-mem">--</div><div class="ace-dash-sub" id="ace-dash-mem-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 0 (C:)</div><div class="ace-dash-value" id="ace-dash-diskc">--</div><div class="ace-dash-sub" id="ace-dash-diskc-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 1 (D:)</div><div class="ace-dash-value" id="ace-dash-diskd">--</div><div class="ace-dash-sub" id="ace-dash-diskd-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">Ethernet</div><div class="ace-dash-value" id="ace-dash-net">--</div><div class="ace-dash-sub" id="ace-dash-net-sub">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-label">GPU 0</div><div class="ace-dash-value" id="ace-dash-gpu">--</div><div class="ace-dash-sub" id="ace-dash-gpu-sub">--</div></div></div>
       </div>
     </div>
 
@@ -16868,31 +16868,31 @@ window.aceCloseAllPanels = function (exceptId) {
     flex: 0 0 30% !important;
     width: 30% !important;
     min-width: 0 !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
     background: #050505 !important;
     border-left: 1px solid #ffa500 !important;
     box-sizing: border-box !important;
-    padding: 8px !important;
+    padding: 6px !important;
     color: #ffa500 !important;
   }
   .ace-dash-card {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 6px;
     background: #0a0a0a; border: 1px solid #ffa500;
-    border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;
+    border-radius: 6px; padding: 3px 6px; margin-bottom: 4px;
   }
   .ace-dash-graph {
-    width: 56px; height: 40px; flex: 0 0 56px;
+    width: 48px; height: 30px; flex: 0 0 48px;
     border: 1px solid #ffa500; border-radius: 3px;
     display: flex; align-items: flex-end; overflow: hidden;
     background: #000;
   }
-  .ace-dash-graph span {
-    display: block; width: 100%;
-    background: linear-gradient(180deg, #ffa500, #5a3b00);
+  .ace-dash-graph canvas.ace-dash-spark {
+    display: block; width: 100%; height: 100%;
   }
   .ace-dash-info { min-width: 0; }
   .ace-dash-label { color: #ffa500; font-weight: bold; font-size: 12px; white-space: nowrap; }
-  .ace-dash-value { color: #ff9d00; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-value { color: #ffa500; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-sub { color: #ffa500; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
 </style>
 <script>
@@ -16927,19 +16927,98 @@ window.aceCloseAllPanels = function (exceptId) {
 
 <script>
 (function () {
-  function aceDashInit() {
-    var cpu = document.getElementById('ace-dash-cpu');
-    var mem = document.getElementById('ace-dash-mem');
-    if (cpu) cpu.textContent = (navigator.hardwareConcurrency || '?') + ' logical cores';
-    if (mem) {
-      var p = window.performance && performance.memory;
-      if (p && p.usedJSHeapSize) mem.textContent = (p.usedJSHeapSize / 1048576).toFixed(1) + ' MB used';
-      else if (navigator.deviceMemory) mem.textContent = navigator.deviceMemory + ' GB';
-      else mem.textContent = '--';
+  var history = [[], [], [], [], [], []];
+  var canvases = [];
+  var timer = null;
+
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+  function terminalOpen() {
+    var p = document.getElementById('terminal-panel');
+    return !!(p && p.style.display !== 'none' && !p.hasAttribute('hidden'));
+  }
+  function initCanvases() {
+    var cards = document.querySelectorAll('#ace-term-dashboard .ace-dash-card');
+    for (var i = 0; i < cards.length && i < canvases.length; i++) {}
+    cards.forEach(function (card, idx) {
+      var cv = card.querySelector('canvas.ace-dash-spark');
+      if (!cv) return;
+      var r = cv.getBoundingClientRect();
+      cv.width = Math.max(2, Math.round((r.width || 48) * 2));
+      cv.height = Math.max(2, Math.round((r.height || 30) * 2));
+      canvases[idx] = cv;
+    });
+  }
+  function drawSpark(idx) {
+    var cv = canvases[idx];
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var w = cv.width, h = cv.height;
+    var pts = history[idx] || [];
+    ctx.clearRect(0, 0, w, h);
+    if (!pts.length) return;
+    ctx.beginPath();
+    for (var k = 0; k < pts.length; k++) {
+      var x = (k / Math.max(1, pts.length - 1)) * w;
+      var y = h - (Math.max(0, Math.min(100, pts[k])) / 100) * h;
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#ffa500';
+    ctx.lineWidth = Math.max(1, w / 96);
+    ctx.stroke();
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 165, 0, 0.15)';
+    ctx.fill();
+  }
+  function push(idx, value) {
+    var arr = history[idx];
+    arr.push(value);
+    if (arr.length > 30) arr.shift();
+    drawSpark(idx);
+  }
+  function apply(m) {
+    if (!m) return;
+    var cpu = m.cpu || {}, ram = m.ram || {};
+    var dc = (m.disks || {})['C:'] || {}, dd = (m.disks || {})['D:'] || {};
+    var net = m.network || {}, gpu = m.gpu || {};
+    setText('ace-dash-cpu', (cpu.percent || 0) + '%');
+    setText('ace-dash-cpu-sub', (cpu.freq_ghz || 0) + ' GHz');
+    setText('ace-dash-mem', (ram.percent || 0) + '%');
+    setText('ace-dash-mem-sub', (ram.used_gb || 0) + ' / ' + (ram.total_gb || 0) + ' GB');
+    setText('ace-dash-diskc', 'SSD (NVMe) · Active: ' + (dc.active_pct || 0) + '%');
+    setText('ace-dash-diskc-sub', 'R: ' + (dc.read_mb_s || 0).toFixed(1) + ' MB/s · W: ' + (dc.write_mb_s || 0).toFixed(1) + ' MB/s · Free: ' + (dc.free_gb || 0) + ' GB');
+    setText('ace-dash-diskd', 'Removable (USB) · Free: ' + (dd.free_gb || 0) + ' GB');
+    setText('ace-dash-diskd-sub', 'R: ' + (dd.read_mb_s || 0).toFixed(1) + ' MB/s · W: ' + (dd.write_mb_s || 0).toFixed(1) + ' MB/s');
+    setText('ace-dash-net', 'S: ' + (net.sent_kbps || 0) + ' Kbps · R: ' + (net.recv_kbps || 0) + ' Kbps');
+    setText('ace-dash-net-sub', 'Local: 127.0.0.1:5000 (UP)');
+    setText('ace-dash-gpu', gpu.name || 'GPU 0');
+    setText('ace-dash-gpu-sub', 'Load: ' + (gpu.load_pct || 0) + '% · Mem: ' + (gpu.shared_mem_gb || 0).toFixed(1) + ' GB');
+    push(0, cpu.percent || 0);
+    push(1, ram.percent || 0);
+    push(2, dc.active_pct || 0);
+    push(3, Math.min(100, (dd.read_mb_s || 0) + (dd.write_mb_s || 0)));
+    push(4, Math.min(100, ((net.sent_kbps || 0) + (net.recv_kbps || 0)) / 100));
+    push(5, gpu.load_pct || 0);
+  }
+  function poll() {
+    if (!terminalOpen()) return;
+    fetch('/api/system/metrics', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.ok) apply(j); })
+      .catch(function () {});
+  }
+  function sync() {
+    if (terminalOpen()) {
+      if (!timer) { initCanvases(); poll(); timer = setInterval(poll, 1500); }
+    } else if (timer) {
+      clearInterval(timer); timer = null;
     }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aceDashInit);
-  else aceDashInit();
+  function init() { initCanvases(); sync(); setInterval(sync, 500); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
 </body>
