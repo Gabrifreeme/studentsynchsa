@@ -4704,6 +4704,7 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
                                        obs=bug_obs, question=user_message)
         return _evidence_fallback(evidence, names, question=user_message)
 
+    got = None
     if chat_one is not None and active:
         try:
             msgs = list(llm_messages) + [{"role": "user", "content": prompt}]
@@ -4711,22 +4712,38 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
                            tools_schema=[], tool_choice="none")
         except Exception:
             got = None
-        if got:
-            text = (got[0] or "").strip() if isinstance(got, (tuple, list)) else str(got).strip()
-            # The grounded call can itself emit leaked tool markup; if so, fall
-            # through to the evidence fallback instead of showing it to Chris.
-            text = _sanitize_reply(text) if text else None
-            if text:
-                text = _repair_plain_english_answer(
-                    user_message, text, evidence, names)
-                if (_bug_re.search(user_message or "")
-                        and _bug_answer_is_useless(text)):
-                    return _bug_evidence_reply(
-                        evidence,
-                        "I could not write the fix summary: the model answered "
-                        "%r instead of describing the page." % text[:60],
-                        obs=bug_obs, question=user_message)
-                return text
+    # If the active provider was the slow local Ollama and it timed out, retry
+    # the SAME grounded prompt (which already contains the web_search results)
+    # with a fast cloud provider. This is one short call — it turns a timeout
+    # and a garbage evidence-fallback into a correct answer.
+    if not got and (not active or active[0] == "Ollama"):
+        for p in _chat_providers():
+            if not p[2] or (active and (p[0], p[3]) == (active[0], active[3])):
+                continue
+            try:
+                msgs = list(llm_messages) + [{"role": "user", "content": prompt}]
+                got = chat_one(p[0], p[1], p[2], p[3], msgs,
+                               tools_schema=[], tool_choice="none")
+            except Exception:
+                got = None
+            if got:
+                break
+    if got:
+        text = (got[0] or "").strip() if isinstance(got, (tuple, list)) else str(got).strip()
+        # The grounded call can itself emit leaked tool markup; if so, fall
+        # through to the evidence fallback instead of showing it to Chris.
+        text = _sanitize_reply(text) if text else None
+        if text:
+            text = _repair_plain_english_answer(
+                user_message, text, evidence, names)
+            if (_bug_re.search(user_message or "")
+                    and _bug_answer_is_useless(text)):
+                return _bug_evidence_reply(
+                    evidence,
+                    "I could not write the fix summary: the model answered "
+                    "%r instead of describing the page." % text[:60],
+                    obs=bug_obs, question=user_message)
+            return text
 
     if _bug_re.search(user_message or ""):
         return _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
@@ -4859,17 +4876,34 @@ def _final_summary_call(active, llm_messages, names, last_screen):
         prompt += "\nLast screen heard:\n%s" % last_screen[:800]
     msgs = _ollama_local_messages(llm_messages)
     msgs.append({"role": "user", "content": prompt})
-    is_ollama = (active and active[0] == "Ollama") or not active
-    try:
-        if is_ollama and OLLAMA_ENABLED:
-            got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
-                            msgs, timeout=(15, 120), tools_schema=OLLAMA_TOOLS_SCHEMA)
-        elif active:
+    # Prefer a working CLOUD provider for the final summary: it is ONE quick
+    # call, and the local 7B on CPU is both slow and prone to stale/garbled
+    # answers at this stage (it once reported an old attached image instead of
+    # the actual research results). Only fall back to Ollama if no cloud model
+    # answers. This does NOT change which provider does the work/ searching —
+    # Ollama stays first — it only makes the closing sentence reliable.
+    got = None
+    if active and active[0] != "Ollama":
+        try:
             got = _chat_one(active[0], active[1], active[2], active[3], msgs)
-        else:
+        except Exception:
             got = None
-    except Exception:
-        got = None
+    if not got:
+        for p in _chat_providers():
+            if not p[2]:
+                continue
+            try:
+                got = _chat_one(p[0], p[1], p[2], p[3], msgs, timeout=(8, 25))
+            except Exception:
+                got = None
+            if got:
+                break
+    if not got and OLLAMA_ENABLED:
+        try:
+            got = _chat_one("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL,
+                            msgs, timeout=(15, 60), tools_schema=[])
+        except Exception:
+            got = None
     if got:
         text = (got[0] or "").strip()
         if text:
