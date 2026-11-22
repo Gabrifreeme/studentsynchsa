@@ -3090,6 +3090,32 @@ button[data-tooltip="Restart App"], #explorer-refresh-btn, .ace-mode-btn {
 /* Nudge status spinners slightly toward the outer edges */
 #model-spinner { margin-left: -6px !important; }
 #model-spinner-right { margin-right: -6px !important; }
+
+/* ACEsi-themed confirmation modal (replaces native confirm/alert) */
+.ace-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 2147483000;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex; align-items: center; justify-content: center;
+}
+.ace-confirm-box {
+  background: #0a0a0a; border: 1px solid #ffa500; border-radius: 10px;
+  padding: 20px 24px; color: #ffa500;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.85);
+  font-family: "Roboto Mono", monospace; min-width: 320px; max-width: 90vw;
+}
+.ace-confirm-title { font-weight: bold; color: #ffa500; font-size: 15px; margin-bottom: 10px; }
+.ace-confirm-message { color: #ff9d00; font-size: 12px; line-height: 1.5; margin-bottom: 18px; }
+.ace-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.ace-confirm-actions button {
+  background: #0a0a0a; color: #ffa500; border: 1px solid #ffa500;
+  border-radius: 6px; padding: 6px 16px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: bold;
+}
+.ace-confirm-actions button:hover { background: #ffa500; color: #000; }
+.ace-confirm-actions button.ace-confirm-ok {
+  background: #ffa500; color: #000; border: 1px solid #ffa500;
+}
+.ace-confirm-actions button.ace-confirm-ok:hover { background: #ffbf00; border-color: #ffbf00; }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -6123,9 +6149,47 @@ perspective: 900px;
 
 
 
+
+      /* Promise-based themed confirm dialog */
+      function showConfirmModal(title, message) {
+        return new Promise(function (resolve) {
+          var backdrop = document.createElement("div");
+          backdrop.className = "ace-confirm-backdrop";
+          backdrop.innerHTML =
+            '<div class="ace-confirm-box" role="dialog" aria-modal="true">' +
+              '<div class="ace-confirm-title"></div>' +
+              '<div class="ace-confirm-message"></div>' +
+              '<div class="ace-confirm-actions">' +
+                '<button type="button" data-act="cancel">Cancel</button>' +
+                '<button type="button" class="ace-confirm-ok" data-act="ok">OK</button>' +
+              '</div>' +
+            '</div>';
+          backdrop.querySelector(".ace-confirm-title").textContent = title || "Confirm";
+          backdrop.querySelector(".ace-confirm-message").textContent = message || "";
+          document.body.appendChild(backdrop);
+          var done = function (value) {
+            document.removeEventListener("keydown", onKey);
+            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+            resolve(value);
+          };
+          var onKey = function (e) {
+            if (e.key === "Enter") { e.preventDefault(); done(true); }
+            else if (e.key === "Escape") { e.preventDefault(); done(false); }
+          };
+          document.addEventListener("keydown", onKey);
+          backdrop.addEventListener("click", function (e) {
+            var act = e.target.getAttribute("data-act");
+            if (act === "ok") done(true);
+            else if (act === "cancel") done(false);
+          });
+          var okBtn = backdrop.querySelector(".ace-confirm-ok");
+          if (okBtn) okBtn.focus();
+        });
+      }
+
       async function restartAcesi() {
 
-        if (!confirm("Restart ACESi Server? The page reloads as soon as it is back."))
+        if (!(await showConfirmModal("Restart ACESi Server", "Restart ACESi Server? The page reloads as soon as it is back.")))
 
           return;
 
@@ -11573,9 +11637,9 @@ let _geoPayload = {};
 
       }
 
-      function clearChatHistory() {
+      async function clearChatHistory() {
 
-        if (confirm("Clear all chat history?")) {
+        if (!(await showConfirmModal("Clear Chat History", "Clear all chat history?"))) {
 
           var container = document.getElementById("chat-messages");
 
@@ -11878,7 +11942,7 @@ let _geoPayload = {};
 
       async function forgetMemory(key) {
 
-        if (!confirm("Forget memory: " + key + "?")) return;
+        if (!(await showConfirmModal("Forget Memory", "Forget memory: " + key + "?"))) return;
 
         try {
 
