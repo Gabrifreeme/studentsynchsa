@@ -4919,28 +4919,34 @@ perspective: 900px;
         >
         </div>
 
-          <div style="position:relative; display:flex; flex-direction:column; width:100%; padding:8px; border:1px solid #ff9d00; background:#000; border-radius:4px; margin-top:8px;">
+          <div style="position:relative; display:flex; flex-direction:column; width:100%; padding:8px; border:1px solid #ff9d00; background:#000; border-radius:4px; margin-top:8px; box-sizing:border-box; flex:0 0 auto;">
             <!-- Textarea at top, full width, borderless -->
-            <textarea id="chat-input" rows="1" style="width:100%; padding:6px; background:#111; color:#ff9d00; border:0; font-family:inherit; outline:none; resize:none; min-height:24px; max-height:200px; white-space:pre-wrap; flex:0 0 auto;">Ask ACEsi...</textarea>
-            
+            <textarea
+              id="chat-input"
+              placeholder="Ask ACEsi..."
+              rows="1"
+              wrap="soft"
+              style="width:100%; padding:6px; background:#111; color:#ff9d00; border:0; font-family:inherit; outline:none; resize:none; min-height:24px; max-height:200px; overflow-y:auto; white-space:pre-wrap; flex:0 0 auto; box-sizing:border-box;"
+              onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
+            ></textarea>
+
             <!-- Bottom toolbar row: + mic spk model badge left, Send right -->
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; margin-top:6px; border-top:1px solid #ff9d00; background:#000;">
-              <div style="display:flex; gap:6px; align-items:center;">
-                <button onclick="addNewPrompt()" title="Add prompt">+</button>
-                <button id="acesi-mic-btn" onclick="window.acesiToggleMic && window.acesiToggleMic(this)" title="Mic">Mic</button>
-                <button id="acesi-spk-btn" onclick="window.acesiToggleSpeaker && window.acesiToggleSpeaker(this)" title="Speaker">Speaker</button>
-                <span id="mobile-model-indicator" style="background:#111; color:#ff9d00; border:1px solid #ff9d00; padding:1px 6px; border-radius:3px; margin-left:auto;">qwen2.5:7b</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0 0 0; margin-top:6px; border-top:1px solid #ff9d00; background:#000;">
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <button onclick="addNewPrompt()" title="Add prompt" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer; font-family:inherit; font-weight:bold; line-height:1; min-width:34px;">+</button>
+                <button id="acesi-mic-btn" onclick="window.acesiToggleMic && window.acesiToggleMic(this)" title="Mic" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; line-height:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V19H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.1A5 5 0 0 0 17 11z"/></svg>
+                </button>
+                <button id="acesi-spk-btn" onclick="window.acesiToggleSpeaker && window.acesiToggleSpeaker(this)" title="Speaker" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 10px; border-radius:3px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; line-height:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4.03v8.05A4.47 4.47 0 0 0 16.5 12zm-2.5-8.77v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                </button>
+                <span id="mobile-model-indicator" style="background:#111; color:#ff9d00; border:1px solid #ff9d00; padding:4px 8px; border-radius:3px; font-size:12px; line-height:1.2; white-space:nowrap;">qwen2.5:7b</span>
               </div>
               <button onclick="sendMessage()" title="Send" style="background:#000; color:#ff9d00; border:1px solid #ff9d00; padding:6px 12px; border-radius:3px; font-family:inherit; font-weight:bold; cursor:pointer;">Send</button>
             </div>
           </div>
 
-
-
-
         </div>
-
-      </div>
 
 
 
