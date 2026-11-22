@@ -2815,8 +2815,76 @@ button[title="Restart App"], #explorer-refresh-btn, #explorer-search {
   border: 1px solid #ffa500 !important;
   box-shadow: none !important;
 }
-/* Composer controls: +, Mic, Speaker and model picker - bright amber hairline */
-button[title="Add prompt"], #acesi-mic-btn, #acesi-spk-btn, #mobile-model-picker-btn {
+/* Explorer dividers + search box - bright amber */
+#open-editors-header, #open-editors-list, #explorer-search {
+  border-bottom: 1px solid #ffa500 !important;
+  box-shadow: inset 0 -1px 0 #ffa500 !important;
+}
+#explorer-search {
+  border: 1px solid #ffa500 !important;
+  box-shadow: inset 0 0 0 1px #ffa500 !important;
+}
+/* Explorer column divider + scrollbar - bright amber */
+#code-panel + .resizer {
+  background: #ffa500 !important;
+  border-right: 1px solid #ffa500 !important;
+  box-shadow: inset -1px 0 0 #ffa500, 1px 0 0 #ffa500 !important;
+}
+#explorer::-webkit-scrollbar-thumb,
+#explorer::-webkit-scrollbar-thumb:hover {
+  background: #ffa500 !important;
+}
+#explorer::-webkit-scrollbar-track { background: transparent !important; }
+/* Divider directly under the Search files... box */
+#explorer-panel > div[style*="border-bottom"] {
+  border-bottom: 1px solid #ffa500 !important;
+  box-shadow: inset 0 -1px 0 #ffa500 !important;
+}
+/* Explorer header buttons - bright amber */
+button[title="Restart App"], #explorer-refresh-btn {
+  border: 1px solid #ffa500 !important;
+  box-shadow: inset 0 0 0 1px #ffa500 !important;
+  color: #ffa500 !important;
+  font-weight: bold;
+}
+button[title="Restart App"]:hover, #explorer-refresh-btn:hover { color: #000 !important; }
+/* Bottom-left corner of the status bar */
+#bottom-status { border-left: 1px solid #ffa500 !important; }
+/* Code Editor toolbar buttons - bright amber borders */
+#save-btn, button[title="Auto Fix"], #format-btn, #clear-btn,
+#copy-btn, #paste-btn, #devtool-plus-btn {
+  border: 1px solid #ffa500 !important;
+  box-shadow: inset 0 0 0 1px #ffa500 !important;
+}
+/* Conversation header buttons + Plan/Build - bright amber borders */
+button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"],
+.ace-mode-switch, .ace-mode-btn + .ace-mode-btn {
+  border: 1px solid #ffa500 !important;
+  box-shadow: inset 0 0 0 1px #ffa500 !important;
+}
+/* Conversation header buttons - bright amber text */
+button[title="Run Execution"], button[title="Open Terminal"], button[onclick="openSettings()"] {
+  color: #ffa500 !important;
+}
+button[title="Run Execution"]:hover, button[title="Open Terminal"]:hover,
+button[onclick="openSettings()"]:hover {
+  color: #000 !important;
+}
+/* Model picker text matches the Send button exactly */
+#mobile-model-picker-btn, #bottom-model-picker,
+#mobile-model-indicator, #bottom-model-picker-label,
+#mobile-model-picker-btn > span, #bottom-model-picker > span {
+  color: #ffa500 !important;
+  font-weight: bold;
+}
+#mobile-model-picker-btn:hover, #bottom-model-picker:hover,
+#mobile-model-picker-btn:focus, #bottom-model-picker:focus,
+#mobile-model-picker-btn:hover > span, #bottom-model-picker:hover > span,
+#mobile-model-picker-btn:focus > span, #bottom-model-picker:focus > span {
+  color: #000 !important;
+}
+/* Composer controls: +, Mic, Speaker and model pickers - bright amber hairline */
+button[title="Add prompt"], #acesi-mic-btn, #acesi-spk-btn, #mobile-model-picker-btn, #bottom-model-picker, button[title="Send"] {
   border: 1px solid #ffa500 !important;
   box-shadow: inset 0 0 0 1px #ffa500 !important;
 }
@@ -2833,6 +2901,11 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
 .acesi-tab, .file, .acesi-msg, .acesi-3d-box {
   border-color: #ffa500 !important;
   outline-color: #ffa500 !important;
+}
+/* Bottom notification line - bright amber text throughout */
+#bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
+#ace-last-change-short, #ace-last-change-toggle {
+  color: #ffa500 !important;
 }
 /* Intentionally borderless textarea */
 #chat-input, #chat-input:focus { border: 0 !important; outline: none !important; box-shadow: none !important; }
