@@ -3867,6 +3867,8 @@ git add -u (stage tracked)</label
 
               <option value="gemini">Gemini</option>
 
+              <option value="ollama">Ollama (local)</option>
+
 
 
 
@@ -3918,6 +3920,8 @@ git add -u (stage tracked)</label
               <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
 
               <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b</option>
+
+              <option value="qwen2.5:7b">qwen2.5:7b (Ollama local)</option>
 
             </select>
 
@@ -7973,6 +7977,13 @@ perspective: 900px;
 
           >openai/gpt-oss-120b</span
         >
+        <select id="bottom-model-picker" title="Select model" onchange="onBottomModelChange()" style="background:#000;color:#ff9d00;border:1px solid #ff9d00;padding:1px 4px;font-family:inherit;font-size:10px;border-radius:2px;max-width:150px;">
+          <option value="openai/gpt-oss-120b">gpt-oss-120b</option>
+          <option value="qwen/qwen3.8-27b">qwen3.8-27b</option>
+          <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+          <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
+          <option value="qwen2.5:7b">qwen2.5:7b (local)</option>
+        </select>
         <span id="model-spinner-right" class="status-ok" title="Checking server health..."></span>
       </span>
 
@@ -10836,9 +10847,11 @@ let _geoPayload = {};
         modelSelect.innerHTML = "";
 
         // Only models behind the two verified working keys.
-        var models = provider === "gemini"
-          ? ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
-          : ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
+        var models = provider === "ollama"
+          ? ["qwen2.5:7b"]
+          : provider === "gemini"
+            ? ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+            : ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
 
         models.forEach(function (m) {
 
@@ -10906,6 +10919,7 @@ let _geoPayload = {};
 
         var ind = document.getElementById("current-model-indicator");
         if (ind && m && m.value) ind.textContent = m.value;
+        if (typeof syncBottomModelPicker === 'function') syncBottomModelPicker();
 
       }
 
@@ -10937,7 +10951,45 @@ let _geoPayload = {};
         if (!m.value && m.options.length) m.value = m.options[0].value;
 
         persistModelSelection();
+        syncBottomModelPicker();
 
+      }
+
+      // Bottom status-bar model picker (second picker, kept in sync with Settings)
+      function syncBottomModelPicker() {
+        var m = document.getElementById("settings-model");
+        var b = document.getElementById("bottom-model-picker");
+        if (!m || !b) return;
+        var v = m.value || "";
+        // If the value isn't one of the bottom options, add it so it shows.
+        var found = false;
+        for (var i = 0; i < b.options.length; i++) {
+          if (b.options[i].value === v) { found = true; break; }
+        }
+        if (!found && v) {
+          var o = document.createElement("option");
+          o.value = v; o.textContent = v;
+          b.appendChild(o);
+        }
+        b.value = v;
+      }
+
+      function onBottomModelChange() {
+        var b = document.getElementById("bottom-model-picker");
+        var m = document.getElementById("settings-model");
+        var p = document.getElementById("settings-provider");
+        if (!b || !m) return;
+        m.value = b.value;
+        // Also set the matching provider so Settings shows the right one.
+        if (p) {
+          var v = b.value;
+          p.value = /gemini/i.test(v) ? "gemini" : (/qwen2\.5|ollama/i.test(v) ? "ollama" : "groq");
+          updateModelsForProvider();
+          m.value = v;
+        }
+        persistModelSelection();
+        syncModelSelectionToServer();
+        if (window.showAceToast) window.showAceToast("Model: " + b.value, 'success', 2000);
       }
 
       /* ===== Load Settings from Server ===== */
@@ -15074,6 +15126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     var rate = data.rate_limits || {};
                     var providerKey = null;
                     if (/gemini/i.test(activeModel)) providerKey = 'Gemini';
+                    else if (/qwen2\.5|ollama/i.test(activeModel)) providerKey = null; // local - no rate limit headers
                     else if (/groq|qwen|gpt-oss/i.test(activeModel)) providerKey = 'Groq';
                     var rl = providerKey ? rate[providerKey] : null;
                     if (!rl) {
