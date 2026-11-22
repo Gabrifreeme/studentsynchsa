@@ -7016,6 +7016,56 @@ def chat():
         save_conversation("assistant", _follow_reply)
         return jsonify({"reply": _follow_reply})
 
+def _answer_after_pc_file_open(file_path, question):
+    """Follow-up completion after a deterministic file-open tool call.
+
+    The PC-file fast path emits the editor popup immediately, but must NOT end
+    the turn with only "Opened X in the Code Editor." — the tool's result (the
+    file contents) is appended as a system/tool message and one more completion
+    pass writes the actual answer. Local Ollama first, cloud only as fallback.
+    """
+    fname = os.path.basename(file_path)
+    content = ""
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf'):
+            content = "[%s opened in the Code Editor — binary preview, no plain text]" % fname
+        else:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as fh:
+                content = fh.read()[:14000]
+    except Exception as exc:
+        content = "(file content unavailable: %s)" % exc
+
+    tool_result = (
+        "TOOL RESULT — open_user_file(%s): opened successfully in the Code Editor.\n"
+        "<file content>\n%s\n</file content>" % (file_path, content)
+    )
+    follow_msgs = [
+        {"role": "system", "content":
+            "You are ACEsi. The user asked a question that required opening a file. "
+            "The file was opened and its contents are in the tool result below. "
+            "Read that result and answer the user's question completely and concretely, "
+            "referencing real code/values from the file. Do not say only that the file "
+            "was opened; do not claim you cannot read it."},
+        {"role": "user", "content": str(question or "")},
+        {"role": "system", "content": tool_result},
+    ]
+    chain = [
+        ("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL),
+        ("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL),
+    ]
+    for name, endpoint, api_key, model in chain:
+        try:
+            got = _chat_one(name, endpoint, api_key, model, follow_msgs,
+                            tools_schema=[], tool_choice="none", timeout=(10, 60))
+        except Exception as exc:
+            print("[ACE-DISPATCH] follow-up via %s failed: %s" % (name, exc), flush=True)
+            continue
+        if got and got[0] and str(got[0]).strip():
+            return str(got[0]).strip()
+    return "Opened %s in the Code Editor. I could not generate a text answer right now." % fname
+
+
     # Deterministic PC-file open. Instructions like "Go to D:/Pictures/
     # Screenshots find the file flyfly.png and open it." are NOT device
     # navigation ("go to" used to trip _nav_task and burn 144s in the UI loop).
@@ -7034,8 +7084,10 @@ def chat():
                 'name': _fname,
                 'kind': _kind,
             })
-            reply = "Opened %s in the Code Editor." % _fname
-            print("📂 PC-file open -> Code Editor: %s" % _rp)
+            # Tool result + automatic follow-up completion: the answer must be
+            # based on the file contents, not just an "opened" acknowledgement.
+            reply = _answer_after_pc_file_open(_rp, user_message)
+            print("📂 PC-file open -> Code Editor: %s (follow-up answer ready)" % _rp)
         else:
             reply = "I couldn't find that file on your PC. Check the folder and filename and try again."
             print("📂 PC-file open: not found for %r" % user_message[:120])
