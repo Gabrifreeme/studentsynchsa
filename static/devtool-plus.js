@@ -68,6 +68,10 @@ Analogous  ${r(-40)}  ${r(40)}`}},{id:"gradient",name:"CSS Gradient Generator",c
     .cat { padding: 3px 8px; cursor: pointer; border-color: #444; color: var(--dtp-muted); }
     .cat.active { background: var(--dtp-accent); color: #000; border-color: var(--dtp-accent); }
     .body { display: flex; flex: 1; min-height: 0; }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: #000; }
+    *::-webkit-scrollbar-thumb { background: #ffa500; border: 1px solid #ffa500; border-radius: 4px; }
+    *::-webkit-scrollbar-thumb:hover { background: #ffbf00; }
     .list { width: 40%; overflow-y: auto; border-right: 1px solid #333; }
     .item { display: flex; align-items: center; gap: 4px; padding: 5px 7px; cursor: pointer; border-bottom: 1px solid #1c1c1c; }
     .item:hover { background: #141414; }
