@@ -2532,7 +2532,7 @@
 
         background: #111;
 
-        box-shadow: none !important;
+        box-shadow: 0 0 0 1px #00ff00 !important;
 
         animation: model-spin 1s linear infinite;
 
@@ -2547,7 +2547,7 @@
       #model-spinner.status-ok,
       #model-spinner-right.status-ok {
 
-        border-color: #ffa500 #ffa500 #ffa500 #ffa500;
+        border-color: #00ff00 #00ff00 #00ff00 #007a00;
 
       }
 
@@ -2901,6 +2901,21 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
 .acesi-tab, .file, .acesi-msg, .acesi-3d-box {
   border-color: #ffa500 !important;
   outline-color: #ffa500 !important;
+}
+/* Single continuous header bottom line: all three headers share one fixed height */
+#chat-panel .panel-header.chat-panel-header,
+#code-panel .panel-header,
+#explorer-panel .panel-header {
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  box-sizing: border-box !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  border-bottom: 1px solid #ffa500 !important;
 }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
