@@ -5175,7 +5175,7 @@ git add -u (stage tracked)</label
           <span class="chat-panel-title">CONVERSATION</span>
           <div style="display:flex; align-items:center; gap:6px;">
             <button class="btn" data-tooltip="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
-            <button class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
+            <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
             <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
           </div>
           <div class="ace-mode-switch" role="group" aria-label="Agent mode">
@@ -16799,6 +16799,36 @@ window.aceCloseAllPanels = function (exceptId) {
 };
 </script>
 
+
+<script>
+/* Keep the Terminal button tooltip in sync with the terminal panel state */
+(function () {
+  function updateTerminalTooltip() {
+    var btn = document.getElementById('terminal-toggle-btn');
+    if (!btn) return;
+    var panel = document.getElementById('terminal-panel');
+    var open = !!(panel && !panel.hasAttribute('hidden') && panel.style.display !== 'none');
+    btn.setAttribute('data-tooltip', open ? 'Close Terminal' : 'Open Terminal');
+  }
+  window.updateTerminalTooltip = updateTerminalTooltip;
+  function initTerminalTooltipSync() {
+    updateTerminalTooltip();
+    var panel = document.getElementById('terminal-panel');
+    if (panel && window.MutationObserver) {
+      new MutationObserver(updateTerminalTooltip).observe(panel, {
+        attributes: true, attributeFilter: ['style', 'hidden']
+      });
+    }
+    var btn = document.getElementById('terminal-toggle-btn');
+    if (btn) btn.addEventListener('click', function () { setTimeout(updateTerminalTooltip, 0); });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTerminalTooltipSync);
+  } else {
+    initTerminalTooltipSync();
+  }
+})();
+</script>
 </body>
 
 </html>
