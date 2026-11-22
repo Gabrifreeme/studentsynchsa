@@ -5495,6 +5495,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
         time_budget = 180
     else:
         time_budget = 90 if _nav_task(user_message) else 60
+    # With local Ollama first (CPU model, slow), allow a longer dispatch budget
+    # so a real research round can finish before the loop gives up.
+    if OLLAMA_ENABLED:
+        time_budget = max(time_budget, 180)
     # Bug-report mode: cap rounds so the model cannot burn the Groq TPM budget
     # on repeated identical calls. 4 rounds = connect, inspect, read network,
     # summarize. If it needs more, the tail summary runs instead of a 429.
@@ -5550,21 +5554,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if _ollama_entry and any(p[0] == "Ollama" for p in providers):
                         _ollama_entry = None  # already present via preferred model
                     if _ollama_entry:
-                        # Warm up the local model once so the compact time slice
-                        # isn't consumed by a cold load. Uses a generous timeout;
-                        # keep_alive keeps it resident for follow-up rounds.
-                        try:
-                            # No tools on the warm-up: a 22-tool schema makes the
-                            # CPU prefill far too slow. We only want to load the
-                            # model weights into memory (keep_alive).
-                            _chat_one("Ollama", OLLAMA_ENDPOINT, "local",
-                                      OLLAMA_CHAT_MODEL,
-                                      [{"role": "user", "content": "ok"}],
-                                      timeout=(10, 90),
-                                      tools_schema=[], tool_choice="none",
-                                      extra_options={"keep_alive": "30m"})
-                        except Exception:
-                            pass
+                        # No separate warm-up: it used to spend the whole request
+                        # budget on a probe call. keep_alive="30m" on the real call
+                        # keeps the model resident, so first-use loading happens
+                        # inside the bounded call itself.
                         providers = [_ollama_entry] + providers
                         print("[local-first] Ollama first; cloud fallback: %s"
                               % [p[0] for p in providers[1:]])
@@ -5640,10 +5633,32 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # the slice and we fall back to cloud anyway.
                         msgs = _ollama_local_messages(
                             llm_messages, system=_fix_sys)
+                        # Web/research questions need the search tools so Ollama
+                        # can actually look things up (it cannot browse on its own).
+                        _web_intent = bool(re.search(
+                            r"\b(?:search|browse|look\s*up|internet|web|fetch|"
+                            r"website|url|google|find\s+out|research)\b",
+                            (user_message or ""), re.IGNORECASE))
                         _needs_tools = (tc == "required" or _want_files or
                                         _want_device or _code_file_intent or
-                                        _bug_intent or bool(_file_fix_intent))
-                        schema = ollama_domain_schema if _needs_tools else []
+                                        _bug_intent or bool(_file_fix_intent) or
+                                        _web_intent)
+                        # Research/search tasks get the FULL research toolset —
+                        # web search, fetch, curl, delegate (deep research), and
+                        # the file tools so it can both find and save answers.
+                        # If the local model is too slow, we accept that and let
+                        # the cloud fallback take over; capability is not the
+                        # thing we trim here.
+                        _research_tools = {"web_search", "webfetch", "curl",
+                                           "delegate", "delegate_parallel",
+                                           "project_doctor", "read_file",
+                                           "grep", "list_files", "write_file"}
+                        if _web_intent and not (tc == "required" or _want_files
+                                                or _want_device or _code_file_intent
+                                                or _bug_intent):
+                            schema = _filter_tools_schema(TOOLS_SCHEMA, _research_tools)
+                        else:
+                            schema = ollama_domain_schema if _needs_tools else []
                         tc2 = tc if _needs_tools else "none"
                     elif _pname in REDUCED_MODE_PROVIDERS or _pname.startswith("OpenRouter"):
                         # Reduced payload: the full one is rejected outright by
@@ -5700,10 +5715,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     _budget = (getattr(g, "chat_deadline", None)
                                if has_request_context() else None)
                     if p[0] == "Ollama":
-                        # Local CPU model: bounded slice so cloud fallbacks keep
-                        # budget. A 7B answers simple questions in ~5s; complex
-                        # questions fall through to Groq/Gemini instead.
-                        _read_to = 30.0
+                        # Local CPU model doing real research/tool work: give it
+                        # the full call window. keep_alive keeps it resident. If
+                        # it is too slow, that is a known hardware limit, not a
+                        # capability we trim away.
+                        _read_to = 120.0
                     elif _budget is not None:
                         _left_s = max(1.0, _budget - time.monotonic() - 0.5)
                         _slice = max(3.0, min(12.0, _left_s / max(1, _n_left)))
@@ -6759,7 +6775,7 @@ def chat():
     # One deadline for the whole response (provider calls, fallbacks, summary).
     # When Ollama is the first choice on CPU, allow more time for the local
     # model (it is slow but free), otherwise keep the snappy cloud deadline.
-    _deadline_s = 65.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
+    _deadline_s = 180.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
     g.chat_deadline = time.monotonic() + _deadline_s
     data = request.json
     user_message = data.get('message', '')
