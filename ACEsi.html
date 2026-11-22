@@ -10582,7 +10582,7 @@ let _geoPayload = {};
             window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
-              aiReply.split("[EXEC:")[0].trim() +
+              aceFormatAssistantReply(aiReply.split("[EXEC:")[0].trim()) +
 
               '<br><span style="color:#888;">[Running: ' +
 
@@ -10677,7 +10677,7 @@ let _geoPayload = {};
             window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
-              followData.reply +
+              aceFormatAssistantReply(followData.reply) +
 
               "</div>"
             );
@@ -10687,7 +10687,7 @@ let _geoPayload = {};
             window.aceChatInsertReply(
               '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> ' +
 
-              aiReply +
+              aceFormatAssistantReply(aiReply) +
 
               "</div>"
             );
@@ -16534,6 +16534,68 @@ document.addEventListener('DOMContentLoaded', function() {
     chat.insertBefore(node, chat.firstChild);
     chat.scrollTop = chat.scrollHeight;
   };
+
+/* ACEsi assistant reply formatter: styled markdown tables + collapsible summary card.
+   Chat-only - the terminal Live System Feed is untouched. */
+function aceEscapeHtml(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function aceFormatInline(s) {
+  return aceEscapeHtml(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/`([^`]+)`/g, '<code style="color:#ffa500;background:#0a0a0a;border:1px solid #ffa500;border-radius:3px;padding:1px 4px;">$1</code>');
+}
+function aceTableCells(line) {
+  return String(line).replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(function (c) { return c.trim(); });
+}
+function aceIsSeparator(line) {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(String(line));
+}
+function aceRenderMarkdownTables(text) {
+  var lines = String(text == null ? "" : text).split(/\r?\n/);
+  var out = [];
+  var i = 0;
+  while (i < lines.length) {
+    if (lines[i].indexOf("|") !== -1 && i + 1 < lines.length && aceIsSeparator(lines[i + 1])) {
+      var head = aceTableCells(lines[i]);
+      var body = [];
+      i += 2;
+      while (i < lines.length && lines[i].indexOf("|") !== -1 && lines[i].trim() !== "") {
+        body.push(aceTableCells(lines[i]));
+        i++;
+      }
+      var cellStyle = "border:1px solid #ffa500;padding:6px 10px;font-size:11px;";
+      var html = '<table style="border-collapse:collapse;width:100%;background:#0a0a0a;border:1px solid #ffa500;border-radius:6px;margin:8px 0;overflow:hidden;">';
+      html += "<thead><tr>" + head.map(function (c) {
+        return '<th style="' + cellStyle + 'background:rgba(255, 165, 0, 0.15);color:#ffa500;font-weight:bold;text-align:left;">' + aceFormatInline(c) + "</th>";
+      }).join("") + "</tr></thead><tbody>";
+      body.forEach(function (row) {
+        html += "<tr>" + head.map(function (_, k) {
+          return '<td style="' + cellStyle + 'color:#ffa500;">' + aceFormatInline(row[k] || "") + "</td>";
+        }).join("") + "</tr>";
+      });
+      html += "</tbody></table>";
+      out.push(html);
+      continue;
+    }
+    out.push(aceFormatInline(lines[i]));
+    i++;
+  }
+  return out.join("<br>");
+}
+function aceFormatAssistantReply(text) {
+  var raw = String(text == null ? "" : text);
+  var m = raw.match(/([^\n]*Summary of Changes[^\n]*\n[\s\S]*)$/i);
+  if (!m) return aceRenderMarkdownTables(raw);
+  var before = raw.slice(0, m.index).replace(/\s+$/, "");
+  var summary = m[1];
+  var title = summary.split("\n")[0].replace(/^\s*/, "") || "Summary of Changes ✅";
+  var body = aceRenderMarkdownTables(summary.split("\n").slice(1).join("\n"));
+  var card = '<details open style="background:#0a0a0a;border:1px solid #ffa500;border-radius:6px;padding:8px 12px;margin:8px 0;">' +
+    '<summary style="color:#ffa500;font-weight:bold;cursor:pointer;">' + aceFormatInline(title) + "</summary>" +
+    '<div style="margin-top:6px;">' + body + "</div></details>";
+  return (before ? aceRenderMarkdownTables(before) + "<br>" : "") + card;
+}
 
   window.aceChatInsertReply = function (html, replyId) {
     var chat = document.getElementById("chat-messages");

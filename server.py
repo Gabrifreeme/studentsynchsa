@@ -7360,6 +7360,21 @@ def chat():
             "fixed unless project_doctor reports it clean — cannot verify means NOT fixed. Report "
             "only what the analyzers actually show. You do NOT need Chris to give you special "
             "phrasing: any request about an error, bug, 404 or 'fix it' triggers this loop."
+            " AGENT TURN SUMMARY: whenever you modify files, execute tools, or complete a "
+            "multi-step coding task, end your reply with a structured 'Summary of Changes ✅' "
+            "section. Put a short status header first (include the Git commit hash or the "
+            "modified file names when available), then a markdown table with exactly these "
+            "four columns: Change | Before | After | Effect. Keep each cell brief and concrete. "
+            "After the table add concise bullet points for provider/model routing (e.g. "
+            "qwen2.5:7b local first, cloud fallback) and any key side effects. Example shape:\n"
+            "Summary of Changes ✅ (files: ACEsi.html, server.py)\n"
+            "| Change | Before | After | Effect |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Chat composer | 1px dim border | 2px bright amber | clearer input |\n"
+            "- Routing: qwen2.5:7b (local) first; cloud fallback if unavailable.\n"
+            "- Side effects: flutter analyze clean.\n"
+            "Only include this section when work was actually done; do not add it to ordinary "
+            "conversational replies."
         )
         # Hard rule: in Plan Mode the agent must not pretend to switch modes
         # or output the confirmation phrase.
