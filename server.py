@@ -9465,6 +9465,14 @@ def tool_read_file(path):
         return False, "file not found: %s" % path
     if _kill_protected_path(rp):
         return False, "blocked: that file is protected."
+    if _looks_like_chat_answer(content):
+        return False, ("BLOCKED: content looks like a chat answer / markdown, not file "
+                       "contents. Use edit_file with exact old/new text, or pass the "
+                       "raw file contents only.")
+    if os.path.basename(rp).lower() == "acesi.html" and len(str(content)) < 100000:
+        return False, ("BLOCKED: refusing to replace ACEsi.html with a %d-char "
+                       "snippet; the full file is ~449k chars. Use edit_file for "
+                       "targeted changes." % len(str(content)))
     try:
         with open(rp, 'r', encoding='utf-8', errors='replace') as f:
             c = f.read()
@@ -10044,6 +10052,24 @@ def tool_grep(pattern, path="."):
         except Exception:
             pass
     return True, "\n".join(hits) if hits else "(no matches)"
+
+def _looks_like_chat_answer(content):
+    """Reject markdown answers accidentally passed as file contents.
+
+    A local model sometimes answers a "fix this file" prompt by calling
+    write_file with its own prose answer (optionally wrapped in ``` fences),
+    which destroys the real file. Detect that shape before any write happens.
+    """
+    s = str(content or "").lstrip()
+    low = s[:220].lower()
+    markers = ("below is", "**fixed", "# fixed", "here is the", "here's the",
+               "i've fixed", "i have fixed", "following is", "```")
+    if any(low.startswith(m) for m in markers):
+        return True
+    if "```" in s[:500] and not s.startswith("<"):
+        return True
+    return False
+
 
 def tool_write_file(path, content):
     if _kill_armed():
