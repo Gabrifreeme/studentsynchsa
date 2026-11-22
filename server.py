@@ -5597,13 +5597,23 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # Groq/Gemini/other cloud calls at all. That is the whole point of
                 # running Ollama locally - chats must stay on this machine.
                 # Cloud providers remain a fallback only when no local model runs.
-                _local_only = ((OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")
+                # Check Ollama LIVE at dispatch time - OLLAMA_ENABLED is computed
+                # once at import and can be stale if Ollama started later.
+                _ollama_now = False
+                try:
+                    import requests as _rq
+                    _ollama_now = bool(_rq.get(
+                        OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags",
+                        timeout=(1, 2)).ok)
+                except Exception:
+                    pass
+                _local_only = ((_ollama_now and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")
                                or os.environ.get("ACESI_OFFLINE", "0") != "0")
                 # LOCAL-FIRST: Ollama (qwen2.5:7b) is the FIRST choice. Cloud
                 # providers stay in the chain as automatic fallback ONLY when
                 # Ollama is unavailable or local-only mode is disabled.
                 _ollama_entry = None
-                if OLLAMA_ENABLED and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
+                if _ollama_now and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
                     _ollama_entry = _ollama_chain_entry()
                     if _ollama_entry and any(p[0] == "Ollama" for p in providers):
                         _ollama_entry = None  # already present via preferred model
@@ -5674,6 +5684,10 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     providers = []
 
                 for p in providers:
+
+                    if _local_only and p[0] != "Ollama":
+
+                        continue
                     _pname = p[0]
                     # read_file only rides along when the task actually involves
                     # files; otherwise it is dead weight in the schema.
@@ -5819,7 +5833,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         break
                 # OpenRouter fallback removed: that key has no credits. Both
                 # Groq and Gemini model variants are already in the chain above.
-                if (got is None and OLLAMA_ENABLED and not _image_request
+                if (got is None and _ollama_now and not _image_request
                         and not any(p[0] == "Ollama" for p in providers)):
                     # Legacy last-resort Ollama (only when it is NOT already the
                     # first choice in the chain). Ollama warm-up probe first: cheap tiny call that forces the
