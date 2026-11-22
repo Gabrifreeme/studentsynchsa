@@ -2912,6 +2912,17 @@ button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], butt
   background: rgba(255, 165, 0, 0.2) !important;
   color: #ffa500 !important;
 }
+/* Header bar buttons and tool icons - 6px rounded corners */
+#chat-panel .panel-header button, #code-panel .panel-header button,
+#explorer-panel .panel-header button {
+  border-radius: 6px !important;
+}
+/* Plan|Build segmented toggle: round the outer frame, keep inner halves square */
+.ace-mode-switch {
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+.ace-mode-btn { border-radius: 0 !important; }
 /* Header button tooltips - open downward so they stay in the viewport */
 #chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header {
   overflow: visible !important;
