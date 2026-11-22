@@ -5795,7 +5795,18 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     # FreeLLM 3x with a flat 2s sleep, which could not fix
                     # 'daily_quota_exhausted' and just burned the round budget.
                     if got is not None:
-                        active = p
+                        # Hand‑off: if Ollama just finished a tool‑heavy turn
+                        # (i.e. it called read_file, edit_file, project_doctor,
+                        # web_search, etc.), let the fast cloud model Groq finish
+                        # the synthesis. Ollama is free local; Groq’s reduced‑mode
+                        # calls use ~2–4k tokens and never hit the 20s budget hard.
+                        if p[0] == "Ollama" and got[1]:  # Ollama and it had tool calls
+                            active = ("Groq", GROQ_ENDPOINT,
+                                      GROQ_API_KEY,
+                                      GROQ_MODEL_BROWSER if domain in _BROWSER_DOMAINS
+                                      else GROQ_MODEL)
+                        else:
+                            active = p
                         break
                 # OpenRouter fallback removed: that key has no credits. Both
                 # Groq and Gemini model variants are already in the chain above.
