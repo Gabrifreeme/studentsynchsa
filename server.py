@@ -3621,6 +3621,7 @@ _PROV_HARD_QUOTA_MARKS = (
     "daily_quota_exhausted", "quota_exhausted", "daily rate limit",
     "try again in 24", "exhausted your daily", "monthly limit",
     "insufficient_quota", "billing_hard_limit",
+    "per day limit exceeded", "generate_content_free_tier_requests",
 )
 
 
@@ -3677,6 +3678,15 @@ def _prov_retry_wait(headers, text, attempt):
             return max(0.0, min(float(ra), _PROV_429_CAP_S))
         except (TypeError, ValueError):
             pass
+    # Parse "retry in XhYmZs" or "reset ~HHhMMm" from body text
+    m = re.search(r"retry in\s+([\d.]+)\s*h\s*([\d.]+)\s*m", text or "")
+    if m:
+        total = float(m.group(1)) * 3600 + float(m.group(2)) * 60
+        return max(0.0, min(total, _PROV_429_CAP_S))
+    m = re.search(r"reset ~(\d+)h(\d+)m", text or "")
+    if m:
+        total = float(m.group(1)) * 3600 + float(m.group(2)) * 60
+        return max(0.0, min(total, _PROV_429_CAP_S))
     m = re.search(r"reset ~(\d+)s", text or "")
     if m:
         return max(0.0, min(float(m.group(1)) + 0.5, _PROV_429_CAP_S))
@@ -3994,10 +4004,16 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
                 _prov_record(name, model, 429, reason,
                              "daily/period quota exhausted - not retrying")
                 return None
+            wait = _prov_retry_wait(getattr(r, "headers", None), r.text, attempt)
+            # If the provider tells us to wait many hours (daily free-tier quota
+            # exhausted), don't sleep that long — skip to the next provider instead.
+            if wait > 60:
+                _prov_record(name, model, 429, reason,
+                             "daily quota long wait skipped: %.1fs > 60s" % wait)
+                return None
             if spent + 1 > _PROV_RETRY_BUDGET_S:
                 _prov_record(name, model, 429, reason, "retry budget exhausted")
                 return None
-            wait = _prov_retry_wait(getattr(r, "headers", None), r.text, attempt)
             if _deadline is not None:
                 _left = _deadline - time.monotonic() - 1.0
                 if _left <= 0:
