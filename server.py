@@ -9071,6 +9071,33 @@ def userfile_open():
 # frontend change is required — only the engine below is missing.
 PROJECT_ROOT = os.path.realpath(DATA_DIR)
 
+# Watchdog: a chat answer must never replace the full UI with a markdown snippet.
+# Keep a golden copy and restore it automatically if ACEsi.html ever shrinks.
+_ACESI_UI_FILE = os.path.join(PROJECT_ROOT, "ACEsi.html")
+_ACESI_UI_GOLDEN = os.path.join(PROJECT_ROOT, "ACEsi.html.golden")
+
+
+def _acesi_ui_watchdog():
+    try:
+        if (os.path.isfile(_ACESI_UI_FILE) and os.path.getsize(_ACESI_UI_FILE) > 200000
+                and not os.path.exists(_ACESI_UI_GOLDEN)):
+            shutil.copy2(_ACESI_UI_FILE, _ACESI_UI_GOLDEN)
+            print("🛡️ golden ACEsi.html snapshot created", flush=True)
+    except Exception as exc:
+        print("🛡️ golden snapshot failed: %s" % exc, flush=True)
+    while True:
+        try:
+            if (os.path.exists(_ACESI_UI_GOLDEN) and os.path.isfile(_ACESI_UI_FILE)
+                    and os.path.getsize(_ACESI_UI_FILE) < 200000):
+                shutil.copy2(_ACESI_UI_GOLDEN, _ACESI_UI_FILE)
+                print("🛡️ ACEsi.html restored from golden copy", flush=True)
+        except Exception:
+            pass
+        time.sleep(5)
+
+
+threading.Thread(target=_acesi_ui_watchdog, daemon=True).start()
+
 INDICATOR_STATES = [
     "Thinking",
     "Considering next steps",
@@ -18134,6 +18161,10 @@ def auto_fix_stream():
         yield "Applying fix...\n\n"
         time.sleep(0.5)
         cleaned = strip_code_fences(fixed_code)
+        _bad = _reject_markdown_write(cleaned, target)
+        if _bad:
+            yield "BLOCKED: %s\n\n" % _bad
+            return
         try:
             with open(target, 'w', encoding='utf-8') as f:
                 f.write(cleaned)

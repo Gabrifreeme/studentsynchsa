@@ -61,6 +61,9 @@ test_widget.dart
 profile.txt
 reminders.json
 
+# Golden watchdog snapshot of the UI (auto-restored if a chat answer overwrites it)
+ACEsi.html.golden
+
 # ACE admin key (never commit)
 ace_admin_key.txt
 # Local databases (never commit)
