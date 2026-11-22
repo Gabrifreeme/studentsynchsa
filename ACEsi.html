@@ -8439,7 +8439,17 @@ perspective: 900px;
       <button id="term-find-close" type="button" title="Close (Esc)">&#10005;</button>
     </div>
 
-    <div id="terminal-output" style="flex: 1; overflow: hidden; padding: 0; margin: 0; background: #000; display: block; width: 100%; height: 100%; position: relative;"></div>
+    <div id="terminal-split" style="display:flex; flex-direction:row; flex:1 1 auto; min-height:0; width:100%;">
+      <div id="terminal-output" style="flex:0 0 70%; width:70%; overflow:hidden; padding:0; margin:0; background:#000; display:block; height:100%; position:relative;"></div>
+      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; overflow-y:auto; background:#050505; border-left:1px solid #ffa500; box-sizing:border-box; padding:8px; font-family:'Roboto Mono',monospace; color:#ffa500;">
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:35%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">CPU</div><div class="ace-dash-value" id="ace-dash-cpu">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:52%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Memory</div><div class="ace-dash-value" id="ace-dash-mem">--</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:4%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 0 (C:)</div><div class="ace-dash-value">SSD (NVMe)</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:2%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Disk 1 (D:)</div><div class="ace-dash-value">Removable (USB)</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:18%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">Ethernet</div><div class="ace-dash-value">S: 0 R: 0</div></div></div>
+        <div class="ace-dash-card"><div class="ace-dash-graph"><span style="height:9%"></span></div><div class="ace-dash-info"><div class="ace-dash-label">GPU 0</div><div class="ace-dash-value">Intel(R) UHD Graphics</div></div></div>
+      </div>
+    </div>
 
 <style id="ace-term-dashboard-style">
   #ace-term-heartbeat {
@@ -16839,6 +16849,52 @@ window.aceCloseAllPanels = function (exceptId) {
 </script>
 
 
+
+<style id="ace-term-split-style">
+  #terminal-split {
+    display: flex !important;
+    flex-direction: row !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+  }
+  #terminal-output {
+    flex: 0 0 70% !important;
+    width: 70% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  #ace-term-dashboard {
+    flex: 0 0 30% !important;
+    width: 30% !important;
+    min-width: 0 !important;
+    overflow-y: auto !important;
+    background: #050505 !important;
+    border-left: 1px solid #ffa500 !important;
+    box-sizing: border-box !important;
+    padding: 8px !important;
+    color: #ffa500 !important;
+  }
+  .ace-dash-card {
+    display: flex; align-items: center; gap: 8px;
+    background: #0a0a0a; border: 1px solid #ffa500;
+    border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;
+  }
+  .ace-dash-graph {
+    width: 56px; height: 40px; flex: 0 0 56px;
+    border: 1px solid #ffa500; border-radius: 3px;
+    display: flex; align-items: flex-end; overflow: hidden;
+    background: #000;
+  }
+  .ace-dash-graph span {
+    display: block; width: 100%;
+    background: linear-gradient(180deg, #ffa500, #5a3b00);
+  }
+  .ace-dash-info { min-width: 0; }
+  .ace-dash-label { color: #ffa500; font-weight: bold; font-size: 12px; white-space: nowrap; }
+  .ace-dash-value { color: #ff9d00; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
+</style>
 <script>
 /* Keep the Terminal button tooltip in sync with the terminal panel state */
 (function () {
@@ -16866,6 +16922,24 @@ window.aceCloseAllPanels = function (exceptId) {
   } else {
     initTerminalTooltipSync();
   }
+})();
+</script>
+
+<script>
+(function () {
+  function aceDashInit() {
+    var cpu = document.getElementById('ace-dash-cpu');
+    var mem = document.getElementById('ace-dash-mem');
+    if (cpu) cpu.textContent = (navigator.hardwareConcurrency || '?') + ' logical cores';
+    if (mem) {
+      var p = window.performance && performance.memory;
+      if (p && p.usedJSHeapSize) mem.textContent = (p.usedJSHeapSize / 1048576).toFixed(1) + ' MB used';
+      else if (navigator.deviceMemory) mem.textContent = navigator.deviceMemory + ' GB';
+      else mem.textContent = '--';
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aceDashInit);
+  else aceDashInit();
 })();
 </script>
 </body>
