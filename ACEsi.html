@@ -1422,7 +1422,7 @@
 
 
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+    <script src="/static/diff.min.js"></script>
 
     <!-- DevTool+ : bundled with Lit locally in /static/ so it works offline and sends nothing out. -->
     <script type="module" src="/static/devtool-plus.js?v=3"></script>
@@ -2622,13 +2622,13 @@
 
     </style>
 
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+      <link rel="stylesheet" href="/static/xterm.css" />
 
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="/static/xterm.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="/static/xterm-addon-fit.js"></script>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/static/socket.io.min.js"></script>
 
 
 <style>
@@ -4461,7 +4461,7 @@ git add -u (stage tracked)</label
 
               <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b</option>
 
-              <option value="qwen2.5:7b">qwen2.5:7b (Ollama local)</option>
+              <option value="qwen2.5:7b" selected>qwen2.5:7b (Ollama local)</option>
 
             </select>
 
@@ -11021,7 +11021,7 @@ let _geoPayload = {};
       function updateModelsForProvider() {
 
         var providerSel = document.getElementById("settings-provider");
-        var provider = providerSel ? providerSel.value : "groq";
+        var provider = providerSel ? providerSel.value : "ollama";
 
         var modelSelect = document.getElementById("settings-model");
 

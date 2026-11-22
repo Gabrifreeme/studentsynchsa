@@ -19140,8 +19140,14 @@ def summary_scheduler():
                     and get_config('last_summary_date', '') != today):
                 set_config('last_summary_date', today)
                 text = build_summary_text()
-                send_ntfy("ACEsi — Good morning", "Good morning, Chris.\n\n" + text)
-                print("📱 Proactive check-in sent")
+                # OFFLINE-FIRST: the daily briefing is local by default. The
+                # ntfy.sh push is opt-in so a completely offline boot never
+                # attempts an external connection from a background thread.
+                if get_config('summary_ntfy_enabled', '0') != '0':
+                    send_ntfy("ACEsi — Good morning", "Good morning, Chris.\n\n" + text)
+                    print("📱 Proactive check-in sent (ntfy)")
+                else:
+                    print("📱 Daily summary ready locally (ntfy push disabled)")
         except Exception as e:
             print(f"⚠️ Scheduler error: {e}")
         time.sleep(30)
