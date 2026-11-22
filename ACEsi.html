@@ -2959,6 +2959,12 @@ button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], butt
 #chat-panel .panel-header button:hover::after,
 #code-panel .panel-header button:hover::after,
 #explorer-panel .panel-header button:hover::after { opacity: 1; }
+/* Plan|Build tooltips anchor right so they stay inside the panel, not clipped */
+.ace-mode-btn::after {
+  left: auto !important;
+  right: 0 !important;
+  transform: none !important;
+}
 /* Conversation header buttons - bright amber text */
 button[data-tooltip="Run Execution"], button[data-tooltip="Open Terminal"], button[onclick="openSettings()"] {
   color: #ffa500 !important;
