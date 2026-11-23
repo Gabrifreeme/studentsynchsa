@@ -3235,10 +3235,6 @@ input::placeholder, textarea::placeholder {
   width:auto !important; min-width:0 !important; padding:0 8px !important;
   white-space:nowrap !important; font-size:11px !important;
 }
-/* Same readable hover as the Preferences update button */
-#code-panel .panel-header button[data-tooltip="Open Terminal"]:hover {
-  background:#2a1e00 !important; color:#ffa500 !important;
-}
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -3568,8 +3564,9 @@ input::placeholder, textarea::placeholder {
   .ace-pref-btn { width:100%; padding:8px !important; background:#000 !important; color:#ffa500 !important;
     border:2px solid #ffa500 !important; border-radius:8px !important; cursor:pointer;
     font-family:"Roboto Mono",monospace !important; font-size:11px !important; }
-  /* Higher specificity than the global #settings-panel button color rule */
-  #settings-panel .ace-pref-btn:hover { background:#2a1e00 !important; color:#ffa500 !important; }
+  /* Match the Terminal button hover: solid amber with black (readable) text.
+     Needs higher specificity than the global #settings-panel button color rule. */
+  #settings-panel .ace-pref-btn:hover { background:#ffa500 !important; color:#000 !important; }
 
   /* Dedicated detail page for each settings section */
   .ace-detail-header { display:flex; align-items:center; gap:12px; margin:4px 6px 10px;
