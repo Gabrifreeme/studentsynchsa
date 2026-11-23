@@ -5624,6 +5624,8 @@ perspective: 900px;
               onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"
             ></textarea>
 
+            <div id="ace-chat-attach-preview" style="display:none; flex-wrap:wrap; gap:8px; padding:0 0 2px 0;"></div>
+
             <!-- Bottom toolbar row: + mic spk model badge left, Send right -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:0; margin:0; border:0; background:transparent; gap:8px;">
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -10837,6 +10839,7 @@ let _geoPayload = {};
           });
 
           const data = await res.json();
+          window.dispatchEvent(new CustomEvent("acesi:chat-sent"));
           console.log("ACEsi raw response:", data);
           // Hold the live tool row briefly so the steps can actually be seen.
           await stopLiveActivity();
@@ -17555,6 +17558,53 @@ window.aceCheckForUpdates = function (install) {
       input.focus();
       if (window.showAceToast) window.showAceToast("Pasted screenshot: " + names.join(", "));
     });
+  });
+})();
+</script>
+<script id="ace-chat-attach-thumbs">
+(function () {
+  var box = document.getElementById("ace-chat-attach-preview");
+  if (!box) return;
+
+  function render() {
+    var imgs = (window.__acesiAttachments || []).filter(function (f) {
+      return f && f.isImage && typeof f.dataUrl === "string";
+    });
+    box.innerHTML = "";
+    if (!imgs.length) { box.style.display = "none"; return; }
+    box.style.display = "flex";
+    imgs.forEach(function (f) {
+      var wrap = document.createElement("div");
+      wrap.style.cssText = "position:relative;width:72px;height:72px;border:2px solid #ffa500;border-radius:6px;overflow:hidden;background:#000;";
+      var img = document.createElement("img");
+      img.src = f.dataUrl;
+      img.alt = f.name || "screenshot";
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;";
+      img.addEventListener("click", function () {
+        if (typeof window._aceShowChatImagePreview === "function")
+          window._aceShowChatImagePreview(f.dataUrl, f.name || "Attached image");
+      });
+      var x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "\u00d7";
+      x.title = "Remove " + (f.name || "image");
+      x.style.cssText = "position:absolute;top:0;right:0;width:18px;height:18px;line-height:16px;padding:0;background:#ffa500;color:#000;border:0;border-radius:0 0 0 6px;font-weight:bold;cursor:pointer;";
+      x.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        window.__acesiAttachments = (window.__acesiAttachments || []).filter(function (a) { return a !== f; });
+        render();
+      });
+      wrap.appendChild(img); wrap.appendChild(x); box.appendChild(wrap);
+    });
+  }
+
+  window.addEventListener("acesi:attachments-changed", render);
+  render();
+
+  // Clear attachments after a successful send so they don't attach to later messages.
+  window.addEventListener("acesi:chat-sent", function () {
+    window.__acesiAttachments = [];
+    render();
   });
 })();
 </script>
