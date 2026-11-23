@@ -7115,11 +7115,12 @@ perspective: 900px;
           var msgSpan = document.createElement("span");
           msgSpan.className = "ace-notif-text";
           div.appendChild(msgSpan);
-          var user = chat.querySelector(".ace-user-msg");
+          var users = chat.querySelectorAll(".ace-user-msg");
+          var user = users.length ? users[users.length - 1] : null;
           if (user && user.parentNode) {
             user.parentNode.insertBefore(div, user.nextSibling);
           } else {
-            chat.insertBefore(div, chat.firstChild);
+            chat.appendChild(div);
           }
         }
         var msgSpan = div.querySelector(".ace-notif-text");
@@ -16537,7 +16538,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!node) return;
     node.classList.add("ace-user-msg");
     if (messageId) { node.setAttribute("data-msg-id", messageId); aceMsgIdAdd(messageId); }
-    chat.insertBefore(node, chat.firstChild);
+    // Chronological order: oldest at top, newest at the bottom.
+    chat.appendChild(node);
     chat.scrollTop = chat.scrollHeight;
   };
 
@@ -16610,11 +16612,12 @@ window.aceFormatAssistantReply = aceFormatAssistantReply;
     if (!chat) return;
     if (aceMsgIdSeen(replyId)) return; // drop duplicate reply
     aceMsgIdAdd(replyId);
-    var user = chat.querySelector(".ace-user-msg");
+    var users = chat.querySelectorAll(".ace-user-msg");
+    var user = users.length ? users[users.length - 1] : null;
     if (user && user.parentNode) {
       user.insertAdjacentHTML("afterend", html);
     } else {
-      chat.insertAdjacentHTML("afterbegin", html);
+      chat.insertAdjacentHTML("beforeend", html);
     }
     chat.scrollTop = chat.scrollHeight;
   };

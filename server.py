@@ -7953,6 +7953,24 @@ def _resolve_direct_fix_path(target):
     except Exception:
         matches = []
     if not matches:
+        # Typo tolerance: "sync_provoder.dart" -> "sync_provider.dart". Without
+        # this the request fell into the slow agent loop (~5 minutes).
+        try:
+            import difflib
+            all_dart = []
+            for dirpath, dirnames, filenames in os.walk(PROJECT_ROOT):
+                dirnames[:] = [d for d in dirnames if d.lower() not in {
+                    ".git", ".dart_tool", "build", "node_modules", "__pycache__"}]
+                all_dart += [os.path.join(dirpath, f) for f in filenames
+                             if f.lower().endswith(".dart")]
+            close = difflib.get_close_matches(base,
+                                              [os.path.basename(p) for p in all_dart],
+                                              n=1, cutoff=0.72)
+            if close:
+                matches = [p for p in all_dart if os.path.basename(p) == close[0]]
+        except Exception:
+            matches = []
+    if not matches:
         return None
     root_matches = [m for m in matches if os.path.dirname(m) == os.path.abspath(PROJECT_ROOT)]
     return os.path.abspath(root_matches[0] if root_matches else matches[0])
