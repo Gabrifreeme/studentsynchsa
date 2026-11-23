@@ -5881,7 +5881,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # the full call window. keep_alive keeps it resident. If
                         # it is too slow, that is a known hardware limit, not a
                         # capability we trim away.
-                        _read_to = 120.0
+                        _read_to = 50.0
                     elif _budget is not None:
                         _left_s = max(1.0, _budget - time.monotonic() - 0.5)
                         _slice = max(3.0, min(12.0, _left_s / max(1, _n_left)))
@@ -7265,7 +7265,7 @@ def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     for name, endpoint, api_key, model in chain:
         try:
             got = _chat_one(name, endpoint, api_key, model, follow_msgs,
-                            tools_schema=[], tool_choice="none", timeout=(10, 120))
+                            tools_schema=[], tool_choice="none", timeout=(10, 50))
         except Exception as exc:
             print("[ACE-DISPATCH] follow-up via %s failed: %s" % (name, exc), flush=True)
             continue
@@ -7358,7 +7358,7 @@ def chat():
     # One deadline for the whole response (provider calls, fallbacks, summary).
     # When Ollama is the first choice on CPU, allow more time for the local
     # model (it is slow but free), otherwise keep the snappy cloud deadline.
-    _deadline_s = 180.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
+    _deadline_s = 50.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
     g.chat_deadline = time.monotonic() + _deadline_s
     data = request.json
     user_message = data.get('message', '')
@@ -18233,7 +18233,7 @@ def llm_reply(messages, max_tokens=2048, temperature=0.3, tool_choice="auto",
                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
                     json={"model": model, "messages": messages, "temperature": temperature,
                           "max_tokens": max_tokens, "tools": tools_schema, "tool_choice": tool_choice},
-                    timeout=(10, 120))
+                    timeout=(10, 50))
                 _record_rate_headers(name, r.headers)
                 if r.status_code == 200:
                     msg = r.json()["choices"][0]["message"]
@@ -18596,7 +18596,7 @@ def auto_fix_stream():
                              "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                             "AppleWebKit/537.36 Chrome/120 Safari/537.36")},
                     json={"model": model, "messages": fix_messages, "temperature": 0.3, "max_tokens": 400},
-                    timeout=(10, 120)
+                    timeout=(10, 50)
                 )
                 if resp.status_code == 200:
                     fixed_code = resp.json()["choices"][0]["message"]["content"]

@@ -10698,6 +10698,14 @@ async function sendMessage(reuseMsgId) {
         if (!text) return;
 
         currentAbortController = new AbortController();
+        // Hard stop at 50s - the local 7B cannot finish beyond this on this CPU,
+        // so fail fast instead of letting the timer run to 120s.
+        var _aceTimeoutId = setTimeout(function () {
+          if (window.currentAbortController === currentAbortController) {
+            try { currentAbortController.abort(); } catch (e) {}
+          }
+        }, 50000);
+        window.__aceChatTimeoutId = _aceTimeoutId;
         // Capture the signal once so every request in this flow (initial chat,
         // exec, follow-up chat) can be cancelled by the same Stop click.
         const signal = currentAbortController.signal;
@@ -11014,6 +11022,7 @@ let _geoPayload = {};
 
           // The request is done (or was cancelled): release the controller and
           // restore the Send button so the next message submits on one click.
+          if (window.__aceChatTimeoutId) { clearTimeout(window.__aceChatTimeoutId); window.__aceChatTimeoutId = null; }
           currentAbortController = null;
           if (sendBtn) {
             sendBtn.textContent = "Send";
