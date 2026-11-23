@@ -7618,11 +7618,9 @@ def chat():
         save_conversation("assistant", _notif_reply)
         return jsonify({"reply": _notif_reply})
 
-    # Deterministic Settings style fixes: instant offline, no model needed.
-    _style_reply, _did_style = _simple_style_fix_reply(request_text)
-    if _style_reply:
-        save_conversation("assistant", _style_reply)
-        return jsonify({"reply": _style_reply})
+    # NOTE: the old deterministic "style fix" rule was removed. It matched on
+    # generic words like "change"/"Settings"/"tab" and hijacked unrelated
+    # requests. Such edits must go to the model.
 
     # Deterministic button removal: instant offline, with a real summary.
     _remove_reply, _did_remove = _simple_button_remove_reply(request_text)
