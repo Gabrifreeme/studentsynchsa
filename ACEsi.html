@@ -3459,6 +3459,40 @@ input::placeholder, textarea::placeholder {
   }
   #settings-panel button.ace-btn-secondary.ace-bottom-save { margin: 0 8px 0 0; }
   #settings-panel .ace-bottom-row { display:flex; gap:8px; justify-content:center; align-items:center; }
+
+  /* ===== Settings modal: every line bright amber + rounded corners on all ===== */
+  #settings-panel { color:#ffa500 !important; }
+  #settings-panel,
+  #settings-panel button,
+  #settings-panel select,
+  #settings-panel input,
+  #settings-panel textarea,
+  #settings-panel .collapsible-header,
+  #settings-panel .collapsible-content,
+  #settings-panel .tab-content {
+    border-color:#ffa500 !important;
+    border-radius:8px !important;
+  }
+  /* The collapsible content used to drop its top border, leaving a missing line */
+  #settings-panel .collapsible-content { border:1px solid #ffa500 !important; }
+  /* All text in the modal is the same bright amber */
+  #settings-panel button,
+  #settings-panel select,
+  #settings-panel input,
+  #settings-panel textarea { color:#ffa500 !important; }
+  /* Keep black text on solid-amber active surfaces */
+  #settings-panel button[data-tab].active,
+  #settings-panel button[data-tab].active:hover,
+  #settings-panel button.ace-btn-primary,
+  #settings-panel .collapsible-header:hover { color:#000 !important; }
+  /* The dim helper text inside API Keys */
+  #settings-panel .collapsible-content > div:first-child { color:#ffa500 !important; }
+  /* Higher-specificity overrides win over the older 2px/#ff9d00 rules */
+  #settings-panel button[data-tab],
+  #settings-panel button[data-tab].active,
+  #settings-panel button[data-tab].active:hover { border-radius:8px !important; }
+  #settings-panel .collapsible-header { color:#ffa500 !important; }
+  #settings-panel .collapsible-header:hover { color:#000 !important; }
 </style>
 <script>
   window.aceInitSettingsOverhaul = function () {
