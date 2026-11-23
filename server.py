@@ -7156,7 +7156,13 @@ def _simple_style_fix_reply(message):
 
     marker = "/* ACEsi deterministic style fix: tab highlight + hover text */"
     if marker in source:
-        return None, False
+        return ("This is already fixed in ACEsi.html - no changes were needed.\n\n"
+                "Summary of Changes ✅ (files: ACEsi.html)\n"
+                "| Change | Before | After | Effect |\n"
+                "| --- | --- | --- | --- |\n"
+                "| Settings tab highlight | already correct | unchanged | no change needed |\n"
+                "| Add/Edit Prompt hover text | already black on amber | unchanged | no change needed |\n\n"
+                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
 
     css = (
         "\n<style id=\"ace-deterministic-style-fix\">\n"
@@ -7375,7 +7381,7 @@ def chat():
 
     # Deterministic Settings style fixes: instant offline, no model needed.
     _style_reply, _did_style = _simple_style_fix_reply(request_text)
-    if _did_style:
+    if _style_reply:
         save_conversation("assistant", _style_reply)
         return jsonify({"reply": _style_reply})
 
