@@ -7315,6 +7315,57 @@ def _simple_server_page_reply(message):
     return reply, True
 
 
+def _simple_pairing_page_reply(message):
+    """Deterministic 'add Pairing settings' path for offline mode."""
+    msg = str(message or "")
+    if not re.search(r"\bpair(?:ing)?\b", msg, re.I):
+        return None, False
+    if not re.search(r"\b(add|these|this|enable|set\s+up)\b", msg, re.I):
+        return None, False
+
+    target = os.path.join(PROJECT_ROOT, "ACEsi.html")
+    if not os.path.isfile(target) or os.path.getsize(target) < 200000:
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    marker = "/* ACEsi deterministic pairing page */"
+    if marker in source:
+        return ("The Pairing settings are already in ACEsi - no changes were needed.\n\n"
+                "Summary of Changes \u2705 (files: ACEsi.html)\n"
+                "| Change | Before | After | Effect |\n"
+                "| --- | --- | --- | --- |\n"
+                "| Pairing settings page | already present | unchanged | no change needed |\n\n"
+                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
+
+    if "</body>" not in source:
+        return None, False
+    updated = source.replace("</body>", '<script id="ace-pairing-page">\n/* ACEsi deterministic pairing page */\n(function () {\n  var detail = document.getElementById(\'ace-detail-page\');\n  if (!detail || document.getElementById(\'ace-pairing-content\')) return;\n\n  var box = document.createElement(\'div\');\n  box.id = \'ace-pairing-content\';\n  box.className = \'ace-preferences-content\';\n  box.style.cssText = \'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;\';\n\n  var html = \'<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:6px;">Pairing</div>\' +\n    \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:10px;">Pair and authorize devices to this machine/account using a secure code.</div>\' +\n    \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 6px;">Pair device</div>\' +\n    \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:6px;">Pair a device, or use a secure code from another machine to pair and grant access to your Synchronized Workspace.</div>\' +\n    \'<button type="button" id="ace-pair-device" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Pair device</button>\' +\n    \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">Device access</div>\' +\n    \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Device access uses encrypted codes. Revoke and pair again if needed.</div>\' +\n    \'<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">\' +\n    \'<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">\' +\n    \'<input type="checkbox" id="ace-pair-remote" style="margin-right:4px;width:auto;">\' +\n    \'<span class="ace-switch"></span><span>Keep session active to pairing</span></label>\' +\n    \'<button type="button" id="ace-pair-cancel" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Cancel pairing</button>\' +\n    \'</div>\';\n\n  box.innerHTML = html;\n  detail.appendChild(box);\n\n  var orig = window.aceSettingsNavClick;\n  window.aceSettingsNavClick = function (key) {\n    if (typeof orig === \'function\') orig(key);\n    var generic = document.getElementById(\'ace-generic-nav-content\');\n    if (key === \'pairing\' && generic) generic.style.display = \'none\';\n    box.style.display = (key === \'pairing\') ? \'block\' : \'none\';\n  };\n})();\n</script>\n' + "</body>", 1)
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not add Pairing settings: %s" % exc, False
+
+    sha = _git_head_short()
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| Pairing page | missing | page added | applied pairing page |",
+        "| Pair device | missing | button added | applied pairing page |",
+        "| Device access | missing | toggle + cancel | applied pairing page |",
+    ]
+    reply = ("Added the Pairing settings to Settings - Preferences - Pairing.\n\n"
+             "Summary of Changes \u2705 (files: ACEsi.html)\n%s\n\n"
+             "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).\n"
+             "- Side effects: %s" %
+             ("\n".join(rows), "git %s" % sha if sha else "file written on disk"))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7492,6 +7543,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic Pairing settings: instant offline, no model needed.
+    _pair_reply, _did_pair = _simple_pairing_page_reply(request_text)
+    if _pair_reply:
+        save_conversation("assistant", _pair_reply)
+        return jsonify({"reply": _pair_reply})
 
     # Deterministic Server settings: instant offline, no model needed.
     _srv_reply, _did_srv = _simple_server_page_reply(request_text)

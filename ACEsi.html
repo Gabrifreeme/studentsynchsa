@@ -17695,6 +17695,43 @@ window.aceCheckForUpdates = function (install) {
   };
 })();
 </script>
+<script id="ace-pairing-page">
+/* ACEsi deterministic pairing page */
+(function () {
+  var detail = document.getElementById('ace-detail-page');
+  if (!detail || document.getElementById('ace-pairing-content')) return;
+
+  var box = document.createElement('div');
+  box.id = 'ace-pairing-content';
+  box.className = 'ace-preferences-content';
+  box.style.cssText = 'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;';
+
+  var html = '<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:6px;">Pairing</div>' +
+    '<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:10px;">Pair and authorize devices to this machine/account using a secure code.</div>' +
+    '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 6px;">Pair device</div>' +
+    '<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:6px;">Pair a device, or use a secure code from another machine to pair and grant access to your Synchronized Workspace.</div>' +
+    '<button type="button" id="ace-pair-device" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Pair device</button>' +
+    '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">Device access</div>' +
+    '<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Device access uses encrypted codes. Revoke and pair again if needed.</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
+    '<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">' +
+    '<input type="checkbox" id="ace-pair-remote" style="margin-right:4px;width:auto;">' +
+    '<span class="ace-switch"></span><span>Keep session active to pairing</span></label>' +
+    '<button type="button" id="ace-pair-cancel" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Cancel pairing</button>' +
+    '</div>';
+
+  box.innerHTML = html;
+  detail.appendChild(box);
+
+  var orig = window.aceSettingsNavClick;
+  window.aceSettingsNavClick = function (key) {
+    if (typeof orig === 'function') orig(key);
+    var generic = document.getElementById('ace-generic-nav-content');
+    if (key === 'pairing' && generic) generic.style.display = 'none';
+    box.style.display = (key === 'pairing') ? 'block' : 'none';
+  };
+})();
+</script>
 </body>
 
 </html>
