@@ -3588,8 +3588,10 @@ input::placeholder, textarea::placeholder {
   .ace-nav-item { display:flex; align-items:center; gap:12px; padding:8px 10px; margin:0 6px;
     border:2px solid transparent; border-radius:8px; color:#ff9d00;
     font-family:"Roboto Mono",monospace; font-size:12px; cursor:pointer; }
-  .ace-nav-item:hover { background:#1a1200; color:#ffa500; }
   .ace-nav-item.active { background:#222; color:#ffa500; border-color:#ffa500; }
+  /* Same solid-amber hover with black text as the other buttons */
+  #settings-panel .ace-nav-item:hover,
+  #settings-panel .ace-nav-item.active:hover { background:#ffa500 !important; color:#000 !important; }
   .ace-nav-ico { width:18px; text-align:center; font-size:13px; }
   #settings-panel button[data-tab] { color:#ffa500 !important; }
   #settings-panel button[data-tab].active,
