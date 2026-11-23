@@ -3564,7 +3564,8 @@ input::placeholder, textarea::placeholder {
   .ace-pref-btn { width:100%; padding:8px !important; background:#000 !important; color:#ffa500 !important;
     border:2px solid #ffa500 !important; border-radius:8px !important; cursor:pointer;
     font-family:"Roboto Mono",monospace !important; font-size:11px !important; }
-  .ace-pref-btn:hover { background:#ffa500 !important; color:#000 !important; }
+  /* Higher specificity than the global #settings-panel button color rule */
+  #settings-panel .ace-pref-btn:hover { background:#2a1e00 !important; color:#ffa500 !important; }
 
   /* Dedicated detail page for each settings section */
   .ace-detail-header { display:flex; align-items:center; gap:12px; margin:4px 6px 10px;
