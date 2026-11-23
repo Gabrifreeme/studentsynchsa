@@ -7063,6 +7063,75 @@ def _simple_file_write_reply(message):
     return reply, True
 
 
+def _simple_button_remove_reply(message):
+    """Deterministic 'remove/delete the "X" button' path for slow/offline mode.
+
+    Removes exactly one button whose visible label matches, with strict guards so
+    a markdown answer can never overwrite the UI with a large destructive edit.
+    Returns (reply, did_work).
+    """
+    msg = str(message or "")
+    if not re.search(r"\b(?:remove|delete|get\s+rid\s+of)\b", msg, re.I):
+        return None, False
+
+    # Prefer a quoted label, otherwise "remove the X (tab) button".
+    lm = re.search("[\"'`]([^\"'`]{2,60})[\"'`]", msg)
+    if lm:
+        label = lm.group(1).strip()
+    else:
+        lm = re.search(r"\b(?:remove|delete)\s+(?:the\s+)?(.{2,60}?)\s+(?:tab\s+)?button\b", msg, re.I)
+        if not lm:
+            return None, False
+        label = lm.group(1).strip()
+    label = re.sub(r"^(?:the|a|an)\s+", "", label, flags=re.I).strip()
+    if not label or len(label) > 60:
+        return None, False
+
+    fm = re.search(r"([A-Za-z0-9_.\-]+\.(?:html|py|js|dart|ts|tsx))", msg, re.I)
+    name = fm.group(1) if fm else "ACEsi.html"
+    if "/" in name or "\\" in name or ".." in name:
+        return None, False
+    target = os.path.join(PROJECT_ROOT, name)
+    if not os.path.isfile(target):
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    pat = re.compile(r"<button\b[^>]*>\s*" + re.escape(label) + r"\s*</button>", re.I | re.S)
+    found = list(pat.finditer(source))
+    if len(found) != 1:
+        return None, False
+    hit = found[0]
+    removed_len = hit.end() - hit.start()
+    # One button must be a small slice - never allow a big destructive rewrite.
+    if removed_len > 4000 or removed_len > len(source) // 20:
+        return None, False
+    updated = source[:hit.start()] + source[hit.end():]
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not remove %s: %s" % (label, exc), False
+
+    sha = _git_head_short()
+    head = "Summary of Changes ✅ (files: %s)" % name
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| %s button | present | removed | applied button removal |" % label,
+    ]
+    bullets = [
+        "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).",
+        "- Side effects: %s" % ("git %s" % sha if sha else "file written on disk"),
+    ]
+    reply = ("Removed the `%s` button from `%s`.\n\n%s\n%s\n%s" %
+             (label, name, head, "\n".join(rows), "\n".join(bullets)))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7240,6 +7309,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic button removal: instant offline, with a real summary.
+    _remove_reply, _did_remove = _simple_button_remove_reply(request_text)
+    if _did_remove:
+        save_conversation("assistant", _remove_reply)
+        return jsonify({"reply": _remove_reply})
 
     # Deterministic simple file creation: instant offline, with a real summary.
     _simple_reply, _did_write = _simple_file_write_reply(request_text)
