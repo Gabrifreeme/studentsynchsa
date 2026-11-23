@@ -5677,8 +5677,6 @@ perspective: 900px;
 
           </div>
 
-          <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" title="Close Terminal" style="display:none; position:absolute; right:26px; top:50%; transform:translateY(-50%); align-items:center; justify-content:center; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; z-index:11;">Close Terminal</button>
-
           <span id="model-spinner" class="status-ok" data-tooltip="Server status: online" style="display:inline-block;width:10px;height:10px;"></span>
 
         </div>
@@ -8517,6 +8515,7 @@ perspective: 900px;
     <div id="terminal-panel" style="display: none; flex-direction: column; height: 300px; min-height: 300px; max-height: 300px; background: #000; border-top: 1px solid #ffa500; position: relative;">
     <!-- Terminal title bar: one row, horizontally centred in the window -->
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #ffa500; flex: 0 0 auto; box-sizing: border-box;">
+      <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" title="Close Terminal" style="background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
       <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" data-tooltip="Toggle Live Server Log on or Off" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
     </div>
@@ -16168,7 +16167,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!el) {
       el = document.createElement('div');
       el.id = 'ace-term-heartbeat';
-      hdr.insertBefore(el, hdr.firstChild); // far-left spot in the terminal header
+      var closeBtn = document.getElementById('ace-close-terminal-inline');
+      hdr.insertBefore(el, closeBtn ? closeBtn.nextSibling : hdr.firstChild);
+      // Close Terminal sits immediately before the green "|" heartbeat
     }
     window.__aceTermHeartbeatEl = el;
     var frames = ['|', '/', '-', '\\']; // ASCII spinner frames
@@ -17068,35 +17069,6 @@ window.aceCloseAllPanels = function (exceptId) {
   .ace-dash-sub { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
 </style>
-<script>
-/* The Terminal button keeps a constant "Open Terminal" tooltip.
-   A separate "Close Terminal" control appears beside the status spinner
-   only while the terminal panel is open. */
-(function () {
-  function syncCloseTerminalControl() {
-    var ctl = document.getElementById('ace-close-terminal-inline');
-    var panel = document.getElementById('terminal-panel');
-    if (!ctl) return;
-    var open = !!(panel && !panel.hasAttribute('hidden') && panel.style.display !== 'none');
-    ctl.style.display = open ? 'inline-flex' : 'none';
-  }
-  window.syncCloseTerminalControl = syncCloseTerminalControl;
-  function init() {
-    syncCloseTerminalControl();
-    var panel = document.getElementById('terminal-panel');
-    if (panel && window.MutationObserver) {
-      new MutationObserver(syncCloseTerminalControl).observe(panel, {
-        attributes: true, attributeFilter: ['style', 'hidden']
-      });
-    }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-</script>
 
 <script>
 (function () {
