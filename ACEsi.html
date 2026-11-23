@@ -7115,13 +7115,8 @@ perspective: 900px;
           var msgSpan = document.createElement("span");
           msgSpan.className = "ace-notif-text";
           div.appendChild(msgSpan);
-          var users = chat.querySelectorAll(".ace-user-msg");
-          var user = users.length ? users[users.length - 1] : null;
-          if (user && user.parentNode) {
-            user.parentNode.insertBefore(div, user.nextSibling);
-          } else {
-            chat.appendChild(div);
-          }
+          // Chronological: notifications go to the end of the chat too.
+          chat.appendChild(div);
         }
         var msgSpan = div.querySelector(".ace-notif-text");
         if (!msgSpan) {
@@ -16612,13 +16607,8 @@ window.aceFormatAssistantReply = aceFormatAssistantReply;
     if (!chat) return;
     if (aceMsgIdSeen(replyId)) return; // drop duplicate reply
     aceMsgIdAdd(replyId);
-    var users = chat.querySelectorAll(".ace-user-msg");
-    var user = users.length ? users[users.length - 1] : null;
-    if (user && user.parentNode) {
-      user.insertAdjacentHTML("afterend", html);
-    } else {
-      chat.insertAdjacentHTML("beforeend", html);
-    }
+    // Chronological: every reply/notice goes to the END of the chat.
+    chat.insertAdjacentHTML("beforeend", html);
     chat.scrollTop = chat.scrollHeight;
   };
 
