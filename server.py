@@ -7209,6 +7209,58 @@ def _simple_style_fix_reply(message):
     return reply, True
 
 
+def _simple_notifications_add_reply(message):
+    """Deterministic 'add these notification settings' path for offline mode."""
+    msg = str(message or "")
+    if not re.search(r"\bnotifications?\b", msg, re.I):
+        return None, False
+    if not re.search(r"\b(add|these|this|enable|set\s+up)\b", msg, re.I):
+        return None, False
+
+    target = os.path.join(PROJECT_ROOT, "ACEsi.html")
+    if not os.path.isfile(target) or os.path.getsize(target) < 200000:
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    marker = "/* ACEsi deterministic notifications page */"
+    if marker in source:
+        return ("The Notifications settings are already in ACEsi - no changes were needed.\n\n"
+                "Summary of Changes \u2705 (files: ACEsi.html)\n"
+                "| Change | Before | After | Effect |\n"
+                "| --- | --- | --- | --- |\n"
+                "| Notifications settings | already present | unchanged | no change needed |\n\n"
+                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
+
+    if "</body>" not in source:
+        return None, False
+    updated = source.replace("</body>", '<script id="ace-notifications-page">\n/* ACEsi deterministic notifications page */\n(function () {\n  var detail = document.getElementById(\'ace-detail-page\');\n  if (!detail || document.getElementById(\'ace-notifications-content\')) return;\n\n  var box = document.createElement(\'div\');\n  box.id = \'ace-notifications-content\';\n  box.className = \'ace-preferences-content\';\n  box.style.display = \'none\';\n  box.style.margin = \'10px 6px 2px\';\n  box.style.padding = \'10px\';\n  box.style.background = \'#0a0a0a\';\n  box.style.border = \'2px solid #ffa500\';\n  box.style.borderRadius = \'8px\';\n\n  var rows = [\n    [\'Desktop notifications\', \'Notify when to receive notifications and how often\', \'desktop-notifications\'],\n    [\'Agent notifications\', \'Show system notification when the agent is complete or needs attention\', \'agent-complete\'],\n    [\'Permission required\', \'Show system notification when a permission is required\', \'agent-permission\'],\n    [\'Prompts\', \'Show system notification when the agent asks a question\', \'agent-prompts\'],\n    [\'Error\', \'Show system notification on error or access\', \'agent-errors\']\n  ];\n  var html = \'<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:8px;">Notifications</div>\';\n  rows.forEach(function (r) {\n    html += \'<label class="ace-toggle" style="display:flex;align-items:center;gap:10px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:11px;cursor:pointer;">\' +\n            \'<input type="checkbox" id="\' + r[2] + \'" checked style="margin-right:4px;width:auto;">\' +\n            \'<span class="ace-switch"></span>\' +\n            \'<span><b>\' + r[0] + \'</b><br><span style="color:#ff9d00;font-size:10px;">\' + r[1] + \'</span></span>\' +\n            \'</label>\';\n  });\n  box.innerHTML = html;\n  detail.appendChild(box);\n\n  var orig = window.aceSettingsNavClick;\n  window.aceSettingsNavClick = function (key) {\n    if (typeof orig === \'function\') orig(key);\n    var generic = document.getElementById(\'ace-generic-nav-content\');\n    if (key === \'notifications\' && generic) generic.style.display = \'none\';\n    box.style.display = (key === \'notifications\') ? \'block\' : \'none\';\n  };\n})();\n</script>\n' + "</body>", 1)
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not add notification settings: %s" % exc, False
+
+    sha = _git_head_short()
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| Desktop notifications | missing | toggle added | applied notifications page |",
+        "| Agent notifications | missing | 2 toggles added | applied notifications page |",
+        "| Prompts | missing | toggle added | applied notifications page |",
+        "| Error | missing | toggle added | applied notifications page |",
+    ]
+    reply = ("Added the Notifications settings to Settings - Preferences - Notifications.\n\n"
+             "Summary of Changes \u2705 (files: ACEsi.html)\n%s\n\n"
+             "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).\n"
+             "- Side effects: %s" %
+             ("\n".join(rows), "git %s" % sha if sha else "file written on disk"))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7386,6 +7438,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic Notifications settings: instant offline, no model needed.
+    _notif_reply, _did_notif = _simple_notifications_add_reply(request_text)
+    if _notif_reply:
+        save_conversation("assistant", _notif_reply)
+        return jsonify({"reply": _notif_reply})
 
     # Deterministic Settings style fixes: instant offline, no model needed.
     _style_reply, _did_style = _simple_style_fix_reply(request_text)

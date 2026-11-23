@@ -17617,6 +17617,49 @@ window.aceCheckForUpdates = function (install) {
   });
 })();
 </script>
+<script id="ace-notifications-page">
+/* ACEsi deterministic notifications page */
+(function () {
+  var detail = document.getElementById('ace-detail-page');
+  if (!detail || document.getElementById('ace-notifications-content')) return;
+
+  var box = document.createElement('div');
+  box.id = 'ace-notifications-content';
+  box.className = 'ace-preferences-content';
+  box.style.display = 'none';
+  box.style.margin = '10px 6px 2px';
+  box.style.padding = '10px';
+  box.style.background = '#0a0a0a';
+  box.style.border = '2px solid #ffa500';
+  box.style.borderRadius = '8px';
+
+  var rows = [
+    ['Desktop notifications', 'Notify when to receive notifications and how often', 'desktop-notifications'],
+    ['Agent notifications', 'Show system notification when the agent is complete or needs attention', 'agent-complete'],
+    ['Permission required', 'Show system notification when a permission is required', 'agent-permission'],
+    ['Prompts', 'Show system notification when the agent asks a question', 'agent-prompts'],
+    ['Error', 'Show system notification on error or access', 'agent-errors']
+  ];
+  var html = '<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:8px;">Notifications</div>';
+  rows.forEach(function (r) {
+    html += '<label class="ace-toggle" style="display:flex;align-items:center;gap:10px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:11px;cursor:pointer;">' +
+            '<input type="checkbox" id="' + r[2] + '" checked style="margin-right:4px;width:auto;">' +
+            '<span class="ace-switch"></span>' +
+            '<span><b>' + r[0] + '</b><br><span style="color:#ff9d00;font-size:10px;">' + r[1] + '</span></span>' +
+            '</label>';
+  });
+  box.innerHTML = html;
+  detail.appendChild(box);
+
+  var orig = window.aceSettingsNavClick;
+  window.aceSettingsNavClick = function (key) {
+    if (typeof orig === 'function') orig(key);
+    var generic = document.getElementById('ace-generic-nav-content');
+    if (key === 'notifications' && generic) generic.style.display = 'none';
+    box.style.display = (key === 'notifications') ? 'block' : 'none';
+  };
+})();
+</script>
 </body>
 
 </html>
