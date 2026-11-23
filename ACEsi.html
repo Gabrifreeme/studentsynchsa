@@ -3555,6 +3555,9 @@ input::placeholder, textarea::placeholder {
   /* Preferences panel shown by the first nav item */
   .ace-preferences-content { margin:10px 6px 2px; padding:10px; background:#0a0a0a;
     border:2px solid #ffa500; border-radius:8px; }
+  .ace-generic-title { color:#ffa500; font-family:"Roboto Mono",monospace; font-size:12px;
+    font-weight:bold; margin-bottom:8px; }
+  .ace-generic-desc { color:#ff9d00; font-family:"Roboto Mono",monospace; font-size:11px; }
   .ace-pref-row { display:flex; align-items:center; margin-bottom:10px; }
   .ace-pref-toggle { color:#ffa500 !important; font-family:"Roboto Mono",monospace; font-size:12px; }
   .ace-pref-buttons { display:flex; flex-direction:column; gap:8px; }
@@ -4821,7 +4824,7 @@ git add -u (stage tracked)</label
         </div>
 
         <div class="ace-settings-nav">
-          <div class="ace-settings-back"><span>←</span> Back to app</div>
+          <div class="ace-settings-back" onclick="var p=document.getElementById('settings-panel');if(p)p.style.display='none'"><span>←</span> Back to app</div>
           <div class="ace-settings-search"><span>🔍</span><input type="text" placeholder="Search" aria-label="Search settings" /></div>
           <div class="ace-settings-nav-list">
         <div class="ace-nav-item active" data-nav="preferences" onclick="aceSettingsNavClick('preferences')"><span class="ace-nav-ico">☰</span><span>Preferences</span></div>
@@ -4852,6 +4855,11 @@ git add -u (stage tracked)</label
             <button type="button" class="ace-pref-btn" onclick="aceCheckForUpdates(false)">Check for Updates</button>
             <button type="button" class="ace-pref-btn" onclick="aceCheckForUpdates(true)">Check for Updates and Install</button>
           </div>
+        </div>
+
+        <div id="ace-generic-nav-content" class="ace-preferences-content" style="display:none">
+          <div id="ace-generic-nav-title" class="ace-generic-title"></div>
+          <div id="ace-generic-nav-desc" class="ace-generic-desc"></div>
         </div>
 
       </div>
@@ -17397,11 +17405,38 @@ document.addEventListener('click', function () {
 <script>
 window.aceSettingsNavClick = function (key) {
   var items = document.querySelectorAll('#settings-tab-ai .ace-nav-item');
+  var label = '';
   for (var i = 0; i < items.length; i++) {
-    items[i].classList.toggle('active', items[i].getAttribute('data-nav') === key);
+    var on = items[i].getAttribute('data-nav') === key;
+    items[i].classList.toggle('active', on);
+    if (on) label = (items[i].textContent || '').trim();
   }
   var pc = document.getElementById('ace-preferences-content');
-  if (pc) pc.style.display = (key === 'preferences') ? 'block' : 'none';
+  var gc = document.getElementById('ace-generic-nav-content');
+  var target = null;
+  if (key === 'preferences') {
+    if (pc) { pc.style.display = 'block'; target = pc; }
+    if (gc) gc.style.display = 'none';
+  } else {
+    if (pc) pc.style.display = 'none';
+    if (gc) {
+      var title = document.getElementById('ace-generic-nav-title');
+      var desc = document.getElementById('ace-generic-nav-desc');
+      if (title) title.textContent = label;
+      if (desc) desc.textContent = label + ' settings will appear here.';
+      gc.style.display = 'block';
+      target = gc;
+    }
+  }
+  // The nav list is tall; scroll the panel into view so the click is visibly live.
+  if (target) {
+    setTimeout(function () {
+      try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {
+        var p = document.getElementById('settings-panel');
+        if (p) p.scrollTop = target.offsetTop - 40;
+      }
+    }, 30);
+  }
 };
 window.aceCheckForUpdates = function (install) {
   if (window.showAceToast) window.showAceToast(install ? 'Checking for updates...' : 'Checking for updates...', 'info', 3000);
