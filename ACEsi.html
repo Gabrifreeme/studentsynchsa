@@ -3592,6 +3592,9 @@ input::placeholder, textarea::placeholder {
   /* Same solid-amber hover with black text as the other buttons */
   #settings-panel .ace-nav-item:hover,
   #settings-panel .ace-nav-item.active:hover { background:#ffa500 !important; color:#000 !important; }
+  /* The label spans have their own amber color rule - force them black on hover too */
+  #settings-panel .ace-nav-item:hover span,
+  #settings-panel .ace-nav-item.active:hover span { color:#000 !important; }
   .ace-nav-ico { width:18px; text-align:center; font-size:13px; }
   #settings-panel button[data-tab] { color:#ffa500 !important; }
   #settings-panel button[data-tab].active,
