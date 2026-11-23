@@ -3156,6 +3156,11 @@ input::placeholder, textarea::placeholder {
   z-index: 9999;
 }
 #terminal-logs-btn:hover::after { opacity: 1; }
+
+/* Composer mode/quality selects + header button alignment */
+#chat-panel .panel-header.chat-panel-header > div { margin-left: auto !important; }
+#composer-mode-select, #composer-quality-select { background:#000 !important; color:#ffa500 !important; border:1px solid #ffa500 !important; border-radius:6px !important; }
+#composer-mode-select option, #composer-quality-select option { background:#000 !important; color:#ffa500 !important; }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -5226,10 +5231,6 @@ git add -u (stage tracked)</label
             <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
             <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
           </div>
-          <div class="ace-mode-switch" role="group" aria-label="Agent mode">
-            <button type="button" class="ace-mode-btn active" data-mode="plan" aria-pressed="true" data-tooltip="Plan Mode: reason and outline before changing any files">Plan</button>
-            <button type="button" class="ace-mode-btn" data-mode="build" aria-pressed="false" data-tooltip="Build Mode: apply changes directly to your files">Build</button>
-          </div>
         </div>
 <style id="acesi-3d-notif-styles">
 #acesi-3d-notif-wrap {
@@ -5355,12 +5356,17 @@ perspective: 900px;
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4.03v8.05A4.47 4.47 0 0 0 16.5 12zm-2.5-8.77v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                 </button>
               </div>
-              <div style="position:relative; flex:1; min-width:0; display:flex;">
-                <button id="mobile-model-picker-btn" type="button" onclick="toggleComposerModelPicker(event)" title="Select model" style="width:100%; height:32px; padding:0 10px; border-radius:3px; border:1px solid #ffa500; background:#000; color:#ff9d00; font-family:inherit; font-size:12px; line-height:1; display:flex; align-items:center; justify-content:center; gap:6px; box-sizing:border-box; cursor:pointer; min-width:0;" onmouseover="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onmouseout="if(!this.dataset.open){this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';}" onfocus="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onblur="if(!this.dataset.open){this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';}">
-                  <span id="mobile-model-indicator" style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;">qwen2.5:7b</span>
-                  <span aria-hidden="true" style="flex:0 0 auto; font-size:10px; line-height:1; opacity:0.9;">&#9662;</span>
-                </button>
-                <div id="mobile-model-picker-menu" style="display:none; position:absolute; bottom:100%; left:0; right:0; margin-bottom:6px; background:#0b0b0b; border:1px solid #ffa500; border-radius:4px; box-shadow:0 8px 24px rgba(0,0,0,0.55); padding:4px; z-index:1200; max-height:220px; overflow-y:auto; box-sizing:border-box;"></div>
+              <div style="flex:1; min-width:0; display:flex; gap:6px; align-items:center;">
+                <select id="composer-mode-select" title="Agent mode" style="flex:1; min-width:0; height:32px; padding:0 8px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; box-sizing:border-box;" onchange="if(typeof aceSetMode==='function')aceSetMode(this.value)">
+                  <option value="plan">Plan</option>
+                  <option value="build">Build</option>
+                </select>
+                <select id="composer-quality-select" title="Response quality" style="flex:1; min-width:0; height:32px; padding:0 8px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; box-sizing:border-box;" onchange="try{localStorage.setItem('ace_quality',this.value)}catch(e){}">
+                  <option value="Default">Default</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
               </div>
               <button onclick="sendMessage()" title="Send" style="background:#000; color:#ff9d00; border:1px solid #ffa500; height:32px; padding:0 14px; border-radius:3px; font-family:inherit; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; flex:0 0 auto;" onmouseover="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onmouseout="this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';" onfocus="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onblur="this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';">Send</button>
             </div>
@@ -5605,6 +5611,8 @@ perspective: 900px;
               🧰
 
             </button>
+
+            <span id="model-spinner" class="status-ok" title="Checking server health..." style="display:inline-block;width:10px;height:10px;margin-left:4px;"></span>
 
           </div>
 
@@ -5957,6 +5965,8 @@ perspective: 900px;
           btns[i].classList.toggle("active", on);
           btns[i].setAttribute("aria-pressed", on ? "true" : "false");
         }
+        var modeSel = document.getElementById("composer-mode-select");
+        if (modeSel) modeSel.value = window.aceMode;
         try {
           document.dispatchEvent(new CustomEvent("acesi:modechange", {
             detail: { mode: window.aceMode, isBuildMode: isBuildMode }
@@ -5974,6 +5984,13 @@ perspective: 900px;
           });
         }
         aceSetMode("plan");
+        try {
+          var qs = localStorage.getItem("ace_quality");
+          if (qs) {
+            var qsel = document.getElementById("composer-quality-select");
+            if (qsel) qsel.value = qs;
+          }
+        } catch (e) {}
       })();
 
       // --- Plan Mode: Plan-mode action intercept warning bubble ---
@@ -8147,7 +8164,6 @@ perspective: 900px;
     >
 
       <span style="flex: 1; display: flex; align-items: center; gap: 6px; background: #000; color: #ff9d00; border: none; padding: 4px 10px; border-radius: 3px; font-family: inherit; font-weight: bold; font-size: 12px; white-space: nowrap; min-width: 0;">
-        <span id="model-spinner" class="status-ok" title="Checking server health..."></span>
         <span>ACEsi</span>
         <span>|</span>
         <span>Agent: <b>1</b> | Devices: <b id="device-count">...</b> connected</span>
@@ -8165,7 +8181,6 @@ perspective: 900px;
           </button>
           <div id="bottom-model-picker-menu" style="display:none; position:absolute; bottom:100%; right:0; margin-bottom:6px; background:#0b0b0b; border:1px solid #ffa500; border-radius:4px; box-shadow:0 8px 24px rgba(0,0,0,0.55); padding:4px; z-index:1600; min-width:220px; max-height:240px; overflow-y:auto; box-sizing:border-box;"></div>
         </div>
-        <span id="model-spinner-right" class="status-ok" title="Checking server health..."></span>
       </span>
 
     </div>
