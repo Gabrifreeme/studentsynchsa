@@ -3508,6 +3508,33 @@ input::placeholder, textarea::placeholder {
   #settings-panel button[data-tab],
   #settings-panel button[data-tab].active,
   #settings-panel button[data-tab].active:hover { border-width:2px !important; }
+
+  /* Tools & Integrations: round corners + one bright amber for every label/text */
+  #settings-panel button.ace-btn-danger,
+  #settings-panel button.ace-btn-secondary,
+  #settings-panel button.ace-btn-utility,
+  #settings-panel button.ace-btn-primary {
+    border-radius:8px !important;
+    border-width:2px !important;
+    color:#ffa500 !important;
+  }
+  #settings-panel .ace-switch { border-width:2px !important; }
+  #settings-panel div,
+  #settings-panel label,
+  #settings-panel span,
+  #settings-panel button,
+  #settings-panel select,
+  #settings-panel option { color:#ffa500 !important; }
+  /* Keep black text on solid amber active surfaces */
+  #settings-panel button[data-tab].active,
+  #settings-panel button[data-tab].active:hover,
+  #settings-panel button.ace-btn-primary,
+  #settings-panel .collapsible-header:hover,
+  #settings-panel option:checked { color:#000 !important; }
+  /* Inactive tab labels also need the brighter amber (older [data-tab] rule wins) */
+  #settings-panel button[data-tab] { color:#ffa500 !important; }
+  #settings-panel button[data-tab].active,
+  #settings-panel button[data-tab].active:hover { color:#000 !important; }
 </style>
 <script>
   window.aceInitSettingsOverhaul = function () {
