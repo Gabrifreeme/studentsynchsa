@@ -3839,7 +3839,10 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
     if name.startswith("OpenRouter"):
         max_tokens = 512
     elif name == "Ollama":
-        max_tokens = 400
+        # This CPU 7B runs at ~2 tokens/s. 400 tokens needs ~3 minutes, which is
+        # why replies always hit the deadline. Keep answers short enough to land
+        # inside the 50s cap; complex edits are handled by deterministic paths.
+        max_tokens = 80
     elif name in ("Groq", "Cerebras"):
         max_tokens = 4096
     else:
