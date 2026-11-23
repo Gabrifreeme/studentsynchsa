@@ -3498,7 +3498,8 @@ input::placeholder, textarea::placeholder {
     border-top:2px solid #ffa500 !important;
     box-sizing:border-box !important;
     flex:0 0 auto !important;
-    z-index:1002 !important;
+    /* Above the Settings modal (z-index 10000) so DevTools opens on top of it */
+    z-index:10001 !important;
   }
   /* The dim helper text inside API Keys */
   #settings-panel .collapsible-content > div:first-child { color:#ffa500 !important; }
