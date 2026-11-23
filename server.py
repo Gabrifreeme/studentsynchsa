@@ -7030,7 +7030,10 @@ def _simple_file_write_reply(message):
     if not m:
         return None, False
     name = m.group(1).strip()
-    content = m.group(2).strip().rstrip(".'\"")
+    content = m.group(2).strip()
+    content = re.split(r"\s*,\s*then\b|\s+\bthen\s+tell\b|\s+\band\s+tell\b",
+                       content, maxsplit=1, flags=re.I)[0]
+    content = content.strip().rstrip(".'\"")
     if "/" in name or "\\" in name or ".." in name:
         return None, False
     target = os.path.join(PROJECT_ROOT, name)
@@ -7217,6 +7220,13 @@ def chat():
     # PROMPT only; routing/intent detection must never read that text (it can
     # contain words like "flutter analyze" which trigger Explorer-fix mode).
     request_text = user_message
+
+    # Deterministic simple file creation: instant offline, with a real summary.
+    _simple_reply, _did_write = _simple_file_write_reply(request_text)
+    if _did_write:
+        save_conversation("assistant", _simple_reply)
+        return jsonify({"reply": _simple_reply})
+
     # Clients that omit "model" (phone UI, external callers) must still use the
     # provider/model saved in Settings instead of silently reverting to Groq.
     requested_model = data.get('model', '') or get_config('model', '') or ''
@@ -7577,12 +7587,6 @@ def chat():
     else:
         # OpenRouter has no credits; default to a model that actually works.
         model = GROQ_MODEL
-
-    # Deterministic simple file creation: instant offline, with a real summary.
-    _simple_reply, _did_write = _simple_file_write_reply(request_text)
-    if _did_write:
-        save_conversation("assistant", _simple_reply)
-        return jsonify({"reply": _simple_reply})
 
     # "note this / write down: X / log X" → journal entry
     note_match = re.match(r'^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$', user_message, re.IGNORECASE)
@@ -9876,6 +9880,8 @@ def _match_pc_file_open_request(message):
     if not m:
         return False
     ml = m.lower()
+    if re.match(r"^\s*(?:create|write|make|add)\b", ml):
+        return False
     has_drive = bool(re.search(r'\b[a-z]:[\\/][^\s,;]+', ml))
     has_action = bool(re.search(r'\b(?:open|view|show|find|display|read|load)\b', ml))
     # An explicit drive path plus a file action is unambiguous. It must win even
