@@ -3347,7 +3347,7 @@ input::placeholder, textarea::placeholder {
   /* Hover: keep the label bright amber on the dark hover background. Active (incl. hovered) stays solid amber. */
   #settings-panel button[data-tab]:hover { background:#2a1e00 !important; color:#ff9d00 !important; }
   #settings-panel button[data-tab].active,
-  #settings-panel button[data-tab].active:hover { background:#ff9d00 !important; color:#000 !important; }
+  #settings-panel button[data-tab].active:hover { background:#ffa500 !important; color:#000 !important; }
 
   /* Dropdowns */
   #settings-provider, #settings-model {
@@ -11260,7 +11260,7 @@ let _geoPayload = {};
         var activeBtn = document.querySelector('[data-tab="' + tabId + '"]');
 
         if (activeBtn) {
-          activeBtn.style.background = "#ff9d00";
+          activeBtn.style.background = "#ffa500";
           activeBtn.classList.add("active");
         }
 
@@ -12681,7 +12681,7 @@ let _geoPayload = {};
 
           panel.style.display = "block";
 
-          switchTab("settings-tab-ai");
+          switchTab("settings-tab-prompt");
 
           if (!_settingsInitialized) {
 
