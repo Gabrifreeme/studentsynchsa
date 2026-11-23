@@ -17478,6 +17478,27 @@ window.aceCheckForUpdates = function (install) {
     background:#ffa500 !important; color:#000 !important;
   }
 </style>
+<style id="ace-tab-button-terminal-style">
+/* Settings tabs styled exactly like the Code Editor Terminal button:
+   black background, amber text/border; amber background + black text on hover.
+   No permanent "active" highlight. */
+#settings-panel button[data-tab],
+#settings-panel button[data-tab].active,
+#settings-panel button[data-tab].active:hover,
+#settings-panel button[data-tab]:hover {
+  background:#000 !important;
+  color:#ffa500 !important;
+  border:1px solid #ffa500 !important;
+  border-radius:6px !important;
+  padding:0 8px !important;
+  font-size:11px !important;
+}
+#settings-panel button[data-tab]:hover,
+#settings-panel button[data-tab].active:hover {
+  background:#ffa500 !important;
+  color:#000 !important;
+}
+</style>
 </body>
 
 </html>
