@@ -10773,7 +10773,7 @@ async function sendMessage(reuseMsgId) {
 
           '<div style="background:#1a1a1a;padding:8px 12px;border-radius:6px;border:1px solid #ffa500;margin-bottom:8px;margin-left:20px;"><b>You:</b> ' +
 
-          text +
+          window.aceEscapeHtml(text) +
 
           "</div>",
 
@@ -16840,6 +16840,14 @@ document.addEventListener('DOMContentLoaded', function() {
   window.__aceMsgIdCtr = 0;
   window.__aceLastUserMsgId = null;
   window.__aceBlockedMsgId = null;
+
+  // User text is displayed as HTML - escape it so prompts containing tags like
+  // <button ...> show as plain text instead of rendering as real elements.
+  window.aceEscapeHtml = function (s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  };
 
   window.aceNewMsgId = function () {
     if (window.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
