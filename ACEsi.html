@@ -16596,6 +16596,8 @@ function aceFormatAssistantReply(text) {
     '<div style="margin-top:6px;">' + body + "</div></details>";
   return (before ? aceRenderMarkdownTables(before) + "<br>" : "") + card;
 }
+// Expose globally: sendMessage() lives in another script block/scope.
+window.aceFormatAssistantReply = aceFormatAssistantReply;
 
   window.aceChatInsertReply = function (html, replyId) {
     var chat = document.getElementById("chat-messages");
