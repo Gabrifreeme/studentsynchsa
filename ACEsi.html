@@ -6014,10 +6014,18 @@ perspective: 900px;
         // 3) Hide the warning bubble: it was only needed until the user clicked.
         var _wb = btn.closest(".ace-mode-warning") || document.querySelector("#chat-messages > .ace-mode-warning");
         if (_wb) _wb.style.display = "none";
-        // 4) Confirmation message.
-        window.aceChatInsertReply(
-          '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Proceeding with your request...</div>'
-        );
+        // 4) Confirmation message. It belongs BEFORE the re-sent request:
+        //    notice -> user's prompt -> ACEsi's answer.
+        var confirmation = '<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border-radius:6px;border:none;margin-bottom:8px;"><b>ACEsi:</b> Switched to Build Mode. Proceeding with your request...</div>';
+        var originalMsg = null;
+        if (reuseMsgId) originalMsg = document.querySelector('#chat-messages .ace-user-msg[data-msg-id="' + reuseMsgId + '"]');
+        if (originalMsg && originalMsg.parentNode) {
+          originalMsg.insertAdjacentHTML("beforebegin", confirmation);
+        } else {
+          var chatBox = document.getElementById("chat-messages");
+          if (chatBox) chatBox.insertAdjacentHTML("beforeend", confirmation);
+        }
+        if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
         // 5) Immediately execute the original action without the user retyping it.
         if (prompt) {
           var input = document.getElementById("chat-input");
