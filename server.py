@@ -4106,15 +4106,22 @@ def _ollama_local_messages(llm_messages, system=None):
             if system:
                 sys_ = {"role": "system", "content": system}
                 continue
-            sys_ = {"role": "system", "content":
-                    OLLAMA_SYS_PROMPT +
-                    "\nMEMORY: You DO have persistent memory. The bracketed blocks below "
-                    "([Facts I know about Chris], [Shared history], [Tasks & calendar], and "
-                    "the recent conversation turns) are loaded from your database every message. "
-                    "When Chris asks 'can you access/remember your memory', answer YES and quote "
-                    "the exact facts below — never say you have no memory. Always give the final "
-                    "text reply in the last turn.\n\n"
-                    + build_context_block(light=True)}
+            # Ordinary chat must NOT pay for the device-navigation prompt or the
+            # full context dump - on this CPU that prefill alone costs ~60s and
+            # causes the 120s timeout. Use a tiny chat persona; only UI/device
+            # tasks keep the navigation rules.
+            _u = str((first_user or {}).get("content", "")).lower()
+            _ui_chat = any(w in _u for w in
+                           ("ui_", "tap", "swipe", "screenshot", "device",
+                            "portal", "app ", "navigate"))
+            if _ui_chat:
+                sys_ = {"role": "system", "content": OLLAMA_SYS_PROMPT}
+            else:
+                sys_ = {"role": "system", "content":
+                        "You are ACEsi, a concise helpful assistant. Answer the user's "
+                        "question directly and concretely. If you edited files or ran tools, "
+                        "end with a short 'Summary of Changes ✅' table "
+                        "(Change | Before | After | Effect) and 1-2 bullets."}
         elif role == "user" and first_user is None and "SCREEN STATE" not in str(m.get("content", "")):
             if "You only described" not in str(m.get("content", "")) and \
                "I detected Chrome" not in str(m.get("content", "")) and \
@@ -4122,8 +4129,8 @@ def _ollama_local_messages(llm_messages, system=None):
                 first_user = m
         elif role in ("user", "assistant", "tool"):
             tail.append(m)
-    return ([m for m in (sys_, first_user) if m] + tail[-3:]) if sys_ else (
-        [m for m in (first_user,) if m] + tail[-3:])
+    return ([m for m in (sys_, first_user) if m] + tail[-1:]) if sys_ else (
+        [m for m in (first_user,) if m] + tail[-1:])
 
 
 _DEV_TOOLS = ("ui_app_open", "ui_tap", "ui_swipe", "ui_type", "ui_key",
