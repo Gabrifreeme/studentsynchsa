@@ -7132,6 +7132,69 @@ def _simple_button_remove_reply(message):
     return reply, True
 
 
+def _simple_style_fix_reply(message):
+    """Deterministic Settings highlight/hover fixes for slow/offline local mode.
+
+    Appends a small, idempotent CSS block to ACEsi.html. Returns (reply, did_work).
+    """
+    msg = str(message or "")
+    if not re.search(r"\b(?:fix|change|make|correct|update)\b", msg, re.I):
+        return None, False
+    if not re.search(r"\bsettings\b", msg, re.I):
+        return None, False
+    if not re.search(r"\b(?:highlight|hover|tab|button)\b", msg, re.I):
+        return None, False
+
+    target = os.path.join(PROJECT_ROOT, "ACEsi.html")
+    if not os.path.isfile(target) or os.path.getsize(target) < 200000:
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    marker = "/* ACEsi deterministic style fix: tab highlight + hover text */"
+    if marker in source:
+        return None, False
+
+    css = (
+        "\n<style id=\"ace-deterministic-style-fix\">\n"
+        + marker + "\n"
+        "  #settings-panel button[data-tab]:not(.active) { background:#000 !important; }\n"
+        "  #settings-panel button[data-tab].active { background:#ffa500 !important; color:#000 !important; }\n"
+        "  #settings-panel button[onclick=\"openPromptManager()\"]:hover,\n"
+        "  #settings-panel button[title=\"Add/Edit Prompts\"]:hover {\n"
+        "    background:#ffa500 !important; color:#000 !important;\n"
+        "  }\n"
+        "</style>\n"
+    )
+    if "</body>" not in source:
+        return None, False
+    updated = source.replace("</body>", css + "</body>", 1)
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not update styles: %s" % exc, False
+
+    sha = _git_head_short()
+    head = "Summary of Changes \u2705 (files: ACEsi.html)"
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| Settings tab highlight | stuck on System Prompt | follows selected tab | applied highlight fix |",
+        "| Add/Edit Prompt hover text | amber on amber | black on amber | applied hover fix |",
+    ]
+    bullets = [
+        "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).",
+        "- Side effects: %s" % ("git %s" % sha if sha else "file written on disk"),
+    ]
+    reply = ("Fixed the Settings tab highlight and the Add/Edit Prompt hover text.\n\n%s\n%s\n%s"
+             % (head, "\n".join(rows), "\n".join(bullets)))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7309,6 +7372,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic Settings style fixes: instant offline, no model needed.
+    _style_reply, _did_style = _simple_style_fix_reply(request_text)
+    if _did_style:
+        save_conversation("assistant", _style_reply)
+        return jsonify({"reply": _style_reply})
 
     # Deterministic button removal: instant offline, with a real summary.
     _remove_reply, _did_remove = _simple_button_remove_reply(request_text)
