@@ -3217,6 +3217,24 @@ input::placeholder, textarea::placeholder {
   border-right-color:#ffa500;
   border-bottom-color:#ffa500;
 }
+/* Terminal button tooltips: explicit bright amber (never the grey native one) */
+#terminal-toggle-btn::after,
+#ace-close-terminal-inline::after {
+  content:attr(data-tooltip);
+  position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:#ffa500 !important; color:#000 !important; border:1px solid #ffa500 !important;
+  border-radius:6px; padding:3px 8px; font-family:inherit; font-size:11px; font-weight:bold;
+  white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s; z-index:9999;
+}
+#terminal-toggle-btn:hover::after,
+#ace-close-terminal-inline:hover::after { opacity:1; }
+/* Text buttons in the Code Editor toolbar need room for their labels; the
+   generic .btn rule sizes every button as a 24px icon square. */
+#code-panel .panel-header button[data-tooltip="Run Execution"],
+#code-panel .panel-header button[onclick="openSettings()"] {
+  width:auto !important; min-width:0 !important; padding:0 8px !important;
+  white-space:nowrap !important; font-size:11px !important;
+}
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -8515,7 +8533,7 @@ perspective: 900px;
     <div id="terminal-panel" style="display: none; flex-direction: column; height: 300px; min-height: 300px; max-height: 300px; background: #000; border-top: 1px solid #ffa500; position: relative;">
     <!-- Terminal title bar: one row, horizontally centred in the window -->
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #ffa500; flex: 0 0 auto; box-sizing: border-box;">
-      <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" title="Close Terminal" style="background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
+      <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
       <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" data-tooltip="Toggle Live Server Log on or Off" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
     </div>
