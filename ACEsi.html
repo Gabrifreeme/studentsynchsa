@@ -10701,7 +10701,8 @@ async function sendMessage(reuseMsgId) {
         // Keep local Ollama short (it cannot finish past ~50s on this CPU), but
         // give explicitly selected cloud models room to actually answer.
         var _aceIsCloud = /^(gemini|openai\/|gpt|qwen\/|llama|claude)/i.test(getSelectedModel() || "");
-        var _aceCutoff = _aceIsCloud ? 180000 : 50000;
+        // No short cutoff: let Ollama run as long as it needs (30 min server cap).
+        var _aceCutoff = 1800000;
         var _aceTimeoutId = setTimeout(function () {
           if (window.currentAbortController === currentAbortController) {
             try { currentAbortController.abort(); } catch (e) {}

@@ -3809,6 +3809,12 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
     if name == "Gemini":
         msgs = [m for m in (msgs or [])
                 if m.get("role") != "tool" and not m.get("tool_calls")]
+        # Gemini's OpenAI-compat layer 400s on "Requests ending with a model
+        # turn": the history must end with a user message. When the previous
+        # round ended on an assistant reply, append a short user nudge so the
+        # request is accepted instead of burning the whole deadline on 400s.
+        if msgs and msgs[-1].get("role") != "user":
+            msgs = msgs + [{"role": "user", "content": "Continue with the task."}]
     if api_key != "local":
         headers["Authorization"] = f"Bearer {api_key}"
     # Use a compact schema for Ollama: on this 2012-CPU box prefill is ~10 tok/s,
@@ -5625,7 +5631,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     # With local Ollama first (CPU model, slow), allow a longer dispatch budget
     # so a real research round can finish before the loop gives up.
     if OLLAMA_ENABLED:
-        time_budget = max(time_budget, 180)
+        time_budget = max(time_budget, 1800)
     # Bug-report mode: cap rounds so the model cannot burn the Groq TPM budget
     # on repeated identical calls. 4 rounds = connect, inspect, read network,
     # summarize. If it needs more, the tail summary runs instead of a 429.
@@ -5896,7 +5902,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         # the full call window. keep_alive keeps it resident. If
                         # it is too slow, that is a known hardware limit, not a
                         # capability we trim away.
-                        _read_to = 50.0
+                        # User asked for the longest possible local window so
+                        # Ollama can run past 5 minutes without being cut off.
+                        _read_to = 1800.0
                     elif _budget is not None:
                         _left_s = max(1.0, _budget - time.monotonic() - 0.5)
                         _slice = max(3.0, min(12.0, _left_s / max(1, _n_left)))
@@ -6007,7 +6015,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     got = _chat_one(active[0], active[1], active[2], active[3],
                                     fwd_msgs, tools_schema=fwd_schema,
                                     tool_choice=tc,
-                                    timeout=IMAGE_CALL_TIMEOUT if _image_request else (8, 30))
+                                    timeout=IMAGE_CALL_TIMEOUT if _image_request else
+                                    ((8, 1800.0) if active[0] == "Ollama" else (8, 30)))
                 if got is None:
                     active = None
                     continue
@@ -7577,7 +7586,15 @@ def chat():
     # One deadline for the whole response (provider calls, fallbacks, summary).
     # When Ollama is the first choice on CPU, allow more time for the local
     # model (it is slow but free), otherwise keep the snappy cloud deadline.
-    _deadline_s = 50.0 if OLLAMA_ENABLED else CHAT_SOFT_DEADLINE_S
+    # Explicit cloud model in the picker needs room for multi-round tool work;
+    # Ollama stays short so a slow local call fails fast instead of hanging.
+    _sel_model = str((request.json or {}).get('model') or '') if request.is_json else ''
+    if _sel_model and not str(_sel_model).startswith('qwen2.5'):
+        _deadline_s = 180.0
+    elif OLLAMA_ENABLED:
+        _deadline_s = 1800.0
+    else:
+        _deadline_s = CHAT_SOFT_DEADLINE_S
     g.chat_deadline = time.monotonic() + _deadline_s
     data = request.json
     user_message = data.get('message', '')
