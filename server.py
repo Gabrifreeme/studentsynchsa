@@ -7010,6 +7010,48 @@ def _local_file_answer(file_path, question):
                    "already imports. No new packages needed.")
     return "\n".join(out)
 
+def _simple_file_write_reply(message):
+    """Deterministic 'create FILE with text X' path for slow/offline local mode.
+
+    Returns (reply, did_work) so /chat can answer instantly without the 7B model.
+    """
+    m = re.search(
+        r"(?:create|write|make)\s+(?:a\s+)?(?:file\s+)?"
+        r"([A-Za-z0-9_.\-]+\.[A-Za-z0-9]+)\b[^\n]*?"
+        r"(?:with|containing|saying|text)\s+(?:the\s+text\s+)?[\"']?([^\"'\n]+)",
+        str(message or ""), re.I)
+    if not m:
+        return None, False
+    name = m.group(1).strip()
+    content = m.group(2).strip().rstrip(".'\"")
+    if "/" in name or "\\" in name or ".." in name:
+        return None, False
+    target = os.path.join(PROJECT_ROOT, name)
+    try:
+        existed = os.path.isfile(target)
+        old = open(target, encoding="utf-8", errors="replace").read() if existed else ""
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(content + "\n")
+    except Exception as exc:
+        return "Could not write %s: %s" % (name, exc), False
+    sha = _git_head_short()
+    head = "Summary of Changes ✅ (files: %s)" % name
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| %s | %s | %s | %s |" % (
+            name, " ".join(old.split())[:50] or "(new file)",
+            " ".join(content.split())[:50], "applied write_file"),
+    ]
+    bullets = [
+        "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).",
+        "- Side effects: %s" % ("git %s" % sha if sha else "file written on disk"),
+    ]
+    reply = ("Created `%s` with the text `%s`.\n\n%s\n%s\n%s" %
+             (name, content, head, "\n".join(rows), "\n".join(bullets)))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7455,6 +7497,12 @@ def chat():
     else:
         # OpenRouter has no credits; default to a model that actually works.
         model = GROQ_MODEL
+
+    # Deterministic simple file creation: instant offline, with a real summary.
+    _simple_reply, _did_write = _simple_file_write_reply(request_text)
+    if _did_write:
+        save_conversation("assistant", _simple_reply)
+        return jsonify({"reply": _simple_reply})
 
     # "note this / write down: X / log X" → journal entry
     note_match = re.match(r'^(?:note|write|log|jot)\s+(?:this|that|down|it|the following)?\s*[:,\-]?\s*(.+)$', user_message, re.IGNORECASE)
