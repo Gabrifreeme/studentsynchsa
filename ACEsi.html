@@ -3174,7 +3174,7 @@ input::placeholder, textarea::placeholder {
 /* Server spinner: far right of the Code Editor toolbar.
    The header needs a z-index above #code-editor (z:3), otherwise the tooltip
    is painted behind the editor and cannot be read. */
-#code-panel .panel-header { z-index: 10 !important; }
+#code-panel .panel-header { z-index: 10 !important; justify-content: center !important; }
 #model-spinner {
   position:absolute !important; right:8px !important; top:50% !important;
   transform:translateY(-50%) !important; margin:0 !important;
@@ -3189,6 +3189,34 @@ input::placeholder, textarea::placeholder {
   z-index:9999;
 }
 #model-spinner:hover::after { opacity:1; }
+/* Spinning status ring: a 3/4 green arc with a visible gap. The container stays
+   still (so the tooltip does not orbit), while an inner ::before ring rotates.
+   The previous solid box-shadow filled the gap and the transform !important
+   cancelled the animation, which is why it looked like a static green dot. */
+#model-spinner {
+  transform:none !important;
+  animation:none !important;
+  width:14px !important; height:14px !important;
+  margin:0 !important; margin-top:-7px !important;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+#model-spinner::before {
+  content:''; position:absolute; inset:0;
+  border:2px solid transparent;
+  border-top-color:#00ff00;
+  border-right-color:#00ff00;
+  border-bottom-color:#00ff00;
+  border-radius:50%;
+  box-sizing:border-box;
+  animation:model-spin 0.8s linear infinite;
+}
+#model-spinner.status-dead::before {
+  border-top-color:#ffa500;
+  border-right-color:#ffa500;
+  border-bottom-color:#ffa500;
+}
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -5255,9 +5283,7 @@ git add -u (stage tracked)</label
         <div class="panel-header chat-panel-header">
           <span class="chat-panel-title">CONVERSATION</span>
           <div style="display:flex; align-items:center; gap:6px;">
-            <button class="btn" data-tooltip="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
             <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
-            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
           </div>
         </div>
 <style id="acesi-3d-notif-styles">
@@ -5440,6 +5466,7 @@ perspective: 900px;
 
           >
 
+            <button class="btn" data-tooltip="Run Execution" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('run-panel');document.getElementById('run-panel').style.display = 'block'">Run Run ▶</button>
 
             <button
 
@@ -5646,7 +5673,11 @@ perspective: 900px;
 
             </button>
 
+            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
+
           </div>
+
+          <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" title="Close Terminal" style="display:none; position:absolute; right:26px; top:50%; transform:translateY(-50%); align-items:center; justify-content:center; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; z-index:11;">Close Terminal</button>
 
           <span id="model-spinner" class="status-ok" data-tooltip="Server status: online" style="display:inline-block;width:10px;height:10px;"></span>
 
@@ -17038,31 +17069,31 @@ window.aceCloseAllPanels = function (exceptId) {
   #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
 </style>
 <script>
-/* Keep the Terminal button tooltip in sync with the terminal panel state */
+/* The Terminal button keeps a constant "Open Terminal" tooltip.
+   A separate "Close Terminal" control appears beside the status spinner
+   only while the terminal panel is open. */
 (function () {
-  function updateTerminalTooltip() {
-    var btn = document.getElementById('terminal-toggle-btn');
-    if (!btn) return;
+  function syncCloseTerminalControl() {
+    var ctl = document.getElementById('ace-close-terminal-inline');
     var panel = document.getElementById('terminal-panel');
+    if (!ctl) return;
     var open = !!(panel && !panel.hasAttribute('hidden') && panel.style.display !== 'none');
-    btn.setAttribute('data-tooltip', open ? 'Close Terminal' : 'Open Terminal');
+    ctl.style.display = open ? 'inline-flex' : 'none';
   }
-  window.updateTerminalTooltip = updateTerminalTooltip;
-  function initTerminalTooltipSync() {
-    updateTerminalTooltip();
+  window.syncCloseTerminalControl = syncCloseTerminalControl;
+  function init() {
+    syncCloseTerminalControl();
     var panel = document.getElementById('terminal-panel');
     if (panel && window.MutationObserver) {
-      new MutationObserver(updateTerminalTooltip).observe(panel, {
+      new MutationObserver(syncCloseTerminalControl).observe(panel, {
         attributes: true, attributeFilter: ['style', 'hidden']
       });
     }
-    var btn = document.getElementById('terminal-toggle-btn');
-    if (btn) btn.addEventListener('click', function () { setTimeout(updateTerminalTooltip, 0); });
   }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTerminalTooltipSync);
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    initTerminalTooltipSync();
+    init();
   }
 })();
 </script>
