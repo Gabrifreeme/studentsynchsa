@@ -4689,6 +4689,70 @@ def _no_summary_note(active):
             "final round (the provider answered normally).")
 
 
+def _git_head_short():
+    try:
+        r = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                           cwd=PROJECT_ROOT, capture_output=True, timeout=5)
+        return (r.stdout or b"").decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def _append_turn_summary(reply, llm_messages, active=None):
+    """Append a structured 'Summary of Changes' from the tool calls actually made.
+
+    The local 7B model often ignores the prompt instruction, so the summary is
+    generated here from the real edit_file/write_file arguments instead.
+    """
+    if not reply or "Summary of Changes" in str(reply):
+        return reply
+    edits = []
+    for m in (llm_messages or []):
+        for tc in (m.get("tool_calls") or []):
+            fn = tc.get("function") or {}
+            name = fn.get("name") or ""
+            if name not in ("edit_file", "write_file"):
+                continue
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except Exception:
+                args = {}
+            edits.append((name, str(args.get("path") or ""),
+                          str(args.get("old") or ""), str(args.get("new") or ""),
+                          str(args.get("content") or "")))
+    if not edits:
+        return reply
+    files = sorted(set(e[1] for e in edits if e[1]))
+    sha = _git_head_short()
+    head = "Summary of Changes ✅"
+    if files:
+        head += " (files: %s)" % ", ".join(os.path.basename(f) for f in files[:6])
+    elif sha:
+        head += " (%s)" % sha
+    rows = []
+    for name, path, old, new, content in edits[:6]:
+        before = " ".join(old.split())[:52] or ("(new file)" if name == "write_file" else "(n/a)")
+        after = " ".join(new.split())[:52] or " ".join(content.split())[:52] or "(updated)"
+        rows.append("| %s | %s | %s | %s |" % (
+            os.path.basename(path) or name, before, after,
+            "applied %s" % name))
+    if not rows:
+        return reply
+    model = (active[3] if active and len(active) > 3 else "qwen2.5:7b")
+    provider = (active[0] if active else "Ollama")
+    block = [
+        "", "", head, "",
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+    ] + rows + [
+        "",
+        "- Routing: %s / %s (local first; cloud only if selected explicitly)." % (provider, model),
+        "- Side effects: %s" % ("git %s" % sha if sha else "changes applied on disk"),
+        "",
+    ]
+    return str(reply).rstrip() + "\n" + "\n".join(block)
+
+
 def _final_answer(llm_messages, names, last_screen, active, user_message,
                   chat_one=None, bug_obs=""):
     """The reply to show the user when the loop ends with work done.
@@ -4718,7 +4782,8 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
         if _bug_re.search(user_message or ""):
             return _bug_evidence_reply(evidence, _no_summary_note(active),
                                        obs=bug_obs, question=user_message)
-        return _evidence_fallback(evidence, names, question=user_message)
+        return _append_turn_summary(
+        _evidence_fallback(evidence, names, question=user_message), llm_messages, active)
 
     got = None
     if chat_one is not None and active:
@@ -4759,11 +4824,12 @@ def _final_answer(llm_messages, names, last_screen, active, user_message,
                     "I could not write the fix summary: the model answered "
                     "%r instead of describing the page." % text[:60],
                     obs=bug_obs, question=user_message)
-            return text
+            return _append_turn_summary(text, llm_messages, active)
 
     if _bug_re.search(user_message or ""):
-        return _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
-                                   question=user_message)
+        return _append_turn_summary(
+            _bug_evidence_reply(evidence, _no_summary_note(active), obs=bug_obs,
+                                question=user_message), llm_messages, active)
     return _evidence_fallback(evidence, names, question=user_message)
 
 
@@ -7507,6 +7573,11 @@ def chat():
         _prefs_block = build_preferences_block()
         _prefs_text = ("\n\n" + _prefs_block) if _prefs_block else ""
         system_prompt = (
+            "WORK SUMMARY RULE: after ANY file edit, tool execution or multi-step coding "
+            "task, your reply MUST end with a 'Summary of Changes ✅' section: a short "
+            "header with the changed file names, then a markdown table "
+            "'| Change | Before | After | Effect |', then 1-2 bullets on model routing "
+            "and side effects. Never skip it after real work.\n\n"
             "You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. "
             "You are calm, present, and can be quiet — you don't gush, over-cheer, or over-promise. "
             "You can be brief; silence is fine. If you don't know something, say you don't know. "
