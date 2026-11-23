@@ -17499,6 +17499,65 @@ window.aceCheckForUpdates = function (install) {
   color:#000 !important;
 }
 </style>
+<script id="ace-chat-screenshot-paste">
+/* Paste a screenshot into the chat box (Ctrl+V or right-click -> Paste).
+   Uses ACEsi's existing attachment pipeline so pasted images become vision input. */
+(function () {
+  var input = document.getElementById("chat-input");
+  if (!input || input._aceShotPasteWired) return;
+  input._aceShotPasteWired = true;
+
+  function readImage(file, name) {
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve({
+          name: name,
+          type: (file.type || "image/png"),
+          size: file.size || 0,
+          isImage: true,
+          dataUrl: reader.result
+        });
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  input.addEventListener("paste", function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.kind === "file" && /^image\//i.test(it.type || "")) {
+        var f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (!files.length) return; // normal text paste - leave it alone
+    e.preventDefault();
+    var stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    Promise.all(files.map(function (f, idx) {
+      var name = "screenshot-" + stamp + (files.length > 1 ? "-" + (idx + 1) : "") + ".png";
+      return readImage(f, name);
+    })).then(function (loaded) {
+      loaded = loaded.filter(Boolean);
+      if (!loaded.length) return;
+      window.__acesiAttachments = (window.__acesiAttachments || []).concat(loaded);
+      window.dispatchEvent(new CustomEvent("acesi:attachments-changed", {
+        detail: { attachments: window.__acesiAttachments.slice() }
+      }));
+      var names = loaded.map(function (x) { return x.name; });
+      var prefix = input.value && !/\s$/.test(input.value) ? " " : "";
+      input.value = (input.value || "") + prefix + "[Attached: " + names.join(", ") + "] ";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+      if (window.showAceToast) window.showAceToast("Pasted screenshot: " + names.join(", "));
+    });
+  });
+})();
+</script>
 </body>
 
 </html>
