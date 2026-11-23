@@ -5700,7 +5700,19 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # providers stay in the chain as automatic fallback ONLY when
                 # Ollama is unavailable or local-only mode is disabled.
                 _ollama_entry = None
-                if _ollama_now and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
+                # If the user explicitly picked a cloud model, that choice wins:
+                # do NOT prepend Ollama. Previously Ollama ran first, burned the
+                # whole 50s deadline, and left every cloud fallback 0s -> all
+                # "deadline" failures with no answer at all.
+                _explicit_cloud = False
+                if preferred_model and os.environ.get("ACESI_OFFLINE", "0") == "0":
+                    _wp = _find_provider_for_model(preferred_model)
+                    if _wp and _wp[0] != "Ollama" and any(p[0] == _wp[0] for p in providers):
+                        _explicit_cloud = True
+                        providers = [p for p in providers if p[0] == _wp[0]] or providers
+                        print("[model-picker] %s -> using %s only (no Ollama first)"
+                              % (preferred_model, _wp[0]), flush=True)
+                if _ollama_now and not _explicit_cloud and not _image_request and not _ollama_task_too_big(user_message, llm_messages):
                     _ollama_entry = _ollama_chain_entry()
                     if _ollama_entry and any(p[0] == "Ollama" for p in providers):
                         _ollama_entry = None  # already present via preferred model

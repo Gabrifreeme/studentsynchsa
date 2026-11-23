@@ -10698,13 +10698,15 @@ async function sendMessage(reuseMsgId) {
         if (!text) return;
 
         currentAbortController = new AbortController();
-        // Hard stop at 50s - the local 7B cannot finish beyond this on this CPU,
-        // so fail fast instead of letting the timer run to 120s.
+        // Keep local Ollama short (it cannot finish past ~50s on this CPU), but
+        // give explicitly selected cloud models room to actually answer.
+        var _aceIsCloud = /^(gemini|openai\/|gpt|qwen\/|llama|claude)/i.test(getSelectedModel() || "");
+        var _aceCutoff = _aceIsCloud ? 180000 : 50000;
         var _aceTimeoutId = setTimeout(function () {
           if (window.currentAbortController === currentAbortController) {
             try { currentAbortController.abort(); } catch (e) {}
           }
-        }, 50000);
+        }, _aceCutoff);
         window.__aceChatTimeoutId = _aceTimeoutId;
         // Capture the signal once so every request in this flow (initial chat,
         // exec, follow-up chat) can be cancelled by the same Stop click.
