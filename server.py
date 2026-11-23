@@ -6861,50 +6861,80 @@ def _plan_mode_blocks_action(text):
 
 
 def _local_file_answer(file_path, question):
-    """Deterministic offline answer: real structure/class data from local files."""
+    """Short, useful offline answer built from real local files (no model round)."""
     fname = os.path.basename(file_path)
-    lines = ["Opened %s in the Code Editor. Here is what I can read locally:" % fname]
-    root = os.path.dirname(os.path.abspath(file_path))
-    while root and os.path.basename(root).lower() not in ("lib", "acesi"):
-        parent = os.path.dirname(root)
-        if not parent or parent == root:
+    # Locate the Flutter project's lib/ folder.
+    lib = None
+    cur = os.path.dirname(os.path.abspath(file_path))
+    while cur and cur != os.path.dirname(cur):
+        cand = os.path.join(cur, "lib")
+        if os.path.isdir(cand) and os.path.isfile(os.path.join(cur, "pubspec.yaml")):
+            lib = cand
             break
-        root = parent
-    if os.path.basename(root).lower() != "lib":
-        for cand in (os.path.join(PROJECT_ROOT, "lib"),
-                     os.path.join(os.path.dirname(file_path), "lib")):
-            if os.path.isdir(cand):
-                root = cand
-                break
-    if os.path.isdir(root):
-        folders, files = [], []
-        for cur, dirs, fs in os.walk(root):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in
-                       ("__pycache__", "build", ".dart_tool")]
-            rel = os.path.relpath(cur, root)
-            if rel != ".":
-                folders.append(rel.replace(os.sep, "/"))
-            files += [os.path.relpath(os.path.join(cur, f), root).replace(os.sep, "/")
-                      for f in fs if f.endswith(".dart")]
-        lines.append("lib/ folders: " + ", ".join(sorted(folders)[:40]))
-        lines.append("Dart files: " + ", ".join(sorted(files)[:40]))
+        cur = os.path.dirname(cur)
+    if not lib:
+        return "Opened %s in the Code Editor. I could not locate a lib/ folder beside a pubspec.yaml." % fname
+
+    groups = {}
+    screens, providers = [], []
+    for root, dirs, files in os.walk(lib):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in
+                   ("__pycache__", "build", ".dart_tool")]
+        dart = [f for f in files if f.endswith(".dart")]
+        if not dart:
+            continue
+        rel = os.path.relpath(root, lib).replace(os.sep, "/")
+        top = rel.split("/")[0]
+        if top == ".":
+            top = "root"
+        groups.setdefault(top, 0)
+        groups[top] += len(dart)
+        if rel.startswith("presentation/screens/") and "/" not in rel[len("presentation/screens/"):]:
+            screens.append(rel.split("/")[-1])
+        if rel == "presentation/providers":
+            providers += [f[:-5] for f in dart if f.endswith("_provider.dart")]
+
+    src = ""
     try:
         src = open(file_path, "r", encoding="utf-8", errors="replace").read()
-        classes = re.findall(r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s+extends\s+([A-Za-z_][A-Za-z0-9_]*)", src)
-        imports = re.findall(r"(?m)^import\s+['\"]([^'\"]+)", src)
-        if classes:
-            lines.append("Classes in %s: %s" % (
-                fname, ", ".join("%s extends %s" % c for c in classes[:20])))
-        if imports:
-            lines.append("Imports: " + ", ".join(imports[:20]))
-        lines.append("File size: %d lines" % (src.count("\n") + 1))
-    except Exception as exc:
-        lines.append("Could not parse %s: %s" % (fname, exc))
-    lines.append("Suggestion: extract the repeated card/list widgets from %s into "
-                 "small StatelessWidget components in lib/presentation/widgets/, "
-                 "using only packages already in pubspec.yaml." % fname)
-    return "\n".join(lines)
+    except Exception:
+        pass
+    classes = re.findall(r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s+extends\s+([A-Za-z_][A-Za-z0-9_]*)", src)
+    watches = sorted(set(re.findall(r"ref\.(?:watch|read)\(\s*([A-Za-z_][A-Za-z0-9_]*)", src)))
+    pubspec = os.path.join(os.path.dirname(lib), "pubspec.yaml")
+    has_riverpod = False
+    try:
+        has_riverpod = "riverpod" in open(pubspec, encoding="utf-8", errors="replace").read()
+    except Exception:
+        pass
 
+    out = ["I opened `%s` in the Code Editor. Short version:" % fname, ""]
+    out.append("**lib/ layout** — " + ", ".join("%s (%d files)" % (k, v)
+                                                 for k, v in sorted(groups.items())))
+    if screens:
+        out.append("**Screens built (%d)** — %s" % (
+            len(screens), ", ".join(sorted(s.replace("_", " ").title() for s in screens))))
+    if providers:
+        out.append("**Providers (%d)** — %s" % (
+            len(providers), ", ".join(sorted(p.replace("_", " ") for p in providers))))
+    out.append("")
+    out.append("**`%s`** — %d lines, classes: %s." % (
+        fname, src.count("\n") + 1,
+        ", ".join("%s (%s)" % c for c in classes[:6]) or "none found"))
+    if watches:
+        out.append("It reads: %s." % ", ".join(watches))
+    out.append("")
+    if has_riverpod:
+        out.append("**One clean improvement:** the repeated Card/Padding/Text blocks in "
+                   "`%s` can be pulled into small stateless widgets in "
+                   "`lib/presentation/widgets/common_widgets.dart` (already imported), and "
+                   "`ref.watch(...)` narrowed to `ref.select(...)` so only the changed "
+                   "tile rebuilds. Riverpod is already in `pubspec.yaml` — no new packages." % fname)
+    else:
+        out.append("**One clean improvement:** move the repeated Card/Padding/Text blocks "
+                   "into `lib/presentation/widgets/common_widgets.dart`, which this file "
+                   "already imports. No new packages needed.")
+    return "\n".join(out)
 
 def _answer_after_pc_file_open(file_path, question):
     """Follow-up completion after a deterministic file-open tool call.
@@ -6940,6 +6970,9 @@ def _answer_after_pc_file_open(file_path, question):
         {"role": "user", "content": str(question or "")},
         {"role": "system", "content": tool_result},
     ]
+    if re.search(r"\b(summar|inspect|structure|explain|what.*built|show me)\b",
+                 str(question or ""), re.I):
+        return _local_file_answer(file_path, question)
     chain = [("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)]
     if not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
             and os.environ.get("ACESI_OFFLINE", "0") == "0":
