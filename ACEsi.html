@@ -3565,6 +3565,14 @@ input::placeholder, textarea::placeholder {
     border:2px solid #ffa500 !important; border-radius:8px !important; cursor:pointer;
     font-family:"Roboto Mono",monospace !important; font-size:11px !important; }
   .ace-pref-btn:hover { background:#ffa500 !important; color:#000 !important; }
+
+  /* Dedicated detail page for each settings section */
+  .ace-detail-header { display:flex; align-items:center; gap:12px; margin:4px 6px 10px;
+    padding-bottom:8px; border-bottom:2px solid #ffa500; }
+  .ace-detail-back { color:#ffa500; font-family:"Roboto Mono",monospace; font-size:12px;
+    cursor:pointer; padding:4px 8px; border:2px solid #ffa500; border-radius:8px; }
+  .ace-detail-back:hover { background:#ffa500; color:#000; }
+  .ace-detail-title { color:#ffa500; font-family:"Roboto Mono",monospace; font-size:14px; font-weight:bold; }
   .ace-settings-nav { background:#0a0a0a; padding:8px 4px; border:2px solid #ffa500; border-radius:8px; }
   .ace-settings-back { display:flex; align-items:center; gap:8px; padding:8px 10px; color:#ffa500;
     font-family:"Roboto Mono",monospace; font-size:11px; cursor:pointer; }
@@ -4823,7 +4831,8 @@ git add -u (stage tracked)</label
 
         </div>
 
-        <div class="ace-settings-nav">
+        <div id="ace-nav-page">
+          <div class="ace-settings-nav">
           <div class="ace-settings-back" onclick="var p=document.getElementById('settings-panel');if(p)p.style.display='none'"><span>←</span> Back to app</div>
           <div class="ace-settings-search"><span>🔍</span><input type="text" placeholder="Search" aria-label="Search settings" /></div>
           <div class="ace-settings-nav-list">
@@ -4841,9 +4850,16 @@ git add -u (stage tracked)</label
         <div class="ace-nav-item" data-nav="experimental" onclick="aceSettingsNavClick('experimental')"><span class="ace-nav-ico">⚗️</span><span>Experimental</span></div>
         <div class="ace-nav-item" data-nav="about" onclick="aceSettingsNavClick('about')"><span class="ace-nav-ico">ℹ️</span><span>About</span></div>
           </div>
+          </div>
         </div>
 
-        <div id="ace-preferences-content" class="ace-preferences-content">
+        <div id="ace-detail-page" style="display:none">
+          <div class="ace-detail-header">
+            <div class="ace-detail-back" onclick="aceSettingsBackToNav()">← Back</div>
+            <div id="ace-detail-title" class="ace-detail-title"></div>
+          </div>
+
+          <div id="ace-preferences-content" class="ace-preferences-content">
           <div class="ace-pref-row">
             <label class="ace-toggle ace-pref-toggle">
               <input type="checkbox" id="spellcheck-enable" onchange="try{localStorage.setItem('ace_spellcheck',this.checked?'1':'0')}catch(e){}" />
@@ -4860,6 +4876,8 @@ git add -u (stage tracked)</label
         <div id="ace-generic-nav-content" class="ace-preferences-content" style="display:none">
           <div id="ace-generic-nav-title" class="ace-generic-title"></div>
           <div id="ace-generic-nav-desc" class="ace-generic-desc"></div>
+        </div>
+
         </div>
 
       </div>
@@ -17411,32 +17429,35 @@ window.aceSettingsNavClick = function (key) {
     items[i].classList.toggle('active', on);
     if (on) label = (items[i].textContent || '').trim();
   }
+  var navPage = document.getElementById('ace-nav-page');
+  var detail = document.getElementById('ace-detail-page');
+  if (navPage) navPage.style.display = 'none';
+  if (detail) detail.style.display = 'block';
+  var title = document.getElementById('ace-detail-title');
+  if (title) title.textContent = label;
   var pc = document.getElementById('ace-preferences-content');
   var gc = document.getElementById('ace-generic-nav-content');
-  var target = null;
   if (key === 'preferences') {
-    if (pc) { pc.style.display = 'block'; target = pc; }
+    if (pc) pc.style.display = 'block';
     if (gc) gc.style.display = 'none';
   } else {
     if (pc) pc.style.display = 'none';
-    if (gc) {
-      var title = document.getElementById('ace-generic-nav-title');
-      var desc = document.getElementById('ace-generic-nav-desc');
-      if (title) title.textContent = label;
-      if (desc) desc.textContent = label + ' settings will appear here.';
-      gc.style.display = 'block';
-      target = gc;
-    }
+    var gt = document.getElementById('ace-generic-nav-title');
+    var gd = document.getElementById('ace-generic-nav-desc');
+    if (gt) gt.textContent = label;
+    if (gd) gd.textContent = label + ' settings will appear here.';
+    if (gc) gc.style.display = 'block';
   }
-  // The nav list is tall; scroll the panel into view so the click is visibly live.
-  if (target) {
-    setTimeout(function () {
-      try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {
-        var p = document.getElementById('settings-panel');
-        if (p) p.scrollTop = target.offsetTop - 40;
-      }
-    }, 30);
-  }
+  var p = document.getElementById('settings-panel');
+  if (p) p.scrollTop = 0;
+};
+window.aceSettingsBackToNav = function () {
+  var navPage = document.getElementById('ace-nav-page');
+  var detail = document.getElementById('ace-detail-page');
+  if (detail) detail.style.display = 'none';
+  if (navPage) navPage.style.display = 'block';
+  var p = document.getElementById('settings-panel');
+  if (p) p.scrollTop = 0;
 };
 window.aceCheckForUpdates = function (install) {
   if (window.showAceToast) window.showAceToast(install ? 'Checking for updates...' : 'Checking for updates...', 'info', 3000);
