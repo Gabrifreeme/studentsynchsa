@@ -7155,26 +7155,33 @@ def _simple_style_fix_reply(message):
         return None, False
 
     marker = "/* ACEsi deterministic style fix: tab highlight + hover text */"
-    if marker in source:
-        return ("This is already fixed in ACEsi.html - no changes were needed.\n\n"
-                "Summary of Changes ✅ (files: ACEsi.html)\n"
-                "| Change | Before | After | Effect |\n"
-                "| --- | --- | --- | --- |\n"
-                "| Settings tab highlight | already correct | unchanged | no change needed |\n"
-                "| Add/Edit Prompt hover text | already black on amber | unchanged | no change needed |\n\n"
-                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
-
     css = (
         "\n<style id=\"ace-deterministic-style-fix\">\n"
         + marker + "\n"
-        "  #settings-panel button[data-tab]:not(.active) { background:#000 !important; }\n"
+        "  #settings-panel button[data-tab]:not(.active) { background:#000 !important; color:#ffa500 !important; }\n"
         "  #settings-panel button[data-tab].active { background:#ffa500 !important; color:#000 !important; }\n"
         "  #settings-panel button[onclick=\"openPromptManager()\"]:hover,\n"
-        "  #settings-panel button[title=\"Add/Edit Prompts\"]:hover {\n"
+        "  #settings-panel button[title=\"Add/Edit Prompts\"]:hover,\n"
+        "  #settings-panel button[title=\"Close Settings\"]:hover {\n"
         "    background:#ffa500 !important; color:#000 !important;\n"
         "  }\n"
         "</style>\n"
     )
+
+    old_block = re.search(
+        r'\n?<style id="ace-deterministic-style-fix">.*?</style>\n?', source, re.I | re.S)
+    if old_block:
+        if 'button[title="Close Settings"]:hover' in old_block.group(0):
+            return ("This is already fixed in ACEsi.html - no changes were needed.\n\n"
+                    "Summary of Changes ✅ (files: ACEsi.html)\n"
+                    "| Change | Before | After | Effect |\n"
+                    "| --- | --- | --- | --- |\n"
+                    "| Settings tab highlight | already correct | unchanged | no change needed |\n"
+                    "| Add/Edit Prompt hover text | already black on amber | unchanged | no change needed |\n"
+                    "| Close X hover text | already black on amber | unchanged | no change needed |\n\n"
+                    "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
+        source = source[:old_block.start()] + source[old_block.end():]
+
     if "</body>" not in source:
         return None, False
     updated = source.replace("</body>", css + "</body>", 1)
@@ -7191,12 +7198,13 @@ def _simple_style_fix_reply(message):
         "| --- | --- | --- | --- |",
         "| Settings tab highlight | stuck on System Prompt | follows selected tab | applied highlight fix |",
         "| Add/Edit Prompt hover text | amber on amber | black on amber | applied hover fix |",
+        "| Close X hover text | amber on amber | black on amber | applied hover fix |",
     ]
     bullets = [
         "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).",
         "- Side effects: %s" % ("git %s" % sha if sha else "file written on disk"),
     ]
-    reply = ("Fixed the Settings tab highlight and the Add/Edit Prompt hover text.\n\n%s\n%s\n%s"
+    reply = ("Fixed the Settings tab highlight, Add/Edit Prompt hover text, and Close X hover text.\n\n%s\n%s\n%s"
              % (head, "\n".join(rows), "\n".join(bullets)))
     return reply, True
 

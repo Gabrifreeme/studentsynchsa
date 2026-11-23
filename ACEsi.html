@@ -17470,10 +17470,11 @@ window.aceCheckForUpdates = function (install) {
 
 <style id="ace-deterministic-style-fix">
 /* ACEsi deterministic style fix: tab highlight + hover text */
-  #settings-panel button[data-tab]:not(.active) { background:#000 !important; }
+  #settings-panel button[data-tab]:not(.active) { background:#000 !important; color:#ffa500 !important; }
   #settings-panel button[data-tab].active { background:#ffa500 !important; color:#000 !important; }
   #settings-panel button[onclick="openPromptManager()"]:hover,
-  #settings-panel button[title="Add/Edit Prompts"]:hover {
+  #settings-panel button[title="Add/Edit Prompts"]:hover,
+  #settings-panel button[title="Close Settings"]:hover {
     background:#ffa500 !important; color:#000 !important;
   }
 </style>
