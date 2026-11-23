@@ -17732,6 +17732,52 @@ window.aceCheckForUpdates = function (install) {
   };
 })();
 </script>
+<script id="ace-generic-settings-page">
+/* ACEsi generic settings page builder */
+(function () {
+  var detail = document.getElementById('ace-detail-page');
+  if (!detail) return;
+  var ids = { Experimental: 'experimental', About: 'about', Appearance: 'appearance',
+    Shortcuts: 'shortcuts', Providers: 'providers', Models: 'models', Extensions: 'extensions',
+    Projects: 'projects', Worktrees: 'worktrees' };
+  Object.keys(ids).forEach(function (title) {
+    var id = 'ace-page-' + ids[title];
+    if (document.getElementById(id)) return;
+    var box = document.createElement('div');
+    box.id = id;
+    box.className = 'ace-preferences-content';
+    box.style.cssText = 'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;';
+    var extra = '';
+    if (title === 'Experimental') {
+      extra = '<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin:8px 0;">Try experimental features</div>' +
+        '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 4px;">Experimental virtual console</div>' +
+        '<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Allow using Shift + Enter to split the last selected text, including the current selection</div>' +
+        '<button type="button" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Over the top</button>' +
+        '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">New features</div>' +
+        '<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">' +
+        '<input type="checkbox" id="ace-exp-inline-terminal" checked style="margin-right:4px;width:auto;"><span class="ace-switch"></span>' +
+        '<span>New inline terminal<br><span style="color:#ff9d00;font-size:10px;">A single integrated terminal that opens when asked for Web, with a native terminal like the one in VS Code.</span></span></label>' +
+        '<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">' +
+        '<input type="checkbox" id="ace-exp-inline-ui" checked style="margin-right:4px;width:auto;"><span class="ace-switch"></span>' +
+        '<span>New inline UI<br><span style="color:#ff9d00;font-size:10px;">Enable the new inline user interface features.</span></span></label>';
+    }
+    box.innerHTML = '<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:8px;">' + title + '</div>' +
+      '<div style="color:#ff9d00;font-family:monospace;font-size:10px;">' + title + ' settings are configured here.</div>' + extra;
+    detail.appendChild(box);
+  });
+
+  var orig = window.aceSettingsNavClick;
+  window.aceSettingsNavClick = function (key) {
+    if (typeof orig === 'function') orig(key);
+    var generic = document.getElementById('ace-generic-nav-content');
+    if (generic) generic.style.display = (key === 'other') ? 'none' : generic.style.display;
+    Object.keys(ids).forEach(function (t) {
+      var el = document.getElementById('ace-page-' + ids[t]);
+      if (el) el.style.display = (ids[t] === key) ? 'block' : 'none';
+    });
+  };
+})();
+</script>
 </body>
 
 </html>

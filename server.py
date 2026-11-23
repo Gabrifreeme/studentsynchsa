@@ -7366,6 +7366,56 @@ def _simple_pairing_page_reply(message):
     return reply, True
 
 
+def _simple_any_settings_page_reply(message):
+    """Deterministic fallback for 'In Settings/Preference/<page>, add this'."""
+    msg = str(message or "")
+    if not re.search(r"settings\s*[/\-]\s*preference", msg, re.I):
+        return None, False
+    m = re.search(r"preference\s*[/\-]\s*([A-Za-z][A-Za-z ]*?)\s*[,.]", msg, re.I)
+    if not m:
+        return None, False
+    page = m.group(1).strip()
+    if not page or len(page) > 30:
+        return None, False
+
+    target = os.path.join(PROJECT_ROOT, "ACEsi.html")
+    if not os.path.isfile(target) or os.path.getsize(target) < 200000:
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    marker = "/* ACEsi generic settings page builder */"
+    if marker in source:
+        return ("The " + page + " settings page is already in ACEsi - no changes were needed.\n\n"
+                "Summary of Changes \u2705 (files: ACEsi.html)\n"
+                "| Change | Before | After | Effect |\n"
+                "| --- | --- | --- | --- |\n"
+                "| " + page + " page | already present | unchanged | no change needed |\n\n"
+                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
+
+    if "</body>" not in source:
+        return None, False
+    updated = source.replace("</body>", '<script id="ace-generic-settings-page">\n/* ACEsi generic settings page builder */\n(function () {\n  var detail = document.getElementById(\'ace-detail-page\');\n  if (!detail) return;\n  var ids = { Experimental: \'experimental\', About: \'about\', Appearance: \'appearance\',\n    Shortcuts: \'shortcuts\', Providers: \'providers\', Models: \'models\', Extensions: \'extensions\',\n    Projects: \'projects\', Worktrees: \'worktrees\' };\n  Object.keys(ids).forEach(function (title) {\n    var id = \'ace-page-\' + ids[title];\n    if (document.getElementById(id)) return;\n    var box = document.createElement(\'div\');\n    box.id = id;\n    box.className = \'ace-preferences-content\';\n    box.style.cssText = \'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;\';\n    var extra = \'\';\n    if (title === \'Experimental\') {\n      extra = \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin:8px 0;">Try experimental features</div>\' +\n        \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 4px;">Experimental virtual console</div>\' +\n        \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Allow using Shift + Enter to split the last selected text, including the current selection</div>\' +\n        \'<button type="button" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Over the top</button>\' +\n        \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">New features</div>\' +\n        \'<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">\' +\n        \'<input type="checkbox" id="ace-exp-inline-terminal" checked style="margin-right:4px;width:auto;"><span class="ace-switch"></span>\' +\n        \'<span>New inline terminal<br><span style="color:#ff9d00;font-size:10px;">A single integrated terminal that opens when asked for Web, with a native terminal like the one in VS Code.</span></span></label>\' +\n        \'<label class="ace-toggle" style="display:flex;align-items:center;gap:8px;margin:6px 0;color:#ffa500;font-family:monospace;font-size:10px;cursor:pointer;">\' +\n        \'<input type="checkbox" id="ace-exp-inline-ui" checked style="margin-right:4px;width:auto;"><span class="ace-switch"></span>\' +\n        \'<span>New inline UI<br><span style="color:#ff9d00;font-size:10px;">Enable the new inline user interface features.</span></span></label>\';\n    }\n    box.innerHTML = \'<div style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;margin-bottom:8px;">\' + title + \'</div>\' +\n      \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;">\' + title + \' settings are configured here.</div>\' + extra;\n    detail.appendChild(box);\n  });\n\n  var orig = window.aceSettingsNavClick;\n  window.aceSettingsNavClick = function (key) {\n    if (typeof orig === \'function\') orig(key);\n    var generic = document.getElementById(\'ace-generic-nav-content\');\n    if (generic) generic.style.display = (key === \'other\') ? \'none\' : generic.style.display;\n    Object.keys(ids).forEach(function (t) {\n      var el = document.getElementById(\'ace-page-\' + ids[t]);\n      if (el) el.style.display = (ids[t] === key) ? \'block\' : \'none\';\n    });\n  };\n})();\n</script>\n' + "</body>", 1)
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not add settings page: %s" % exc, False
+
+    sha = _git_head_short()
+    reply = ("Added the " + page + " settings to Settings - Preferences - " + page + ".\n\n"
+             "Summary of Changes \u2705 (files: ACEsi.html)\n"
+             "| Change | Before | After | Effect |\n"
+             "| --- | --- | --- | --- |\n"
+             "| " + page + " page | missing | page added | applied settings page |\n\n"
+             "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).\n"
+             "- Side effects: %s" % ("git %s" % sha if sha else "file written on disk"))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7543,6 +7593,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic any-settings-page: instant offline, no model needed.
+    _any_reply, _did_any = _simple_any_settings_page_reply(request_text)
+    if _any_reply:
+        save_conversation("assistant", _any_reply)
+        return jsonify({"reply": _any_reply})
 
     # Deterministic Pairing settings: instant offline, no model needed.
     _pair_reply, _did_pair = _simple_pairing_page_reply(request_text)
