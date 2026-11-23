@@ -5064,6 +5064,7 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
     Rounds cap so a stuck model still terminates.
     Publishes live work-steps to _AGENT so the frontend (which polls
     /opencode/status) renders progress inline, exactly like run_agent does."""
+    global OLLAMA_ENABLED
     # Fresh provider-failure diagnostics for THIS dispatch only.
     _prov_reset()
     _prov_spend()
@@ -5607,6 +5608,8 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                         timeout=(1, 2)).ok)
                 except Exception:
                     pass
+                if _ollama_now and not OLLAMA_ENABLED:
+                    OLLAMA_ENABLED = True  # refresh the stale import-time flag
                 _local_only = ((_ollama_now and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")
                                or os.environ.get("ACESI_OFFLINE", "0") != "0")
                 # LOCAL-FIRST: Ollama (qwen2.5:7b) is the FIRST choice. Cloud
@@ -5630,6 +5633,11 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     if _local_providers:
                         providers = _local_providers
                         print("[local-only] cloud providers disabled; using Ollama only")
+                    elif _ollama_now:
+                        _oe = _ollama_chain_entry()
+                        if _oe:
+                            providers = [_oe]
+                            print("[local-only] Ollama added as sole provider")
 
                 if _image_request and not _img_raced:
                     # Race both Gemini models at once. A stuck Flash call used to
@@ -6852,6 +6860,58 @@ def _plan_mode_blocks_action(text):
     return bool(_PLAN_ACTION_RE.search(text))
 
 
+def _answer_after_pc_file_open(file_path, question):
+    """Follow-up completion after a deterministic file-open tool call.
+
+    The PC-file fast path emits the editor popup immediately, but must NOT end
+    the turn with only "Opened X in the Code Editor." — the tool's result (the
+    file contents) is appended as a system/tool message and one more completion
+    pass writes the actual answer. Local Ollama first, cloud only as fallback.
+    """
+    fname = os.path.basename(file_path)
+    content = ""
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf'):
+            content = "[%s opened in the Code Editor — binary preview, no plain text]" % fname
+        else:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as fh:
+                content = fh.read()[:14000]
+    except Exception as exc:
+        content = "(file content unavailable: %s)" % exc
+
+    tool_result = (
+        "TOOL RESULT — open_user_file(%s): opened successfully in the Code Editor.\n"
+        "<file content>\n%s\n</file content>" % (file_path, content)
+    )
+    follow_msgs = [
+        {"role": "system", "content":
+            "You are ACEsi. The user asked a question that required opening a file. "
+            "The file was opened and its contents are in the tool result below. "
+            "Read that result and answer the user's question completely and concretely, "
+            "referencing real code/values from the file. Do not say only that the file "
+            "was opened; do not claim you cannot read it."},
+        {"role": "user", "content": str(question or "")},
+        {"role": "system", "content": tool_result},
+    ]
+    chain = [("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)]
+    if not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
+            and os.environ.get("ACESI_OFFLINE", "0") == "0":
+        chain.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL))
+    for name, endpoint, api_key, model in chain:
+        try:
+            got = _chat_one(name, endpoint, api_key, model, follow_msgs,
+                            tools_schema=[], tool_choice="none", timeout=(10, 60))
+        except Exception as exc:
+            print("[ACE-DISPATCH] follow-up via %s failed: %s" % (name, exc), flush=True)
+            continue
+        if got and got[0] and str(got[0]).strip():
+            return str(got[0]).strip()
+    return "Opened %s in the Code Editor. I could not generate a text answer right now." % fname
+
+
+
+
 @app.route('/chat', methods=['POST'])
 @require_token
 def chat():
@@ -7038,56 +7098,6 @@ def chat():
     if _follow_reply:
         save_conversation("assistant", _follow_reply)
         return jsonify({"reply": _follow_reply})
-
-def _answer_after_pc_file_open(file_path, question):
-    """Follow-up completion after a deterministic file-open tool call.
-
-    The PC-file fast path emits the editor popup immediately, but must NOT end
-    the turn with only "Opened X in the Code Editor." — the tool's result (the
-    file contents) is appended as a system/tool message and one more completion
-    pass writes the actual answer. Local Ollama first, cloud only as fallback.
-    """
-    fname = os.path.basename(file_path)
-    content = ""
-    try:
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.pdf'):
-            content = "[%s opened in the Code Editor — binary preview, no plain text]" % fname
-        else:
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as fh:
-                content = fh.read()[:14000]
-    except Exception as exc:
-        content = "(file content unavailable: %s)" % exc
-
-    tool_result = (
-        "TOOL RESULT — open_user_file(%s): opened successfully in the Code Editor.\n"
-        "<file content>\n%s\n</file content>" % (file_path, content)
-    )
-    follow_msgs = [
-        {"role": "system", "content":
-            "You are ACEsi. The user asked a question that required opening a file. "
-            "The file was opened and its contents are in the tool result below. "
-            "Read that result and answer the user's question completely and concretely, "
-            "referencing real code/values from the file. Do not say only that the file "
-            "was opened; do not claim you cannot read it."},
-        {"role": "user", "content": str(question or "")},
-        {"role": "system", "content": tool_result},
-    ]
-    chain = [("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)]
-    if not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
-            and os.environ.get("ACESI_OFFLINE", "0") == "0":
-        chain.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL))
-    for name, endpoint, api_key, model in chain:
-        try:
-            got = _chat_one(name, endpoint, api_key, model, follow_msgs,
-                            tools_schema=[], tool_choice="none", timeout=(10, 60))
-        except Exception as exc:
-            print("[ACE-DISPATCH] follow-up via %s failed: %s" % (name, exc), flush=True)
-            continue
-        if got and got[0] and str(got[0]).strip():
-            return str(got[0]).strip()
-    return "Opened %s in the Code Editor. I could not generate a text answer right now." % fname
-
 
     # Deterministic PC-file open. Instructions like "Go to D:/Pictures/
     # Screenshots find the file flyfly.png and open it." are NOT device
