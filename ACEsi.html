@@ -3579,7 +3579,7 @@ input::placeholder, textarea::placeholder {
     }
 
     // Convert the two checkboxes into toggle switches (keep IDs for existing JS)
-    ['show-toolbar', 'ntfy-enable'].forEach(function (id) {
+    ['devtools-enable', 'ntfy-enable'].forEach(function (id) {
       var cb = document.getElementById(id);
       if (!cb) return;
       var lbl = cb.closest('label');
@@ -3591,6 +3591,17 @@ input::placeholder, textarea::placeholder {
         cb.parentNode.insertBefore(sw, cb.nextSibling);
       }
     });
+
+    // DevTools slider follows the panel state (also toggled by Ctrl+Alt+D or its close button)
+    var devCb = document.getElementById('devtools-enable');
+    var dtPanel = document.getElementById('devtool-plus-panel');
+    if (devCb && dtPanel) {
+      devCb.checked = !!dtPanel.open;
+      if (window.MutationObserver) {
+        new MutationObserver(function () { devCb.checked = !!dtPanel.open; })
+          .observe(dtPanel, { attributes: true, attributeFilter: ['open'] });
+      }
+    }
 
     // "Save All Settings" and the bottom "Close" button were removed from the
     // HTML (Close is now the sticky X at the top-right); "Save Prompt" lives
@@ -4882,15 +4893,15 @@ git add -u (stage tracked)</label
 
               type="checkbox"
 
-              id="show-toolbar"
+              id="devtools-enable"
 
               style="margin-right: 4px; width: auto"
 
-              onclick="toggleDeveloperToolbar()"
+              onchange="if(window.toggleDevToolPlus)window.toggleDevToolPlus(this.checked)"
 
             />
 
-            Show Developer Toolbar
+            DevTools
 
           </label>
 
@@ -5741,33 +5752,7 @@ perspective: 900px;
               📄
 
             </button>
-
-            <button
-
-              id="devtool-plus-btn"
-
-              class="btn"
-
-              data-tooltip="DevTool+"
-
-              style="
-                background: #000;
-                color: #ff9d00;
-                border: 1px solid #ffa500;
-                padding: 3px 7px;
-                font-size: 13px;
-                margin-bottom: 0px;
-              "
-
-              onclick="window.toggleDevToolPlus && window.toggleDevToolPlus()"
-
-            >
-
-              🧰
-
-            </button>
-
-            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
+<button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
 
           </div>
 
