@@ -3171,17 +3171,21 @@ input::placeholder, textarea::placeholder {
 .ace-comp-dropdown-menu button:hover, .ace-comp-dropdown-menu button:focus {
   background:#ffa500; color:#000; border-color:#ffa500;
 }
-/* Server spinner: far right of the Code Editor toolbar */
+/* Server spinner: far right of the Code Editor toolbar.
+   The header needs a z-index above #code-editor (z:3), otherwise the tooltip
+   is painted behind the editor and cannot be read. */
+#code-panel .panel-header { z-index: 10 !important; }
 #model-spinner {
   position:absolute !important; right:8px !important; top:50% !important;
   transform:translateY(-50%) !important; margin:0 !important;
 }
+/* Open the tooltip to the LEFT of the spinner, centered inside the header. */
 #model-spinner::after {
   content:attr(data-tooltip);
-  position:absolute; right:0; top:calc(100% + 6px);
+  position:absolute; right:calc(100% + 10px); top:50%; transform:translateY(-50%);
   background:#ffa500; color:#000; border:1px solid #ffa500;
-  border-radius:6px; padding:3px 8px; font-family:inherit; font-size:11px;
-  white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s;
+  border-radius:6px; padding:4px 9px; font-family:inherit; font-size:11px;
+  font-weight:bold; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s;
   z-index:9999;
 }
 #model-spinner:hover::after { opacity:1; }
