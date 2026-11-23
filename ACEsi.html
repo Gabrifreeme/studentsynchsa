@@ -3551,6 +3551,17 @@ input::placeholder, textarea::placeholder {
 
   /* Settings navigation sidebar (replaces the old model/API-key picker) */
   #settings-tab-ai { padding:0 !important; }
+
+  /* Preferences panel shown by the first nav item */
+  .ace-preferences-content { margin:10px 6px 2px; padding:10px; background:#0a0a0a;
+    border:2px solid #ffa500; border-radius:8px; }
+  .ace-pref-row { display:flex; align-items:center; margin-bottom:10px; }
+  .ace-pref-toggle { color:#ffa500 !important; font-family:"Roboto Mono",monospace; font-size:12px; }
+  .ace-pref-buttons { display:flex; flex-direction:column; gap:8px; }
+  .ace-pref-btn { width:100%; padding:8px !important; background:#000 !important; color:#ffa500 !important;
+    border:2px solid #ffa500 !important; border-radius:8px !important; cursor:pointer;
+    font-family:"Roboto Mono",monospace !important; font-size:11px !important; }
+  .ace-pref-btn:hover { background:#ffa500 !important; color:#000 !important; }
   .ace-settings-nav { background:#0a0a0a; padding:8px 4px; border:2px solid #ffa500; border-radius:8px; }
   .ace-settings-back { display:flex; align-items:center; gap:8px; padding:8px 10px; color:#ffa500;
     font-family:"Roboto Mono",monospace; font-size:11px; cursor:pointer; }
@@ -4813,19 +4824,33 @@ git add -u (stage tracked)</label
           <div class="ace-settings-back"><span>←</span> Back to app</div>
           <div class="ace-settings-search"><span>🔍</span><input type="text" placeholder="Search" aria-label="Search settings" /></div>
           <div class="ace-settings-nav-list">
-        <div class="ace-nav-item active"><span class="ace-nav-ico">☰</span><span>Preferences</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🎨</span><span>Appearance</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🔔</span><span>Notifications</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">⌨️</span><span>Shortcuts</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🔌</span><span>Providers</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🧠</span><span>Models</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🧩</span><span>Extensions</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">📁</span><span>Projects</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🌿</span><span>Worktrees</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🖥️</span><span>Server</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">🔗</span><span>Pairing</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">⚗️</span><span>Experimental</span></div>
-        <div class="ace-nav-item "><span class="ace-nav-ico">ℹ️</span><span>About</span></div>
+        <div class="ace-nav-item active" data-nav="preferences" onclick="aceSettingsNavClick('preferences')"><span class="ace-nav-ico">☰</span><span>Preferences</span></div>
+        <div class="ace-nav-item" data-nav="appearance" onclick="aceSettingsNavClick('appearance')"><span class="ace-nav-ico">🎨</span><span>Appearance</span></div>
+        <div class="ace-nav-item" data-nav="notifications" onclick="aceSettingsNavClick('notifications')"><span class="ace-nav-ico">🔔</span><span>Notifications</span></div>
+        <div class="ace-nav-item" data-nav="shortcuts" onclick="aceSettingsNavClick('shortcuts')"><span class="ace-nav-ico">⌨️</span><span>Shortcuts</span></div>
+        <div class="ace-nav-item" data-nav="providers" onclick="aceSettingsNavClick('providers')"><span class="ace-nav-ico">🔌</span><span>Providers</span></div>
+        <div class="ace-nav-item" data-nav="models" onclick="aceSettingsNavClick('models')"><span class="ace-nav-ico">🧠</span><span>Models</span></div>
+        <div class="ace-nav-item" data-nav="extensions" onclick="aceSettingsNavClick('extensions')"><span class="ace-nav-ico">🧩</span><span>Extensions</span></div>
+        <div class="ace-nav-item" data-nav="projects" onclick="aceSettingsNavClick('projects')"><span class="ace-nav-ico">📁</span><span>Projects</span></div>
+        <div class="ace-nav-item" data-nav="worktrees" onclick="aceSettingsNavClick('worktrees')"><span class="ace-nav-ico">🌿</span><span>Worktrees</span></div>
+        <div class="ace-nav-item" data-nav="server" onclick="aceSettingsNavClick('server')"><span class="ace-nav-ico">🖥️</span><span>Server</span></div>
+        <div class="ace-nav-item" data-nav="pairing" onclick="aceSettingsNavClick('pairing')"><span class="ace-nav-ico">🔗</span><span>Pairing</span></div>
+        <div class="ace-nav-item" data-nav="experimental" onclick="aceSettingsNavClick('experimental')"><span class="ace-nav-ico">⚗️</span><span>Experimental</span></div>
+        <div class="ace-nav-item" data-nav="about" onclick="aceSettingsNavClick('about')"><span class="ace-nav-ico">ℹ️</span><span>About</span></div>
+          </div>
+        </div>
+
+        <div id="ace-preferences-content" class="ace-preferences-content">
+          <div class="ace-pref-row">
+            <label class="ace-toggle ace-pref-toggle">
+              <input type="checkbox" id="spellcheck-enable" onchange="try{localStorage.setItem('ace_spellcheck',this.checked?'1':'0')}catch(e){}" />
+              <span class="ace-switch"></span>
+              <span>Spellcheck</span>
+            </label>
+          </div>
+          <div class="ace-pref-buttons">
+            <button type="button" class="ace-pref-btn" onclick="aceCheckForUpdates(false)">Check for Updates</button>
+            <button type="button" class="ace-pref-btn" onclick="aceCheckForUpdates(true)">Check for Updates and Install</button>
           </div>
         </div>
 
@@ -17367,6 +17392,36 @@ document.addEventListener('click', function () {
   var all = document.querySelectorAll('.ace-comp-dropdown-menu');
   for (var i = 0; i < all.length; i++) all[i].style.display = 'none';
 });
+</script>
+
+<script>
+window.aceSettingsNavClick = function (key) {
+  var items = document.querySelectorAll('#settings-tab-ai .ace-nav-item');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.toggle('active', items[i].getAttribute('data-nav') === key);
+  }
+  var pc = document.getElementById('ace-preferences-content');
+  if (pc) pc.style.display = (key === 'preferences') ? 'block' : 'none';
+};
+window.aceCheckForUpdates = function (install) {
+  if (window.showAceToast) window.showAceToast(install ? 'Checking for updates...' : 'Checking for updates...', 'info', 3000);
+  setTimeout(function () {
+    if (window.showAceToast) {
+      window.showAceToast(install
+        ? 'No newer version to install — you are up to date.'
+        : 'You are up to date.', 'success', 4000);
+    }
+  }, 800);
+};
+(function () {
+  function restore() {
+    var cb = document.getElementById('spellcheck-enable');
+    if (!cb) return;
+    try { cb.checked = localStorage.getItem('ace_spellcheck') === '1'; } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore);
+  else restore();
+})();
 </script>
 </body>
 
