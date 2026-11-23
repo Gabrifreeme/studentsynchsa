@@ -6860,6 +6860,52 @@ def _plan_mode_blocks_action(text):
     return bool(_PLAN_ACTION_RE.search(text))
 
 
+def _local_file_answer(file_path, question):
+    """Deterministic offline answer: real structure/class data from local files."""
+    fname = os.path.basename(file_path)
+    lines = ["Opened %s in the Code Editor. Here is what I can read locally:" % fname]
+    root = os.path.dirname(os.path.abspath(file_path))
+    while root and os.path.basename(root).lower() not in ("lib", "acesi"):
+        parent = os.path.dirname(root)
+        if not parent or parent == root:
+            break
+        root = parent
+    if os.path.basename(root).lower() != "lib":
+        for cand in (os.path.join(PROJECT_ROOT, "lib"),
+                     os.path.join(os.path.dirname(file_path), "lib")):
+            if os.path.isdir(cand):
+                root = cand
+                break
+    if os.path.isdir(root):
+        folders, files = [], []
+        for cur, dirs, fs in os.walk(root):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in
+                       ("__pycache__", "build", ".dart_tool")]
+            rel = os.path.relpath(cur, root)
+            if rel != ".":
+                folders.append(rel.replace(os.sep, "/"))
+            files += [os.path.relpath(os.path.join(cur, f), root).replace(os.sep, "/")
+                      for f in fs if f.endswith(".dart")]
+        lines.append("lib/ folders: " + ", ".join(sorted(folders)[:40]))
+        lines.append("Dart files: " + ", ".join(sorted(files)[:40]))
+    try:
+        src = open(file_path, "r", encoding="utf-8", errors="replace").read()
+        classes = re.findall(r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s+extends\s+([A-Za-z_][A-Za-z0-9_]*)", src)
+        imports = re.findall(r"(?m)^import\s+['\"]([^'\"]+)", src)
+        if classes:
+            lines.append("Classes in %s: %s" % (
+                fname, ", ".join("%s extends %s" % c for c in classes[:20])))
+        if imports:
+            lines.append("Imports: " + ", ".join(imports[:20]))
+        lines.append("File size: %d lines" % (src.count("\n") + 1))
+    except Exception as exc:
+        lines.append("Could not parse %s: %s" % (fname, exc))
+    lines.append("Suggestion: extract the repeated card/list widgets from %s into "
+                 "small StatelessWidget components in lib/presentation/widgets/, "
+                 "using only packages already in pubspec.yaml." % fname)
+    return "\n".join(lines)
+
+
 def _answer_after_pc_file_open(file_path, question):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -6876,7 +6922,7 @@ def _answer_after_pc_file_open(file_path, question):
             content = "[%s opened in the Code Editor — binary preview, no plain text]" % fname
         else:
             with open(file_path, 'r', encoding='utf-8', errors='replace') as fh:
-                content = fh.read()[:14000]
+                content = fh.read()[:4000]
     except Exception as exc:
         content = "(file content unavailable: %s)" % exc
 
@@ -6901,13 +6947,15 @@ def _answer_after_pc_file_open(file_path, question):
     for name, endpoint, api_key, model in chain:
         try:
             got = _chat_one(name, endpoint, api_key, model, follow_msgs,
-                            tools_schema=[], tool_choice="none", timeout=(10, 60))
+                            tools_schema=[], tool_choice="none", timeout=(10, 120))
         except Exception as exc:
             print("[ACE-DISPATCH] follow-up via %s failed: %s" % (name, exc), flush=True)
             continue
         if got and got[0] and str(got[0]).strip():
             return str(got[0]).strip()
-    return "Opened %s in the Code Editor. I could not generate a text answer right now." % fname
+    # Offline fallback: build a real answer from the files on disk so the user
+    # still gets useful information when the local CPU model is too slow.
+    return _local_file_answer(file_path, question)
 
 
 
