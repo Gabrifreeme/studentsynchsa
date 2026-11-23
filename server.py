@@ -7264,6 +7264,57 @@ def _simple_notifications_add_reply(message):
     return reply, True
 
 
+def _simple_server_page_reply(message):
+    """Deterministic 'add Server settings' path for offline mode."""
+    msg = str(message or "")
+    if not re.search(r"\bserver\b", msg, re.I):
+        return None, False
+    if not re.search(r"\b(add|these|this|enable|set\s+up)\b", msg, re.I):
+        return None, False
+
+    target = os.path.join(PROJECT_ROOT, "ACEsi.html")
+    if not os.path.isfile(target) or os.path.getsize(target) < 200000:
+        return None, False
+    try:
+        with open(target, "r", encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except Exception:
+        return None, False
+
+    marker = "/* ACEsi deterministic server page */"
+    if marker in source:
+        return ("The Server settings are already in ACEsi - no changes were needed.\n\n"
+                "Summary of Changes \u2705 (files: ACEsi.html)\n"
+                "| Change | Before | After | Effect |\n"
+                "| --- | --- | --- | --- |\n"
+                "| Server settings page | already present | unchanged | no change needed |\n\n"
+                "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly)."), False
+
+    if "</body>" not in source:
+        return None, False
+    updated = source.replace("</body>", '<script id="ace-server-page">\n/* ACEsi deterministic server page */\n(function () {\n  var detail = document.getElementById(\'ace-detail-page\');\n  if (!detail || document.getElementById(\'ace-server-content\')) return;\n\n  var box = document.createElement(\'div\');\n  box.id = \'ace-server-content\';\n  box.className = \'ace-preferences-content\';\n  box.style.cssText = \'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;\';\n\n  var html = \'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">\' +\n    \'<span style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;">Server</span>\' +\n    \'<button type="button" id="ace-server-add" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Add server</button>\' +\n    \'</div>\' +\n    \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:8px;">Manage server connections</div>\' +\n    \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 6px;">Connection</div>\' +\n    \'<input type="text" id="ace-server-host" placeholder="my-account:org" style="width:100%;box-sizing:border-box;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:6px;font-family:monospace;font-size:11px;">\' +\n    \'<button type="button" id="ace-server-test" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Test connection</button>\' +\n    \'<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">Terminal shell</div>\' +\n    \'<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Use built-in or external tools.</div>\' +\n    \'<button type="button" id="ace-server-autodetect" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Auto Detect</button>\';\n\n  box.innerHTML = html;\n  detail.appendChild(box);\n\n  var orig = window.aceSettingsNavClick;\n  window.aceSettingsNavClick = function (key) {\n    if (typeof orig === \'function\') orig(key);\n    var generic = document.getElementById(\'ace-generic-nav-content\');\n    if (key === \'server\' && generic) generic.style.display = \'none\';\n    box.style.display = (key === \'server\') ? \'block\' : \'none\';\n  };\n})();\n</script>\n' + "</body>", 1)
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    except Exception as exc:
+        return "Could not add Server settings: %s" % exc, False
+
+    sha = _git_head_short()
+    rows = [
+        "| Change | Before | After | Effect |",
+        "| --- | --- | --- | --- |",
+        "| Server page | missing | page added | applied server page |",
+        "| Connection | missing | host + test button | applied server page |",
+        "| Terminal shell | missing | Auto Detect button | applied server page |",
+    ]
+    reply = ("Added the Server settings to Settings - Preferences - Server.\n\n"
+             "Summary of Changes \u2705 (files: ACEsi.html)\n%s\n\n"
+             "- Routing: qwen2.5:7b / Ollama (local first; cloud only if selected explicitly).\n"
+             "- Side effects: %s" %
+             ("\n".join(rows), "git %s" % sha if sha else "file written on disk"))
+    return reply, True
+
+
 def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
@@ -7441,6 +7492,12 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic Server settings: instant offline, no model needed.
+    _srv_reply, _did_srv = _simple_server_page_reply(request_text)
+    if _srv_reply:
+        save_conversation("assistant", _srv_reply)
+        return jsonify({"reply": _srv_reply})
 
     # Deterministic Notifications settings: instant offline, no model needed.
     _notif_reply, _did_notif = _simple_notifications_add_reply(request_text)

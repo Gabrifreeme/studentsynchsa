@@ -17660,6 +17660,41 @@ window.aceCheckForUpdates = function (install) {
   };
 })();
 </script>
+<script id="ace-server-page">
+/* ACEsi deterministic server page */
+(function () {
+  var detail = document.getElementById('ace-detail-page');
+  if (!detail || document.getElementById('ace-server-content')) return;
+
+  var box = document.createElement('div');
+  box.id = 'ace-server-content';
+  box.className = 'ace-preferences-content';
+  box.style.cssText = 'display:none;margin:10px 6px 2px;padding:10px;background:#0a0a0a;border:2px solid #ffa500;border-radius:8px;';
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+    '<span style="color:#ffa500;font-family:monospace;font-size:12px;font-weight:bold;">Server</span>' +
+    '<button type="button" id="ace-server-add" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Add server</button>' +
+    '</div>' +
+    '<div style="color:#ff9d00;font-family:monospace;font-size:10px;margin-bottom:8px;">Manage server connections</div>' +
+    '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:8px 0 6px;">Connection</div>' +
+    '<input type="text" id="ace-server-host" placeholder="my-account:org" style="width:100%;box-sizing:border-box;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:6px;font-family:monospace;font-size:11px;">' +
+    '<button type="button" id="ace-server-test" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Test connection</button>' +
+    '<div style="color:#ffa500;font-family:monospace;font-size:11px;font-weight:bold;margin:12px 0 6px;">Terminal shell</div>' +
+    '<div style="color:#ff9d00;font-family:monospace;font-size:10px;">Use built-in or external tools.</div>' +
+    '<button type="button" id="ace-server-autodetect" style="margin-top:6px;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:5px 10px;font-family:monospace;font-size:10px;cursor:pointer;">Auto Detect</button>';
+
+  box.innerHTML = html;
+  detail.appendChild(box);
+
+  var orig = window.aceSettingsNavClick;
+  window.aceSettingsNavClick = function (key) {
+    if (typeof orig === 'function') orig(key);
+    var generic = document.getElementById('ace-generic-nav-content');
+    if (key === 'server' && generic) generic.style.display = 'none';
+    box.style.display = (key === 'server') ? 'block' : 'none';
+  };
+})();
+</script>
 </body>
 
 </html>
