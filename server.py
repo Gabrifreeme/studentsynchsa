@@ -7222,21 +7222,6 @@ def chat():
     # contain words like "flutter analyze" which trigger Explorer-fix mode).
     request_text = user_message
 
-    # Deterministic simple file creation: instant offline, with a real summary.
-    _simple_reply, _did_write = _simple_file_write_reply(request_text)
-    if _did_write:
-        save_conversation("assistant", _simple_reply)
-        return jsonify({"reply": _simple_reply})
-
-    # Clients that omit "model" (phone UI, external callers) must still use the
-    # provider/model saved in Settings instead of silently reverting to Groq.
-    requested_model = data.get('model', '') or get_config('model', '') or ''
-    requested_provider = data.get('provider', '') or get_config('provider', '') or ''
-  
-    if _kill_armed():
-        return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
-    save_conversation("user", user_message)
-
     # Plan Mode is read-only: intercept action-oriented prompts so the UI can
     # offer a one-click switch to Build Mode instead of executing them.
     # Strict mode check: if isBuildMode is false (Plan Mode), return the
@@ -7255,6 +7240,22 @@ def chat():
             "message": _warning,
             "action_prompt": user_message,
         })
+
+    # Deterministic simple file creation: instant offline, with a real summary.
+    _simple_reply, _did_write = _simple_file_write_reply(request_text)
+    if _did_write:
+        save_conversation("assistant", _simple_reply)
+        return jsonify({"reply": _simple_reply})
+
+
+    # Clients that omit "model" (phone UI, external callers) must still use the
+    # provider/model saved in Settings instead of silently reverting to Groq.
+    requested_model = data.get('model', '') or get_config('model', '') or ''
+    requested_provider = data.get('provider', '') or get_config('provider', '') or ''
+  
+    if _kill_armed():
+        return jsonify({"reply": "E-STOP is armed — ACEsi is stopped. Type the un-kill word on your phone or use the web UI to resume."})
+    save_conversation("user", user_message)
 
     # Build Mode: when the user asks to fix something in a file, do the work
     # directly - read the file, generate the fix, write it - instead of
