@@ -6020,7 +6020,7 @@ perspective: 900px;
         var originalMsg = null;
         if (reuseMsgId) originalMsg = document.querySelector('#chat-messages .ace-user-msg[data-msg-id="' + reuseMsgId + '"]');
         if (originalMsg && originalMsg.parentNode) {
-          originalMsg.insertAdjacentHTML("beforebegin", confirmation);
+          originalMsg.insertAdjacentHTML("afterend", confirmation);
         } else {
           var chatBox = document.getElementById("chat-messages");
           if (chatBox) chatBox.insertAdjacentHTML("beforeend", confirmation);
