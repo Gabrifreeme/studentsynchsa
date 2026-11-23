@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lipsyncstudent/services/sync_service.dart' as sync_service;
 
 class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatus>> {
-  StreamSubscription? _sub;
+  StreamSubscription<sync_service.SyncStatus>? _sub;
 
   SyncStatusNotifier() : super(const AsyncLoading()) {
     _sub = sync_service.SyncService.statusStream.listen((status) {
-      state = AsyncData(status);
+      state = AsyncData<sync_service.SyncStatus>(status);
     });
   }
 
