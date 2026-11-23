@@ -7128,6 +7128,16 @@ def _answer_after_pc_file_open(file_path, question, preferred_model=None):
 
 
 
+BASE_SYSTEM_PROMPT_SHORT = """You are ACEsi, Chris's companion and assistant. Speak in short, natural, honest sentences. Be calm, present and concise; silence is fine. Never invent memories or past events. Use the facts and journal entries in context naturally. Keep replies short unless asked for more.
+
+TYPO TOLERANCE: read charitably. Resolve slightly misspelled filenames with the file tools instead of failing or asking.
+
+TOOLS: use project_doctor before and after every fix; never claim a fix unless the analyzer reports clean. Use delegate for deep codebase investigation. Apply file changes with edit_file / write_file and report the real result.
+
+MODE: Plan Mode is read-only; Build Mode applies changes directly. Never pretend to switch modes.
+
+AGENT TURN SUMMARY: after any file edit, tool run or multi-step coding task, end your reply with 'Summary of Changes ✅' (changed file names), a markdown table '| Change | Before | After | Effect |', then 1-2 bullets for model routing and side effects. Never skip it after real work."""
+
 # Built-in ACEsi system prompt (shown in Settings -> System Prompt).
 BASE_SYSTEM_PROMPT = (
             "WORK SUMMARY RULE: after ANY file edit, tool execution or multi-step coding "
@@ -7714,8 +7724,9 @@ def chat():
         _saved_sys_prompt = _matched or get_config("system_prompt", "")
         # The Settings field now shows the built-in prompt; saving it unchanged
         # must not duplicate the whole prompt into the model context.
-        if (_saved_sys_prompt and BASE_SYSTEM_PROMPT
-                and str(_saved_sys_prompt).strip() == str(BASE_SYSTEM_PROMPT).strip()):
+        if (_saved_sys_prompt and
+                ((BASE_SYSTEM_PROMPT and str(_saved_sys_prompt).strip() == str(BASE_SYSTEM_PROMPT).strip()) or
+                 (BASE_SYSTEM_PROMPT_SHORT and str(_saved_sys_prompt).strip() == str(BASE_SYSTEM_PROMPT_SHORT).strip()))):
             _saved_sys_prompt = ""
         if _saved_sys_prompt and str(_saved_sys_prompt).strip():
             system_prompt += "\n\n[USER SYSTEM PROMPT — OVERRIDES / ADDITIONS — OBEY THESE FIRST]\n" + str(_saved_sys_prompt).strip()
@@ -20208,7 +20219,15 @@ def api_settings():
         data = request.get_json() or {}
         # Persist the system prompt to the DB — read by prompt assembly via get_config('system_prompt').
         if data.get('system_prompt') is not None:
-            set_config('system_prompt', str(data['system_prompt']))
+            _sp = str(data['system_prompt'])
+            if len(_sp.split()) > 250:
+                return jsonify({"ok": False,
+                                "error": "System prompt must be 250 words or fewer (got %d)."
+                                         % len(_sp.split())}), 400
+            if _sp.strip() == str(BASE_SYSTEM_PROMPT_SHORT).strip():
+                set_config('system_prompt', "")   # built-in default, no override needed
+            else:
+                set_config('system_prompt', _sp)
         if data.get('model') is not None:
             set_config('model', str(data['model']))
         if data.get('provider') is not None:
@@ -20252,7 +20271,7 @@ def api_settings():
             pass
         return jsonify({
             'system_prompt': get_config('system_prompt', ''),
-            'base_system_prompt': BASE_SYSTEM_PROMPT,
+            'base_system_prompt': BASE_SYSTEM_PROMPT_SHORT,
             'model':         get_config('model', ''),
             'provider':      get_config('provider', ''),
             'groq_key':      k.get('groq', ''),

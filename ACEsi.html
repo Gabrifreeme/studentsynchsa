@@ -11332,6 +11332,7 @@ let _geoPayload = {};
               promptField.value = d.system_prompt;
             else if (d.base_system_prompt)
               promptField.value = d.base_system_prompt;
+            if (typeof updatePromptWordCount === "function") updatePromptWordCount();
           }
 
           checkModelStatus();
@@ -11540,7 +11541,7 @@ let _geoPayload = {};
 
             } else {
 
-              if (window.showAceToast) window.showAceToast("Save failed: " + ((d && d.message) || "unknown"), 'error', 5000);
+              if (window.showAceToast) window.showAceToast("Save failed: " + ((d && (d.error || d.message)) || "unknown"), 'error', 5000);
 
             }
 
