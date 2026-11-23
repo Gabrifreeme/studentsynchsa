@@ -13726,6 +13726,16 @@ _BROAD_PROBES = frozenset(("answer question", "price lookup", "compare values"))
 def _outstanding_subtasks(user_message: str, names: list[str]) -> list[str]:
     """Which requested subtasks have had no matching tool call yet."""
     text = (user_message or "").lower()
+    # "remove the Search button", "search box", "search field" are UI edits -
+    # the word 'search' there must NOT trigger the web-search probe (it made
+    # the model call web_search in a loop for 7+ minutes on a button removal).
+    _ui_element = bool(re.search(
+        r"\b(?:search|find)\s+(?:button|box|field|bar|icon|menu|tab|panel|input|option|feature)\b",
+        text) or re.search(
+        r"\b(?:button|box|field|bar|icon|menu|tab|panel|input)\b[^.]{0,30}\b(?:remove|delete|hide|add|change)\b",
+        text))
+    if _ui_element:
+        return []
     done = set(names)
     matched = [label for label, tools, pattern in _SUBTASK_PROBES
                if re.search(pattern, text) and not (done & set(tools))]
