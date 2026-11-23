@@ -7023,17 +7023,18 @@ def _simple_file_write_reply(message):
     Returns (reply, did_work) so /chat can answer instantly without the 7B model.
     """
     m = re.search(
-        r"(?:create|write|make)\s+(?:a\s+)?(?:file\s+)?"
-        r"([A-Za-z0-9_.\-]+\.[A-Za-z0-9]+)\b[^\n]*?"
-        r"(?:with|containing|saying|text)\s+(?:the\s+text\s+)?[\"']?([^\"'\n]+)",
+        r"(?:create(?:d)?|write|wrote|make|made|add(?:ed)?)\s+(?:a\s+)?(?:file\s+)?"
+        r"[`'\"]?([A-Za-z0-9_.\-]+\.[A-Za-z0-9]+)[`'\"]?\b[^\n]*?"
+        r"(?:with|containing|saying|text)\s+(?:the\s+text\s+)?[`'\"]?([^`'\"\n]+)",
         str(message or ""), re.I)
     if not m:
         return None, False
     name = m.group(1).strip()
     content = m.group(2).strip()
-    content = re.split(r"\s*,\s*then\b|\s+\bthen\s+tell\b|\s+\band\s+tell\b",
+    content = re.split(r"\s*,\s*then\b|\s+\bthen\s+tell\b|\s+\band\s+tell\b|"
+                       r"\s*\.\s*(?:and|then)\b",
                        content, maxsplit=1, flags=re.I)[0]
-    content = content.strip().rstrip(".'\"")
+    content = content.strip().strip("`'\"").strip().rstrip(".'\"")
     if "/" in name or "\\" in name or ".." in name:
         return None, False
     target = os.path.join(PROJECT_ROOT, name)
@@ -9898,7 +9899,7 @@ def _match_pc_file_open_request(message):
     if not m:
         return False
     ml = m.lower()
-    if re.match(r"^\s*(?:create|write|make|add)\b", ml):
+    if re.match(r"^\s*(?:create(?:d)?|write|wrote|make|made|add(?:ed)?)\b", ml):
         return False
     has_drive = bool(re.search(r'\b[a-z]:[\\/][^\s,;]+', ml))
     has_action = bool(re.search(r'\b(?:open|view|show|find|display|read|load)\b', ml))
