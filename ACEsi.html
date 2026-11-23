@@ -11326,8 +11326,13 @@ let _geoPayload = {};
           if (d.gemini_key)
             document.getElementById("settings-gemini-key").value = d.gemini_key;
 
-          if (d.system_prompt)
-            document.getElementById("settings-prompt").value = d.system_prompt;
+          var promptField = document.getElementById("settings-prompt");
+          if (promptField) {
+            if (d.system_prompt && d.system_prompt.trim())
+              promptField.value = d.system_prompt;
+            else if (d.base_system_prompt)
+              promptField.value = d.base_system_prompt;
+          }
 
           checkModelStatus();
 
