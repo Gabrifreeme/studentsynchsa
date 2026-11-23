@@ -3161,6 +3161,30 @@ input::placeholder, textarea::placeholder {
 #chat-panel .panel-header.chat-panel-header > div { margin-left: auto !important; }
 #composer-mode-select, #composer-quality-select { background:#000 !important; color:#ffa500 !important; border:1px solid #ffa500 !important; border-radius:6px !important; }
 #composer-mode-select option, #composer-quality-select option { background:#000 !important; color:#ffa500 !important; }
+
+/* Custom composer dropdowns - no native blue highlighting */
+.ace-comp-dropdown-menu button {
+  display:block; width:100%; text-align:left; padding:6px 8px; margin:0;
+  background:#0a0a0a; color:#ffa500; border:1px solid transparent;
+  border-radius:4px; font-family:inherit; font-size:11px; cursor:pointer;
+}
+.ace-comp-dropdown-menu button:hover, .ace-comp-dropdown-menu button:focus {
+  background:#ffa500; color:#000; border-color:#ffa500;
+}
+/* Server spinner: far right of the Code Editor toolbar */
+#model-spinner {
+  position:absolute !important; right:8px !important; top:50% !important;
+  transform:translateY(-50%) !important; margin:0 !important;
+}
+#model-spinner::after {
+  content:attr(data-tooltip);
+  position:absolute; right:0; top:calc(100% + 6px);
+  background:#ffa500; color:#000; border:1px solid #ffa500;
+  border-radius:6px; padding:3px 8px; font-family:inherit; font-size:11px;
+  white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s;
+  z-index:9999;
+}
+#model-spinner:hover::after { opacity:1; }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
 #ace-last-change-short, #ace-last-change-toggle {
@@ -5357,16 +5381,22 @@ perspective: 900px;
                 </button>
               </div>
               <div style="flex:1; min-width:0; display:flex; gap:6px; align-items:center;">
-                <select id="composer-mode-select" title="Agent mode" style="flex:1; min-width:0; height:32px; padding:0 8px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; box-sizing:border-box;" onchange="if(typeof aceSetMode==='function')aceSetMode(this.value)">
-                  <option value="plan">Plan</option>
-                  <option value="build">Build</option>
-                </select>
-                <select id="composer-quality-select" title="Response quality" style="flex:1; min-width:0; height:32px; padding:0 8px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; box-sizing:border-box;" onchange="try{localStorage.setItem('ace_quality',this.value)}catch(e){}">
-                  <option value="Default">Default</option>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
+                <div style="position:relative; flex:1; min-width:0;">
+                  <button id="composer-mode-btn" type="button" onclick="aceToggleComposerDropdown('mode',event)" style="width:100%; height:32px; display:flex; align-items:center; justify-content:center; gap:6px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer;" data-value="plan"><span id="composer-mode-label">Plan</span><span aria-hidden="true">&#9662;</span></button>
+                  <div id="composer-mode-menu" class="ace-comp-dropdown-menu" style="display:none; position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:#0a0a0a; border:1px solid #ffa500; border-radius:6px; padding:4px; z-index:1200;">
+                    <button type="button" onclick="acePickComposerDropdown('mode','plan')">Plan</button>
+                    <button type="button" onclick="acePickComposerDropdown('mode','build')">Build</button>
+                  </div>
+                </div>
+                <div style="position:relative; flex:1; min-width:0;">
+                  <button id="composer-quality-btn" type="button" onclick="aceToggleComposerDropdown('quality',event)" style="width:100%; height:32px; display:flex; align-items:center; justify-content:center; gap:6px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer;" data-value="Default"><span id="composer-quality-label">Default</span><span aria-hidden="true">&#9662;</span></button>
+                  <div id="composer-quality-menu" class="ace-comp-dropdown-menu" style="display:none; position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:#0a0a0a; border:1px solid #ffa500; border-radius:6px; padding:4px; z-index:1200;">
+                    <button type="button" onclick="acePickComposerDropdown('quality','Default')">Default</button>
+                    <button type="button" onclick="acePickComposerDropdown('quality','Low')">Low</button>
+                    <button type="button" onclick="acePickComposerDropdown('quality','Medium')">Medium</button>
+                    <button type="button" onclick="acePickComposerDropdown('quality','High')">High</button>
+                  </div>
+                </div>
               </div>
               <button onclick="sendMessage()" title="Send" style="background:#000; color:#ff9d00; border:1px solid #ffa500; height:32px; padding:0 14px; border-radius:3px; font-family:inherit; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; flex:0 0 auto;" onmouseover="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onmouseout="this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';" onfocus="this.style.background='#ffa500';this.style.borderColor='#ffa500';this.style.color='#000';" onblur="this.style.background='#000';this.style.borderColor='#ffa500';this.style.color='#ff9d00';">Send</button>
             </div>
@@ -5612,9 +5642,9 @@ perspective: 900px;
 
             </button>
 
-            <span id="model-spinner" class="status-ok" title="Checking server health..." style="display:inline-block;width:10px;height:10px;margin-left:4px;"></span>
-
           </div>
+
+          <span id="model-spinner" class="status-ok" data-tooltip="Server status: online" style="display:inline-block;width:10px;height:10px;"></span>
 
         </div>
 
@@ -5965,8 +5995,10 @@ perspective: 900px;
           btns[i].classList.toggle("active", on);
           btns[i].setAttribute("aria-pressed", on ? "true" : "false");
         }
-        var modeSel = document.getElementById("composer-mode-select");
-        if (modeSel) modeSel.value = window.aceMode;
+        var modeLabel = document.getElementById("composer-mode-label");
+        if (modeLabel) modeLabel.textContent = window.aceMode === "build" ? "Build" : "Plan";
+        var modeBtn = document.getElementById("composer-mode-btn");
+        if (modeBtn) modeBtn.setAttribute("data-value", window.aceMode);
         try {
           document.dispatchEvent(new CustomEvent("acesi:modechange", {
             detail: { mode: window.aceMode, isBuildMode: isBuildMode }
@@ -5987,8 +6019,10 @@ perspective: 900px;
         try {
           var qs = localStorage.getItem("ace_quality");
           if (qs) {
-            var qsel = document.getElementById("composer-quality-select");
-            if (qsel) qsel.value = qs;
+            var qlabel = document.getElementById("composer-quality-label");
+            var qbtn = document.getElementById("composer-quality-btn");
+            if (qlabel) qlabel.textContent = qs;
+            if (qbtn) qbtn.setAttribute("data-value", qs);
           }
         } catch (e) {}
       })();
@@ -11459,8 +11493,10 @@ let _geoPayload = {};
           var el = document.getElementById(id);
           if (!el) return;
           el.className = ok ? "status-ok" : "status-dead";
-          el.title = (ok ? "Server healthy/running" : "SERVER PROBLEM - investigate")
-            + (detail ? " (" + detail + ")" : "");
+          el.removeAttribute("title");
+          el.setAttribute("data-tooltip",
+            (ok ? "Server healthy/running" : "SERVER PROBLEM - investigate")
+            + (detail ? " (" + detail + ")" : ""));
         });
         window.aceServerHealth.ok = !!ok;
         window.aceServerHealth.lastCheck = Date.now();
@@ -17120,6 +17156,35 @@ window.aceCloseAllPanels = function (exceptId) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+</script>
+
+<script>
+window.aceToggleComposerDropdown = function (kind, e) {
+  if (e) e.stopPropagation();
+  var menu = document.getElementById('composer-' + kind + '-menu');
+  if (!menu) return;
+  var wasOpen = menu.style.display === 'block';
+  var all = document.querySelectorAll('.ace-comp-dropdown-menu');
+  for (var i = 0; i < all.length; i++) all[i].style.display = 'none';
+  menu.style.display = wasOpen ? 'none' : 'block';
+};
+window.acePickComposerDropdown = function (kind, value) {
+  var label = document.getElementById('composer-' + kind + '-label');
+  var btn = document.getElementById('composer-' + kind + '-btn');
+  var menu = document.getElementById('composer-' + kind + '-menu');
+  if (label) label.textContent = value;
+  if (btn) btn.setAttribute('data-value', value);
+  if (menu) menu.style.display = 'none';
+  if (kind === 'mode') {
+    if (typeof aceSetMode === 'function') aceSetMode(String(value).toLowerCase());
+  } else {
+    try { localStorage.setItem('ace_quality', value); } catch (e) {}
+  }
+};
+document.addEventListener('click', function () {
+  var all = document.querySelectorAll('.ace-comp-dropdown-menu');
+  for (var i = 0; i < all.length; i++) all[i].style.display = 'none';
+});
 </script>
 </body>
 
