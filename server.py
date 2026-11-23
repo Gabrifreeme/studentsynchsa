@@ -5612,6 +5612,14 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                     OLLAMA_ENABLED = True  # refresh the stale import-time flag
                 _local_only = ((_ollama_now and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")
                                or os.environ.get("ACESI_OFFLINE", "0") != "0")
+                # EXPLICIT MODEL PICK: a cloud model chosen in the UI must actually
+                # be used. Local-only is the DEFAULT, not a lock - the picker wins.
+                if preferred_model and os.environ.get("ACESI_OFFLINE", "0") == "0":
+                    _wanted_provider = _find_provider_for_model(preferred_model)
+                    if _wanted_provider and _wanted_provider[0] != "Ollama":
+                        _local_only = False
+                        print("[model-picker] %s selected -> cloud routing enabled"
+                              % preferred_model, flush=True)
                 # LOCAL-FIRST: Ollama (qwen2.5:7b) is the FIRST choice. Cloud
                 # providers stay in the chain as automatic fallback ONLY when
                 # Ollama is unavailable or local-only mode is disabled.
@@ -6936,7 +6944,7 @@ def _local_file_answer(file_path, question):
                    "already imports. No new packages needed.")
     return "\n".join(out)
 
-def _answer_after_pc_file_open(file_path, question):
+def _answer_after_pc_file_open(file_path, question, preferred_model=None):
     """Follow-up completion after a deterministic file-open tool call.
 
     The PC-file fast path emits the editor popup immediately, but must NOT end
@@ -6970,11 +6978,23 @@ def _answer_after_pc_file_open(file_path, question):
         {"role": "user", "content": str(question or "")},
         {"role": "system", "content": tool_result},
     ]
-    if re.search(r"\b(summar|inspect|structure|explain|what.*built|show me)\b",
-                 str(question or ""), re.I):
+    _explicit_cloud = False
+    if preferred_model and os.environ.get("ACESI_OFFLINE", "0") == "0":
+        _w = _find_provider_for_model(preferred_model)
+        if _w and _w[0] != "Ollama":
+            _explicit_cloud = True
+    if not _explicit_cloud and re.search(
+            r"\b(summar|inspect|structure|explain|what.*built|show me)\b",
+            str(question or ""), re.I):
         return _local_file_answer(file_path, question)
     chain = [("Ollama", OLLAMA_ENDPOINT, "local", OLLAMA_CHAT_MODEL)]
-    if not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
+    if preferred_model and os.environ.get("ACESI_OFFLINE", "0") == "0":
+        _w = _find_provider_for_model(preferred_model)
+        if _w and _w[0] != "Ollama":
+            chain = [_w] + chain
+            print("[model-picker] %s selected -> cloud routing enabled"
+                  % preferred_model, flush=True)
+    elif not (OLLAMA_ENABLED and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0") \
             and os.environ.get("ACESI_OFFLINE", "0") == "0":
         chain.append(("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL))
     for name, endpoint, api_key, model in chain:
@@ -7200,7 +7220,7 @@ def chat():
             })
             # Tool result + automatic follow-up completion: the answer must be
             # based on the file contents, not just an "opened" acknowledgement.
-            reply = _answer_after_pc_file_open(_rp, user_message)
+            reply = _answer_after_pc_file_open(_rp, user_message, preferred_model=requested_model)
             print("📂 PC-file open -> Code Editor: %s (follow-up answer ready)" % _rp)
         else:
             reply = "I couldn't find that file on your PC. Check the folder and filename and try again."
