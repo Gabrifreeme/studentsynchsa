@@ -4350,6 +4350,15 @@ def _request_gaps(user_message, allowed_names):
     """
     if _is_read_only_file_qa(user_message):
         return None
+    # UI-element edits ("remove the Search button", "hide the search box")
+    # must not be treated as web-search tasks by the gap probe.
+    _t = str(user_message or "").lower()
+    if re.search(
+            r"\b(?:search|find)\s+(?:button|box|field|bar|icon|menu|tab|panel|input|option|feature)\b",
+            _t) or re.search(
+            r"\b(?:button|box|field|bar|icon|menu|tab|panel|input)\b[^.]{0,40}\b(?:remove|delete|hide|add|change|disable)\b",
+            _t):
+        return None
     if ace_dispatcher is None:
         return None
     return ace_dispatcher.find_gaps(user_message, allowed_names)
