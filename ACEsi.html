@@ -18046,6 +18046,11 @@ html body #chat-composer > div:last-child::before {
   content:""; position:absolute; left:-13px; right:-13px; top:-7px;
   height:1px; background:#ffa500 !important; pointer-events:none;
 }
+/* Composer side edges: bright from the bottom corner up to the top line. */
+html body #chat-composer {
+  border-left-color:#ffa500 !important;
+  border-right-color:#ffa500 !important;
+}
 /* Bottom frame lines: bright amber to match the top two. */
 html body .ace-composer-topline { background:#ffa500 !important; }
 html body #bottom-status {
