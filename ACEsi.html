@@ -6493,7 +6493,7 @@ perspective: 900px;
         window.__aceFlutterFollow = false;
         if (window.__aceFlutterTimer) { clearInterval(window.__aceFlutterTimer); window.__aceFlutterTimer = null; }
         var b = document.getElementById("ace-flutter-mode-btn");
-        if (b) { b.textContent = "Flutter Console: OFF"; b.style.color = "#ffa500"; }
+        if (b) { b.textContent = "Flutter Log: OFF"; b.style.color = "#ffa500"; }
         var st = document.getElementById("flutter-console-status");
         if (st) st.textContent = "idle";
         var pane = document.getElementById("flutter-console");
@@ -6504,7 +6504,7 @@ perspective: 900px;
         if (typeof window.openAceTerminal === "function") { try { window.openAceTerminal(); } catch (e) {} }
         window.__aceFlutterFollow = true;
         var b = document.getElementById("ace-flutter-mode-btn");
-        if (b) { b.textContent = "Flutter Console: LIVE"; b.style.color = "#00ff00"; }
+        if (b) { b.textContent = "Flutter Log: ON"; b.style.color = "#00ff00"; }
         var st = document.getElementById("flutter-console-status");
         if (st) st.textContent = "live";
         if (window.__aceFlutterTimer) clearInterval(window.__aceFlutterTimer);
@@ -8878,8 +8878,8 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #ffa500; flex: 0 0 auto; box-sizing: border-box;">
       <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
-      <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" data-tooltip="Toggle Live Server Log on or Off" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
-      <button id="ace-flutter-mode-btn" type="button" onclick="if(window.__aceFlutterFollow){window.stopAceFlutterFollow()}else{window.startAceFlutterFollow()}" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Flutter Console: OFF</button>
+      <button id="terminal-logs-btn" type="button" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Live Logs: OFF</button>
+      <button id="ace-flutter-mode-btn" type="button" onclick="if(window.__aceFlutterFollow){window.stopAceFlutterFollow()}else{window.startAceFlutterFollow()}" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Flutter Log: OFF</button>
     </div>
 
         
@@ -16624,7 +16624,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function setLiveLogButton(on) {
     var btn = document.getElementById('terminal-logs-btn');
-    if (btn) btn.textContent = on ? '📜 Live Logs: ON' : '📜 Live Logs';
+    if (btn) btn.textContent = on ? 'Live Logs: ON' : 'Live Logs: OFF';
   }
 
   window.startAceLiveLogs = function () {
