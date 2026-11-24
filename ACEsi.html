@@ -16529,9 +16529,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (done) done();
       };
       (function step() {
+        if (finished) return;
         if (!line || !line.parentNode) { if (done) done(); return; }
         idx += 1;
         if (idx > len) {
+          finished = true;
+          window.__aceFinishTyping = null;
           window.aceFillTerminalLine(line, segs);
           if (done) done();
           return;
