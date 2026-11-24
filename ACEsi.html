@@ -6538,7 +6538,6 @@ perspective: 900px;
 
       window.aceFlutterSend = async function () {
         var inp = document.getElementById('flutter-console-input');
-        if (!inp) return;
         var key = inp ? inp.value.trim() : '';
         if (!key) return;
         if (inp) inp.value = '';
@@ -8906,8 +8905,16 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
     <div id="terminal-split" style="display:flex; flex-direction:row; flex:1 1 auto; min-height:0; width:100%;">
       <div id="terminal-left" style="flex:0 0 70%; width:70%; display:flex; flex-direction:column; min-height:0;">
       <div id="terminal-output" style="flex:1 1 auto; width:100%; overflow:hidden; padding:0; margin:0; background:#000; display:block; position:relative;"></div>
-      <div id="flutter-console" style="display:none; flex:1 1 auto; width:100%; overflow:auto; padding:0; margin:0; background:#000; position:relative;">
-        <pre id="flutter-console-output" style="margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;"></pre>
+      <div id="flutter-console" style="display:none; flex:1 1 auto; flex-direction:column; width:100%; min-height:0; padding:0; margin:0; background:#000; position:relative;">
+        <pre id="flutter-console-output" style="flex:1 1 auto; min-height:0; margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;overflow:auto;"></pre>
+        <div id="flutter-prompt-row" style="display:flex; align-items:center; gap:6px; flex:0 0 auto; padding:4px 10px 6px; border-top:1px solid #ffa500;">
+          <span style="color:#ffa500; font-family:monospace; font-size:12px; white-space:pre;">PS D:\projects\acesi&gt;&nbsp;</span>
+          <input id="flutter-console-input" type="text" autocomplete="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();window.aceFlutterSend()}"
+            placeholder="r = reload, R = restart, q = quit"
+            style="flex:1; min-width:0; background:transparent; border:none; outline:none; color:#ffa500; font-family:monospace; font-size:12px;">
+          <button type="button" onclick="window.aceFlutterSend()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:11px;cursor:pointer;">Send</button>
+        </div>
       </div>
       </div>
       <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #ffa500; font-family:'Roboto Mono',monospace; color:#ffa500;">
