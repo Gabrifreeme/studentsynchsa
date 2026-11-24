@@ -8622,7 +8622,9 @@ def run_command():
         # `flutter run` / `dart run` are long-lived, attached dev sessions that
         # never exit on their own. subprocess.run would block this request
         # thread forever, so stream to a log and return immediately.
-        if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+        # Detect flutter run ANYWHERE in the command so `cd ...; flutter run`
+        # is also handled (otherwise it falls through to the blocking branch).
+        if re.search(r'\b(flutter\s+run|dart\s+run)\b', command, re.I):
             # Kill stale Flutter/Chrome from a previous run - its debug Chrome
             # holds the flutter_tools temp profile and makes new launches fail
             # with "Chrome exited with code 0 before DevTools listening".
@@ -8638,6 +8640,8 @@ def run_command():
                      capture_output=True, timeout=15)
             except Exception:
                 pass
+            # Drop a leading `cd <path> ;` - the process runs in _IDE_ROOT already.
+            command = re.sub(r'^\s*cd\s+[^;&]+[;&]\s*', '', command, flags=re.I)
             command = _resolve_run_device(command)
             if command is None:
                 return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
@@ -8645,11 +8649,19 @@ def run_command():
             log = open(os.path.join(_IDE_ROOT, log_path), 'w', encoding='utf-8')
             # Run in the Explorer's project root (LibSyncStudent), not ACEsi's
             # own folder - otherwise flutter run builds the wrong app.
-            # Do NOT pass CREATE_NO_WINDOW here: Flutter spawns Chrome as a
-            # child, and a no-window parent makes Chrome exit before DevTools
-            # listens. A short console flash is worth a working browser.
-            proc = subprocess.Popen(command, shell=True, stdout=log,
-                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
+            # Launch via a detached .bat + Start-Process. A plain child process
+            # of this server makes Flutter's Chrome hand off to an existing
+            # instance and exit code 0 before DevTools listens. A detached,
+            # separately-started batch (the way a normal terminal launches it)
+            # lets Chrome open properly.
+            bat = os.path.join(_IDE_ROOT, f'run_{uuid.uuid4().hex}.bat')
+            with open(bat, 'w', encoding='utf-8') as bf:
+                bf.write('@echo off\r\n'
+                         f'cd /d "{_IDE_ROOT}"\r\n'
+                         f'{command} >> "{os.path.join(_IDE_ROOT, log_path)}" 2>&1\r\n')
+            proc = subprocess.Popen(
+                ["cmd.exe", "/c", "start", "", "/min", bat],
+                cwd=_IDE_ROOT, stdout=log, stderr=subprocess.STDOUT)
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
