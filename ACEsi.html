@@ -3232,7 +3232,7 @@ input::placeholder, textarea::placeholder {
    generic .btn rule sizes every button as a 24px icon square. */
 #code-panel .panel-header button[data-tooltip="Open Terminal"],
 #code-panel .panel-header button[onclick="openSettings()"],
-#code-panel .panel-header button[data-tooltip="Restart App"],
+#code-panel .panel-header #code-restart-btn,
 #explorer-panel .panel-header #explorer-refresh-btn {
   width:auto !important; min-width:66px !important; padding:0 8px !important;
   height:24px !important; white-space:nowrap !important; font-size:11px !important;
@@ -5884,7 +5884,7 @@ perspective: 900px;
             </button>
 <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
 
-            <button class="btn" data-tooltip="Ctrl+click to Restart App" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{if(window.showAceToast)window.showAceToast('Hold Ctrl and click to restart.','info',3000);}" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
+            <button id="code-restart-btn" class="btn" data-tooltip="Ctrl+click to Restart App" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{if(window.showAceToast)window.showAceToast('Hold Ctrl and click to restart.','info',3000);}" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
 
           </div>
 
