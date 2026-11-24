@@ -5325,7 +5325,7 @@ git add -u (stage tracked)</label
 
         onclick="
 
-          fetch('http://127.0.0.1:5000/api/portal/status')
+          fetch('/api/portal/status')
 
             .then((r) => r.json())
 
@@ -5455,7 +5455,7 @@ git add -u (stage tracked)</label
 
         onclick="
 
-          fetch('http://127.0.0.1:5000/api/scr')
+          fetch('/api/scr')
 
             .then((r) => r.json())
 
@@ -6439,7 +6439,7 @@ perspective: 900px;
 
 
         try {
-          const response = await fetch("http://127.0.0.1:5000/api/terminal", {
+          const response = await fetch("/api/terminal", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -7916,7 +7916,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
               }
 
-              fetch("http://127.0.0.1:5000/api/save-file", {
+              fetch("/api/save-file", {
 
                 method: "POST",
 
@@ -7998,7 +7998,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
               }
 
-              fetch('http://127.0.0.1:5000/api/format', {
+              fetch('/api/format', {
 
                 method: 'POST',
 
@@ -8285,7 +8285,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
               }
 
-              fetch("http://127.0.0.1:5000/api/save-file", {
+              fetch("/api/save-file", {
 
                 method: "POST",
 
@@ -9291,7 +9291,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
 
 
-        fetch("http://127.0.0.1:5000/api/autofix", {
+        fetch("/api/autofix", {
 
           method: "POST",
 
@@ -9437,7 +9437,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
           return;
         }
 
-        fetch("http://127.0.0.1:5000/api/save-file", {
+        fetch("/api/save-file", {
 
           method: "POST",
 
@@ -11150,7 +11150,7 @@ let _geoPayload = {};
 
               }
 
-              fetch("http://127.0.0.1:5000/api/save-file", {
+              fetch("/api/save-file", {
 
                 method: "POST",
 
@@ -11664,7 +11664,7 @@ let _geoPayload = {};
 
         try {
 
-          var r = await fetch("http://127.0.0.1:5000/api/settings");
+          var r = await fetch("/api/settings");
 
           var d = await r.json();
 
@@ -11700,7 +11700,7 @@ let _geoPayload = {};
       // header indicator and chat requests to the hardcoded gpt-oss default.
       document.addEventListener("DOMContentLoaded", function () {
 
-        fetch("http://127.0.0.1:5000/api/settings")
+        fetch("/api/settings")
           .then(function (r) { return r.json(); })
           .then(function (d) { restoreModelSelection(d); })
           .catch(function () { restoreModelSelection({}); });
@@ -11732,7 +11732,7 @@ let _geoPayload = {};
 
         };
 
-        fetch("http://127.0.0.1:5000/api/settings", {
+        fetch("/api/settings", {
 
           method: "POST",
 
@@ -11782,7 +11782,7 @@ let _geoPayload = {};
         ok: null,
         lastCheck: 0,
         timer: null,
-        url: "http://127.0.0.1:5000/api/health"
+        url: "/api/health"
       };
 
       function aceSetServerHealth(ok, detail) {
@@ -11863,7 +11863,7 @@ let _geoPayload = {};
 
         var prompt = document.getElementById("settings-prompt").value;
 
-        fetch("http://127.0.0.1:5000/api/settings", {
+        fetch("/api/settings", {
 
           method: "POST",
 
@@ -12120,7 +12120,7 @@ let _geoPayload = {};
 
       function triggerPing() {
 
-        fetch("http://127.0.0.1:5000/api/system/exec", {
+        fetch("/api/system/exec", {
 
           method: "POST",
 
@@ -12895,7 +12895,7 @@ let _geoPayload = {};
 
               }
 
-              fetch("http://127.0.0.1:5000/api/save-file", {
+              fetch("/api/save-file", {
 
                 method: "POST",
 
@@ -14411,7 +14411,7 @@ window.checkSyntax = function(filename) {
 
 
 
-    fetch('http://127.0.0.1:5000/api/check-syntax', {
+    fetch('/api/check-syntax', {
 
         method: 'POST',
 
