@@ -8907,7 +8907,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
         <pre id="flutter-console-output" style="margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;"></pre>
       </div>
       </div>
-      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #ffa500; font-family:'Roboto Mono',monospace; color:#ffa500;">
+      <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #00ff88; font-family:'Roboto Mono',monospace; color:#00ff88;">
         <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-cpu">CPU · --</div><div class="ace-dash-sub" id="ace-dash-cpu-sub"></div></div></div>
         <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-mem">Memory · --</div><div class="ace-dash-sub" id="ace-dash-mem-sub"></div></div></div>
         <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-diskc">Disk 0 (C:) --</div><div class="ace-dash-sub" id="ace-dash-diskc-sub">--</div></div></div>
@@ -17469,8 +17469,8 @@ window.aceCloseAllPanels = function (exceptId) {
     overflow: hidden !important;
     box-sizing: border-box !important;
     background: #050505 !important;
-    border-left: 1px solid #ffa500 !important;
-    color: #ffa500 !important;
+    border-left: 1px solid #00ff88 !important;
+    color: #00ff88 !important;
   }
   .ace-dash-card {
     flex: 1 !important;
@@ -17481,12 +17481,14 @@ window.aceCloseAllPanels = function (exceptId) {
     padding: 4px 8px !important;
     margin: 0 !important;
     box-sizing: border-box !important;
-    background: #0a0a0a; border: 1px solid #ffa500;
+    background: #0a0a0a; border: 1px solid #00ff88;
     border-radius: 6px;
+    box-shadow: 0 0 6px rgba(0,255,136,0.25);
   }
   .ace-dash-graph {
     width: 56px; height: 100%; max-height: 36px; flex: 0 0 56px;
-    border: 1px solid #ffa500; border-radius: 3px;
+    border: 1px solid #00ff88; border-radius: 3px;
+    box-shadow: 0 0 5px rgba(0,255,136,0.25);
     display: flex; align-items: flex-end; overflow: hidden;
     background: #000;
   }
@@ -17494,10 +17496,10 @@ window.aceCloseAllPanels = function (exceptId) {
     display: block; width: 100%; height: 100%;
   }
   .ace-dash-info { min-width: 0; }
-  .ace-dash-label { color: #ffa500; font-weight: bold; font-size: 12px; white-space: nowrap; }
-  .ace-dash-value { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ace-dash-sub { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
+  .ace-dash-label { color: #00ff88; text-shadow: 0 0 5px rgba(0,255,136,0.5); font-weight: bold; font-size: 12px; white-space: nowrap; }
+  .ace-dash-value { color: #00ff88; text-shadow: 0 0 5px rgba(0,255,136,0.5); font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-sub { color: #00ff88; text-shadow: 0 0 4px rgba(0,255,136,0.4); font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ace-term-dashboard::-webkit-scrollbar-thumb { background: #00ff88 !important; }
 </style>
 
 <script>
@@ -17526,26 +17528,46 @@ window.aceCloseAllPanels = function (exceptId) {
       canvases[idx] = cv;
     });
   }
+  var _sparkPhase = 0;
   function drawSpark(idx) {
     var cv = canvases[idx];
     if (!cv) return;
     var ctx = cv.getContext('2d');
     var w = cv.width, h = cv.height;
-    var pts = history[idx] || [];
+    var pts = (history[idx] || []).slice();
     ctx.clearRect(0, 0, w, h);
-    if (!pts.length) return;
+    // Keep a visible waveform even before real data arrives.
+    if (!pts.length) pts = [0, 0, 0, 0, 0, 0];
+    var n = pts.length;
+    var phase = _sparkPhase + idx * 0.9;
     ctx.beginPath();
-    for (var k = 0; k < pts.length; k++) {
-      var x = (k / Math.max(1, pts.length - 1)) * w;
-      var y = h - (Math.max(0, Math.min(100, pts[k])) / 100) * h;
+    for (var k = 0; k < n; k++) {
+      var x = (k / Math.max(1, n - 1)) * w;
+      var base = Math.max(0, Math.min(100, pts[k]));
+      // Tiny continuous heartbeat pulse so flat lines still look alive.
+      var pulse = Math.sin(phase + k * 0.55) * 1.6 + Math.sin(phase * 1.7 + k * 0.23) * 0.8;
+      var val = Math.max(0, Math.min(100, base + pulse));
+      var y = h - (val / 100) * h;
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = '#ffa500';
-    ctx.lineWidth = Math.max(1, w / 96);
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = Math.max(1, w / 80);
+    ctx.shadowColor = 'rgba(0,255,136,0.8)';
+    ctx.shadowBlur = 5;
     ctx.stroke();
+    ctx.shadowBlur = 0;
+    // A faint line-chart fill under the curve (not a solid block).
     ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 165, 0, 0.15)';
+    var grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(0,255,136,0.18)');
+    grad.addColorStop(1, 'rgba(0,255,136,0)');
+    ctx.fillStyle = grad;
     ctx.fill();
+  }
+  function animateSparks() {
+    if (!terminalOpen()) return;
+    _sparkPhase += 0.08;
+    for (var i = 0; i < canvases.length; i++) drawSpark(i);
   }
   function push(idx, value) {
     var arr = history[idx];
@@ -17589,7 +17611,7 @@ window.aceCloseAllPanels = function (exceptId) {
       clearInterval(timer); timer = null;
     }
   }
-  function init() { initCanvases(); sync(); setInterval(sync, 500); }
+  function init() { initCanvases(); sync(); setInterval(sync, 500); setInterval(animateSparks, 90); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
