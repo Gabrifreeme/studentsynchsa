@@ -2781,9 +2781,9 @@ body { padding: 0 !important; }
   box-shadow: inset 0 1px 0 #ffa500, inset 0 -1px 0 #ffa500 !important;
 }
 /* One vertical divider between each column; one frame at the outer edges */
-#chat-panel { border-left: 1px solid #ffa500 !important; border-right: 0 !important; }
+#chat-panel { border-left: 1px solid #995C00 !important; border-right: 0 !important; }
 #code-panel { border-left: 0 !important; border-right: 0 !important; }
-#explorer-panel { border-left: 0 !important; border-right: 1px solid #ffa500 !important; box-shadow: inset -1px 0 0 #ffa500, inset 0 1px 0 #ffa500, inset 0 -1px 0 #ffa500 !important; }
+#explorer-panel { border-left: 0 !important; border-right: 1px solid #995C00 !important; box-shadow: none !important; }
 /* The CODE EDITOR / EXPLORER divider is a single bright amber 1px line */
 #code-panel + .resizer { background: #ffa500 !important; box-shadow: inset -1px 0 0 #ffa500 !important; }
 .resizer, .resizer:hover, .resizer.active {
@@ -2793,14 +2793,14 @@ body { padding: 0 !important; }
   border: 0 !important;
   box-shadow: inset -1px 0 0 #ffa500 !important;
 }
-.panel-header { border-bottom: 1px solid #ffa500 !important; box-shadow: none !important; }
+.panel-header { border-bottom: 1px solid #995C00 !important; box-shadow: none !important; }
 /* One horizontal line above the status bar, one at the very bottom */
 #bottom-status {
   border-top: 0 !important;
   border-bottom: 1px solid #ffa500 !important;
   box-shadow: none !important;
 }
-#line-numbers { border-right: 1px solid #ffa500 !important; box-shadow: inset -1px 0 0 #ffa500 !important; }
+#line-numbers { border-right: 1px solid #995C00 !important; box-shadow: none !important; }
 #open-editors-header, #open-editors-list {
   border-bottom: 2px solid #ffa500 !important;
   box-shadow: none !important;
@@ -3265,23 +3265,26 @@ input::placeholder, textarea::placeholder {
   .ace-explorer-divider { height:2px !important; min-height:2px !important; width:100% !important;
     background:#ffa500 !important; display:block !important; flex:0 0 2px !important; }
 /* Real amber divider under each panel header - not a border, cannot be overridden. */
-  .ace-header-divider { height:2px !important; min-height:2px !important; flex:0 0 2px !important;
-    width:100% !important; background:#ffa500 !important; display:block !important; z-index:50 !important; }
+  .ace-header-divider { height:1px !important; min-height:1px !important; flex:0 0 1px !important;
+    width:100% !important; background:#995C00 !important; display:block !important; z-index:50 !important; }
 
-  /* Composer top line: bright amber 2px, cannot be overridden by inline style */
+  /* Composer: single muted 1px line */
   #chat-composer {
-    border:2px solid #ffa500 !important;
-    border-top:2px solid #ffa500 !important;
-    box-shadow:inset 0 2px 0 #ffa500, inset 0 -2px 0 #ffa500 !important;
+    border:1px solid #995C00 !important;
+    border-top:1px solid #995C00 !important;
+    box-shadow:none !important;
   }
-/* All main panel lines: bright amber 2px so they read clearly on black. */
-  #main-container,
+/* Frame: muted amber 1px; panels get active/inactive colours below. */
+  #main-container, #bottom-status {
+    border-color:#995C00 !important;
+    border-style:solid !important;
+    border-width:1px !important;
+  }
   #chat-panel, #code-panel, #explorer-panel,
   #chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header,
-  #bottom-status, #chat-composer, #line-numbers {
-    border-color:#ffa500 !important;
-    border-style:solid !important;
-    border-width:2px !important;
+  #chat-composer, #line-numbers {
+    border-width:1px !important;
+    border-color:#995C00 !important;
   }
 /* Text buttons in the Code Editor toolbar need room for their labels; the
    generic .btn rule sizes every button as a 24px icon square. */
@@ -5693,7 +5696,7 @@ perspective: 900px;
         </div>
 
           <div class="ace-composer-topline"></div>
-          <div id="chat-composer" style="position:relative; display:flex; flex-direction:column; width:100%; padding:14px 12px 10px 12px; border:2px solid #ffa500; border-top:2px solid #ffa500 !important; border-top-color:#ffa500 !important; background:#000; border-radius:4px; margin:2px 0 0 0; box-sizing:border-box; flex:0 0 auto; gap:8px; z-index:5; overflow:visible; box-shadow: inset 0 1px 0 #ffa500, inset 0 -1px 0 #ffa500 !important;">
+          <div id="chat-composer" style="position:relative; display:flex; flex-direction:column; width:100%; padding:14px 12px 10px 12px; border:1px solid #995C00; border-top:1px solid #995C00 !important; border-top-color:#995C00 !important; background:#000; border-radius:4px; margin:2px 0 0 0; box-sizing:border-box; flex:0 0 auto; gap:8px; z-index:5; overflow:visible; box-shadow:none !important;">
             <!-- Textarea at top, full width, borderless -->
             <textarea
               id="chat-input"
@@ -5719,7 +5722,7 @@ perspective: 900px;
               </div>
               <div style="flex:1; min-width:0; display:flex; gap:6px; align-items:center;">
                 <div style="position:relative; flex:1; min-width:0;">
-                  <button id="composer-mode-btn" type="button" onclick="aceToggleComposerDropdown('mode',event)" style="width:100%; height:32px; display:flex; align-items:center; justify-content:center; gap:6px; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer;" data-value="plan"><span id="composer-mode-label">Plan</span><span aria-hidden="true">&#9662;</span></button>
+                  <button id="composer-mode-btn" type="button" onclick="aceToggleComposerDropdown('mode',event)" style="width:100%; height:32px; display:flex; align-items:center; justify-content:center; gap:6px; background:#000; color:#ffa500; border:0; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer;" data-value="plan"><span id="composer-mode-label">Plan</span><span aria-hidden="true">&#9662;</span></button>
                   <div id="composer-mode-menu" class="ace-comp-dropdown-menu" style="display:none; position:absolute; bottom:calc(100% + 6px); left:0; right:0; background:#0a0a0a; border:1px solid #ffa500; border-radius:6px; padding:4px; z-index:1200;">
                     <button type="button" onclick="acePickComposerDropdown('mode','plan')">Plan</button>
                     <button type="button" onclick="acePickComposerDropdown('mode','build')">Build</button>
@@ -17967,6 +17970,71 @@ window.aceCheckForUpdates = function (install) {
   };
 })();
 </script>
+
+<style id="ace-active-panel-final">
+#chat-panel.ace-panel-active, #code-panel.ace-panel-active, #explorer-panel.ace-panel-active {
+  border-color:#ffa500 !important; box-shadow:0 0 8px rgba(255,165,0,.30) !important;
+}
+#chat-panel.ace-panel-active > .panel-header,
+#code-panel.ace-panel-active > .panel-header,
+#explorer-panel.ace-panel-active > .panel-header { border-bottom-color:#ffa500 !important; }
+</style>
+
+<script>
+(function(){
+  var panels=['chat-panel','code-panel','explorer-panel'];
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    while(t&&t!==document){
+      if(t.id&&panels.indexOf(t.id)!==-1){
+        panels.forEach(function(id){var p=document.getElementById(id);if(p)p.classList.toggle('ace-panel-active',id===t.id);});
+        return;
+      }
+      t=t.parentElement;
+    }
+  });
+  var c=document.getElementById('code-panel');if(c)c.classList.add('ace-panel-active');
+})();
+</script>
+
+<style id="ace-active-divider">
+#chat-panel.ace-panel-active > .ace-header-divider,
+#code-panel.ace-panel-active > .ace-header-divider,
+#explorer-panel.ace-panel-active > .ace-header-divider {
+  background:#ffa500 !important;
+}
+#chat-panel.ace-panel-active,
+#code-panel.ace-panel-active,
+#explorer-panel.ace-panel-active {
+  border-color:#ffa500 !important;
+}
+</style>
+
+<style id="ace-bright-lines-final">
+/* Mute the remaining structural bright lines; keep the code/explorer resizer
+   and the active panel bright (user likes those). */
+.ace-composer-topline {
+  height:1px !important; min-height:1px !important;
+  background:#995C00 !important; box-shadow:none !important;
+}
+.ace-explorer-divider { background:#995C00 !important; height:1px !important; min-height:1px !important; }
+#chat-panel + .resizer { background:#995C00 !important; box-shadow:none !important; }
+#explorer-search { border:1px solid #995C00 !important; box-shadow:none !important; }
+/* Input row: only Send keeps a border */
+#chat-composer button[title="Add prompt"],
+#chat-composer #acesi-mic-btn,
+#chat-composer #acesi-spk-btn,
+#chat-composer #composer-mode-btn,
+#chat-composer #composer-quality-btn {
+  border:0 !important;
+  box-shadow:none !important;
+}
+/* Inset bright shadows were drawing 1px amber lines over the muted borders. */
+#chat-panel, #code-panel, #explorer-panel, #bottom-status { box-shadow:none !important; }
+#chat-panel.ace-panel-active, #code-panel.ace-panel-active, #explorer-panel.ace-panel-active {
+  box-shadow:0 0 8px rgba(255,165,0,.30) !important;
+}
+</style>
 </body>
 
 </html>
