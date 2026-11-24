@@ -5885,7 +5885,7 @@ perspective: 900px;
             </button>
 <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
 
-            <button id="code-restart-btn" class="btn" data-tooltip="Ctrl+click to Restart App" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{if(window.showAceToast)window.showAceToast('Hold Ctrl and click to restart.','info',3000);}" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
+            <button id="code-restart-btn" class="btn" data-tooltip="Click: hard refresh (Ctrl+F5) • Ctrl+click: restart server" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{window.aceHardRefresh()}" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
 
           </div>
 
@@ -6615,6 +6615,16 @@ perspective: 900px;
       }
 
 
+
+      // Hard refresh (same idea as Ctrl+F5): reload from a cache-busting URL so
+      // the browser fetches fresh HTML instead of serving a cached copy.
+      window.aceHardRefresh = function () {
+        try {
+          if (window.showAceToast) window.showAceToast("Refreshing...", 'info', 2000);
+        } catch (e) {}
+        var sep = window.location.href.indexOf('?') >= 0 ? '&' : '?';
+        window.location.replace(window.location.pathname + sep + '_hr=' + Date.now());
+      };
 
       // Expose globally so the Restart button can call it
 
