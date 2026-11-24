@@ -16507,7 +16507,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Typewriter effect: only the bottom 3 lines animate; older lines fill instantly.
   window.aceTypingEnabled = true;
-  window.aceTerminalTypeSpeed = 3;
+  window.aceTerminalTypeSpeed = 22;
   window.aceTypeTerminalLine = function (line, text, segs) {
     try {
       if (!line || !line.parentNode) return;
@@ -16517,7 +16517,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       var len = text.length;
       var idx = 0;
-      var spd = (len > 400) ? 1 : window.aceTerminalTypeSpeed;
+      var spd = (len > 400) ? 4 : window.aceTerminalTypeSpeed;
       (function step() {
         if (!line || !line.parentNode) return;
         // If this line is no longer one of the bottom 3, finish it instantly
@@ -16537,7 +16537,7 @@ document.addEventListener('DOMContentLoaded', function() {
           window.aceFillTerminalLine(line, segs);
           return;
         }
-        line.textContent = text.slice(0, idx);
+        line.textContent = text.slice(0, idx) + '\u2588';
         setTimeout(step, spd);
       })();
     } catch (e) {}
