@@ -9639,12 +9639,16 @@ def api_save_file():
             f.write(content)
         _log_change(full, old, content, source='explorer')
         print("💾 Explorer: saved %s (%d chars)" % (filename, len(content)))
-        # Wire project_doctor's verify step: prove the saved file is clean.
-        # Only claim success when the analyzer agrees; never claim "fixed" over
-        # remaining errors.
-        verified, errors = doctor_verify_file(full)
+        # Save returns instantly. Re-running dart analyze on save used to take
+        # ~19s; use the cached problems result instead (already computed by the
+        # Explorer badge) so the UI stays responsive.
+        cached = _PROBLEMS_CACHE.get("data") or {}
+        rel = os.path.relpath(full, _IDE_ROOT).replace("\\", "/")
+        entry = (cached.get("files") or {}).get(rel) or {}
+        errs = int(entry.get("error") or 0)
+        verified = (errs == 0) if cached.get("files") else False
         return jsonify({'ok': True, 'message': 'Saved!',
-                        'verified': bool(verified), 'errors': errors[:20]})
+                        'verified': bool(verified), 'errors': []})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

@@ -5703,8 +5703,6 @@ perspective: 900px;
 
           >
 
-            <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
-
             <button
 
               id="save-btn"
@@ -5884,7 +5882,8 @@ perspective: 900px;
               📄
 
             </button>
-<button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
+            <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
+            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Settings</button>
 
             <button id="code-restart-btn" class="btn" data-tooltip="Click: hard refresh (Ctrl+F5) • Ctrl+click: restart server" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{window.aceHardRefresh()}" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Restart</button>
 
