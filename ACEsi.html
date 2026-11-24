@@ -16508,7 +16508,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Typewriter: ONE line at a time, always typing fully to the end.
   // Incoming logs queue up and are shown in order once the current line finishes.
   window.aceTypingEnabled = true;
-  window.aceTerminalTypeSpeed = 7;
+  window.aceTerminalTypeSpeed = 4;
   window.__aceLogQueue = [];
   window.__aceTypingBusy = false;
 
@@ -16527,6 +16527,8 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         line.textContent = text.slice(0, idx) + '\u2588';
+        var histBox = document.getElementById('term-history');
+        if (histBox) histBox.scrollTop = histBox.scrollHeight;
         setTimeout(step, spd);
       })();
     } catch (e) { if (done) done(); }
