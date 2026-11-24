@@ -569,7 +569,7 @@
 
       #code-editor::selection {
 
-        background: rgba(255, 157, 0, 0.35);
+        background: rgba(153, 92, 0, 0.75);
 
       }
 
@@ -770,7 +770,7 @@
 
         border-radius: 2px;
 
-        background: rgba(255, 157, 0, 0.35);
+        background: rgba(153, 92, 0, 0.75);
 
         box-shadow: none !important;
 
@@ -1008,7 +1008,7 @@
 
       ::-webkit-scrollbar-thumb {
 
-        background: #ff9d00;
+        background: #995C00;
 
         border-radius: 4px;
 
@@ -1591,7 +1591,7 @@
 
       #explorer::-webkit-scrollbar-thumb {
 
-        background: rgba(255, 157, 0, 0.35);
+        background: rgba(153, 92, 0, 0.75);
 
         border: 1px solid transparent;
 
@@ -1603,7 +1603,7 @@
 
       #explorer::-webkit-scrollbar-thumb:hover {
 
-        background: rgba(255, 157, 0, 0.6);
+        background: #ffa500;
 
         border: 1px solid transparent;
 
@@ -1689,7 +1689,7 @@
 
         width: 1px;
 
-        background: rgba(255, 157, 0, 0.35);
+        background: rgba(153, 92, 0, 0.75);
 
         opacity: 0;
 
@@ -2058,7 +2058,7 @@
 
       .CodeMirror-scroll::-webkit-scrollbar-thumb {
 
-        background: #ff9d00 !important;
+        background: #995C00 !important;
 
         border: 1px solid #ffa500 !important;
 
@@ -2832,7 +2832,9 @@ button[data-tooltip="Restart App"], #explorer-refresh-btn, #explorer-search {
   border-right: 1px solid #995C00 !important;
   box-shadow: none !important;
 }
-#explorer::-webkit-scrollbar-thumb,
+#explorer::-webkit-scrollbar-thumb {
+  background: #995C00 !important;
+}
 #explorer::-webkit-scrollbar-thumb:hover {
   background: #ffa500 !important;
 }
@@ -3500,7 +3502,7 @@ input::placeholder, textarea::placeholder {
 
 
   /* Run Commands modal: dark-and-amber only, no white or gray */
-  #run-panel::-webkit-scrollbar-thumb { background:#ffa500 !important; border:1px solid #ffa500 !important; }
+  #run-panel::-webkit-scrollbar-thumb { background:#995C00 !important; border:1px solid #995C00 !important; }
   #run-panel::-webkit-scrollbar-track { background:#000 !important; }
   #run-panel, #run-panel * { color:#ffa500 !important; }
   #run-panel, #run-panel div, #run-panel span, #run-panel label,
@@ -14903,7 +14905,7 @@ window.initAceTerminalFn = function() {
 
 #terminal-output .xterm-viewport::-webkit-scrollbar-thumb {
 
-    background: #ff9d00 !important;
+    background: #995C00 !important;
 
     border-radius: 5px !important;
 
@@ -14943,7 +14945,7 @@ window.initAceTerminalFn = function() {
 
 #terminal-output .xterm-viewport::-webkit-scrollbar-thumb {
 
-    background: #ff9d00 !important;
+    background: #995C00 !important;
 
     border-radius: 6px !important;
 
@@ -17466,7 +17468,7 @@ window.aceCloseAllPanels = function (exceptId) {
   .ace-dash-label { color: #8fd3ff; font-weight: bold; font-size: 12px; white-space: nowrap; }
   .ace-dash-value { color: #8fd3ff; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ace-dash-sub { color: #8fd3ff; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
+  #ace-term-dashboard::-webkit-scrollbar-thumb { background: #995C00 !important; }
 </style>
 
 <script>
