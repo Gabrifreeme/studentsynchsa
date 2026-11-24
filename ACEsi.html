@@ -18040,6 +18040,12 @@ window.aceCheckForUpdates = function (install) {
 }
 /* Explorer header divider - bright amber (top-right second line). */
 html body #explorer-panel > .ace-header-divider { background:#ffa500 !important; }
+/* Bright divider just above the control row, reaching the left border. */
+html body #chat-composer > div:last-child { position:relative !important; }
+html body #chat-composer > div:last-child::before {
+  content:""; position:absolute; left:-13px; right:-13px; top:-7px;
+  height:1px; background:#ffa500 !important; pointer-events:none;
+}
 /* Bottom frame lines: bright amber to match the top two. */
 html body .ace-composer-topline { background:#ffa500 !important; }
 html body #bottom-status {
