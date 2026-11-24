@@ -8658,6 +8658,26 @@ def run_command():
             # can watch the build progress from ACEsi's terminal.
             proc = subprocess.Popen(command, shell=True, stdout=log,
                                     stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
+            # web-server mode does not launch a browser itself. Poll the port,
+            # then open Chrome at the URL so the app appears automatically.
+            if 'web-server' in command:
+                import threading as _th
+                def _open_browser_when_ready():
+                    url = 'http://127.0.0.1:55793'
+                    for _ in range(90):  # up to ~90s
+                        time.sleep(1)
+                        try:
+                            import requests as _rq
+                            if _rq.get(url, timeout=2).ok:
+                                log.write(f'[ACEsi] server up - opening Chrome at {url}\n')
+                                log.flush()
+                                _popen(['cmd', '/c', 'start', '', 'chrome', url])
+                                return
+                        except Exception:
+                            pass
+                    log.write('[ACEsi] server did not become ready in time\n')
+                    log.flush()
+                _th.Thread(target=_open_browser_when_ready, daemon=True).start()
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
