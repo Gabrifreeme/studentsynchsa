@@ -5583,6 +5583,11 @@ git add -u (stage tracked)</label
 
         <div class="panel-header chat-panel-header">
           <span class="chat-panel-title">CONVERSATION</span>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+            <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Terminal</button>
+            <button id="code-restart-btn" class="btn" data-tooltip="Click: hard refresh (Ctrl+F5) • Ctrl+click: restart server" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{window.aceHardRefresh()}" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Restart</button>
+            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Settings</button>
+          </div>
         </div>
         <div class="ace-header-divider"></div>
 <style id="acesi-3d-notif-styles">
@@ -5947,10 +5952,7 @@ perspective: 900px;
               📄
 
             </button>
-            <button id="terminal-toggle-btn" class="btn" data-tooltip="Open Terminal" onclick="if(window.aceCloseAllPanels)window.aceCloseAllPanels('terminal-panel');window.toggleAceTerminal()">Terminal</button>
-            <button class="btn" onclick="openSettings()" data-tooltip="Open Settings" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Settings</button>
 
-            <button id="code-restart-btn" class="btn" data-tooltip="Click: hard refresh (Ctrl+F5) • Ctrl+click: restart server" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{window.aceHardRefresh()}" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Restart</button>
 
           </div>
 
@@ -6261,7 +6263,7 @@ perspective: 900px;
 
       <div id="explorer-panel" class="panel">
 
-        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:10px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
+        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:34px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
         <div class="ace-header-divider"></div>
 
         <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ffa500; border-bottom: 2px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
