@@ -6494,9 +6494,7 @@ perspective: 900px;
         if (window.__aceFlutterTimer) { clearInterval(window.__aceFlutterTimer); window.__aceFlutterTimer = null; }
         var b = document.getElementById("ace-flutter-mode-btn");
         if (b) { b.textContent = "Flutter Log: OFF"; b.style.color = "#ffa500"; }
-        var st = document.getElementById("flutter-console-status");
-        if (st) st.textContent = "idle";
-        if (typeof window.aceSwitchTerminal === 'function') window.aceSwitchTerminal('acesi');
+        // stay on Flutter tab so the user can still read the final output
       };
       window.startAceFlutterFollow = function () {
         if (window.__aceFlutterFollow) return;
@@ -6504,8 +6502,6 @@ perspective: 900px;
         window.__aceFlutterFollow = true;
         var b = document.getElementById("ace-flutter-mode-btn");
         if (b) { b.textContent = "Flutter Log: ON"; b.style.color = "#00ff00"; }
-        var st = document.getElementById("flutter-console-status");
-        if (st) st.textContent = "live";
         if (window.__aceFlutterTimer) clearInterval(window.__aceFlutterTimer);
         window.__aceFlutterTimer = setInterval(async function () {
           try {
@@ -6531,21 +6527,17 @@ perspective: 900px;
         var flu = document.getElementById('flutter-console');
         var ta = document.getElementById('ace-tab-acesi');
         var tf = document.getElementById('ace-tab-flutter');
-        if (which === 'flutter') {
-          if (flu) flu.style.display = 'flex';
-          if (out) out.style.display = 'none';
-          if (ta) { ta.style.background = '#000'; ta.style.color = '#ffa500'; }
-          if (tf) { tf.style.background = '#ffa500'; tf.style.color = '#000'; }
-        } else {
-          if (flu) flu.style.display = 'none';
-          if (out) out.style.display = 'block';
-          if (ta) { ta.style.background = '#ffa500'; ta.style.color = '#000'; }
-          if (tf) { tf.style.background = '#000'; tf.style.color = '#ffa500'; }
-        }
+        var showFlutter = (which === 'flutter');
+        if (flu) flu.style.display = showFlutter ? 'block' : 'none';
+        if (out) out.style.display = showFlutter ? 'none' : 'block';
+        if (ta) { ta.style.background = showFlutter ? '#000' : '#ffa500'; ta.style.color = showFlutter ? '#ffa500' : '#000'; }
+        if (tf) { tf.style.background = showFlutter ? '#ffa500' : '#000'; tf.style.color = showFlutter ? '#000' : '#ffa500'; }
+        window.__aceActiveTerminal = which;
       };
 
       window.aceFlutterSend = async function () {
         var inp = document.getElementById('flutter-console-input');
+        if (!inp) return;
         var key = inp ? inp.value.trim() : '';
         if (!key) return;
         if (inp) inp.value = '';
@@ -8916,17 +8908,8 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
         <button id="ace-tab-flutter" type="button" onclick="window.aceSwitchTerminal('flutter')" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px 6px 0 0;padding:3px 12px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;">Flutter Terminal</button>
       </div>
       <div id="terminal-output" style="flex:1 1 auto; width:100%; overflow:hidden; padding:0; margin:0; background:#000; display:block; position:relative;"></div>
-      <div id="flutter-console" style="display:none; flex:1 1 auto; flex-direction:column; min-height:0; border-top:2px solid #ffa500; background:#000;">
-        <div style="display:flex;align-items:center;gap:10px;padding:2px 8px;border-bottom:1px solid #ffa500;">
-          <span style="color:#00ff00;font-family:monospace;font-size:11px;font-weight:bold;">FLUTTER CONSOLE</span>
-          <span id="flutter-console-status" style="color:#ffa500;font-family:monospace;font-size:10px;">idle</span>
-        </div>
-        <pre id="flutter-console-output" style="flex:1 1 auto;min-height:0;margin:0;padding:4px 8px;overflow:auto;color:#ffa500;font-family:monospace;font-size:11px;white-space:pre-wrap;"></pre>
-        <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid #ffa500;">
-          <span style="color:#00ff00;font-family:monospace;font-size:11px;">flutter&gt;</span>
-          <input id="flutter-console-input" type="text" placeholder="r = reload, R = restart, q = quit" onkeydown="if(event.key==='Enter'){event.preventDefault();window.aceFlutterSend()}" style="flex:1;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:11px;">
-          <button type="button" onclick="window.aceFlutterSend()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:4px 10px;font-family:monospace;font-size:11px;cursor:pointer;">Send</button>
-        </div>
+      <div id="flutter-console" style="display:none; flex:1 1 auto; width:100%; overflow:auto; padding:0; margin:0; background:#000; position:relative;">
+        <pre id="flutter-console-output" style="margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;"></pre>
       </div>
       </div>
       <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #ffa500; font-family:'Roboto Mono',monospace; color:#ffa500;">
