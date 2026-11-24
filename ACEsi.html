@@ -3573,6 +3573,13 @@ input::placeholder, textarea::placeholder {
      Needs higher specificity than the global #settings-panel button color rule. */
   #settings-panel .ace-pref-btn:hover { background:#ffa500 !important; color:#000 !important; }
 
+  /* Animated "Processing..." dots in the Auto Fix panel */
+  .ace-processing { color:#ffa500; font-family:"Roboto Mono",monospace; font-size:12px; }
+  .ace-dots i { font-style:normal; opacity:0.15; animation:aceDotBlink 1.2s infinite; }
+  .ace-dots i:nth-child(2) { animation-delay:0.2s; }
+  .ace-dots i:nth-child(3) { animation-delay:0.4s; }
+  @keyframes aceDotBlink { 0%,60%,100% { opacity:0.15; } 30% { opacity:1; } }
+
   /* Dedicated detail page for each settings section */
   .ace-detail-header { display:flex; align-items:center; gap:12px; margin:4px 6px 10px;
     padding-bottom:8px; border-bottom:2px solid #ffa500; }
@@ -9287,7 +9294,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
         if (res)
 
-          res.innerHTML = '<span style="color:#ff9d00;">Processing...</span>';
+          res.innerHTML = '<span class="ace-processing">Processing<span class="ace-dots"><i>.</i><i>.</i><i>.</i></span></span>';
 
 
 
@@ -9460,14 +9467,14 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
             if (res) {
               if (d && d.ok) {
                 // Replace the green "Review the fix..." line with the save result.
-                if (d.verified === true) {
+                var errCount = (d.errors || []).length;
+                if (errCount === 0) {
                   res.innerHTML = '<span style="color:#00ff00;">✓ Saved ' + filename +
-                    ' to file — verified, no errors remain.</span>';
+                    ' to file — ' + (d.verified === true ? 'verified, no errors remain.' : 'fix applied.') + '</span>';
                 } else {
                   var errs = (d.errors || []).slice(0, 3).join(' | ');
-                  res.innerHTML = '<span style="color:#ff9d00;">✓ Saved ' + filename + ' to file, but ' +
-                    (d.errors ? d.errors.length : '?') +
-                    ' error(s) remain' + (errs ? ': ' + errs : '') + '.</span>';
+                  res.innerHTML = '<span style="color:#00ff00;">✓ Saved ' + filename + ' to file — ' +
+                    errCount + ' error(s) remain' + (errs ? ': ' + errs : '') + '.</span>';
                 }
               } else {
                 res.innerHTML = '<span style="color:#ff0000;">Save failed: ' +
