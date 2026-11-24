@@ -3803,7 +3803,7 @@ def _nullable_optional(tools_schema):
 
 
 def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_options=None,
-              tools_schema=None, tool_choice="auto"):
+              tools_schema=None, tool_choice="auto", max_tokens_override=None):
     if not api_key:
         _prov_record(name, model, "nokey", "no API key configured for this provider")
         return None
@@ -3860,6 +3860,8 @@ def _chat_one(name, endpoint, api_key, model, msgs, timeout=(8, 30), extra_optio
         max_tokens = 4096
     else:
         max_tokens = 2048
+    if max_tokens_override:
+        max_tokens = int(max_tokens_override)
 
     body = {"model": model, "messages": msgs, "temperature": 0.4,
             "max_tokens": max_tokens}
@@ -8331,7 +8333,10 @@ def _generate_autofix_fix(code):
     try:
         # Force Groq directly
         if GROQ_API_KEY:
-            result = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs, tool_choice="none")
+            # A 23-line file needs at most ~1200 tokens. The default 4096 made
+            # Groq generate for ~21s; cap it so fixes come back in a few seconds.
+            result = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs,
+                               tool_choice="none", max_tokens_override=1200)
             if result:
                 reply, _, _ = result
                 if reply:
@@ -8341,7 +8346,8 @@ def _generate_autofix_fix(code):
             if not api_key:
                 continue
             try:
-                result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none")
+                result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none",
+                                   max_tokens_override=1200)
                 if result:
                     reply, _, _ = result
                     if reply:
