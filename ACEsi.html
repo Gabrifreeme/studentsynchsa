@@ -9354,6 +9354,16 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
 
 
+      window.__aceConfirmSaveName = function () {
+        var inp = document.getElementById("autofix-filename");
+        var name = inp ? (inp.value || "").trim() : "";
+        if (!name) { if (inp) inp.focus(); return; }
+        window._autofix.file = name;
+        var holder = document.getElementById("autofix-save-name");
+        if (holder) holder.style.display = "none";
+        saveFixedCode();
+      };
+
       function saveFixedCode() {
 
         var pane = document.getElementById("autofix-code");
@@ -9397,15 +9407,21 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
         var filename = window._autofix.file || window.currentFile || "";
 
         if (!filename) {
-
-          filename = prompt("Enter filename to save (e.g. lib/main.dart):", "");
-
-          if (!filename) {
-
-            return;
-
-          } // user cancelled
-
+          // Browsers (Electron) do not support prompt() - use an inline field.
+          var holder = document.getElementById("autofix-save-name");
+          if (!holder) {
+            holder = document.createElement("div");
+            holder.id = "autofix-save-name";
+            holder.style.cssText = "display:flex;gap:8px;align-items:center;justify-content:center;margin:8px 0;";
+            holder.innerHTML = '<input id="autofix-filename" type="text" placeholder="lib/path/file.dart" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:6px 8px;font-family:monospace;font-size:12px;width:280px;">' +
+              '<button type="button" onclick="window.__aceConfirmSaveName()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:6px 10px;cursor:pointer;">Use this name</button>';
+            var sb = document.getElementById("autofix-save-btn");
+            if (sb && sb.parentNode) sb.parentNode.insertBefore(holder, sb);
+          }
+          holder.style.display = "flex";
+          var inp = document.getElementById("autofix-filename");
+          if (inp) inp.focus();
+          return;
         }
 
         fetch("http://127.0.0.1:5000/api/save-file", {
