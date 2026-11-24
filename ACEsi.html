@@ -3229,7 +3229,11 @@ input::placeholder, textarea::placeholder {
 #terminal-toggle-btn:hover::after,
 #ace-close-terminal-inline:hover::after { opacity:1; }
 
-  /* All main panel lines: bright amber 2px so they read clearly on black. */
+  
+  /* Real amber divider under each panel header - not a border, cannot be overridden. */
+  .ace-header-divider { height:2px !important; min-height:2px !important; flex:0 0 2px !important;
+    width:100% !important; background:#ffa500 !important; display:block !important; z-index:50 !important; }
+/* All main panel lines: bright amber 2px so they read clearly on black. */
   #main-container,
   #chat-panel, #code-panel, #explorer-panel,
   #chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header,
@@ -5536,6 +5540,7 @@ git add -u (stage tracked)</label
 
       <div id="chat-panel" class="panel" style="flex: 0 0 30%; min-width: 200px; max-width: 60%; display: flex; flex-direction: column;">
 
+        <div class="ace-header-divider"></div>
         <div class="panel-header chat-panel-header">
           <span class="chat-panel-title">CONVERSATION</span>
         </div>
@@ -5695,6 +5700,7 @@ perspective: 900px;
 
       <div id="code-panel" class="panel">
 
+        <div class="ace-header-divider"></div>
         <div class="panel-header">
 
           <span class="code-panel-title">CODE EDITOR</span>
@@ -6213,6 +6219,7 @@ perspective: 900px;
 
       <div id="explorer-panel" class="panel">
 
+        <div class="ace-header-divider"></div>
         <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:10px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
 
         <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
