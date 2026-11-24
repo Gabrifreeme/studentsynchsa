@@ -3020,6 +3020,9 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
   align-items: center !important;
   border-bottom: 2px solid #ffa500 !important;
 }
+/* Let the middle column shrink so Explorer's right border lands on the viewport edge */
+#code-panel { min-width:0 !important; }
+#explorer-panel { flex:0 0 248px !important; }
 /* Keep the whole UI (including the right border) inside the viewport */
 html, body {
   margin: 0 !important;
