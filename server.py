@@ -491,6 +491,8 @@ def _run(*args, **kw):
 # which prevents NEW spawns.
 _PROCS = {}
 _PROCS_LOCK = threading.RLock()
+# The currently running flutter/dart dev session (started via /run).
+_ACTIVE_RUN = {"proc": None, "log": "", "cmd": ""}
 def _track_proc(p):
     with _PROCS_LOCK:
         _PROCS[p.pid] = p
@@ -8657,7 +8659,14 @@ def run_command():
             # Direct Popen streams stdout/stderr into the log live so the user
             # can watch the build progress from ACEsi's terminal.
             proc = subprocess.Popen(command, shell=True, stdout=log,
-                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
+                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT,
+                                    stdin=subprocess.PIPE, bufsize=0)
+            # Track the live run so ACEsi's terminal can tail its log and send
+            # hot-reload keys (r/R/q) straight to Flutter's stdin.
+            with _PROCS_LOCK:
+                _ACTIVE_RUN["proc"] = proc
+                _ACTIVE_RUN["log"] = log_full
+                _ACTIVE_RUN["cmd"] = command
             # web-server mode does not launch a browser itself. Poll the port,
             # then open Chrome at the URL so the app appears automatically.
             if 'web-server' in command:
@@ -20954,6 +20963,48 @@ def api_terminal():
         return jsonify({'ok': True, 'stdout': result.stdout, 'stderr': result.stderr})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/run/status', methods=['GET'])
+@require_token
+def api_run_status():
+    """Is a Flutter run active? Return the log path and recent tail."""
+    with _PROCS_LOCK:
+        proc = _ACTIVE_RUN.get("proc")
+        log_path = _ACTIVE_RUN.get("log", "")
+        cmd = _ACTIVE_RUN.get("cmd", "")
+    alive = bool(proc and proc.poll() is None)
+    tail = ""
+    if log_path and os.path.isfile(log_path):
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as fh:
+                lines = fh.readlines()
+            tail = "".join(lines[-300:])
+        except Exception:
+            pass
+    return jsonify({'running': alive, 'log': os.path.basename(log_path),
+                    'cmd': cmd, 'tail': tail})
+
+
+@app.route('/api/run/input', methods=['POST'])
+@require_token
+def api_run_input():
+    """Send a keystroke (r = hot reload, R = restart, q = quit) to Flutter."""
+    key = str((request.json or {}).get('key', ''))
+    with _PROCS_LOCK:
+        proc = _ACTIVE_RUN.get("proc")
+    if not proc or proc.poll() is not None or not key:
+        return jsonify({'ok': False, 'error': 'no active Flutter run'}), 400
+    if key.lower() == 'q':
+        with _PROCS_LOCK:
+            _ACTIVE_RUN["proc"] = None
+    try:
+        # shell=True means the direct child is cmd.exe; write to its stdin.
+        proc.stdin.write(key.encode('utf-8') + b'\n')
+        proc.stdin.flush()
+        return jsonify({'ok': True, 'sent': key})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 
 @app.route('/api/format', methods=['POST'])
 @require_token

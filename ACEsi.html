@@ -6486,6 +6486,41 @@ perspective: 900px;
 
 
       
+      /* Tail the active Flutter run's log into ACEsi's own terminal. */
+      window.aceFlutterLastTail = "";
+      window.__aceFlutterFollow = false;
+      window.stopAceFlutterFollow = function () {
+        window.__aceFlutterFollow = false;
+        if (window.__aceFlutterTimer) { clearInterval(window.__aceFlutterTimer); window.__aceFlutterTimer = null; }
+        var b = document.getElementById("ace-flutter-mode-btn");
+        if (b) { b.textContent = "Flutter Log: OFF"; b.style.color = "#ffa500"; }
+      };
+      window.startAceFlutterFollow = function () {
+        if (window.__aceFlutterFollow) return;
+        if (typeof window.openAceTerminal === "function") { try { window.openAceTerminal(); } catch (e) {} }
+        window.__aceFlutterFollow = true;
+        var b = document.getElementById("ace-flutter-mode-btn");
+        if (b) { b.textContent = "Flutter Log: LIVE (r/R/q)"; b.style.color = "#00ff00"; }
+        if (window.__aceFlutterTimer) clearInterval(window.__aceFlutterTimer);
+        window.__aceFlutterTimer = setInterval(async function () {
+          try {
+            const res = await fetch("/api/run/status", {cache: "no-store"});
+            const d = await res.json();
+            if (!d.running) { window.stopAceFlutterFollow(); return; }
+            if (d.tail && d.tail !== window.aceFlutterLastTail) {
+              var added = d.tail.slice(window.aceFlutterLastTail.length);
+              window.aceFlutterLastTail = d.tail;
+              var box = document.getElementById("terminal-output");
+              if (box) {
+                box.innerHTML += "<pre style='color:#ffa500;font-family:monospace;margin:0;white-space:pre-wrap;'>" +
+                  added.replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>";
+                box.scrollTop = box.scrollHeight;
+              }
+            }
+          } catch (e) {}
+        }, 1200);
+      };
+
       async function runTerminalCommand() {
 
         const input = document.getElementById("terminal-input");
@@ -6497,6 +6532,24 @@ perspective: 900px;
 
         if (!cmd) return;
 
+        // When a Flutter run is active, r/R/q/h are Flutter commands, not shell.
+        if (window.__aceFlutterFollow && /^(r|R|q|h|d|c)$/i.test(cmd)) {
+          input.value = "";
+          try {
+            const res = await fetch("/api/run/input", {
+              method: "POST", headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({ key: cmd })
+            });
+            const d = await res.json();
+            output.innerHTML += "<div><span style='color:#00ff00;'>flutter > " +
+              cmd + "</span> " + (d.ok ? "sent" : (d.error || "failed")) + "</div>";
+            output.scrollTop = output.scrollHeight;
+            if (/^q$/i.test(cmd)) stopAceFlutterFollow();
+          } catch (e) {
+            output.innerHTML += "<div style='color:#ff0000;'>Flutter input failed: " + e.message + "</div>";
+          }
+          return;
+        }
 
         // Print the command with a smiley
         output.innerHTML +=
@@ -8257,6 +8310,11 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
                 body: JSON.stringify({command: cmd})
               }).then(function(r) { return r.json(); }).then(function(d) {
                 var out = (d && (d.output || d.error)) || "";
+                // Follow the Flutter run's log live in ACEsi's terminal.
+                if (/\b(flutter|dart)\s+run\b/i.test(cmd) && d && !d.error && typeof window.startAceFlutterFollow === "function") {
+                  window.aceFlutterLastTail = "";
+                  window.startAceFlutterFollow();
+                }
                 if (/^\s*explorer\b/i.test(cmd) && !out.trim() && !(d && d.error)) {
                   out = "Opened project folder in File Explorer.";
                 }
@@ -8813,6 +8871,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
       <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <span style="color: #ff9d00; font-weight: bold; font-family: 'Roboto Mono', monospace;">ACEsi Terminal</span>
       <span id="terminal-logs-btn" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" data-tooltip="Toggle Live Server Log on or Off" style="color: #ff9d00; cursor: pointer; font-weight: bold; font-family: 'Roboto Mono', monospace;">📜 Live Logs</span>
+      <button id="ace-flutter-mode-btn" type="button" onclick="if(window.__aceFlutterFollow){window.stopAceFlutterFollow()}else{window.startAceFlutterFollow()}" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Flutter Log: OFF</button>
     </div>
 
         
