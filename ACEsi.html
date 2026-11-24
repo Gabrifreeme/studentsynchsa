@@ -2802,7 +2802,7 @@ body { padding: 0 !important; }
 }
 #line-numbers { border-right: 1px solid #ffa500 !important; box-shadow: inset -1px 0 0 #ffa500 !important; }
 #open-editors-header, #open-editors-list {
-  border-bottom: 1px solid #ffa500 !important;
+  border-bottom: 2px solid #ffa500 !important;
   box-shadow: none !important;
 }
 #explorer { border: 0 !important; }
@@ -2819,12 +2819,12 @@ button[data-tooltip="Restart App"], #explorer-refresh-btn, #explorer-search {
 #explorer-search, #bottom-model-picker { border-radius: 6px !important; }
 /* Rounded Explorer dividers + search box - bright amber */
 #open-editors-header, #open-editors-list, #explorer-search {
-  border-bottom: 1px solid #ffa500 !important;
-  box-shadow: inset 0 -1px 0 #ffa500 !important;
+  border-bottom: 2px solid #ffa500 !important;
+  box-shadow: inset 0 -2px 0 #ffa500 !important;
 }
 #explorer-search {
-  border: 1px solid #ffa500 !important;
-  box-shadow: inset 0 0 0 1px #ffa500 !important;
+  border: 2px solid #ffa500 !important;
+  box-shadow: inset 0 0 0 2px #ffa500 !important;
 }
 /* Explorer column divider + scrollbar - bright amber */
 #code-panel + .resizer {
@@ -3020,6 +3020,17 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
   align-items: center !important;
   border-bottom: 2px solid #ffa500 !important;
 }
+/* Explorer: OPEN EDITORS divider, search box and its row - 2px bright amber */
+#open-editors-header { border-bottom:2px solid #ffa500 !important; }
+#explorer-search,
+#explorer-search + div,
+#explorer-panel > div:has(> #explorer-search) {
+  border:2px solid #ffa500 !important;
+  color:#ffa500 !important;
+}
+/* Bottom-right model picker badge */
+#bottom-status [class*="model"], #bottom-status select { border:2px solid #ffa500 !important; color:#ffa500 !important; }
+
 /* Let the middle column shrink so Explorer's right border lands on the viewport edge */
 #code-panel { min-width:0 !important; }
 #explorer-panel { flex:0 0 248px !important; }
@@ -3248,6 +3259,10 @@ input::placeholder, textarea::placeholder {
   
   /* Double bright-amber top line on the composer, matching the bottom line */
   .ace-composer-topline { height:2px !important; min-height:2px !important; width:100% !important;
+    background:#ffa500 !important; display:block !important; flex:0 0 2px !important; }
+
+  /* Real amber bars in Explorer - not borders, cannot be overridden */
+  .ace-explorer-divider { height:2px !important; min-height:2px !important; width:100% !important;
     background:#ffa500 !important; display:block !important; flex:0 0 2px !important; }
 /* Real amber divider under each panel header - not a border, cannot be overridden. */
   .ace-header-divider { height:2px !important; min-height:2px !important; flex:0 0 2px !important;
@@ -6249,7 +6264,8 @@ perspective: 900px;
         <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:10px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
         <div class="ace-header-divider"></div>
 
-        <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
+        <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ffa500; border-bottom: 2px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
+        <div class="ace-explorer-divider"></div>
 
 <div id="open-editors-list" style="display: block; font-family: monospace; font-size: 11px; border-bottom: 1px solid #ffa500; padding-bottom: 4px;"></div>
 
