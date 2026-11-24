@@ -3596,6 +3596,12 @@ input::placeholder, textarea::placeholder {
   #settings-panel .ace-nav-item:hover span,
   #settings-panel .ace-nav-item.active:hover span { color:#000 !important; }
   .ace-nav-ico { width:18px; text-align:center; font-size:13px; }
+  /* Explorer header error badge lines up with the per-row badges in the tree */
+  #explorer-panel .panel-header #explorer-problems {
+    min-width:38px !important;
+    text-align:right !important;
+    margin-right:2px !important;
+  }
   #settings-panel button[data-tab] { color:#ffa500 !important; }
   #settings-panel button[data-tab].active,
   #settings-panel button[data-tab].active:hover { color:#000 !important; }
@@ -5876,6 +5882,8 @@ perspective: 900px;
             </button>
 <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
 
+            <button class="btn" data-tooltip="Restart App" onclick="restartAcesi()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
+
           </div>
 
           <span id="model-spinner" class="status-ok" data-tooltip="Server status: online" style="display:inline-block;width:10px;height:10px;"></span>
@@ -6184,7 +6192,7 @@ perspective: 900px;
 
       <div id="explorer-panel" class="panel">
 
-        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:10px;"><button class="btn" data-tooltip="Restart App" onclick="restartAcesi()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
+        <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:10px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
 
         <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ff9d00; border-bottom: 1px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
 
@@ -7352,10 +7360,8 @@ perspective: 900px;
           // If Explorer is showing errors, fix them automatically and flash a
           // short notification in the chat panel. The signature/attempt guards
           // stop the follow-up re-scan from starting an endless fix loop.
-          if (data.counts && data.counts.error > 0 && !data.running &&
-              typeof window.aceAutoFixExplorerProblems === "function") {
-            window.aceAutoFixExplorerProblems(data);
-          }
+          // Auto-fix disabled: show markers only, the user decides when to fix.
+          // (window.aceAutoFixExplorerProblems is intentionally not called.)
 
           if (window.ACE_EXPLORER_TREE) {
 
@@ -7386,7 +7392,8 @@ perspective: 900px;
       // Flash a short ACEsi notification in the chat panel, then remove it.
       // Passing an existing element updates that notification instead of
       // stacking a second one (used for "fixing..." -> "fixed").
-      window.aceExplorerNotify = function (message, existing, highlightTail) {
+      // Explorer notifications are chat-only - never show a floating toast.
+window.aceExplorerNotify = function (message, existing, highlightTail) {
         var chat = document.getElementById("chat-messages");
         if (!chat) return null;
         var div = existing;
@@ -7443,6 +7450,9 @@ perspective: 900px;
       };
 
       window.aceAutoFixExplorerProblems = async function (data) {
+        // Disabled: Explorer errors are markers only. The user decides when
+        // to fix them - ACEsi must never auto-fix on its own.
+        return;
         if (window._aceAutoFixRunning) return;
         var counts = (data && data.counts) || {};
         var errs = counts.error || 0;
@@ -8950,7 +8960,7 @@ perspective: 900px;
 
 
 
-      window._autofix = { original: "", fixed: "" };
+      window._autofix = { original: "", fixed: "", file: "" };
 
 
 
@@ -9221,6 +9231,7 @@ perspective: 900px;
         window._autofix.original = source;
 
         window._autofix.fixed = "";
+        window._autofix.file = window.currentFile || "";
 
         _afixRender();
 
@@ -9377,7 +9388,7 @@ perspective: 900px;
 
         }
 
-        var filename = window.currentFile || "";
+        var filename = window._autofix.file || window.currentFile || "";
 
         if (!filename) {
 
