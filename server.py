@@ -8335,8 +8335,15 @@ def _generate_autofix_fix(code):
         if GROQ_API_KEY:
             # A 23-line file needs at most ~1200 tokens. The default 4096 made
             # Groq generate for ~21s; cap it so fixes come back in a few seconds.
+            # Tight deadline: no 429 backoff sleeps for a tiny code fix. Fall
+            # through to the next provider quickly instead of waiting 30s.
+            _autofix_deadline = time.monotonic() + 12.0
+            try:
+                g.chat_deadline = _autofix_deadline
+            except Exception:
+                pass
             result = _chat_one("Groq", GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, msgs,
-                               tool_choice="none", max_tokens_override=1200)
+                               timeout=(5, 10), tool_choice="none", max_tokens_override=1200)
             if result:
                 reply, _, _ = result
                 if reply:
@@ -8346,8 +8353,8 @@ def _generate_autofix_fix(code):
             if not api_key:
                 continue
             try:
-                result = _chat_one(name, endpoint, api_key, model, msgs, tool_choice="none",
-                                   max_tokens_override=1200)
+                result = _chat_one(name, endpoint, api_key, model, msgs, timeout=(5, 10),
+                                   tool_choice="none", max_tokens_override=1200)
                 if result:
                     reply, _, _ = result
                     if reply:
