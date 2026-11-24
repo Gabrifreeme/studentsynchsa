@@ -3042,7 +3042,19 @@ html::after {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 1px;
+  width: 2px;
+  background: #ffa500;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+/* Guaranteed bright bottom edge at the exact viewport boundary */
+html::before {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
   background: #ffa500;
   z-index: 2147483647;
   pointer-events: none;
