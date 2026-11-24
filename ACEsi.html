@@ -16572,20 +16572,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, '');
     var segs = window.aceColorizeLogLine ? window.aceColorizeLogLine(s) : [{ text: s, color: color || '#8fd3ff' }];
     window.__aceLogQueue.push({ text: s, segs: segs, color: color || '#8fd3ff' });
-    // If the live feed floods, don't fall behind forever - show the backlog instantly.
-    if (window.__aceLogQueue.length > 8) {
-      // Finish the in-flight line first so no completed line lands below it.
-      if (window.__aceFinishTyping) { var f = window.__aceFinishTyping; f(); }
-      window.__aceLogQueue.forEach(function (it) {
-        var h = document.getElementById('term-history');
-        if (!h) return;
-        var l = document.createElement('div');
-        l.style.whiteSpace = 'pre-wrap'; l.style.wordBreak = 'break-word';
-        l.style.color = it.color; l.setAttribute('data-ace-text', it.text);
-        window.aceFillTerminalLine(l, it.segs); h.appendChild(l);
-      });
-      window.__aceLogQueue = [];
-    }
+    // Every line types in order - no instant flood dump (it caused multiple
+    // lines typing at once and lines appearing below the active one).
     window.__aceFlushLogQueue();
   };
 
