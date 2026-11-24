@@ -16001,7 +16001,7 @@ document.addEventListener('DOMContentLoaded', function() {
             '<span style="color:#ff9d00; font-family:monospace; white-space:pre;">PS D:\\projects\\acesi&gt;&nbsp;</span>' +
             '<input id="term-input" type="text" style="flex:1; min-width:0; background:transparent; border:none; color:#ff9d00; font-family:monospace; outline:none;" autocomplete="off">' +
           '</div>' +
-          '<div id="term-history" style="white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; overflow-x:hidden; font-family:monospace; color:#ff9d00; padding:0 10px 8px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
+          '<div id="term-history" style="white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; overflow-x:hidden; font-family:monospace; color:#ff9d00; padding:0 10px 26px; flex:1 1 auto; min-height:0; overflow-y:auto;"></div>';
 
         window.aceTermHeartbeatInit && window.aceTermHeartbeatInit();
         var termInput = document.getElementById("term-input");
@@ -16527,8 +16527,6 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         line.textContent = text.slice(0, idx) + '\u2588';
-        var histBox = document.getElementById('term-history');
-        if (histBox) histBox.scrollTop = histBox.scrollHeight;
         setTimeout(step, spd);
       })();
     } catch (e) { if (done) done(); }
