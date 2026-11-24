@@ -8645,7 +8645,10 @@ def run_command():
             log = open(os.path.join(_IDE_ROOT, log_path), 'w', encoding='utf-8')
             # Run in the Explorer's project root (LibSyncStudent), not ACEsi's
             # own folder - otherwise flutter run builds the wrong app.
-            proc = _popen(command, shell=True, stdout=log,
+            # Do NOT pass CREATE_NO_WINDOW here: Flutter spawns Chrome as a
+            # child, and a no-window parent makes Chrome exit before DevTools
+            # listens. A short console flash is worth a working browser.
+            proc = subprocess.Popen(command, shell=True, stdout=log,
                                     stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
