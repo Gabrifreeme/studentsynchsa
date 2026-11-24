@@ -8646,22 +8646,18 @@ def run_command():
             if command is None:
                 return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
             log_path = f'run_{uuid.uuid4().hex}.log'
-            log = open(os.path.join(_IDE_ROOT, log_path), 'w', encoding='utf-8')
+            log_full = os.path.join(_IDE_ROOT, log_path)
+            log = open(log_full, 'w', encoding='utf-8', buffering=1)
+            # Write a line immediately so the user can SEE the build started in
+            # ACEsi's live log, even before Flutter produces its first line.
+            log.write(f'[ACEsi] {command}\n[ACEsi] working dir: {_IDE_ROOT}\n[ACEsi] build starting...\n')
+            log.flush()
             # Run in the Explorer's project root (LibSyncStudent), not ACEsi's
             # own folder - otherwise flutter run builds the wrong app.
-            # Launch via a detached .bat + Start-Process. A plain child process
-            # of this server makes Flutter's Chrome hand off to an existing
-            # instance and exit code 0 before DevTools listens. A detached,
-            # separately-started batch (the way a normal terminal launches it)
-            # lets Chrome open properly.
-            bat = os.path.join(_IDE_ROOT, f'run_{uuid.uuid4().hex}.bat')
-            with open(bat, 'w', encoding='utf-8') as bf:
-                bf.write('@echo off\r\n'
-                         f'cd /d "{_IDE_ROOT}"\r\n'
-                         f'{command} >> "{os.path.join(_IDE_ROOT, log_path)}" 2>&1\r\n')
-            proc = subprocess.Popen(
-                ["cmd.exe", "/c", "start", "", "/min", bat],
-                cwd=_IDE_ROOT, stdout=log, stderr=subprocess.STDOUT)
+            # Direct Popen streams stdout/stderr into the log live so the user
+            # can watch the build progress from ACEsi's terminal.
+            proc = subprocess.Popen(command, shell=True, stdout=log,
+                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
