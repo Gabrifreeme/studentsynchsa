@@ -17446,11 +17446,16 @@ window.aceCloseAllPanels = function (exceptId) {
     width: 100% !important;
   }
   #terminal-output {
-    flex: 0 0 70% !important;
-    width: 70% !important;
-    height: 100% !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
     min-height: 0 !important;
+    overflow-y: hidden !important;
   }
+  /* Make sure both terminal panes scroll */
+  #term-history { overflow-y: auto !important; flex: 1 1 auto !important; min-height: 0 !important; }
+  #flutter-console { display:block; overflow-y: auto !important; flex: 1 1 auto !important;
+    width:100% !important; height:100% !important; min-height:273px !important; }
+  #flutter-console-output { overflow: auto !important; min-height: 0 !important; }
   #ace-term-dashboard {
     flex: 0 0 30% !important;
     width: 30% !important;
