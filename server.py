@@ -8677,7 +8677,13 @@ def list_files():
 # different directory. ACEsi.html expects a plain array of "lib/..." paths from
 # /api/files, plain text from /api/file-content, and form-encoded input on
 # /api/save-file. Without these the Explorer sits on "Loading..." forever.
-_IDE_ROOT = os.path.dirname(os.path.abspath(__file__))
+# The Explorer points at the Flutter project the user actually edits (the one
+# with real analyzer errors), not ACEsi's own source tree. Override with
+# ACESI_IDE_ROOT if the project moves.
+_FLUTTER_PROJECT = r"C:\Users\gabri\Documents\LibSyncStudent"
+_IDE_ROOT = os.environ.get("ACESI_IDE_ROOT") or (
+    _FLUTTER_PROJECT if os.path.isdir(_FLUTTER_PROJECT)
+    else os.path.dirname(os.path.abspath(__file__)))
 _IDE_LIB = os.path.join(_IDE_ROOT, 'lib')
 
 
@@ -8891,7 +8897,7 @@ def _problems_rel(path):
     p = str(path or "").strip().replace("\\", os.sep).replace("/", os.sep)
     if os.path.isabs(p):
         try:
-            p = os.path.relpath(p, PROJECT_ROOT)
+            p = os.path.relpath(p, _IDE_ROOT)
         except Exception:
             pass
     return p.replace("\\", "/")
@@ -8932,7 +8938,7 @@ def _scan_dart_problems(files, counts, details=None):
         print("[problems] dart executable not found; skipping dart analyze")
         return
     env = os.environ.copy()
-    r = subprocess.run([dart, "analyze", "--format=machine"], cwd=PROJECT_ROOT,
+    r = subprocess.run([dart, "analyze", "--format=machine"], cwd=_IDE_ROOT,
                        env=env, capture_output=True, text=True, timeout=300,
                        errors="replace")
     text = ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
