@@ -6492,7 +6492,8 @@ perspective: 900px;
       window.stopAceFlutterFollow = function () {
         window.__aceFlutterFollow = false;
         if (window.__aceFlutterTimer) { clearInterval(window.__aceFlutterTimer); window.__aceFlutterTimer = null; }
-        // Flutter tab state is shown by the tab buttons themselves.
+        var ft = document.getElementById('ace-tab-flutter');
+        if (ft) ft.style.display = 'none';
         // stay on Flutter tab so the user can still read the final output
       };
       window.startAceFlutterFollow = function () {
@@ -6510,6 +6511,8 @@ perspective: 900px;
               var added = d.tail.slice(window.aceFlutterLastTail.length);
               window.aceFlutterLastTail = d.tail;
               var box = document.getElementById("flutter-console-output");
+              var ft = document.getElementById('ace-tab-flutter');
+              if (ft) ft.style.display = 'inline-block';
               if (typeof window.aceSwitchTerminal === 'function') window.aceSwitchTerminal('flutter');
               if (box) {
                 box.textContent += added;
@@ -8885,7 +8888,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
       <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <button id="terminal-logs-btn" type="button" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Live Logs: OFF</button>
         <button id="ace-tab-acesi" type="button" onclick="window.aceSwitchTerminal('acesi')" style="background:#ffa500;color:#000;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:bold;cursor:pointer;">ACEsi Terminal</button>
-        <button id="ace-tab-flutter" type="button" onclick="window.aceSwitchTerminal('flutter')" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:bold;cursor:pointer;">Flutter Terminal</button>
+        <button id="ace-tab-flutter" type="button" onclick="window.aceSwitchTerminal('flutter')" style="display:none;background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:bold;cursor:pointer;">Flutter Terminal</button>
     </div>
 
         
@@ -16502,7 +16505,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {}
   };
 
-  // Typewriter effect: only the bottom 2 lines animate; older lines fill instantly.
+  // Typewriter effect: only the bottom 3 lines animate; older lines fill instantly.
   window.aceTypingEnabled = true;
   window.aceTerminalTypeSpeed = 3;
   window.aceTypeTerminalLine = function (line, text, segs) {
@@ -16517,14 +16520,14 @@ document.addEventListener('DOMContentLoaded', function() {
       var spd = (len > 400) ? 1 : window.aceTerminalTypeSpeed;
       (function step() {
         if (!line || !line.parentNode) return;
-        // If this line is no longer one of the bottom 2, finish it instantly
+        // If this line is no longer one of the bottom 3, finish it instantly
         var hist = document.getElementById('term-history');
-        if (hist && hist.children.length > 2) {
+        if (hist && hist.children.length > 3) {
           var pos = -1;
           for (var i = 0; i < hist.children.length; i++) {
             if (hist.children[i] === line) { pos = i; break; }
           }
-          if (pos >= 0 && pos < hist.children.length - 2) {
+          if (pos >= 0 && pos < hist.children.length - 3) {
             window.aceFillTerminalLine(line, segs);
             return;
           }
