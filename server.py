@@ -8623,6 +8623,21 @@ def run_command():
         # never exit on their own. subprocess.run would block this request
         # thread forever, so stream to a log and return immediately.
         if re.match(r'^\s*(flutter\s+run|dart\s+run)\b', command, re.I):
+            # Kill stale Flutter/Chrome from a previous run - its debug Chrome
+            # holds the flutter_tools temp profile and makes new launches fail
+            # with "Chrome exited with code 0 before DevTools listening".
+            try:
+                _run(["taskkill", "/F", "/IM", "dart.exe", "/T"],
+                     capture_output=True, timeout=10)
+                _run(["taskkill", "/F", "/IM", "flutter.exe", "/T"],
+                     capture_output=True, timeout=10)
+                _run(["powershell.exe", "-NoProfile", "-Command",
+                      "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+                      "Where-Object { $_.CommandLine -match 'flutter_tools_chrome_device' } | "
+                      "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"],
+                     capture_output=True, timeout=15)
+            except Exception:
+                pass
             command = _resolve_run_device(command)
             if command is None:
                 return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
