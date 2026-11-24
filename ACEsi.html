@@ -3020,12 +3020,13 @@ button, .btn, input, select, .ace-mode-switch, .ace-mode-btn,
   align-items: center !important;
   border-bottom: 2px solid #ffa500 !important;
 }
-/* Explorer: OPEN EDITORS divider, search box and its row - 2px bright amber */
-#open-editors-header { border-bottom:2px solid #ffa500 !important; }
+/* Explorer: OPEN EDITORS divider, search box and its row - muted amber */
+#open-editors-header { border-bottom:1px solid #995C00 !important; }
 #explorer-search,
 #explorer-search + div,
 #explorer-panel > div:has(> #explorer-search) {
-  border:2px solid #ffa500 !important;
+  border:1px solid #995C00 !important;
+  box-shadow:none !important;
   color:#ffa500 !important;
 }
 /* Bottom-right model picker badge */
@@ -6269,7 +6270,7 @@ perspective: 900px;
         <div class="panel-header"><span>EXPLORER</span><div style="display:flex;align-items:center;gap:6px;margin-right:34px;"><button class="btn" id="explorer-refresh-btn" data-tooltip="Refresh Explorer" onclick="loadExplorer()" style="background:#000;color:#ffa500;border:2px solid #ffa500;padding:0 8px;font-weight:bold;">Refresh</button></div><span id="explorer-problems" class="explorer-badge" role="status" aria-live="polite" title="Scanning for problems..."></span></div>
         <div class="ace-header-divider"></div>
 
-        <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ffa500; border-bottom: 2px solid #ffa500; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
+        <div id="open-editors-header" style="padding: 4px 8px; font-size: 11px; font-weight: bold; color: #ffa500; border-bottom: 1px solid #995C00; cursor: pointer; user-select: none;">&#9660; OPEN EDITORS</div>
         <div class="ace-explorer-divider"></div>
 
 <div id="open-editors-list" style="display: block; font-family: monospace; font-size: 11px; border-bottom: 1px solid #ffa500; padding-bottom: 4px;"></div>
@@ -18020,7 +18021,12 @@ window.aceCheckForUpdates = function (install) {
 .ace-explorer-divider { background:#995C00 !important; height:1px !important; min-height:1px !important; }
 #chat-panel + .resizer { background:#995C00 !important; box-shadow:none !important; }
 #code-panel + .resizer { background:#995C00 !important; border-right-color:#995C00 !important; box-shadow:none !important; }
-#explorer-search { border:1px solid #995C00 !important; box-shadow:none !important; }
+#explorer-search,
+#explorer-search + div,
+#explorer-panel > div:has(> #explorer-search) {
+  border:1px solid #995C00 !important;
+  box-shadow:none !important;
+}
 /* Input row: only Send keeps a border */
 #chat-composer button[title="Add prompt"],
 #chat-composer #acesi-mic-btn,
@@ -18030,6 +18036,8 @@ window.aceCheckForUpdates = function (install) {
   border:0 !important;
   box-shadow:none !important;
 }
+/* OPEN EDITORS divider - the broad "force bright" rule above overrides colour. */
+html body #open-editors-header { border-bottom-color:#995C00 !important; }
 /* Inset bright shadows were drawing 1px amber lines over the muted borders. */
 #chat-panel, #code-panel, #explorer-panel, #bottom-status { box-shadow:none !important; }
 #chat-panel.ace-panel-active, #code-panel.ace-panel-active, #explorer-panel.ace-panel-active {
