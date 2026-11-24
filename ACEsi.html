@@ -3274,43 +3274,14 @@ input::placeholder, textarea::placeholder {
     border-top:2px solid #ffa500 !important;
     box-shadow:inset 0 2px 0 #ffa500, inset 0 -2px 0 #ffa500 !important;
   }
-
-  /* ===== Refined borders: 1px muted amber for inactive panels, bright when active ===== */
-  #chat-panel, #code-panel, #explorer-panel {
-    border-width:1px !important;
-    border-color:#995C00 !important;
-    transition:border-color .18s ease, box-shadow .18s ease !important;
-  }
-  /* whichever panel was last clicked gets the bright amber glow */
-  #chat-panel.ace-panel-active, #code-panel.ace-panel-active, #explorer-panel.ace-panel-active {
-    border-color:#ffa500 !important;
-    box-shadow:0 0 8px rgba(255,165,0,.35) !important;
-  }
-  /* header separators follow their panel */
-  #chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header {
-    border-bottom-width:1px !important;
-    border-bottom-color:#995C00 !important;
-  }
-  #chat-panel.ace-panel-active .panel-header,
-  #code-panel.ace-panel-active .panel-header,
-  #explorer-panel.ace-panel-active .panel-header {
-    border-bottom-color:#ffa500 !important;
-  }
-  /* Input row: only Send keeps a border. + mic speaker Plan Default are bare. */
-  #chat-composer > div:last-child #acesi-mic-btn,
-  #chat-composer > div:last-child #acesi-spk-btn,
-  #chat-composer > div:last-child button[title="Add prompt"],
-  #chat-composer > div:last-child #composer-mode-btn,
-  #chat-composer > div:last-child #composer-quality-select,
-  #chat-composer > div:last-child button[onclick="addNewPrompt()"] {
-    border:0 !important;
-    box-shadow:none !important;
-  }
-/* Main frame elements keep bright amber; panels use the refined inactive/active rules above. */
+/* All main panel lines: bright amber 2px so they read clearly on black. */
   #main-container,
+  #chat-panel, #code-panel, #explorer-panel,
+  #chat-panel .panel-header, #code-panel .panel-header, #explorer-panel .panel-header,
   #bottom-status, #chat-composer, #line-numbers {
     border-color:#ffa500 !important;
     border-style:solid !important;
+    border-width:2px !important;
   }
 /* Text buttons in the Code Editor toolbar need room for their labels; the
    generic .btn rule sizes every button as a 24px icon square. */
@@ -17996,47 +17967,6 @@ window.aceCheckForUpdates = function (install) {
   };
 })();
 </script>
-<script>
-(function () {
-  var panels = ['chat-panel','code-panel','explorer-panel'];
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    while (t && t !== document) {
-      if (t.id && panels.indexOf(t.id) !== -1) {
-        panels.forEach(function (id) {
-          var p = document.getElementById(id);
-          if (p) p.classList.toggle('ace-panel-active', id === t.id);
-        });
-        return;
-      }
-      t = t.parentElement;
-    }
-  });
-  var code = document.getElementById('code-panel');
-  if (code) code.classList.add('ace-panel-active');
-})();
-</script>
-
-<style id="ace-final-panel-active">
-/* FINAL override: active panel bright amber, inactive muted. Must be last. */
-html body #chat-panel,
-html body #code-panel,
-html body #explorer-panel {
-  border-color:#995C00 !important;
-  box-shadow:none !important;
-}
-html body #chat-panel.ace-panel-active,
-html body #code-panel.ace-panel-active,
-html body #explorer-panel.ace-panel-active {
-  border-color:#ffa500 !important;
-  box-shadow:0 0 8px rgba(255,165,0,.35) !important;
-}
-html body #chat-panel.ace-panel-active .panel-header,
-html body #code-panel.ace-panel-active .panel-header,
-html body #explorer-panel.ace-panel-active .panel-header {
-  border-bottom-color:#ffa500 !important;
-}
-</style>
 </body>
 
 </html>
