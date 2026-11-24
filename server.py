@@ -8664,19 +8664,25 @@ def run_command():
                 import threading as _th
                 def _open_browser_when_ready():
                     url = 'http://127.0.0.1:55793'
-                    for _ in range(90):  # up to ~90s
+                    import socket as _sock
+                    for attempt in range(180):  # up to ~3 min
                         time.sleep(1)
+                        s = None
                         try:
-                            import requests as _rq
-                            # Bypass any system proxy for localhost checks.
-                            if _rq.get(url, timeout=2,
-                                       proxies={'http': '', 'https': ''}).ok:
-                                log.write(f'[ACEsi] server up - opening Chrome at {url}\n')
-                                log.flush()
-                                _popen(['cmd', '/c', 'start', '', 'chrome', url])
-                                return
+                            # Raw socket - no HTTP, no proxy, no DNS.
+                            s = _sock.create_connection(('127.0.0.1', 55793), timeout=1)
+                            log.write(f'[ACEsi] server ready after {attempt+1}s - opening Chrome\n')
+                            log.flush()
+                            _popen(['cmd', '/c', 'start', '', 'chrome', url])
+                            return
                         except Exception:
-                            pass
+                            if attempt % 20 == 19:
+                                log.write(f'[ACEsi] still waiting for web server... {attempt+1}s\n')
+                                log.flush()
+                        finally:
+                            if s is not None:
+                                try: s.close()
+                                except Exception: pass
                     log.write('[ACEsi] server did not become ready in time\n')
                     log.flush()
                 _th.Thread(target=_open_browser_when_ready, daemon=True).start()
