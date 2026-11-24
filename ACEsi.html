@@ -16511,6 +16511,7 @@ document.addEventListener('DOMContentLoaded', function() {
   window.aceTerminalTypeSpeed = 4;
   window.__aceLogQueue = [];
   window.__aceTypingBusy = false;
+  window.__aceFinishTyping = null;   // set while a line is typing
 
   window.aceTypeTerminalLine = function (line, text, segs, done) {
     try {
@@ -16518,6 +16519,15 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!window.aceTypingEnabled) { window.aceFillTerminalLine(line, segs); if (done) done(); return; }
       var len = text.length, idx = 0;
       var spd = (len > 400) ? 3 : window.aceTerminalTypeSpeed;
+      var finished = false;
+      window.__aceFinishTyping = function () {
+        if (finished) return;
+        finished = true;
+        window.aceFillTerminalLine(line, segs);
+        window.__aceFinishTyping = null;
+        window.__aceTypingBusy = false;
+        if (done) done();
+      };
       (function step() {
         if (!line || !line.parentNode) { if (done) done(); return; }
         idx += 1;
@@ -16561,6 +16571,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.__aceLogQueue.push({ text: s, segs: segs, color: color || '#8fd3ff' });
     // If the live feed floods, don't fall behind forever - show the backlog instantly.
     if (window.__aceLogQueue.length > 8) {
+      // Finish the in-flight line first so no completed line lands below it.
+      if (window.__aceFinishTyping) { var f = window.__aceFinishTyping; f(); }
       window.__aceLogQueue.forEach(function (it) {
         var h = document.getElementById('term-history');
         if (!h) return;
