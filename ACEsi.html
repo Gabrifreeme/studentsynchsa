@@ -16527,8 +16527,6 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
         line.textContent = text.slice(0, idx) + '\u2588';
-        var h = document.getElementById('term-history');
-        if (h) h.scrollTop = h.scrollHeight;
         setTimeout(step, spd);
       })();
     } catch (e) { if (done) done(); }
