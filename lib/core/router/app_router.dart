@@ -5,7 +5,6 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
-import 'package:studentsyncsa/presentation/screens/auth/fake_download_screen.dart';
 import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
@@ -32,7 +31,7 @@ void triggerAuthRedirect() {
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigator,
-  initialLocation: '/fake-download',
+  initialLocation: '/dashboard',
   refreshListenable: _authRefresh,
   redirect: (context, state) {
     try {
@@ -41,7 +40,6 @@ final appRouter = GoRouter(
       final authState = auth.valueOrNull;
       final loc = state.matchedLocation;
 
-      if (loc == '/fake-download') return null;
 
       if (authState == null || !authState.authenticated) {
         return '/dashboard';
@@ -54,11 +52,6 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(
-      path: '/fake-download',
-      name: 'fake-download',
-      builder: (context, state) => const FakeDownloadScreen(),
-    ),
     GoRoute(
       path: '/signup',
       name: 'signup',
