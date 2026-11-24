@@ -16515,10 +16515,15 @@ document.addEventListener('DOMContentLoaded', function() {
         window.aceFillTerminalLine(line, segs);
         return;
       }
+      // Only ONE line types at a time. New log lines appear instantly while
+      // the current one keeps typing to completion in place.
+      if (window.__aceTypingLine && window.__aceTypingLine !== line) {
+        window.aceFillTerminalLine(line, segs);
+        return;
+      }
       var len = text.length;
       var idx = 0;
       var spd = (len > 400) ? 4 : window.aceTerminalTypeSpeed;
-      // Only ONE line types at a time - a newer line finishes the previous one.
       window.__aceTypingLine = line;
       (function step() {
         if (!line || !line.parentNode) return;
@@ -16540,10 +16545,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.aceAppendTerminalLine = function (text, color) {
     try { if (typeof window.aceTermHeartbeatInit === 'function') window.aceTermHeartbeatInit(); } catch (e) {}
-    // Finish any still-typing lines before adding a new one, so the live log
-    // stream never cuts a line off mid-word.
+    // (New log lines appear instantly; one line types fully in place.)
     try {
-      var h = document.getElementById('term-history');
+      var h = null;
       if (h) for (var i = 0; i < h.children.length; i++) {
         var ch = h.children[i];
         if (ch.textContent && ch.textContent.slice(-1) === '\u2588') {
