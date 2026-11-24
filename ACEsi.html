@@ -16436,7 +16436,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var tok = m[0];
         if (tok.indexOf('[SERVER]') === 0) push(i, i + tok.length, '#ff00ff'); // neon magenta
         else if (tok.indexOf('[ACESi]') === 0) push(i, i + tok.length, '#00ffff'); // neon cyan
-        else push(i, i + tok.length, '#777777'); // dim grey (timestamps)
+        else push(i, i + tok.length, '#ffa500'); // bright amber (timestamps)
         cursor = i + tok.length;
       }
     }
@@ -17484,18 +17484,33 @@ window.aceCloseAllPanels = function (exceptId) {
       canvases[idx] = cv;
     });
   }
+  var _sparkPhase = 0;
   function drawSpark(idx) {
     var cv = canvases[idx];
     if (!cv) return;
     var ctx = cv.getContext('2d');
     var w = cv.width, h = cv.height;
-    var pts = history[idx] || [];
     ctx.clearRect(0, 0, w, h);
-    if (!pts.length) return;
+    // Faint grid so an idle card still reads as an active monitor.
+    ctx.strokeStyle = 'rgba(143,211,255,0.08)';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx < w; gx += Math.max(8, w / 6)) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+    }
+    for (var gy = 0; gy < h; gy += Math.max(8, h / 3)) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+    }
+    var pts = (history[idx] || []).slice();
+    if (!pts.length) pts = [0, 0, 0, 0, 0, 0];
+    var n = pts.length, phase = _sparkPhase + idx * 0.9;
     ctx.beginPath();
-    for (var k = 0; k < pts.length; k++) {
-      var x = (k / Math.max(1, pts.length - 1)) * w;
-      var y = h - (Math.max(0, Math.min(100, pts[k])) / 100) * h;
+    for (var k = 0; k < n; k++) {
+      var x = (k / Math.max(1, n - 1)) * w;
+      var base = Math.max(0, Math.min(100, pts[k]));
+      // Tiny continuous heartbeat so flat/zero lines still look alive.
+      var pulse = Math.sin(phase + k * 0.55) * 2 + Math.sin(phase * 1.7 + k * 0.23) * 1;
+      var val = Math.max(0, Math.min(100, base + pulse));
+      var y = h - (val / 100) * h;
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = '#8fd3ff';
@@ -17504,6 +17519,11 @@ window.aceCloseAllPanels = function (exceptId) {
     ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
     ctx.fillStyle = 'rgba(143, 211, 255, 0.18)';
     ctx.fill();
+  }
+  function animateSparks() {
+    if (typeof terminalOpen === 'function' && !terminalOpen()) return;
+    _sparkPhase += 0.08;
+    for (var i = 0; i < canvases.length; i++) drawSpark(i);
   }
   function push(idx, value) {
     var arr = history[idx];
@@ -17547,7 +17567,7 @@ window.aceCloseAllPanels = function (exceptId) {
       clearInterval(timer); timer = null;
     }
   }
-  function init() { initCanvases(); sync(); setInterval(sync, 500); }
+  function init() { initCanvases(); sync(); setInterval(sync, 500); setInterval(animateSparks, 90); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
