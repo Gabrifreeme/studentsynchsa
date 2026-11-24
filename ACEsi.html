@@ -6492,16 +6492,14 @@ perspective: 900px;
       window.stopAceFlutterFollow = function () {
         window.__aceFlutterFollow = false;
         if (window.__aceFlutterTimer) { clearInterval(window.__aceFlutterTimer); window.__aceFlutterTimer = null; }
-        var b = document.getElementById("ace-flutter-mode-btn");
-        if (b) { b.textContent = "Flutter Log: OFF"; b.style.color = "#ffa500"; }
+        // Flutter tab state is shown by the tab buttons themselves.
         // stay on Flutter tab so the user can still read the final output
       };
       window.startAceFlutterFollow = function () {
         if (window.__aceFlutterFollow) return;
         if (typeof window.openAceTerminal === "function") { try { window.openAceTerminal(); } catch (e) {} }
         window.__aceFlutterFollow = true;
-        var b = document.getElementById("ace-flutter-mode-btn");
-        if (b) { b.textContent = "Flutter Log: ON"; b.style.color = "#00ff00"; }
+        // Flutter tab state is shown by the tab buttons themselves.
         if (window.__aceFlutterTimer) clearInterval(window.__aceFlutterTimer);
         window.__aceFlutterTimer = setInterval(async function () {
           try {
@@ -8886,7 +8884,8 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #ffa500; flex: 0 0 auto; box-sizing: border-box;">
       <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
       <button id="terminal-logs-btn" type="button" onclick="window.toggleAceLiveLogs && window.toggleAceLiveLogs()" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Live Logs: OFF</button>
-      <button id="ace-flutter-mode-btn" type="button" onclick="if(window.__aceFlutterFollow){window.stopAceFlutterFollow()}else{window.startAceFlutterFollow()}" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;cursor:pointer;">Flutter Log: OFF</button>
+        <button id="ace-tab-acesi" type="button" onclick="window.aceSwitchTerminal('acesi')" style="background:#ffa500;color:#000;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:bold;cursor:pointer;">ACEsi Terminal</button>
+        <button id="ace-tab-flutter" type="button" onclick="window.aceSwitchTerminal('flutter')" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:bold;cursor:pointer;">Flutter Terminal</button>
     </div>
 
         
@@ -8903,10 +8902,6 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
     <div id="terminal-split" style="display:flex; flex-direction:row; flex:1 1 auto; min-height:0; width:100%;">
       <div id="terminal-left" style="flex:0 0 70%; width:70%; display:flex; flex-direction:column; min-height:0;">
-      <div style="display:flex;align-items:center;gap:4px;padding:2px 6px;background:#000;border-bottom:1px solid #ffa500;">
-        <button id="ace-tab-acesi" type="button" onclick="window.aceSwitchTerminal('acesi')" style="background:#ffa500;color:#000;border:1px solid #ffa500;border-radius:6px 6px 0 0;padding:3px 12px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;">ACEsi Terminal</button>
-        <button id="ace-tab-flutter" type="button" onclick="window.aceSwitchTerminal('flutter')" style="background:#000;color:#ffa500;border:1px solid #ffa500;border-radius:6px 6px 0 0;padding:3px 12px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;">Flutter Terminal</button>
-      </div>
       <div id="terminal-output" style="flex:1 1 auto; width:100%; overflow:hidden; padding:0; margin:0; background:#000; display:block; position:relative;"></div>
       <div id="flutter-console" style="display:none; flex:1 1 auto; width:100%; overflow:auto; padding:0; margin:0; background:#000; position:relative;">
         <pre id="flutter-console-output" style="margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;"></pre>
