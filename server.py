@@ -8627,9 +8627,11 @@ def run_command():
             if command is None:
                 return jsonify({'output': '❌ "flutter run" needs a connected Android device, but none was found (or it is locked/offline). Run `adb devices` and unlock the device, then retry.'})
             log_path = f'run_{uuid.uuid4().hex}.log'
-            log = open(log_path, 'w', encoding='utf-8')
+            log = open(os.path.join(_IDE_ROOT, log_path), 'w', encoding='utf-8')
+            # Run in the Explorer's project root (LibSyncStudent), not ACEsi's
+            # own folder - otherwise flutter run builds the wrong app.
             proc = _popen(command, shell=True, stdout=log,
-                                    stderr=subprocess.STDOUT)
+                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT)
             return jsonify({'output': (f'✅ {command} started (pid {proc.pid}). '
                 f'Watch output live: `Get-Content {log_path} -Wait`. The log stays empty '
                 f'for ~50-60s while the APK builds/installs; after install the app launches '
