@@ -17494,9 +17494,9 @@ window.aceCloseAllPanels = function (exceptId) {
     display: block; width: 100%; height: 100%;
   }
   .ace-dash-info { min-width: 0; }
-  .ace-dash-label { color: #ffa500; font-weight: bold; font-size: 12px; white-space: nowrap; }
-  .ace-dash-value { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ace-dash-sub { color: #ffa500; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-label { color: #8fd3ff; font-weight: bold; font-size: 12px; white-space: nowrap; }
+  .ace-dash-value { color: #8fd3ff; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ace-dash-sub { color: #8fd3ff; font-size: 11px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #ace-term-dashboard::-webkit-scrollbar-thumb { background: #ffa500 !important; }
 </style>
 
@@ -17540,11 +17540,11 @@ window.aceCloseAllPanels = function (exceptId) {
       var y = h - (Math.max(0, Math.min(100, pts[k])) / 100) * h;
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = '#ffa500';
+    ctx.strokeStyle = '#8fd3ff';
     ctx.lineWidth = Math.max(1, w / 96);
     ctx.stroke();
     ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 165, 0, 0.15)';
+    ctx.fillStyle = 'rgba(143, 211, 255, 0.18)';
     ctx.fill();
   }
   function push(idx, value) {
