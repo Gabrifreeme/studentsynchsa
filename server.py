@@ -250,7 +250,14 @@ _OLLAMA_MINIMAL_PROMPT = (
 )
 
 def _ollama_reachable():
-    """One cheap check, cached, so a dead local endpoint costs nothing."""
+    """One cheap check, cached, so a dead local endpoint costs nothing.
+
+    Ollama was uninstalled from this PC - never probe the dead endpoint (each
+    probe costs ~4s and made chats hang). A single env flag can re-enable it if
+    Ollama is ever reinstalled.
+    """
+    if os.environ.get("ACESI_OLLAMA_INSTALLED", "0") != "1":
+        return False
     if not OLLAMA_ENDPOINT:
         return False
     try:
@@ -5691,14 +5698,9 @@ def _chat_dispatch(llm_messages, max_rounds=20, user_message="", preferred_model
                 # Cloud providers remain a fallback only when no local model runs.
                 # Check Ollama LIVE at dispatch time - OLLAMA_ENABLED is computed
                 # once at import and can be stale if Ollama started later.
-                _ollama_now = False
-                try:
-                    import requests as _rq
-                    _ollama_now = bool(_rq.get(
-                        OLLAMA_ENDPOINT.replace("/v1", "") + "/api/tags",
-                        timeout=(1, 2)).ok)
-                except Exception:
-                    pass
+                # Ollama is uninstalled - skip the live probe entirely (it used
+                # to cost ~4s on every request and made the UI feel hung).
+                _ollama_now = os.environ.get("ACESI_OLLAMA_INSTALLED", "0") == "1"
                 if _ollama_now and not OLLAMA_ENABLED:
                     OLLAMA_ENABLED = True  # refresh the stale import-time flag
                 _local_only = ((_ollama_now and os.environ.get("ACESI_LOCAL_ONLY", "1") != "0")

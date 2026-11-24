@@ -5884,7 +5884,7 @@ perspective: 900px;
             </button>
 <button class="btn" onclick="openSettings()" data-tooltip="Open Settings">Settings</button>
 
-            <button class="btn" data-tooltip="Restart App" onclick="restartAcesi()" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
+            <button class="btn" data-tooltip="Ctrl+click to Restart App" onclick="if(event.ctrlKey||event.metaKey||event.shiftKey){restartAcesi()}else{if(window.showAceToast)window.showAceToast('Hold Ctrl and click to restart.','info',3000);}" style="background:#000;color:#ff9d00;border:1px solid #ffa500;padding:4px 8px;font-weight:bold;">Restart</button>
 
           </div>
 
