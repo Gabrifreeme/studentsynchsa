@@ -3231,9 +3231,11 @@ input::placeholder, textarea::placeholder {
 /* Text buttons in the Code Editor toolbar need room for their labels; the
    generic .btn rule sizes every button as a 24px icon square. */
 #code-panel .panel-header button[data-tooltip="Open Terminal"],
-#code-panel .panel-header button[onclick="openSettings()"] {
-  width:auto !important; min-width:0 !important; padding:0 8px !important;
-  white-space:nowrap !important; font-size:11px !important;
+#code-panel .panel-header button[onclick="openSettings()"],
+#code-panel .panel-header button[data-tooltip="Restart App"],
+#explorer-panel .panel-header #explorer-refresh-btn {
+  width:auto !important; min-width:66px !important; padding:0 8px !important;
+  height:24px !important; white-space:nowrap !important; font-size:11px !important;
 }
 /* Bottom notification line - bright amber text throughout */
 #bottom-status, #bottom-status *, #ace-last-change, #ace-last-change *,
