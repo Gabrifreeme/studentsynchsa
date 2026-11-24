@@ -2841,10 +2841,10 @@ button[data-tooltip="Restart App"], #explorer-refresh-btn, #explorer-search {
 #open-editors-header, #open-editors-header * {
   color: #ffa500 !important;
 }
-/* Divider directly under the Search files... box */
+/* Dividers under OPEN EDITORS / Search box - muted amber */
 #explorer-panel > div[style*="border-bottom"] {
-  border-bottom: 1px solid #ffa500 !important;
-  box-shadow: inset 0 -1px 0 #ffa500 !important;
+  border-bottom: 1px solid #995C00 !important;
+  box-shadow: none !important;
 }
 /* Explorer header buttons - bright amber */
 button[data-tooltip="Restart App"], #explorer-refresh-btn {
@@ -18037,7 +18037,12 @@ window.aceCheckForUpdates = function (install) {
   box-shadow:none !important;
 }
 /* OPEN EDITORS divider - the broad "force bright" rule above overrides colour. */
-html body #open-editors-header { border-bottom-color:#995C00 !important; }
+html body #open-editors-header,
+html body #open-editors-list,
+html body #explorer-panel > div[style*="border-bottom"] {
+  border-bottom-color:#995C00 !important;
+  box-shadow:none !important;
+}
 /* Inset bright shadows were drawing 1px amber lines over the muted borders. */
 #chat-panel, #code-panel, #explorer-panel, #bottom-status { box-shadow:none !important; }
 #chat-panel.ace-panel-active, #code-panel.ace-panel-active, #explorer-panel.ace-panel-active {
