@@ -7094,6 +7094,7 @@ perspective: 900px;
                 existing.active = true;
 
                 window.currentFile = filePath;
+                window._lastExplorerFile = filePath;
 
                 var ta2 = document.getElementById("code-editor");
 
@@ -9202,7 +9203,10 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
 
 
-      function openAutoFix() {
+      function openAutoFix(filename) {
+        // Remember which file this fix is for so Save to File works without a prompt.
+        var f = filename || window.currentFile || window._lastExplorerFile || "";
+        if (f) window._autofix.file = f;
         // Apply diff colors
         var leftEl = document.getElementById("autofix-original");
         var rightEl = document.getElementById("autofix-code");
@@ -9233,7 +9237,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
         window._autofix.original = source;
 
         window._autofix.fixed = "";
-        window._autofix.file = window.currentFile || "";
+        // Keep the file we captured at the top (Explorer path or current file).
 
         _afixRender();
 
@@ -9281,7 +9285,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
           headers: { "Content-Type": "application/json" },
 
-          body: JSON.stringify({ code: code, filename: window.currentFile || "" }),
+          body: JSON.stringify({ code: code, filename: window._autofix.file || window.currentFile || "" }),
 
         })
 
@@ -15413,7 +15417,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // Trigger Auto Fix automatically if the file looks broken
                 if (window.openAutoFix) {
-                    window.openAutoFix();
+                    window.openAutoFix(finalPath);
                 }
             }, 300);
           });
