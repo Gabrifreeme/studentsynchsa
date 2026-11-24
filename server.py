@@ -11178,7 +11178,15 @@ def tool_flutter_test(path=None):
 
 
 def tool_flutter_analyze():
-    return _run_args(["flutter", "analyze"], timeout=600)
+    # Run in the Explorer's project root, not ACEsi's own folder, so the fix
+    # workflow sees the same 5000+ errors the badge shows.
+    try:
+        r = subprocess.run(["flutter", "analyze"], cwd=_IDE_ROOT,
+                           capture_output=True, text=True, timeout=600,
+                           errors="replace", shell=True)
+        return True, ((r.stdout or "") + "\n" + (r.stderr or "")).strip()
+    except Exception as e:
+        return False, "flutter analyze failed: %s" % e
 
 
 # ---- UI testing: interact with the app on the connected Android device ----
