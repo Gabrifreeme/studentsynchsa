@@ -5722,7 +5722,7 @@ perspective: 900px;
         </div>
 
           <div class="ace-composer-topline"></div>
-          <div id="chat-composer" style="position:relative; display:flex; flex-direction:column; width:100%; padding:14px 12px 10px 12px; border:2px solid #ffa500; border-top:2px solid #ffa500 !important; border-top-color:#ffa500 !important; background:#000; border-radius:4px; margin:2px 0 0 0; box-sizing:border-box; flex:0 0 auto; gap:8px; z-index:5; overflow:visible; box-shadow: inset 0 1px 0 #ffa500, inset 0 -1px 0 #ffa500 !important;">
+          <div id="chat-composer" style="position:relative; display:flex; flex-direction:column; width:100%; padding:14px 12px 10px 12px; border:1px solid #995C00; border-top:1px solid #995C00 !important; border-top-color:#995C00 !important; background:#000; border-radius:4px; margin:2px 0 0 0; box-sizing:border-box; flex:0 0 auto; gap:8px; z-index:5; overflow:visible; box-shadow:none !important;">
             <!-- Textarea at top, full width, borderless -->
             <textarea
               id="chat-input"
@@ -18035,6 +18035,106 @@ html body #chat-panel.ace-panel-active .panel-header,
 html body #code-panel.ace-panel-active .panel-header,
 html body #explorer-panel.ace-panel-active .panel-header {
   border-bottom-color:#ffa500 !important;
+}
+</style>
+
+<style id="ace-refined-borders-final">
+/* ===== FINAL: muted #995C00 borders everywhere; bright #ffa500 only on active panel ===== */
+/* All the structural lines that were bright: */
+html body #chat-panel .panel-header,
+html body #code-panel .panel-header,
+html body #explorer-panel .panel-header,
+html body #line-numbers,
+html body #open-editors-header,
+html body #open-editors-list,
+html body #explorer-search,
+html body #explorer-panel > div[style*="border-bottom"],
+html body #chat-composer,
+html body #bottom-status,
+html body #code-panel + .resizer,
+html body .resizer {
+  border-color:#995C00 !important;
+  box-shadow:none !important;
+}
+/* Active panel gets bright borders + glow on its header and edges */
+html body #chat-panel.ace-panel-active,
+html body #code-panel.ace-panel-active,
+html body #explorer-panel.ace-panel-active {
+  border-color:#ffa500 !important;
+  box-shadow:0 0 8px rgba(255,165,0,.35) !important;
+}
+html body #chat-panel.ace-panel-active .panel-header,
+html body #code-panel.ace-panel-active .panel-header,
+html body #explorer-panel.ace-panel-active .panel-header {
+  border-bottom-color:#ffa500 !important;
+}
+/* 1px only */
+html body #chat-panel, html body #code-panel, html body #explorer-panel { border-width:1px !important; }
+</style>
+
+<style id="ace-refined-borders-absolute">
+/* Absolute final: remove every remaining bright line. */
+/* Header bottom lines: muted for inactive, bright only for active panel. */
+.panel-header { border-bottom-color:#995C00 !important; }
+#chat-panel.ace-panel-active .panel-header,
+#code-panel.ace-panel-active .panel-header,
+#explorer-panel.ace-panel-active .panel-header { border-bottom-color:#ffa500 !important; }
+/* Composer: single muted 1px border, no bright inset shadows */
+#chat-composer {
+  border:1px solid #995C00 !important;
+  border-top:1px solid #995C00 !important;
+  box-shadow:none !important;
+}
+</style>
+
+<style id="ace-header-border-authority">
+html body div.panel-header { border-bottom-color:#995C00 !important; border-bottom-width:1px !important; }
+html body #chat-panel.ace-panel-active > div.panel-header,
+html body #code-panel.ace-panel-active > div.panel-header,
+html body #explorer-panel.ace-panel-active > div.panel-header { border-bottom-color:#ffa500 !important; }
+/* composer single muted line, kill all inset shadows */
+html body #chat-composer {
+  border:1px solid #995C00 !important;
+  border-top:1px solid #995C00 !important;
+  box-shadow:none !important;
+}
+html body #chat-composer > div:last-child button[title="Add prompt"],
+html body #chat-composer > div:last-child #acesi-mic-btn,
+html body #chat-composer > div:last-child #acesi-spk-btn,
+html body #chat-composer > div:last-child #composer-mode-btn,
+html body #chat-composer > div:last-child #composer-quality-select { border:0 !important; box-shadow:none !important; }
+</style>
+
+<style id="ace-header-authority2">
+html body #chat-panel div.panel-header.chat-panel-header,
+html body #code-panel div.panel-header,
+html body #explorer-panel div.panel-header {
+  border-bottom-color:#995C00 !important;
+  border-bottom-width:1px !important;
+}
+html body #chat-panel.ace-panel-active div.panel-header.chat-panel-header,
+html body #code-panel.ace-panel-active div.panel-header,
+html body #explorer-panel.ace-panel-active div.panel-header {
+  border-bottom-color:#ffa500 !important;
+}
+/* composer top + inset shadows - maximum specificity */
+html body #chat-panel #chat-composer {
+  border:1px solid #995C00 !important;
+  border-top:1px solid #995C00 !important;
+  border-top-color:#995C00 !important;
+  box-shadow:none !important;
+}
+</style>
+
+<style id="ace-composer-border-final">
+html body #chat-panel #chat-composer {
+  border-top-width:1px !important;
+  border-top-style:solid !important;
+  border-top-color:#995C00 !important;
+  border-right-color:#995C00 !important;
+  border-bottom-color:#995C00 !important;
+  border-left-color:#995C00 !important;
+  box-shadow:none !important;
 }
 </style>
 </body>
