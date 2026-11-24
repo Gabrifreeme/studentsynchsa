@@ -9445,23 +9445,16 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
 
             var res = document.getElementById("autofix-result");
 
-            if (d && d.ok) {
-              // Clear confirmation at the TOP of the chat panel.
-              var saveMsg = d.verified === true
-                ? 'ACEsi: Saved ' + filename + ' — verified, no errors remain.'
-                : 'ACEsi: Saved ' + filename + ' to file.';
-              if (window.aceChatInsertReply) {
-                window.aceChatInsertReply('<div class="acesi-msg" style="background:#1E1E1E;padding:8px 12px;border:1px solid #ffa500;border-radius:6px;margin-bottom:8px;"><b style="color:#00ff00;">' + saveMsg + '</b></div>');
-              }
-            }
-
             if (res) {
               if (d && d.ok) {
+                // Replace the green "Review the fix..." line with the save result.
                 if (d.verified === true) {
-                  res.innerHTML = '<span style="color:#00ff00;">Saved & verified — no errors remain.</span>';
+                  res.innerHTML = '<span style="color:#00ff00;">✓ Saved ' + filename +
+                    ' to file — verified, no errors remain.</span>';
                 } else {
                   var errs = (d.errors || []).slice(0, 3).join(' | ');
-                  res.innerHTML = '<span style="color:#ff9d00;">Saved, but ' + (d.errors ? d.errors.length : '?') +
+                  res.innerHTML = '<span style="color:#ff9d00;">✓ Saved ' + filename + ' to file, but ' +
+                    (d.errors ? d.errors.length : '?') +
                     ' error(s) remain' + (errs ? ': ' + errs : '') + '.</span>';
                 }
               } else {
