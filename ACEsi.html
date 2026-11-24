@@ -18038,6 +18038,12 @@ window.aceCheckForUpdates = function (install) {
   border:0 !important;
   box-shadow:none !important;
 }
+/* Bottom frame lines: bright amber to match the top two. */
+html body .ace-composer-topline { background:#ffa500 !important; }
+html body #bottom-status {
+  border-top-color:#ffa500 !important;
+  border-bottom-color:#ffa500 !important;
+}
 /* OPEN EDITORS divider - the broad "force bright" rule above overrides colour. */
 html body #open-editors-header,
 html body #open-editors-list,
