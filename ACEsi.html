@@ -16545,6 +16545,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.aceAppendTerminalLine = function (text, color) {
     try { if (typeof window.aceTermHeartbeatInit === 'function') window.aceTermHeartbeatInit(); } catch (e) {}
+    // Finish any still-typing lines before adding a new one, so the live log
+    // stream never cuts a line off mid-word.
+    try {
+      var h = document.getElementById('term-history');
+      if (h) for (var i = 0; i < h.children.length; i++) {
+        var ch = h.children[i];
+        if (ch.textContent && ch.textContent.slice(-1) === '\u2588') {
+          if (ch.getAttribute('data-ace-text')) window.aceFillTerminalLine(ch,
+            window.aceColorizeLogLine ? window.aceColorizeLogLine(ch.getAttribute('data-ace-text')) : null);
+        }
+      }
+    } catch (e) {}
     var history = document.getElementById('term-history');
     if (!history) return;
     var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, ''); // smiley is redundant: color is enough
