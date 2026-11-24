@@ -8668,7 +8668,9 @@ def run_command():
                         time.sleep(1)
                         try:
                             import requests as _rq
-                            if _rq.get(url, timeout=2).ok:
+                            # Bypass any system proxy for localhost checks.
+                            if _rq.get(url, timeout=2,
+                                       proxies={'http': '', 'https': ''}).ok:
                                 log.write(f'[ACEsi] server up - opening Chrome at {url}\n')
                                 log.flush()
                                 _popen(['cmd', '/c', 'start', '', 'chrome', url])
