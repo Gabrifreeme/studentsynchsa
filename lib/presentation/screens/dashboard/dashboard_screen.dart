@@ -25,25 +25,8 @@ class DashboardScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          leading: IconButton(
-            icon: Icon(isRight ? Icons.menu_open_rounded : Icons.menu_rounded),
-            onPressed: () {
-              final scaffold = Scaffold.of(context);
-              if (isRight) {
-                scaffold.openEndDrawer();
-              } else {
-                scaffold.openDrawer();
-              }
-            },
-          ),
           title: const Text('LibSyncStudent',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () => context.push('/notifications'),
-            ),
-          ],
         ),
         body: Center(
           child: ConstrainedBox(
@@ -58,7 +41,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               _PrivacyConsentBanner(),
               const SizedBox(height: 10),
-              _buildTileGrid(context),
+              _buildTileGrid(context, isRight, ref),
             ],
           ),
         ),
@@ -115,68 +98,107 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTileGrid(BuildContext context) {
-    final tiles = <Widget>[
-        AppListTile(
-            icon: Icons.auto_awesome_rounded,
-            label: 'ACEsi',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/ai-recommendations')),
-        AppListTile(
-            icon: Icons.person_rounded,
-            label: 'My Profile',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/onboarding')),
-        AppListTile(
-            icon: Icons.chat_rounded,
-            label: 'Community',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/chat')),
-        AppListTile(
-            icon: Icons.school_rounded,
-            label: 'Universities',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/universities')),
-        AppListTile(
-            icon: Icons.assignment_rounded,
-            label: 'Applications',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/applications')),
-      AppListTile(
-          icon: Icons.account_balance_rounded,
-          label: 'Funding',
-          value: '',
-          compact: true,
-          onTap: () => context.push('/funding')),
-      AppListTile(
-          icon: Icons.settings_rounded,
-          label: 'Settings',
-          value: '',
-          compact: true,
-          onTap: () => context.push('/settings')),
-      AppListTile(
-          icon: Icons.info_outline_rounded,
-          label: 'About Us',
-          value: '',
-          compact: true,
-          onTap: () => context.push('/about')),
+  Widget _buildTileGrid(BuildContext context, bool isRight, WidgetRef ref) {
+    void openMenu() {
+      final scaffold = Scaffold.of(context);
+      if (isRight) {
+        scaffold.openEndDrawer();
+      } else {
+        scaffold.openDrawer();
+      }
+    }
+
+    const tileColors = [
+      AppColors.primary,
+      AppColors.info,
+      AppColors.success,
+      AppColors.primaryLight,
+      AppColors.warning,
+      AppColors.error,
+      AppColors.primary,
+      AppColors.info,
     ];
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisExtent: 72,
-        crossAxisSpacing: AppSpaces.sm,
-        mainAxisSpacing: AppSpaces.sm,
-      ),
-      itemCount: tiles.length,
-      itemBuilder: (context, i) => tiles[i],
+    int colorIndex = 0;
+    Widget tile(IconData icon, String label, String route) {
+      final color = tileColors[colorIndex % tileColors.length];
+      colorIndex++;
+      return AppListTile(
+        icon: icon,
+        iconColor: color,
+        label: label,
+        value: '',
+        compact: true,
+        onTap: () => context.push(route),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: Icon(isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
+                  size: 20, color: AppColors.primary),
+              onPressed: openMenu,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+            const SizedBox(width: AppSpaces.xs),
+            Expanded(child: tile(Icons.auto_awesome_rounded, 'ACEsi', '/ai-recommendations')),
+            const SizedBox(width: AppSpaces.sm),
+            Expanded(child: tile(Icons.person_rounded, 'My Profile', '/onboarding')),
+            const SizedBox(width: AppSpaces.xs),
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined,
+                  size: 20, color: AppColors.primary),
+              onPressed: () => context.push('/notifications'),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpaces.sm),
+        Row(
+          children: [
+            Expanded(child: tile(Icons.chat_rounded, 'Community', '/chat')),
+            const SizedBox(width: AppSpaces.sm),
+            Expanded(child: tile(Icons.school_rounded, 'Universities', '/universities')),
+          ],
+        ),
+        const SizedBox(height: AppSpaces.sm),
+        Row(
+          children: [
+            Expanded(child: tile(Icons.assignment_rounded, 'Applications', '/applications')),
+            const SizedBox(width: AppSpaces.sm),
+            Expanded(child: tile(Icons.account_balance_rounded, 'Funding', '/funding')),
+          ],
+        ),
+        const SizedBox(height: AppSpaces.sm),
+        Row(
+          children: [
+            Expanded(child: tile(Icons.settings_rounded, 'Settings', '/settings')),
+            const SizedBox(width: AppSpaces.sm),
+            Expanded(child: tile(Icons.info_outline_rounded, 'About Us', '/about')),
+          ],
+        ),
+        const SizedBox(height: AppSpaces.sm),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(authProvider.notifier).signOut();
+              if (context.mounted) context.go('/login');
+            },
+            icon: const Icon(Icons.logout_rounded, size: 16),
+            label: const Text('Exit'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(120, 34),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              textStyle: const TextStyle(fontSize: 12),
+              side: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

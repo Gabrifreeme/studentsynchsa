@@ -241,15 +241,6 @@ class DashboardShell extends ConsumerWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  Text(
-                    'SA',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accent,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -278,6 +269,20 @@ class DashboardShell extends ConsumerWidget {
                     },
                   );
                 }).toList(),
+              ),
+            ),
+            const Divider(color: AppColors.divider, thickness: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: _SidebarItem(
+                icon: Icons.logout_rounded,
+                label: 'Exit',
+                selected: false,
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await ref.read(authProvider.notifier).signOut();
+                  if (context.mounted) context.go('/login');
+                },
               ),
             ),
           ],
