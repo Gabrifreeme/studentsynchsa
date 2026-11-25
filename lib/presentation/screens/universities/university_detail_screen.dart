@@ -125,6 +125,13 @@ class UniversityDetailScreen extends ConsumerWidget {
 
               // 2. Offline guide directly under the university card
               AppCard(child: OfflineTab(universityId: uni.id)),
+              const SizedBox(height: 6),
+              // Application Fee + NBT under the offline guide
+              _infoChip(Icons.monetization_on_outlined,
+                'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
+              const SizedBox(height: 6),
+              _infoChip(Icons.assignment_outlined,
+                'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
               const SizedBox(height: 11),
 
               // 3. Images on the left, Apply button beside them
@@ -175,12 +182,6 @@ class UniversityDetailScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: 11),
 
-              // 4. Fee + NBT info
-              _infoChip(Icons.monetization_on_outlined,
-                'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
-              const SizedBox(height: 6),
-              _infoChip(Icons.assignment_outlined,
-                'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
             ],
           ),
         ),
