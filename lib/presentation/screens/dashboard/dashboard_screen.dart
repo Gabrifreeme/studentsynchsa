@@ -28,7 +28,8 @@ class DashboardScreen extends ConsumerWidget {
           title: const Text('LibSyncStudent',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
         ),
-        body: Center(
+        body: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: double.infinity,
@@ -167,7 +168,7 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(child: tile(Icons.info_outline_rounded, 'About Us', '/about')),
           ],
         ),
-        const SizedBox(height: AppSpaces.sm),
+        const SizedBox(height: 200),
         Center(
           child: OutlinedButton.icon(
             onPressed: () async {
