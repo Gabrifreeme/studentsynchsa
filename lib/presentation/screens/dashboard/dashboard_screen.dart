@@ -26,7 +26,7 @@ class DashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('LibSyncStudent',
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
         ),
         body: Center(
           child: ConstrainedBox(
