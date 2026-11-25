@@ -198,7 +198,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 40),
 
                   // 4. Apply button centred under the image card
                   OutlinedButton.icon(
