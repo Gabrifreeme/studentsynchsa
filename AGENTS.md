@@ -46,8 +46,8 @@ It is a Flask server + single-page HTML UI.
 - Command: `python tools/autofill_selftest.py` (from `D:\projects\acesi`)
 - Endpoint: `GET /api/autofill/selftest` (JSON with per-field PASS/FAIL)
 - It extracts the REAL generated JS from `autofill_script.dart`, runs it
-  against a 15-field ITS-style fixture (main doc + iframe), and reports each
-  field. Current result: 15/15 PASS.
+  against a 28-field ITS-style fixture (main doc + iframe), and reports each
+  field. Current result: 28/28 PASS.
 - If any field fails, fix the alias in `autofill_script.dart` and re-run.
   Never work on auto-fill blind — run this first.
 

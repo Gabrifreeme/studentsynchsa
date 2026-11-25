@@ -16,22 +16,29 @@ CHROME = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 PROFILE = {
     "personal": {
         "title": "Mr", "firstName": "Thabo", "lastName": "Dlamini",
-        "initials": "T", "gender": "Male", "idNumber": "9001015800088",
+        "initials": "T", "maidenName": "Nxele", "gender": "Male", "idNumber": "9001015800088",
         "dateOfBirth": "2000-01-01T00:00:00.000",
     },
     "contact": {"email": "thabo@example.com", "phone": "0821234567", "workPhone": ""},
     "address": {"address": "12 Main Road", "addressLine2": "Township",
-                "province": "Gauteng", "postalCode": "2000"},
+                "addressLine3": "Extension 4", "province": "Gauteng",
+                "postalCode": "2000", "postalAddress": "PO Box 12"},
     "demographic": {"nationality": "South African", "homeLanguage": "Zulu",
-                    "populationGroup": "African", "maritalStatus": "Single"},
+                    "populationGroup": "African", "maritalStatus": "Single",
+                    "countryOfBirth": "South Africa"},
     "school": {"schoolName": "Test High", "currentGrade": "Grade 12"},
     "results": {"matricYear": 2024, "matricType": "National Senior Certificate",
-                "examinationNumber": "123456789", "applicationLevel": "Undergraduate"},
+                "examinationNumber": "123456789", "applicationLevel": "Undergraduate",
+                "schoolLeavingCertificate": "NSC-2024", "upgrading": "No"},
     "qualification": {"choices": [{"faculty": "Engineering",
                                    "programme": "Chemical Engineering"}],
                       "academicYear": "2026", "studyMode": "Full-Time"},
     "nextOfKin": {"name": "Parent", "mobilePhone": "0831112222",
+                  "homePhone": "0151112222", "workPhone": "0153334444",
+                  "addressLine1": "5 Kin Road", "postalCode": "0950",
                   "email": "parent@example.com"},
+    "accountContact": {"name": "Account Person", "mobilePhone": "0829998888",
+                       "email": "account@example.com"},
 }
 
 # name -> (expected value, location)
@@ -51,6 +58,19 @@ EXPECTED = {
     "P_HOME_LANG": ("Zulu", "frame"),
     "P_RACE": ("African", "frame"),
     "P_CITIZEN_TYPE": ("Yes", "main"),  # radio group
+    "P_MAIDEN_NAME": ("Nxele", "main"),
+    "P_COUNTRY_OF_BIRTH": ("South Africa", "main"),
+    "P_ADDRESS_3": ("Extension 4", "main"),
+    "P_POSTAL_ADDRESS": ("PO Box 12", "main"),
+    "P_NEXT_OF_KIN_HOME_PHONE": ("0151112222", "main"),
+    "P_NEXT_OF_KIN_WORK_PHONE": ("0153334444", "main"),
+    "P_NEXT_OF_KIN_ADDRESS": ("5 Kin Road", "main"),
+    "P_NEXT_OF_KIN_POSTAL_CODE": ("0950", "main"),
+    "P_ACCOUNT_NAME": ("Account Person", "frame"),
+    "P_ACCOUNT_MOBILE": ("0829998888", "frame"),
+    "P_ACCOUNT_EMAIL": ("account@example.com", "frame"),
+    "P_SCHOOL_LEAVING_CERT": ("NSC-2024", "frame"),
+    "P_UPGRADING": ("No", "frame"),
 }
 
 
@@ -86,11 +106,20 @@ def fixture_html():
         ('P_NATIONALITY', 'select:South African,Other'),
         ('P_MARITAL_STATUS', 'select:Single,Married'),
         ('P_CITIZEN_TYPE', 'radio'),
+        ('P_MAIDEN_NAME', 'text'), ('P_COUNTRY_OF_BIRTH', 'text'),
+        ('P_ADDRESS_3', 'text'), ('P_POSTAL_ADDRESS', 'text'),
+        ('P_NEXT_OF_KIN_HOME_PHONE', 'text'),
+        ('P_NEXT_OF_KIN_WORK_PHONE', 'text'),
+        ('P_NEXT_OF_KIN_ADDRESS', 'text'),
+        ('P_NEXT_OF_KIN_POSTAL_CODE', 'text'),
     ]
     frame_fields = [
         ('P_POSTAL_CODE', 'text'),
         ('P_HOME_LANG', 'select:Zulu,English'),
         ('P_RACE', 'select:African,Coloured'),
+        ('P_ACCOUNT_NAME', 'text'), ('P_ACCOUNT_MOBILE', 'text'),
+        ('P_ACCOUNT_EMAIL', 'text'),
+        ('P_SCHOOL_LEAVING_CERT', 'text'), ('P_UPGRADING', 'select:No,Yes'),
     ]
     iframe_src = '<form>' + ''.join(field(n, t) for n, t in frame_fields) + '</form>'
     # The real app's label patch sets this aria-label; simulate it.
