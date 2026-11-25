@@ -140,9 +140,16 @@ class _FundingListScreenState extends State<FundingListScreen> {
                     ? const Center(
                         child: Text('No programmes found',
                             style: TextStyle(color: AppColors.textMuted)))
-                    : ListView.builder(
+                    : GridView.builder(
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisExtent: 170,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
                         itemCount: filtered.length,
                         itemBuilder: (_, i) {
                           final b = filtered[i];
@@ -197,110 +204,68 @@ class _FundingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = bursary;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: AppColors.card,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: logoColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: StarIcon(Icons.school_outlined, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            b.name,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            b.provider,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const StarIcon(Icons.open_in_new,
-                          size: 18),
-                      onPressed: onOpenLink,
-                      splashRadius: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      icon: Icon(
-                        isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        size: 20,
-                        color: isSaved ? AppColors.primaryLight : AppColors.textMuted,
-                      ),
-                      onPressed: onSave,
-                      splashRadius: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpaces.sm + 2),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: logoColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(AppSpaces.radius),
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: typeColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    b.type,
-                    style: TextStyle(
-                      color: typeColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  b.coverage.isNotEmpty ? b.coverage : b.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
+                child: const StarIcon(Icons.school_outlined, size: 22),
+              ),
+              const SizedBox(width: AppSpaces.xs + 2),
+              Expanded(
+                child: Text(b.name,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              InkWell(
+                onTap: onSave,
+                child: StarIcon(
+                    isSaved ? Icons.bookmark : Icons.bookmark_border,
+                    size: 18),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: AppSpaces.xs),
+          Text(b.provider,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 10),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: AppSpaces.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: typeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(b.type,
+                style: TextStyle(
+                    color: typeColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600)),
+          ),
+          const Spacer(),
+          Text(b.coverage.isNotEmpty ? b.coverage : b.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: AppColors.textMuted, fontSize: 9)),
+        ],
       ),
     );
   }

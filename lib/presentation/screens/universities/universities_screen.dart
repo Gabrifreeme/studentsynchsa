@@ -175,89 +175,57 @@ class _UniversityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uni = university;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: AppColors.card,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // University logo/image
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: logoColor.withValues(alpha: 0.1),
-                        image: uni.logoUrl.isNotEmpty
-                            ? DecorationImage(
-                                image: NetworkImage(uni.logoUrl),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: uni.logoUrl.isEmpty
-                          ? StarIcon(Icons.account_balance_outlined, size: 28)
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            uni.name,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            uni.shortName,
-                            style: const TextStyle(
-                              color: AppColors.primaryLight,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      uni.province,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpaces.sm + 2),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppSpaces.radius),
+              color: logoColor.withValues(alpha: 0.12),
+              image: uni.logoUrl.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(uni.logoUrl), fit: BoxFit.cover)
+                  : null,
             ),
+            child: uni.logoUrl.isEmpty
+                ? StarIcon(Icons.account_balance_outlined, size: 22)
+                : null,
           ),
-        ),
+          const SizedBox(height: AppSpaces.xs + 2),
+          Text(uni.shortName,
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 2),
+          Text(uni.name,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 10),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
+          const Spacer(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const StarIcon(Icons.location_on_outlined, size: 11),
+              const SizedBox(width: 2),
+              Flexible(
+                child: Text(uni.province,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 9),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
