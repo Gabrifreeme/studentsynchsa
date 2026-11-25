@@ -46,7 +46,13 @@ class UniversityDetailScreen extends ConsumerWidget {
 
     if (uni == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('University Details')),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text('University Details'),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -54,7 +60,13 @@ class UniversityDetailScreen extends ConsumerWidget {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: Text(uni.shortName)),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(uni.shortName),
+        ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -84,13 +96,17 @@ class UniversityDetailScreen extends ConsumerWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(_uniImages[uni.id]![0],
-                            width: double.infinity, fit: BoxFit.cover),
+                            width: double.infinity,
+                            height: 120,
+                            fit: BoxFit.cover),
                       ),
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(_uniImages[uni.id]![1],
-                            width: double.infinity, fit: BoxFit.cover),
+                            width: double.infinity,
+                            height: 120,
+                            fit: BoxFit.cover),
                       ),
                     ],
                   ],

@@ -42,6 +42,12 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
