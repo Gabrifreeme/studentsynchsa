@@ -374,13 +374,15 @@ class StarIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShaderMask(
       shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
         colors: [
           AppColors.starRed,
-          AppColors.starBlue,
-          AppColors.starGreen,
           AppColors.starYellow,
+          AppColors.starGreen,
+          AppColors.starBlue,
         ],
-        stops: [0.0, 0.34, 0.67, 1.0],
+        stops: [0.0, 0.33, 0.66, 1.0],
       ).createShader(bounds),
       blendMode: BlendMode.srcIn,
       child: Icon(icon, size: size, color: Colors.white),

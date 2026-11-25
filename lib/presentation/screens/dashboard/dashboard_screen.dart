@@ -54,7 +54,7 @@ class DashboardScreen extends ConsumerWidget {
               _buildStarCta(context, firstName),
               const SizedBox(height: 7),
               _PrivacyConsentBanner(),
-              const SizedBox(height: 7),
+              const SizedBox(height: 90),
               _buildTileGrid(context, isRight, ref),
             ],
           ),
@@ -181,7 +181,7 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(child: tile(Icons.info_outline_rounded, 'About Us', '/about')),
           ],
         ),
-        const SizedBox(height: 166),
+        const SizedBox(height: 83),
         Center(
           child: OutlinedButton.icon(
             onPressed: () async {
