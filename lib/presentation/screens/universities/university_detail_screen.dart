@@ -33,6 +33,10 @@ const Map<String, List<String>> _uniImages = {
   'cut': ['assets/images/Cuo.png', 'assets/images/Cuo1.png'],
   'univen': ['assets/images/Ven.png', 'assets/images/Ven1.png'],
   'vut': ['assets/images/Vaal.png', 'assets/images/Vaal1.png'],
+  'smu': ['assets/logos/smu.png', 'assets/logos/smu.png'],
+  'ump': ['assets/logos/ump.png', 'assets/logos/ump.png'],
+  'up': ['assets/logos/up.png', 'assets/logos/up.png'],
+  'uwc': ['assets/logos/uwc.png', 'assets/logos/uwc.png'],
 };
 
 class UniversityDetailScreen extends ConsumerWidget {
@@ -103,14 +107,25 @@ class UniversityDetailScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 3),
-                        Text(uni.province,
-                            style: const TextStyle(color: AppColors.textSecondary)),
-                      ],
+                    GestureDetector(
+                      onTap: () async {
+                        final query = Uri.encodeComponent(
+                            '${uni.name}, ${uni.province}, South Africa');
+                        await launchUrl(
+                          Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=$query'),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          const StarIcon(Icons.location_on_outlined, size: 14),
+                          const SizedBox(width: 3),
+                          Text(uni.province,
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary)),
+                        ],
+                      ),
                     ),
                     if (uni.description.isNotEmpty) ...[
                       const SizedBox(height: 8),
