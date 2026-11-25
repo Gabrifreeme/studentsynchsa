@@ -77,49 +77,7 @@ class UniversityDetailScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Apply button (top)
-              _SparkleStar(
-                onTap: () => _launchUniv(context, uni),
-              ),
-              const SizedBox(height: 11),
-
-              // Fee + NBT info
-              _infoChip(Icons.monetization_on_outlined,
-                'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
-              const SizedBox(height: 6),
-              _infoChip(Icons.assignment_outlined,
-                'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
-              const SizedBox(height: 11),
-
-              // Offline Resources
-              AppCard(
-                child: Column(
-                  children: [
-                    OfflineTab(universityId: uni.id),
-                    if (_uniImages.containsKey(uni.id)) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(_uniImages[uni.id]![0],
-                            width: double.infinity,
-                            height: 90,
-                            fit: BoxFit.contain),
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(_uniImages[uni.id]![1],
-                            width: double.infinity,
-                            height: 90,
-                            fit: BoxFit.contain),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 11),
-
-              // Header (logo + name, location, description below)
+              // 1. University identity card first
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,6 +121,66 @@ class UniversityDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 11),
+
+              // 2. Offline guide directly under the university card
+              AppCard(child: OfflineTab(universityId: uni.id)),
+              const SizedBox(height: 11),
+
+              // 3. Images on the left, Apply button beside them
+              if (_uniImages.containsKey(uni.id))
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: AppCard(
+                        child: Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset(_uniImages[uni.id]![0],
+                                  width: double.infinity,
+                                  height: 120,
+                                  fit: BoxFit.cover),
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset(_uniImages[uni.id]![1],
+                                  width: double.infinity,
+                                  height: 120,
+                                  fit: BoxFit.cover),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _launchUniv(context, uni),
+                        icon: const StarIcon(Icons.auto_awesome_rounded, size: 16),
+                        label: const Text('Apply'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: AppColors.primary,
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 11),
+
+              // 4. Fee + NBT info
+              _infoChip(Icons.monetization_on_outlined,
+                'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
+              const SizedBox(height: 6),
+              _infoChip(Icons.assignment_outlined,
+                'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
             ],
           ),
         ),
