@@ -37,7 +37,7 @@ class DashboardScreen extends ConsumerWidget {
             },
           ),
           title: const Text('LibSyncStudent',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
@@ -46,18 +46,18 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             children: [
-              const SizedBox(height: 32),
+              const SizedBox(height: 22),
               _buildStarCta(context, firstName),
-              const SizedBox(height: 48),
+              const SizedBox(height: 34),
               _PrivacyConsentBanner(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 17),
               _buildQuickLinks(context),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _buildProgressCards(context),
-              const SizedBox(height: 32),
+              const SizedBox(height: 22),
             ],
           ),
         ),
@@ -73,7 +73,7 @@ class DashboardScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
@@ -84,25 +84,25 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: const StarAvatar(size: 120, pulse: true),
+              child: const StarAvatar(size: 84, pulse: true),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             Text(
               'Welcome, $firstName!',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 28,
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Text(
               'Tap the Star to begin',
               style: TextStyle(
                 color: AppColors.textMuted,
-                fontSize: 13,
-                letterSpacing: 3,
+                fontSize: 10,
+                letterSpacing: 2,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -303,8 +303,8 @@ class _ProgressTile extends StatelessWidget {
       child: AppCard(
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primaryLight, size: 24),
-            const SizedBox(width: 12),
+            Icon(icon, color: AppColors.primaryLight, size: 18),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,17 +312,17 @@ class _ProgressTile extends StatelessWidget {
                   Text(label,
                       style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 18,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.3)),
                   Text(value,
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 14)),
+                          color: AppColors.textSecondary, fontSize: 10)),
                 ],
               ),
             ),
             const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textMuted, size: 20),
+                color: AppColors.textMuted, size: 14),
           ],
         ),
       ),
