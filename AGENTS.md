@@ -77,6 +77,22 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## Auto-fill break points found and fixed (2026-11-25)
+Verified by extracting the real generated JS from `autofill_script.dart` and
+running it against a synthetic ITS form (fields in main document AND iframe):
+- `P_ID_NO` matched the nationality alias `south african` (from the label
+  patch's "South African ID number") and was filled with "South African"
+  instead of the ID number. Removed those two aliases from `nationality`,
+  added `id no / idno / p id no` to `idNumber`.
+- `P_HOME_LANG` inside an iframe had no label patch and no alias — added
+  `home lang / homelang / p home lang`.
+- Added more ITS name aliases and a `latePass()` that re-scans for empty
+  fields at 900ms / 2.5s / 5s (was retrying selects only).
+- WebView now waits 1500ms and only injects when the page actually has form
+  fields, so it no longer fills an intermediate page.
+Test result after fix: 10/10 synthetic fields filled correctly, including
+ID number and iframe home language.
+
 ## Why ACEsi exists (the whole point)
 The app was blocked from going live by ONE feature: automatic filling of
 student application forms on university ITS portals. It never worked reliably;

@@ -165,9 +165,14 @@ if (link) {
 }
 ''');
 
-          // ── Auto-fill injection with 500ms DOM readiness delay ──
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (_profile != null) {
+          // ── Auto-fill injection: wait for the ITS form DOM, and never inject
+          // into an intermediate page that has no form fields. ──
+          await Future.delayed(const Duration(milliseconds: 1500));
+          final formCheck = (await _controller.runJavaScriptReturningResult(
+                  'document.querySelectorAll("input, select, textarea").length > 0'))
+              .toString()
+              .replaceAll('"', '');
+          if (_profile != null && formCheck == 'true') {
             final profileJson = jsonEncode(_profile!.toJson());
             final script = star.buildAutofillScript(profileJson);
             await _controller.runJavaScript(script);

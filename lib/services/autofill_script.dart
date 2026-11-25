@@ -39,22 +39,22 @@ String _buildFullScript(String profileJson, {required bool createStar}) {
   var profile = $profileJson;
 
   var fieldMap = {
-    'title':             ['title','salutation'],
-    'firstName':         ['firstname','first name','fname','given name','givenname'],
-    'lastName':          ['lastname','last name','lname','surname','family name','familyname'],
+    'title':             ['title','salutation','p title'],
+    'firstName':         ['firstname','first name','fname','given name','givenname','first names','initials and names'],
+    'lastName':          ['lastname','last name','lname','surname','family name','familyname','p surname','surname name'],
     'initials':          ['initials'],
     'gender':            ['gender','sex'],
-    'idNumber':          ['idnumber','id number','identity number','national id','sa id','passport number','rsaid'],
+    'idNumber':          ['idnumber','id no','idno','p id no','p idnumber','identity number','identity','national id','sa id','passport number','passport no','rsaid'],
     'dateOfBirth':       ['dateofbirth','date of birth','dob','birthdate','birth date','birthday'],
     'email':             ['email','e-mail','emailaddress','email address'],
-    'phone':             ['phone','telephone','tel','cell','cellphone','mobile','mobile number','contact no','phone number'],
+    'phone':             ['phone','telephone','tel','cell','cellphone','cell no','cell no','mobile','mobile number','contact no','phone number','p cell no'],
     'workPhone':         ['workphone','work phone','telephone work','tel work'],
     'address':           ['address','street','physical address','residential address'],
     'addressLine2':      ['address2','address line2','suburb','town','city'],
     'province':          ['province','state','region'],
     'postalCode':        ['postalcode','postal code','postcode','zip','zipcode','code'],
-    'nationality':       ['nationality','citizenship','citizen','country','sa citizen','south african'],
-    'homeLanguage':      ['homelanguage','home language','language','first language'],
+    'nationality':       ['nationality','citizenship','citizen','country'],
+    'homeLanguage':      ['homelanguage','home language','home lang','homelang','p home lang','language','first language'],
     'populationGroup':   ['populationgroup','population group','race','ethnicity'],
     'maritalStatus':     ['maritalstatus','marital status'],
     'schoolName':        ['school','schoolname','school name','highschool','high school','institution'],
@@ -510,6 +510,31 @@ String _buildFullScript(String profileJson, {required bool createStar}) {
       setTimeout(doRetry, 2000);
       setTimeout(doRetry, 5000);
     }
+
+    // Late DOM pass: ITS portals load form rows in stages. Re-scan for any
+    // field that is still empty and fill it, quietly, after the page settles.
+    function latePass() {
+      var late = getElementsFromAllFrames(normalSelector);
+      var added = 0;
+      for (var i = 0; i < late.length; i++) {
+        var el = late[i];
+        if (el.readOnly || el.disabled || (el.value && String(el.value).trim())) continue;
+        var key = matchField(el);
+        if (!key || !vs[key]) continue;
+        var ok = el.tagName === 'SELECT'
+          ? setSelectValue(el, vs[key])
+          : setInputValue(el, vs[key]);
+        if (ok) {
+          el.style.outline = '3px solid #10B981';
+          added++;
+        }
+      }
+      return added;
+    }
+
+    setTimeout(latePass, 900);
+    setTimeout(latePass, 2500);
+    setTimeout(latePass, 5000);
 
     showToast(
       filled > 0 ? '✅ Filled ' + filled + ' field' + (filled > 1 ? 's' : '') + '!' : 'No fields matched.',
