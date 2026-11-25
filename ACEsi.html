@@ -18066,6 +18066,17 @@ html body #flutter-prompt-row {
 }
 /* Keep the last log line clear of the prompt row. */
 html body #terminal-split { padding-bottom:2px !important; }
+/* Hardware cards: six equal boxes filling the dashboard top to bottom. */
+html body #ace-term-dashboard {
+  justify-content:stretch !important;
+  gap:4px !important;
+}
+html body #ace-term-dashboard .ace-dash-card {
+  flex:1 1 0 !important;
+  height:0 !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
 /* Explorer header divider - bright amber (top-right second line). */
 html body #explorer-panel > .ace-header-divider { background:#ffa500 !important; }
 /* Bright divider just above the control row, reaching the left border. */
