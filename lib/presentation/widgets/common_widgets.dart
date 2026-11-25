@@ -1,6 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 
+/// Single spacing / typography scale shared by every screen.
+/// Sizes are tuned mobile-first; desktop simply gets the same values.
+class AppSpaces {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 24;
+
+  static const double radius = 12;
+  static const double tileIcon = 18;
+  static const double tileTitle = 13;
+  static const double tileSubtitle = 10;
+  static const double tileChevron = 14;
+}
+
 class GradientBackground extends StatelessWidget {
   final Widget child;
   const GradientBackground({super.key, required this.child});
@@ -107,9 +123,9 @@ class AppCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppSpaces.radius),
         child: Padding(
-          padding: padding ?? const EdgeInsets.all(16),
+          padding: padding ?? const EdgeInsets.all(AppSpaces.lg),
           child: child,
         ),
       ),
@@ -244,6 +260,66 @@ class SyncStatusBadge extends StatelessWidget {
           style: TextStyle(color: color, fontSize: 11),
         ),
       ],
+    );
+  }
+}
+
+
+/// Standard tappable row used across the dashboard, lists and settings.
+class AppListTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+  final Color? iconColor;
+  final Widget? trailing;
+
+  const AppListTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.iconColor,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpaces.md, vertical: AppSpaces.sm + 2),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon,
+              color: iconColor ?? AppColors.primaryLight,
+              size: AppSpaces.tileIcon),
+          const SizedBox(width: AppSpaces.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: AppSpaces.tileTitle,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3)),
+                if (value.isNotEmpty) ...[
+                  const SizedBox(height: AppSpaces.xs),
+                  Text(value,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: AppSpaces.tileSubtitle)),
+                ],
+              ],
+            ),
+          ),
+          trailing ?? const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textMuted, size: AppSpaces.tileChevron),
+        ],
+      ),
     );
   }
 }

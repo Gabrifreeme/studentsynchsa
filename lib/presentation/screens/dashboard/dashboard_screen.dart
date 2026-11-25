@@ -122,21 +122,21 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildQuickLinks(BuildContext context) {
     return Column(
       children: [
-        _ProgressTile(
+        AppListTile(
           icon: Icons.auto_awesome_rounded,
           label: 'ACEsi',
           value: 'Ask your Star adviser',
           onTap: () => context.push('/ai-recommendations'),
         ),
         const SizedBox(height: 8),
-        _ProgressTile(
+        AppListTile(
           icon: Icons.person_rounded,
           label: 'My Profile',
           value: 'View and edit your profile',
           onTap: () => context.push('/onboarding'),
         ),
         const SizedBox(height: 8),
-        _ProgressTile(
+        AppListTile(
           icon: Icons.chat_rounded,
           label: 'Community',
           value: 'Chat with other students',
@@ -149,21 +149,21 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildProgressCards(BuildContext context) {
     return Column(
       children: [
-        _ProgressTile(
+        AppListTile(
           icon: Icons.school_rounded,
           label: 'Universities',
           value: '26 available',
           onTap: () => context.push('/universities'),
         ),
         const SizedBox(height: 8),
-        _ProgressTile(
+        AppListTile(
           icon: Icons.assignment_rounded,
           label: 'Applications',
           value: 'Track your progress',
           onTap: () => context.push('/applications'),
         ),
         const SizedBox(height: 8),
-        _ProgressTile(
+        AppListTile(
           icon: Icons.account_balance_rounded,
           label: 'Funding',
           value: 'Bursaries & scholarships',
@@ -283,53 +283,6 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
                 color: AppColors.textMuted,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  const _ProgressTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AppCard(
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.primaryLight, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3)),
-                  Text(value,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 10)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textMuted, size: 14),
           ],
         ),
       ),
