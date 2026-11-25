@@ -133,8 +133,14 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                   Expanded(
                     child: filtered.isEmpty
                         ? const Center(child: Text('No universities found', style: TextStyle(color: AppColors.textMuted)))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        : GridView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisExtent: 156,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
                             itemCount: filtered.length,
                             itemBuilder: (_, i) {
                               return _UniversityCard(
