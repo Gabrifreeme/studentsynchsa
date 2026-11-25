@@ -154,8 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
                                 labelText: 'Email',
-                                prefixIcon: const Icon(Icons.email_outlined,
-                                    color: AppColors.info),
+                                prefixIcon: const StarIcon(Icons.email_outlined),
                               ),
                               validator: (v) =>
                                   v?.isEmpty == true ? 'Enter your email' : null,
@@ -166,14 +165,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 labelText: 'Password',
-                                prefixIcon: const Icon(Icons.lock_outlined,
-                                  color: AppColors.info),
+                                prefixIcon: const StarIcon(Icons.lock_outlined),
                                 suffixIcon: IconButton(
-                                  icon: Icon(
+                                  icon: StarIcon(
                                     _obscurePassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: AppColors.info,
+                                                                            ? Icons.visibility_off_outlined
+                                                                            : Icons.visibility_outlined,
                                   ),
                                   onPressed: () => setState(
                                       () => _obscurePassword = !_obscurePassword),
