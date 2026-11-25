@@ -74,145 +74,135 @@ class UniversityDetailScreen extends ConsumerWidget {
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: double.infinity,
+              maxWidth: MediaQuery.of(context).size.width < 600
+                  ? double.infinity
+                  : 620,
             ),
             child: SingleChildScrollView(
-          padding: const EdgeInsets.all(11),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. University identity card first
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.asset(
-                            'assets/images/${uni.id}_logo.png',
-                            width: 48, height: 48, fit: BoxFit.contain,
-                            errorBuilder: (_, _, _) => const SizedBox(width: 34),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(uni.name,
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () async {
-                        final query = Uri.encodeComponent(
-                            '${uni.name}, ${uni.province}, South Africa');
-                        await launchUrl(
-                          Uri.parse(
-                              'https://www.google.com/maps/search/?api=1&query=$query'),
-                          mode: LaunchMode.externalApplication,
-                        );
-                      },
-                      child: Row(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // 1. University identity card
+                  AppCard(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const StarIcon(Icons.location_on_outlined, size: 14),
-                          const SizedBox(width: 3),
-                          Text(uni.province,
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary)),
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.asset(
+                                  'assets/images/${uni.id}_logo.png',
+                                  width: 40, height: 40, fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) =>
+                                      const SizedBox(width: 28),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(uni.name,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () async {
+                              final query = Uri.encodeComponent(
+                                  '${uni.name}, ${uni.province}, South Africa');
+                              await launchUrl(
+                                Uri.parse(
+                                    'https://www.google.com/maps/search/?api=1&query=$query'),
+                                mode: LaunchMode.externalApplication,
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                const StarIcon(Icons.location_on_outlined,
+                                    size: 14),
+                                const SizedBox(width: 3),
+                                Text(uni.province,
+                                    style: const TextStyle(
+                                        color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    if (uni.description.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(uni.description,
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 9)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 11),
+                  ),
+                  const SizedBox(height: 8),
 
-              // 2. Offline guide directly under the university card
-              AppCard(child: OfflineTab(universityId: uni.id)),
-              const SizedBox(height: 6),
-              // Application Fee + NBT under the offline guide
-              _infoChip(Icons.monetization_on_outlined,
-                'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
-              const SizedBox(height: 6),
-              _infoChip(Icons.assignment_outlined,
-                'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
-              const SizedBox(height: 11),
-
-              // 3. Images on the left, Apply button beside them
-              if (_uniImages.containsKey(uni.id))
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: AppCard(
-                        child: Column(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.asset(_uniImages[uni.id]![0],
-                                  width: double.infinity,
-                                  height: 120,
-                                  fit: BoxFit.cover),
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.asset(_uniImages[uni.id]![1],
-                                  width: double.infinity,
-                                  height: 120,
-                                  fit: BoxFit.cover),
-                            ),
-                          ],
-                        ),
-                      ),
+                  // 2. Offline guide
+                  AppCard(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OfflineTab(universityId: uni.id),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Fee + NBT
+                  _infoChip(Icons.monetization_on_outlined,
+                    'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
+                  const SizedBox(height: 6),
+                  _infoChip(Icons.assignment_outlined,
+                    'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
+                  const SizedBox(height: 8),
+
+                  // 3. Image card - same width as every other card
+                  if (_uniImages.containsKey(uni.id))
+                    AppCard(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _launchUniv(context, uni),
-                            icon: const StarIcon(Icons.auto_awesome_rounded,
-                                size: 16),
-                            label: const Text('Apply'),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 40),
-                              side: const BorderSide(color: AppColors.primary),
-                              foregroundColor: AppColors.primary,
-                              textStyle: const TextStyle(fontSize: 12),
-                            ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.asset(_uniImages[uni.id]![0],
+                                width: double.infinity,
+                                height: 80,
+                                fit: BoxFit.cover),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            'Opens ${uni.shortName}\'s official application page',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                color: AppColors.textMuted, fontSize: 9),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.asset(_uniImages[uni.id]![1],
+                                width: double.infinity,
+                                height: 80,
+                                fit: BoxFit.cover),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              const SizedBox(height: 11),
+                  const SizedBox(height: 6),
 
-            ],
-          ),
-        ),
+                  // 4. Apply button centred under the image card
+                  OutlinedButton.icon(
+                    onPressed: () => _launchUniv(context, uni),
+                    icon: const StarIcon(Icons.auto_awesome_rounded, size: 16),
+                    label: const Text('Apply'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(120, 36),
+                      side: const BorderSide(color: AppColors.primary),
+                      foregroundColor: AppColors.primary,
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Opens ${uni.shortName}\'s official application page',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
