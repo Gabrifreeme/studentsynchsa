@@ -45,7 +45,12 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ],
         ),
-        body: SingleChildScrollView(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            child: SingleChildScrollView(
           padding: const EdgeInsets.all(12),
           child: Column(
             children: [
@@ -59,6 +64,8 @@ class DashboardScreen extends ConsumerWidget {
               _buildProgressCards(context),
               const SizedBox(height: 22),
             ],
+          ),
+        ),
           ),
         ),
       ),
