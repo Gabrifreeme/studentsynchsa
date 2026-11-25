@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/presentation/screens/chat/general_chat_screen.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -23,7 +24,10 @@ class ChatScreen extends StatelessWidget {
           children: [
             AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              onTap: () => _showComingSoon(context),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const GeneralChatScreen()),
+              ),
               child: const SizedBox(
                 height: 48,
                 child: ListTile(

@@ -77,6 +77,13 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## Community Chat
+- General Chat is ACTIVE: `general_chat_screen.dart`, reached from the first
+  card in `chat_screen.dart`. Messages persist in Hive box `general_chat`.
+- It is DEVICE-LOCAL only — there is no community backend/sync. The UI says
+  "On this device" so this is not mistaken for a live shared chat.
+- Province-based and University Interest Groups still show Coming Soon.
+
 ## WebView HTTP error capture (for the UNIVEN second-page 404)
 - `onWebResourceError` now records code, type, URL and description for every
   failed resource, shows the latest in a red banner, and offers "Copy all
