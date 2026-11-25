@@ -68,7 +68,8 @@ class UniversityDetailScreen extends ConsumerWidget {
           automaticallyImplyLeading: false,
           title: Text(uni.shortName),
         ),
-        body: Center(
+        body: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width < 600
@@ -197,7 +198,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 110),
 
                   // 4. Apply button centred under the image card
                   OutlinedButton.icon(
