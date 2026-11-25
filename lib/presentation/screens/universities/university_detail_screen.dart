@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
@@ -229,19 +230,19 @@ class UniversityDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _launchUniv(BuildContext context, dynamic university) {
+  Future<void> _launchUniv(BuildContext context, dynamic university) async {
     final url = (university.applicationUrl as String?)?.isNotEmpty == true
         ? university.applicationUrl as String
         : university.website as String;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => UniversityWebViewScreen(
-          url: url,
-          universityName: university.shortName as String,
-        ),
-      ),
-    );
+    try {
+      await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
+    }
   }
 }
 
