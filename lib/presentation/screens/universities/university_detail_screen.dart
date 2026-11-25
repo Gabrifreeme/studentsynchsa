@@ -64,13 +64,7 @@ class UniversityDetailScreen extends ConsumerWidget {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          title: Text(uni.shortName),
-        ),
+        appBar: AppBar(title: Text(uni.shortName)),
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -83,6 +77,15 @@ class UniversityDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const StarIcon(Icons.arrow_back_rounded, size: 20),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
                   // 1. University identity card
                   AppCard(
                     child: SizedBox(
