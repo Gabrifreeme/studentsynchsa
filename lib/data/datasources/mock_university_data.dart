@@ -52,7 +52,7 @@ class MockUniversityData {
     University(
       id: 'cput', name: 'Cape Peninsula University of Technology',
       shortName: 'CPUT', province: 'Western Cape',
-      website: 'https://www.cput.ac.za', applicationUrl: 'https://alecto.cput.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
+      website: 'https://www.cput.ac.za', applicationUrl: 'https://www.cput.ac.za/study-at-cput/undergraduate/apply',
       logoUrl: 'assets/logos/cput.png',
       hasApplicationFee: true, applicationFee: 100,
       requiresNbt: false, minimumAps: 26,

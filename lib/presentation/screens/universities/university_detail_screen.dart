@@ -81,7 +81,7 @@ class UniversityDetailScreen extends ConsumerWidget {
             children: [
               // Apply button (top)
               _SparkleStar(
-                onTap: () => _launchUniv(context),
+                onTap: () => _launchUniv(context, uni),
               ),
               const SizedBox(height: 11),
 
@@ -199,13 +199,16 @@ class UniversityDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _launchUniv(BuildContext context) {
+  void _launchUniv(BuildContext context, dynamic university) {
+    final url = (university.applicationUrl as String?)?.isNotEmpty == true
+        ? university.applicationUrl as String
+        : university.website as String;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => UniversityWebViewScreen(
-          url: "https://www.univen.ac.za/",
-          universityName: "UNIVEN",
+          url: url,
+          universityName: university.shortName as String,
         ),
       ),
     );
