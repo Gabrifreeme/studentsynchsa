@@ -8935,7 +8935,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
       </div>
     </div>
 
-    <div id="flutter-prompt-row" style="display:flex; align-items:center; gap:6px; flex:0 0 auto; width:100%; padding:5px 10px; border-top:1px solid #ffa500; background:#000; box-sizing:border-box;">
+    <div id="flutter-prompt-row" style="display:flex; align-items:center; gap:6px; flex:0 0 auto; width:100%; padding:6px 10px; border:0; background:#000; box-sizing:border-box;">
       <span style="color:#ffa500; font-family:monospace; font-size:12px; white-space:pre;">PS D:\projects\acesi&gt;&nbsp;</span>
       <input id="flutter-console-input" type="text" autocomplete="off" spellcheck="false"
         onkeydown="if(event.key==='Enter'){event.preventDefault();window.aceFlutterSend()}"
@@ -18058,10 +18058,14 @@ html body #terminal-panel {
 html body #flutter-prompt-row {
   display:flex !important;
   flex:0 0 auto !important;
-  position:sticky !important;
-  bottom:0 !important;
+  position:relative !important;
+  bottom:auto !important;
+  border:0 !important;
+  box-shadow:none !important;
   z-index:9999 !important;
 }
+/* Keep the last log line clear of the prompt row. */
+html body #terminal-split { padding-bottom:2px !important; }
 /* Explorer header divider - bright amber (top-right second line). */
 html body #explorer-panel > .ace-header-divider { background:#ffa500 !important; }
 /* Bright divider just above the control row, reaching the left border. */
