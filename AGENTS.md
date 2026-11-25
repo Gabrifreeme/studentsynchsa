@@ -1,77 +1,57 @@
-﻿# StudentSyncSA - Agent Instructions
+﻿# ACEsi — Operational Rules (read this first)
 
-## Project Overview
-Flutter app for South African university students. Uses WebView to load ITS (Oracle PL/SQL) university portals (UNIVEN, UL, TUT, NWU, etc.) with auto-fill functionality.
+ACEsi is the local agent that runs LibSyncStudent and drives its development.
+It is a Flask server + single-page HTML UI.
 
-## Key Architecture
-- **Flutter + WebView**: App loads university portals in WebView (`webview_flutter`)
-- **Auto-fill**: JavaScript injected into WebView to populate form fields
-- **Profile storage**: Hive local database
-- **State management**: Riverpod + GoRouter
+## Locations
+- ACEsi: `D:\projects\acesi` (`server.py`, `ACEsi.html`, `ACEsi.html.golden`)
+- App under management: `C:\Users\gabri\Documents\LibSyncStudent`
+- ACEsi UI: `http://127.0.0.1:5000/`
+- Flutter web app: `http://127.0.0.1:55793/`
+- Conversation memory: `ace_memory.db`
+- Logs: `server_stdout.txt`, `audit.log`, `run_*.log` (in LibSyncStudent)
 
-## Critical Files
-- `lib/main.dart` - App entry, Hive migration on startup
-- `lib/presentation/screens/universities/webview_impl.dart` - WebView with auto-fill panel
-- `lib/services/autofill_script.dart` - Generates JS for form filling
-- `lib/presentation/screens/profile/profile_onboarding_screen.dart` - Profile editor
-- `lib/services/auth_service.dart` - Auth + profile defaults
+## HARD RULES
+1. **After every edit: commit, push, and save.** No asking for confirmation.
+   - ACEsi HTML edits: also refresh `ACEsi.html.golden` (`copy2`) in the same step.
+   - If the user says a change is wrong: revert it, push the revert, say so.
+2. **Verify visually before claiming a fix.** Use computed styles, pixel sampling,
+   browser screenshots and logs. Never say "fixed" on assumption.
+3. **Ollama is uninstalled.** Never probe it, never set `ACE_OLLAMA=1` or
+   `ACESI_OFFLINE=1`. Cloud provider routing is expected (picker usually
+   `gemini-3.5-flash-lite`).
+4. **The user runs Flutter.** Do NOT run `flutter run`, `analyze`, `test`,
+   `build`, `adb` or `scrcpy` unless explicitly asked. Edit files and tell them
+   what to run.
+5. **Do the edits yourself.** The user wants ACEsi to perform the work, not to
+   describe it. Verify afterwards; do not silently hand-fix guessed problems.
+6. **Agent Turn Summary** after real work: `Summary of Changes ✅` with a table.
+7. **Settings System Prompt** stays capped at 250 words with a live counter.
 
-## Commands
-```bash
-flutter analyze                 # Lint/typecheck
-flutter test                    # Run tests
-flutter run                     # Run app
-```
+## ACEsi UI invariants (do not break)
+- Palette: black `#000`, bright amber `#ffa500`, muted amber `#995C00`,
+  terminal blue `#8fd3ff`, green `#00ff88`, magenta/cyan tags.
+- Borders: 1px; inactive muted, active panel bright. No duplicate/dim lines.
+- Keep the Live System Feed and the 6 hardware sparkline cards.
+- Hardware cards stretch evenly top-to-bottom in the dashboard column.
+- Terminal: 300px, ACEsi tab / Flutter tab. The Flutter prompt:
+  - lives inside the left pane, only on the Flutter tab, no border lines,
+  - no Send button — Enter sends `r`/`R`/`q`,
+  - hardware cards must fill the right column with no strip under them.
+- Flutter run command: `flutter run -d web-server --web-hostname 127.0.0.1 --web-port 55793`
+- Wait for `Flutter run key commands` in the log before sending `R`; pressing
+  keys during startup causes hot-restart timeouts and a white page.
 
-## Auto-fill Implementation
-- WebView configured with `JavaScriptMode.unrestricted`
-- `[All]` button in WebView panel calls `_runAutofill()` â†’ `star.buildAutofillScript(profile)`
-- Generated JS uses `pMap` to try both `oap*` and `P_*` field names (ITS portals use `P_*`)
-- `set()` handles text inputs, `setSelect()` handles radio buttons + selects
-- Portal patches run on `onPageFinished` before auto-fill
+## Environmental awareness
+- `GET /api/environment/snapshot` returns a compact live snapshot (git state for
+  both repos, Flutter run state + log tail, ports 5000/55793, ACEsi.html/golden
+  match). The same block is injected into every `/chat` system prompt as
+  `[LIVE ENVIRONMENT — AUTO-GATHERED]`. Trust it over assumptions.
+- Useful endpoints: `/api/health`, `/api/run/status`, `/api/run/input`,
+  `/api/system/metrics`, `/history`, `/memory/*`, `/journal`, `/cdp/*`,
+  `/api/last_edit`, `/context`.
 
-## Common Issues
-1. **Auto-fill not working**: Check JS injection in `webview_impl.dart` line 239, verify `pMap` lookup in `autofill_script.dart`
-2. **Profile values mismatch dropdowns**: `auth_service.dart` hardcoded defaults must match dropdown items exactly
-3. **Hive stale data**: Migration in `main.dart` patches old values (`'Black'`â†’`'African'`, `'Full-Time'`â†’`'YEAR'`, `'Accepted'`â†’`'I Accept'`)
-4. **WebView permissions**: Requires `webview_flutter_android` for debugging
-
-## Profile Field Mapping (oap* â†’ P_*)
-Key mappings in `autofill_script.dart` pMap:
-- `oapSurname` â†’ `P_SURNAME`
-- `oapIdNumber` â†’ `P_ID_NO`
-- `oapEmail` â†’ `P_EMAIL`
-- `oapCellNo` â†’ `P_CELL_NO`
-- `oapStreet` â†’ `P_ADDRESS_1`
-- `oapCitizenType` â†’ `P_CITIZEN_TYPE` (radio buttons)
-- etc.
-
-## Testing
-No specific test config found. Use `flutter test` for unit tests.
-
-## ADB WiFi + scrcpy Quick Start (after restart / WiFi reconnect)
-```bash
-# 1. Plug phone via USB, then run:
-adb tcpip 5555
-
-# 2. Unplug USB, find phone IP, then run:
-adb connect <phone-ip>:5555
-# (Accept RSA prompt on phone screen)
-
-# 3. Run app + screen mirror (in separate terminals):
-flutter run                    # pick the TCP/IP device from the list
-scrcpy -e                     # -e selects TCP/IP device
-
-# To find current phone IP:
-adb shell ip addr show wlan0 | findstr "inet "
-```
-
-## Execution Rules
-- Do NOT run any `flutter` commands (`flutter run`, `flutter analyze`, `flutter test`, `flutter build`), `adb`, or `scrcpy` after making edits unless the user explicitly asks you to.
-- Focus only on editing the requested files cleanly and directly.
-
-## Web Dashboard (Next.js)
-- Located in `D:\Downloads\project_extracted` (companion web app)
-- Run: `npx --package=next@15.5.9 next dev -p 9002` from that directory
-- Open: `http://localhost:9002`
-- Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
+## Working style
+- Be honest when unsure; prefer a certain small fix over a guessed broad one.
+- When a screenshot disagrees with computed styles, sample pixels to settle it.
+- Keep both repos committed and pushed at all times.

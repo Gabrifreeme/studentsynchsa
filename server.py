@@ -8177,6 +8177,15 @@ def chat():
             "phrase 'Switched to Build Mode'. Simply wait for the system or user to switch to Build Mode, then do the work. "
             "In Build Mode, do the work directly."
         )
+        # Live workspace facts, gathered fresh on every turn. The model must
+        # trust these over assumptions about what is running or committed.
+        try:
+            _env_block = _environment_snapshot()
+            if _env_block:
+                system_prompt += ("\n\n[LIVE ENVIRONMENT — AUTO-GATHERED. TRUST THIS OVER ASSUMPTIONS]\n"
+                                  + _env_block)
+        except Exception:
+            pass
         # Append the user-saved system prompt from Settings if present.
         # (This was appended twice - the same block appeared back to back, which
         # wasted tokens and repeated every rule to the model.)
@@ -16369,6 +16378,95 @@ def _context_overlay(ctx_name):
     if ctx.get('type'):
         parts.append("[Active context: %s (%s)]" % (ctx.get('name') or ctx_name, ctx.get('type')))
     return "\n".join(parts)
+
+
+def _environment_snapshot():
+    """Compact live view of the workspace, attached to every chat turn.
+
+    Everything is gathered with short timeouts so a stuck process can never
+    hold up a reply. This is ACEsi's 'environmental awareness': facts, not
+    assumptions, about the repos, the running Flutter app and the ports.
+    """
+    import socket as _socket
+
+    def run(cmd, cwd):
+        try:
+            r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                               timeout=4)
+            out = (r.stdout or r.stderr or '').strip().splitlines()
+            return out
+        except Exception:
+            return []
+
+    def git_bits(root):
+        branch = run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], root)
+        status = run(['git', 'status', '--short'], root)
+        last = run(['git', 'log', '-1', '--oneline'], root)
+        return {
+            'branch': branch[0] if branch else '?',
+            'dirty': len([x for x in status if x.strip()]),
+            'last': last[0] if last else '?',
+        }
+
+    def port_open(port):
+        sk = None
+        try:
+            sk = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            sk.settimeout(0.4)
+            return sk.connect_ex(('127.0.0.1', port)) == 0
+        except Exception:
+            return False
+        finally:
+            if sk:
+                try: sk.close()
+                except Exception: pass
+
+    lines = ['[LIVE ENVIRONMENT %s]' % time.strftime('%Y-%m-%d %H:%M:%S')]
+    roots = [
+        ('ACEsi', r'D:\projects\acesi'),
+        ('LibSyncStudent', r'C:\Users\gabri\Documents\LibSyncStudent'),
+    ]
+    for name, root in roots:
+        g = git_bits(root)
+        lines.append('%s: repo=%s branch=%s dirty=%s last="%s"' %
+                     (name, root, g['branch'], g['dirty'], g['last']))
+
+    with _PROCS_LOCK:
+        proc = _ACTIVE_RUN.get('proc')
+        log_path = _ACTIVE_RUN.get('log', '')
+        cmd = _ACTIVE_RUN.get('cmd', '')
+    alive = bool(proc and proc.poll() is None)
+    lines.append('Flutter run: %s | cmd=%s | log=%s' %
+                 ('RUNNING' if alive else 'NOT RUNNING', cmd or '-', log_path or '-'))
+    if log_path and os.path.isfile(log_path):
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as fh:
+                tail = [l.rstrip() for l in fh.readlines()[-4:]]
+            if tail:
+                lines.append('Flutter log tail: ' + ' | '.join(tail))
+        except Exception:
+            pass
+
+    lines.append('Ports: 5000(ACEsi)=%s 55793(Flutter)=%s' %
+                 ('UP' if port_open(5000) else 'DOWN',
+                  'UP' if port_open(55793) else 'DOWN'))
+    try:
+        hp = os.path.join(r'D:\projects\acesi', 'ACEsi.html')
+        gp = hp + '.golden'
+        lines.append('ACEsi.html bytes=%d golden_match=%s' %
+                     (os.path.getsize(hp),
+                      os.path.exists(gp) and
+                      open(hp, 'rb').read() == open(gp, 'rb').read()))
+    except Exception:
+        pass
+    return '\n'.join(lines)
+
+
+@app.route('/api/environment/snapshot', methods=['GET'])
+@require_token
+def api_environment_snapshot():
+    """Live workspace snapshot - same block ACEsi receives in chat."""
+    return jsonify({'ok': True, 'snapshot': _environment_snapshot()})
 
 
 @app.route('/context', methods=['GET'])
