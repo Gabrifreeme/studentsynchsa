@@ -6539,6 +6539,8 @@ perspective: 900px;
         var ta = document.getElementById('ace-tab-acesi');
         var tf = document.getElementById('ace-tab-flutter');
         var showFlutter = (which === 'flutter');
+        var fp = document.getElementById('flutter-prompt-row');
+        if (fp && fp.classList) fp.classList.toggle('ace-flutter-active', showFlutter);
         if (flu) {
           flu.style.display = showFlutter ? 'block' : 'none';
           if (flu.classList) flu.classList.toggle('ace-acesi-hidden', !showFlutter);
@@ -18064,8 +18066,10 @@ html body #terminal-panel {
   flex-direction:column !important;
   overflow:hidden !important;
 }
+/* Flutter prompt belongs to the Flutter tab only. */
+html body #flutter-prompt-row { display:none !important; }
+html body #flutter-prompt-row.ace-flutter-active { display:flex !important; }
 html body #flutter-prompt-row {
-  display:flex !important;
   flex:0 0 auto !important;
   position:relative !important;
   bottom:auto !important;
