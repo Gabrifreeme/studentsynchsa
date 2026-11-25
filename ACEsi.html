@@ -8930,6 +8930,13 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
       <div id="flutter-console" style="display:none; flex:1 1 auto; flex-direction:column; width:100%; min-height:0; padding:0; margin:0; background:#000; position:relative;">
         <pre id="flutter-console-output" style="flex:1 1 auto; min-height:0; margin:0;padding:6px 10px;color:#ffa500;font-family:monospace;font-size:12px;white-space:pre-wrap;overflow:auto;"></pre>
       </div>
+    <div id="flutter-prompt-row" style="display:flex; align-items:center; gap:6px; flex:0 0 auto; width:100%; padding:6px 10px; border:0; background:#000; box-sizing:border-box;">
+      <span style="color:#ffa500; font-family:monospace; font-size:12px; white-space:pre;">PS D:\projects\acesi&gt;&nbsp;</span>
+      <input id="flutter-console-input" type="text" autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();window.aceFlutterSend()}"
+        placeholder="r = reload, R = restart, q = quit"
+        style="flex:1; min-width:0; background:transparent; border:none; outline:none; color:#ffa500; font-family:monospace; font-size:12px;">
+    </div>
       </div>
       <div id="ace-term-dashboard" style="flex:0 0 30%; width:30%; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:6px; overflow:hidden; box-sizing:border-box; background:#050505; border-left:1px solid #ffa500; font-family:'Roboto Mono',monospace; color:#ffa500;">
         <div class="ace-dash-card"><div class="ace-dash-graph"><canvas class="ace-dash-spark"></canvas></div><div class="ace-dash-info"><div class="ace-dash-value" id="ace-dash-cpu">CPU · --</div><div class="ace-dash-sub" id="ace-dash-cpu-sub"></div></div></div>
@@ -8941,13 +8948,6 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
       </div>
     </div>
 
-    <div id="flutter-prompt-row" style="display:flex; align-items:center; gap:6px; flex:0 0 auto; width:100%; padding:6px 10px; border:0; background:#000; box-sizing:border-box;">
-      <span style="color:#ffa500; font-family:monospace; font-size:12px; white-space:pre;">PS D:\projects\acesi&gt;&nbsp;</span>
-      <input id="flutter-console-input" type="text" autocomplete="off" spellcheck="false"
-        onkeydown="if(event.key==='Enter'){event.preventDefault();window.aceFlutterSend()}"
-        placeholder="r = reload, R = restart, q = quit"
-        style="flex:1; min-width:0; background:transparent; border:none; outline:none; color:#ffa500; font-family:monospace; font-size:12px;">
-    </div>
 
 <style id="ace-term-dashboard-style">
   #ace-term-heartbeat {
