@@ -212,7 +212,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E17),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
           Center(child: _buildScene()),
@@ -238,17 +238,17 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED),
+                color: const Color(0xFFFFA500),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
+                    color: const Color(0xFFFFA500).withValues(alpha: 0.4),
                     blurRadius: 20,
                   ),
                 ],
               ),
               child: const Text(
-                'Tap to Download StudentSyncSA',
+                'Tap to Download LibSyncStudent',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -268,9 +268,9 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1F2E).withValues(alpha: 0.9),
+          color: const Color(0xFF0D0D0D).withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF2A2F3E)),
+          border: Border.all(color: const Color(0xFF995C00)),
         ),
         child: Icon(
           _paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
@@ -320,9 +320,9 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
           width: 420,
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1F2E),
+              color: const Color(0xFF0D0D0D),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A2F3E), width: 1.5),
+              border: Border.all(color: const Color(0xFF995C00), width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.6),
@@ -337,7 +337,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF2A3040),
+                    color: Color(0xFF141414),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                   ),
                   child: Row(
@@ -352,7 +352,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                           decoration: const BoxDecoration(color: Color(0xFF28C840), shape: BoxShape.circle)),
                       const SizedBox(width: 16),
                       const Text('sssa.4me',
-                          style: TextStyle(color: Color(0xFF888899), fontSize: 13, fontWeight: FontWeight.w500)),
+                          style: TextStyle(color: Color(0xFF995C00), fontSize: 13, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
@@ -363,23 +363,23 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                       Container(
                         width: 64, height: 64,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                          color: const Color(0xFFFFA500).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: const Icon(Icons.download_rounded, color: Color(0xFF7C3AED), size: 32),
+                        child: const Icon(Icons.download_rounded, color: Color(0xFFFFA500), size: 32),
                       ),
                       const SizedBox(height: 24),
                       Column(
                         children: [
                           Text(
-                            _isComplete ? 'Download complete!' : 'Downloading StudentSyncSA...',
+                            _isComplete ? 'Download complete!' : 'Downloading LibSyncStudent...',
                             style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _isComplete ? 'Ready to launch' : '${(_progress * 100).round()}% complete',
                             style: TextStyle(
-                              color: _isComplete ? const Color(0xFF10B981) : const Color(0xFF888899),
+                              color: _isComplete ? const Color(0xFF00FF88) : const Color(0xFF995C00),
                               fontSize: 14, fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -391,9 +391,9 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                         child: Container(
                           height: 32,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A0E17),
+                            color: const Color(0xFF000000),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF2A2F3E)),
+                            border: Border.all(color: const Color(0xFF995C00)),
                           ),
                           child: FractionallySizedBox(
                             widthFactor: _progress,
@@ -401,7 +401,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                             child: Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFF3B82F6), Color(0xFF7C3AED)],
+                                  colors: [Color(0xFFFFA500), Color(0xFFFFA500)],
                                 ),
                               ),
                             ),
@@ -421,7 +421,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                                 constraints: const BoxConstraints(maxWidth: 260),
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2A2F3E),
+                                  color: const Color(0xFF995C00),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: const Color(0xFF3B3F4E)),
                                 ),
@@ -442,10 +442,10 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.check_circle, color: const Color(0xFF10B981), size: 20 + v * 4),
+                                Icon(Icons.check_circle, color: const Color(0xFF00FF88), size: 20 + v * 4),
                                 const SizedBox(width: 8),
-                                Text('StudentSyncSA downloaded!',
-                                    style: TextStyle(color: const Color(0xFF10B981), fontSize: 16, fontWeight: FontWeight.w700)),
+                                Text('LibSyncStudent downloaded!',
+                                    style: TextStyle(color: const Color(0xFF00FF88), fontSize: 16, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
@@ -528,7 +528,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
               constraints: const BoxConstraints(maxWidth: 192),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2F3E),
+                color: const Color(0xFF995C00),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF3B3F4E)),
               ),

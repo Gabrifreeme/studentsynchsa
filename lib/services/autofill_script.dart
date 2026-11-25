@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// autofill_script.dart  –  StudentSyncSA Star Auto-Fill
+// autofill_script.dart  –  LibSyncStudent Star Auto-Fill
 //
 // Built specifically for ITS (Oracle PL/SQL) university portals used by
 // UNIVEN, UL, TUT, NWU and others. These portals use P_* field names and

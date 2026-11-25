@@ -20,16 +20,16 @@ class _FundingListScreenState extends State<FundingListScreen> {
   static const _filterTypes = ['All', 'Bursary', 'Scholarship', 'Nsfas', 'Loan', 'Grant'];
 
   static const _typeColors = {
-    'Bursary': Color(0xFF7C3AED),
-    'Scholarship': Color(0xFF3B82F6),
-    'Nsfas': Color(0xFF10B981),
-    'Loan': Color(0xFFF59E0B),
-    'Grant': Color(0xFFEF4444),
+    'Bursary': Color(0xFFFFA500),
+    'Scholarship': Color(0xFFFFA500),
+    'Nsfas': Color(0xFF00FF88),
+    'Loan': Color(0xFFFFA500),
+    'Grant': Color(0xFFFF4444),
   };
 
   static const _logoColors = [
-    Color(0xFF7C3AED), Color(0xFF3B82F6), Color(0xFF10B981),
-    Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899),
+    Color(0xFFFFA500), Color(0xFFFFA500), Color(0xFF00FF88),
+    Color(0xFFFFA500), Color(0xFFFF4444), Color(0xFF8FD3FF),
   ];
 
   @override

@@ -24,9 +24,9 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   ];
 
   static const _logoColors = [
-    Color(0xFF7C3AED), Color(0xFF3B82F6), Color(0xFF10B981),
-    Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899),
-    Color(0xFF14B8A6), Color(0xFF8B5CF6),
+    Color(0xFFFFA500), Color(0xFFFFA500), Color(0xFF00FF88),
+    Color(0xFFFFA500), Color(0xFFFF4444), Color(0xFF8FD3FF),
+    Color(0xFF00FF88), Color(0xFFFFA500),
   ];
 
   @override

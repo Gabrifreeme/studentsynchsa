@@ -312,7 +312,7 @@ if (link) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+      backgroundColor: isError ? const Color(0xFFFF4444) : const Color(0xFF00FF88),
       behavior: SnackBarBehavior.floating,
       duration: Duration(seconds: isError ? 5 : 3),
     ));
@@ -333,7 +333,7 @@ if (link) {
       builder: (ctx) => AlertDialog(
         title: const Text('Fields on this page',
             style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF0F1624),
+        backgroundColor: const Color(0xFF000000),
         content: SizedBox(
           width: double.maxFinite,
           child: lines.isEmpty
@@ -419,12 +419,12 @@ if (link) {
     return Container(
       height: 260,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1624),
+        color: const Color(0xFF000000),
         border: const Border(
-            top: BorderSide(color: Color(0xFF7C3AED), width: 1)),
+            top: BorderSide(color: Color(0xFFFFA500), width: 1)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+            color: const Color(0xFFFFA500).withValues(alpha: 0.15),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -470,7 +470,7 @@ if (link) {
                       label: const Text('Fill All',
                           style: TextStyle(fontSize: 12)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
+                        backgroundColor: const Color(0xFFFFA500),
                         foregroundColor: Colors.white,
                         padding:
                             const EdgeInsets.symmetric(horizontal: 12),
@@ -535,7 +535,7 @@ if (link) {
         child: Text(
           label.toUpperCase(),
           style: const TextStyle(
-            color: Color(0xFF7C3AED),
+            color: Color(0xFFFFA500),
             fontSize: 10,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.8,
@@ -568,7 +568,7 @@ if (link) {
               child: Text(
                 _fieldLabel(oapName),
                 style: const TextStyle(
-                    color: Color(0xFF888899), fontSize: 11),
+                    color: Color(0xFF995C00), fontSize: 11),
               ),
             ),
             // Value
@@ -599,7 +599,7 @@ if (link) {
                   size: 16,
                   color: filled
                       ? Colors.green
-                      : const Color(0xFFEF4444),
+                      : const Color(0xFFFF4444),
                 ),
               ),
           ],

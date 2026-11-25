@@ -75,7 +75,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     const StarAvatar(size: 56),
                     SizedBox(height: isShort ? 8 : 16),
                     const Text(
-                      'Join studentsyncsa',
+                      'Join LibSyncStudent',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 24,
@@ -112,7 +112,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
                                 labelText: 'Email',
-                                prefixIcon: Icon(Icons.email_outlined),
+                                prefixIcon: const Icon(Icons.email_outlined,
+                                    color: AppColors.info),
                               ),
                               validator: (v) {
                                 if (v?.isEmpty == true) return 'Enter your email';
@@ -126,12 +127,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 labelText: 'Password',
-                                prefixIcon: const Icon(Icons.lock_outlined),
+                                prefixIcon: const Icon(Icons.lock_outlined,
+                                    color: AppColors.info),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword
                                         ? Icons.visibility_off_outlined
                                         : Icons.visibility_outlined,
+                                    color: AppColors.info,
                                   ),
                                   onPressed: () => setState(
                                       () => _obscurePassword = !_obscurePassword),
@@ -149,7 +152,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               obscureText: true,
                               decoration: const InputDecoration(
                                 labelText: 'Confirm Password',
-                                prefixIcon: Icon(Icons.lock_outlined),
+                                prefixIcon: const Icon(Icons.lock_outlined,
+                                    color: AppColors.info),
                               ),
                               validator: (v) {
                                 if (v != _passwordCtrl.text) {
@@ -168,7 +172,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                         width: 20,
                                         height: 20,
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
+                                            strokeWidth: 2, color: AppColors.background),
                                       )
                                     : const Text('Create Account'),
                               ),

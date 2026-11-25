@@ -5,6 +5,7 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
+import 'package:studentsyncsa/presentation/screens/auth/login_screen.dart';
 import 'package:studentsyncsa/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:studentsyncsa/presentation/screens/profile/profile_onboarding_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/universities_screen.dart';
@@ -31,7 +32,7 @@ void triggerAuthRedirect() {
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigator,
-  initialLocation: '/dashboard',
+  initialLocation: '/login',
   refreshListenable: _authRefresh,
   redirect: (context, state) {
     try {
@@ -41,17 +42,24 @@ final appRouter = GoRouter(
       final loc = state.matchedLocation;
 
 
+      final isAuthPage = (loc == '/login' || loc == '/signup');
       if (authState == null || !authState.authenticated) {
-        return '/dashboard';
+        // Unauthenticated: only allow the auth pages, everything else -> login.
+        return isAuthPage ? null : '/login';
       }
-
-      if (loc == '/signup') {
+      // Authenticated: auth pages are not needed.
+      if (isAuthPage) {
         return '/dashboard';
       }
     } catch (_) {}
     return null;
   },
   routes: [
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
+    ),
     GoRoute(
       path: '/signup',
       name: 'signup',
@@ -200,7 +208,7 @@ class DashboardShell extends ConsumerWidget {
       _NavItemData(icon: Icons.home_rounded, label: 'Home', route: '/dashboard', index: 0),
       _NavItemData(icon: Icons.person_rounded, label: 'My Profile', route: '/onboarding'),
       _NavItemData(icon: Icons.notifications_rounded, label: 'Notifications', route: '/notifications'),
-      _NavItemData(icon: Icons.auto_awesome_rounded, label: 'Advisor', route: '/ai-recommendations'),
+      _NavItemData(icon: Icons.auto_awesome_rounded, label: 'ACEsi', route: '/ai-recommendations'),
       _NavItemData(icon: Icons.account_balance_wallet_rounded, label: 'Funding', route: '/funding', index: 3),
       _NavItemData(icon: Icons.school_rounded, label: 'Universities', route: '/universities', index: 1),
       _NavItemData(icon: Icons.assignment_rounded, label: 'Applications', route: '/applications', index: 2),
@@ -219,7 +227,7 @@ class DashboardShell extends ConsumerWidget {
               child: Row(
                 children: [
                   Text(
-                    'StudentSync',
+                    'LibSyncStudent',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,

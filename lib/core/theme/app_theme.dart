@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primary = Color(0xFF7C3AED);
-  static const primaryDark = Color(0xFF5B21B6);
-  static const primaryLight = Color(0xFFA78BFA);
-  static const accent = Color(0xFFAA00FF);
-  static const starGold = Color(0xFFFFC107);
+  // ACEsi black & amber palette
+  static const primary = Color(0xFFFFA500);      // bright ACEsi amber
+  static const primaryDark = Color(0xFF995C00);  // muted amber (inactive borders)
+  static const primaryLight = Color(0xFFFFC266); // light amber
+  static const accent = Color(0xFFFFA500);
+  static const starGold = Color(0xFFFFA500);
 
-  static const background = Color(0xFF0F1624);
-  static const surface = Color(0xFF1A1F35);
-  static const surfaceLight = Color(0xFF2A2A3E);
-  static const card = Color(0xFF1E2A4A);
+  static const background = Color(0xFF000000);
+  static const surface = Color(0xFF0A0A0A);
+  static const surfaceLight = Color(0xFF141414);
+  static const card = Color(0xFF0D0D0D);
 
-  static const textPrimary = Color(0xFFF8FAFC);
-  static const textSecondary = Color(0xFF94A3B8);
-  static const textMuted = Color(0xFF64748B);
+  static const textPrimary = Color(0xFFFFA500);
+  static const textSecondary = Color(0xFFCC8400);
+  static const textMuted = Color(0xFF995C00);
 
-  static const success = Color(0xFF22C55E);
-  static const warning = Color(0xFFF59E0B);
-  static const error = Color(0xFFEF4444);
-  static const info = Color(0xFF3B82F6);
+  static const success = Color(0xFF00FF88);
+  static const warning = Color(0xFFFFA500);
+  static const error = Color(0xFFFF4444);
+  static const info = Color(0xFF8FD3FF);         // terminal blue
 
-  static const border = Color(0xFF2A3A6A);
-  static const divider = Color(0xFF1E293B);
+  static const border = Color(0xFF995C00);
+  static const divider = Color(0xFF995C00);
 }
 
 class AppTheme {
@@ -30,6 +31,25 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: 'monospace',
+      iconTheme: const IconThemeData(color: AppColors.primary),
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(color: AppColors.textPrimary),
+        displayMedium: TextStyle(color: AppColors.textPrimary),
+        displaySmall: TextStyle(color: AppColors.textPrimary),
+        headlineLarge: TextStyle(color: AppColors.textPrimary),
+        headlineMedium: TextStyle(color: AppColors.textPrimary),
+        headlineSmall: TextStyle(color: AppColors.textPrimary),
+        titleLarge: TextStyle(color: AppColors.textPrimary),
+        titleMedium: TextStyle(color: AppColors.textPrimary),
+        titleSmall: TextStyle(color: AppColors.textPrimary),
+        bodyLarge: TextStyle(color: AppColors.textPrimary),
+        bodyMedium: TextStyle(color: AppColors.textPrimary),
+        bodySmall: TextStyle(color: AppColors.textSecondary),
+        labelLarge: TextStyle(color: AppColors.textPrimary),
+        labelMedium: TextStyle(color: AppColors.textPrimary),
+        labelSmall: TextStyle(color: AppColors.textSecondary),
+      ),
       colorScheme: ColorScheme.dark(
         primary: AppColors.primary,
         secondary: AppColors.accent,
@@ -82,7 +102,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textPrimary,
+          foregroundColor: AppColors.background,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -145,7 +165,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      primarySwatch: Colors.purple,
+      primarySwatch: Colors.amber,
       colorScheme: ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.accent,

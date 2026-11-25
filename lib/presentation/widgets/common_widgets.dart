@@ -13,9 +13,9 @@ class GradientBackground extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF0D2158),
-            Color(0xFF0F1624),
-            Color(0xFF181818),
+            Color(0xFF000000),
+            Color(0xFF0A0A0A),
+            Color(0xFF000000),
           ],
         ),
       ),
@@ -33,20 +33,12 @@ class StarAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget image = ClipOval(
-      child: ColorFiltered(
-        colorFilter: ColorFilter.matrix([
-          1, 0, 0, 0, 35,
-          0, 1, 0, 0, 35,
-          0, 0, 1, 0, 35,
-          0, 0, 0, 1, 0,
-        ]),
-        child: Image.asset(
-          'assets/images/psaa.png',
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.high,
-        ),
+      child: Image.asset(
+        'assets/images/star_avatar.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
       ),
     );
     if (pulse) {

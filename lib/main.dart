@@ -39,7 +39,7 @@ class StudentSyncSaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'studentsyncsa',
+      title: 'LibSyncStudent',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       scrollBehavior: const NoScrollbarBehavior(),

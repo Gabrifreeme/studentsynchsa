@@ -36,7 +36,7 @@ class DashboardScreen extends ConsumerWidget {
               }
             },
           ),
-          title: const Text('StudentSyncSA',
+          title: const Text('LibSyncStudent',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
           actions: [
             IconButton(
@@ -115,6 +115,13 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildQuickLinks(BuildContext context) {
     return Column(
       children: [
+        _ProgressTile(
+          icon: Icons.auto_awesome_rounded,
+          label: 'ACEsi',
+          value: 'Ask your Star adviser',
+          onTap: () => context.push('/ai-recommendations'),
+        ),
+        const SizedBox(height: 8),
         _ProgressTile(
           icon: Icons.person_rounded,
           label: 'My Profile',

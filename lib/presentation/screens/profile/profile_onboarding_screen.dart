@@ -2410,12 +2410,12 @@ class _ProfileOnboardingScreenState
 
   Widget _buildProgressBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
       child: Row(
         children: List.generate(7, (i) {
           return Expanded(
             child: Container(
-              height: 4,
+              height: 2.5,
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
@@ -2508,7 +2508,14 @@ class _ProfileOnboardingScreenState
           children: [
             Column(
               children: [
-                _buildProgressBar(),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
+                    child: _buildProgressBar(),
+                  ),
+                ),
                 Text(
                   'Step ${_currentPage + 1} of 7',
                   style: const TextStyle(
@@ -2518,7 +2525,12 @@ class _ProfileOnboardingScreenState
                 ),
                 const SizedBox(height: 8),
                 Expanded(
-                  child: PageView(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      ),
+                      child: PageView(
                     controller: _pageController,
                     physics: const NeverScrollableScrollPhysics(),
                     onPageChanged: (i) => setState(() => _currentPage = i),
@@ -2531,40 +2543,19 @@ class _ProfileOnboardingScreenState
                       _buildAgreementPage(),
                       _buildUploadDocumentsPage(),
                     ],
-                  ),
-                ),
-                _buildBottomButtons(),
-              ],
-            ),
-            // Floating Star avatar
-            Positioned(
-              right: 16,
-              bottom: 100,
-              child: GestureDetector(
-                onTap: _showStarHelp,
-                child: AnimatedBuilder(
-                  animation: _floatAnim,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _floatAnim.value),
-                      child: child,
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.starGold.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      ),
                     ),
-                    child: const StarAvatar(size: 48, pulse: true),
                   ),
                 ),
-              ),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
+                    child: _buildBottomButtons(),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -2631,7 +2622,7 @@ class _ProfileOnboardingScreenState
                     initialValue: _titleCtrl.text.isEmpty ? null : _titleCtrl.text,
                     decoration: const InputDecoration(
                       labelText: 'Title',
-                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                      prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppColors.primary),
                     ),
                     items: const [
                       DropdownMenuItem(value: 'Mr', child: Text('Mr')),
@@ -2650,7 +2641,7 @@ class _ProfileOnboardingScreenState
                     controller: _initialsCtrl,
                     decoration: const InputDecoration(
                         labelText: 'Initials',
-                        prefixIcon: Icon(Icons.short_text, size: 20)),
+                        prefixIcon: Icon(Icons.short_text, size: 20, color: AppColors.info)),
                   ),
                 ),
               ],
@@ -2664,7 +2655,7 @@ class _ProfileOnboardingScreenState
                     controller: _firstNameCtrl,
                     decoration: const InputDecoration(
                         labelText: 'First Name',
-                        prefixIcon: Icon(Icons.person_outline)),
+                        prefixIcon: Icon(Icons.person_outline, color: AppColors.success)),
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
                 ),
@@ -2674,7 +2665,7 @@ class _ProfileOnboardingScreenState
                     controller: _lastNameCtrl,
                     decoration: const InputDecoration(
                         labelText: 'Surname',
-                        prefixIcon: Icon(Icons.person_outline)),
+                        prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryLight)),
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
                 ),
@@ -2686,7 +2677,7 @@ class _ProfileOnboardingScreenState
               controller: _maidenNameCtrl,
               decoration: const InputDecoration(
                 labelText: 'Maiden Name (if applicable)',
-                prefixIcon: Icon(Icons.person_outline),
+                prefixIcon: Icon(Icons.person_outline, color: AppColors.warning),
               ),
             ),
             const SizedBox(height: 16),
@@ -2695,7 +2686,7 @@ class _ProfileOnboardingScreenState
               initialValue: _gender.isEmpty ? null : _gender,
               decoration: const InputDecoration(
                 labelText: 'Gender',
-                prefixIcon: Icon(Icons.wc_outlined),
+                prefixIcon: Icon(Icons.wc_outlined, color: AppColors.primary),
               ),
               items: const [
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
@@ -2729,7 +2720,7 @@ class _ProfileOnboardingScreenState
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: 'Date of Birth',
-                  prefixIcon: const Icon(Icons.calendar_today_outlined),
+                  prefixIcon: const Icon(Icons.calendar_today_outlined, color: AppColors.info),
                   suffixIcon: _selectedDob != null
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 18),
@@ -2751,7 +2742,7 @@ class _ProfileOnboardingScreenState
               controller: _idCtrl,
               decoration: const InputDecoration(
                 labelText: 'ID / Passport Number',
-                prefixIcon: Icon(Icons.badge_outlined),
+                prefixIcon: Icon(Icons.badge_outlined, color: AppColors.success),
               ),
             ),
             // --- Citizenship & Demographics ---
@@ -2776,7 +2767,7 @@ class _ProfileOnboardingScreenState
               initialValue: _citizenship.isEmpty ? null : _citizenship,
               decoration: const InputDecoration(
                 labelText: 'Citizenship Status',
-                prefixIcon: Icon(Icons.flag_outlined),
+                prefixIcon: Icon(Icons.flag_outlined, color: AppColors.primaryLight),
               ),
               items: const [
                 DropdownMenuItem(value: 'SA Citizen', child: Text('SA Citizen')),
@@ -2792,7 +2783,7 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Country of Birth',
-                prefixIcon: Icon(Icons.public_outlined),
+                prefixIcon: Icon(Icons.public_outlined, color: AppColors.warning),
                 suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
               onTap: () async {
@@ -2810,7 +2801,7 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Home Language',
-                prefixIcon: Icon(Icons.language_outlined),
+                prefixIcon: Icon(Icons.language_outlined, color: AppColors.primary),
                 suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
               onTap: () async {
@@ -2828,7 +2819,7 @@ class _ProfileOnboardingScreenState
                        .contains(_populationGroup) ? _populationGroup : null,
               decoration: const InputDecoration(
                 labelText: 'Population Group',
-                prefixIcon: Icon(Icons.people_outlined),
+                prefixIcon: Icon(Icons.people_outlined, color: AppColors.info),
               ),
               items: const [
                 DropdownMenuItem(value: 'African', child: Text('African')),
@@ -2847,7 +2838,7 @@ class _ProfileOnboardingScreenState
               initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
               decoration: const InputDecoration(
                 labelText: 'Marital Status',
-                prefixIcon: Icon(Icons.favorite_outline),
+                prefixIcon: Icon(Icons.favorite_outline, color: AppColors.success),
               ),
               items: const [
                 DropdownMenuItem(value: 'Single', child: Text('Single')),
@@ -2880,7 +2871,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address',
-                prefixIcon: Icon(Icons.email_outlined),
+                prefixIcon: Icon(Icons.email_outlined, color: AppColors.primaryLight),
               ),
             ),
             const SizedBox(height: 16),
@@ -2890,7 +2881,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Cell Phone Number',
-                prefixIcon: Icon(Icons.phone_outlined),
+                prefixIcon: Icon(Icons.phone_outlined, color: AppColors.warning),
               ),
             ),
             const SizedBox(height: 16),
@@ -2900,7 +2891,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Work / Alternative Phone (optional)',
-                prefixIcon: Icon(Icons.phone_forwarded_outlined),
+                prefixIcon: Icon(Icons.phone_forwarded_outlined, color: AppColors.primary),
               ),
             ),
             // --- Residential Address ---
@@ -2925,7 +2916,7 @@ class _ProfileOnboardingScreenState
               controller: _addressCtrl,
               decoration: const InputDecoration(
                 labelText: 'Street Address',
-                prefixIcon: Icon(Icons.home_outlined),
+                prefixIcon: Icon(Icons.home_outlined, color: AppColors.info),
               ),
             ),
             const SizedBox(height: 16),
@@ -2954,7 +2945,7 @@ class _ProfileOnboardingScreenState
                     initialValue: _province.isEmpty ? null : _province,
                     decoration: const InputDecoration(
                       labelText: 'Province',
-                      prefixIcon: Icon(Icons.map_outlined),
+                      prefixIcon: Icon(Icons.map_outlined, color: AppColors.success),
                     ),
                     items: AppConstants.provinces
                         .map((p) => DropdownMenuItem(value: p, child: Text(p)))
@@ -2971,7 +2962,7 @@ class _ProfileOnboardingScreenState
                     readOnly: true,
                     decoration: const InputDecoration(
                       labelText: 'Postal Code',
-                      prefixIcon: Icon(Icons.pin_outlined),
+                      prefixIcon: Icon(Icons.pin_outlined, color: AppColors.primaryLight),
                       suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
                     ),
                     onTap: () async {
@@ -2989,49 +2980,49 @@ class _ProfileOnboardingScreenState
               ],
             ),
             const SizedBox(height: 16),
-            // Postal Address
+            // Postal Address: question + dropdown + switch
+            const Text(
+              'Is your Postal Address the same as your Street address?',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                DropdownButton<String>(
+                  value: _postalSameAsResidential ? 'Yes' : 'No',
+                  dropdownColor: AppColors.card,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                    DropdownMenuItem(value: 'No', child: Text('No')),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _postalSameAsResidential = v == 'Yes';
+                    if (_postalSameAsResidential) _postalAddressCtrl.clear();
+                  }),
+                ),
+                const SizedBox(width: 16),
+                const Text('No',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Switch(
+                  value: _postalSameAsResidential,
+                  activeColor: AppColors.primary,
+                  onChanged: (v) => setState(() {
+                    _postalSameAsResidential = v;
+                    if (v) _postalAddressCtrl.clear();
+                  }),
+                ),
+                const Text('Yes',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _postalAddressCtrl,
               enabled: !_postalSameAsResidential,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Postal Address',
-                prefixIcon: const Icon(Icons.mail_outlined),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _postalSameAsResidential = !_postalSameAsResidential;
-                        if (_postalSameAsResidential) {
-                          _postalAddressCtrl.clear();
-                        }
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Same',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: _postalSameAsResidential
-                                        ? AppColors.primaryLight
-                                        : AppColors.textSecondary)),
-                            Icon(
-                              _postalSameAsResidential
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              size: 18,
-                              color: _postalSameAsResidential
-                                  ? AppColors.primaryLight
-                                  : AppColors.textSecondary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                prefixIcon: Icon(Icons.mail_outlined, color: AppColors.warning),
               ),
             ),
             // --- Additional Info ---
@@ -3053,7 +3044,7 @@ class _ProfileOnboardingScreenState
               initialValue: _disabilityStatus.isEmpty ? null : _disabilityStatus,
               decoration: const InputDecoration(
                 labelText: 'Do you have a disability?',
-                prefixIcon: Icon(Icons.accessible_outlined),
+                prefixIcon: Icon(Icons.accessible_outlined, color: AppColors.primary),
               ),
               items: const [
                 DropdownMenuItem(value: 'No', child: Text('No')),
@@ -3072,7 +3063,7 @@ class _ProfileOnboardingScreenState
               initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
               decoration: const InputDecoration(
                 labelText: 'Do you require a bursary?',
-                prefixIcon: Icon(Icons.monetization_on_outlined),
+                prefixIcon: Icon(Icons.monetization_on_outlined, color: AppColors.info),
               ),
               items: const [
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
@@ -3087,7 +3078,7 @@ class _ProfileOnboardingScreenState
               initialValue: _employmentStatus.isEmpty ? null : _employmentStatus,
               decoration: const InputDecoration(
                 labelText: 'Employment Status',
-                prefixIcon: Icon(Icons.work_outline),
+                prefixIcon: Icon(Icons.work_outline, color: AppColors.success),
               ),
               items: const [
                 DropdownMenuItem(value: 'Unemployed', child: Text('Unemployed')),
@@ -3125,7 +3116,7 @@ class _ProfileOnboardingScreenState
               controller: _nextOfKinNameCtrl,
               decoration: const InputDecoration(
                 labelText: 'Name(s) *',
-                prefixIcon: Icon(Icons.person_outlined),
+                prefixIcon: Icon(Icons.person_outlined, color: AppColors.primaryLight),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3135,7 +3126,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Mobile/Cellular Phone Number *',
-                prefixIcon: Icon(Icons.phone_android_outlined),
+                prefixIcon: Icon(Icons.phone_android_outlined, color: AppColors.warning),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3145,7 +3136,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Home Phone Number *',
-                prefixIcon: Icon(Icons.phone_outlined),
+                prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3155,7 +3146,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Work Phone Number',
-                prefixIcon: Icon(Icons.business_outlined),
+                prefixIcon: Icon(Icons.business_outlined, color: AppColors.info),
               ),
             ),
             const SizedBox(height: 20),
@@ -3169,7 +3160,7 @@ class _ProfileOnboardingScreenState
               controller: _nextOfKinAddr1Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.success),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3178,7 +3169,7 @@ class _ProfileOnboardingScreenState
               controller: _nextOfKinAddr2Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primaryLight),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3187,7 +3178,7 @@ class _ProfileOnboardingScreenState
               controller: _nextOfKinAddr3Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.warning),
               ),
             ),
             const SizedBox(height: 14),
@@ -3195,7 +3186,7 @@ class _ProfileOnboardingScreenState
               controller: _nextOfKinAddr4Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primary),
               ),
             ),
             const SizedBox(height: 14),
@@ -3204,7 +3195,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
+                prefixIcon: Icon(Icons.pin_outlined, color: AppColors.info),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3214,7 +3205,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address *',
-                prefixIcon: Icon(Icons.email_outlined),
+                prefixIcon: Icon(Icons.email_outlined, color: AppColors.success),
               ),
               validator: (v) {
                 if (v?.trim().isEmpty == true) return 'Required';
@@ -3238,7 +3229,7 @@ class _ProfileOnboardingScreenState
               controller: _accountContactNameCtrl,
               decoration: const InputDecoration(
                 labelText: 'Name(s) *',
-                prefixIcon: Icon(Icons.person_outlined),
+                prefixIcon: Icon(Icons.person_outlined, color: AppColors.primaryLight),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3248,7 +3239,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Mobile/Cellular Phone Number *',
-                prefixIcon: Icon(Icons.phone_android_outlined),
+                prefixIcon: Icon(Icons.phone_android_outlined, color: AppColors.warning),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3258,7 +3249,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Home Phone Number *',
-                prefixIcon: Icon(Icons.phone_outlined),
+                prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3273,7 +3264,7 @@ class _ProfileOnboardingScreenState
               controller: _accountContactAddr1Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 1 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.info),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3282,7 +3273,7 @@ class _ProfileOnboardingScreenState
               controller: _accountContactAddr2Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 2 *',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.success),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3291,7 +3282,7 @@ class _ProfileOnboardingScreenState
               controller: _accountContactAddr3Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 3',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primaryLight),
               ),
             ),
             const SizedBox(height: 14),
@@ -3299,7 +3290,7 @@ class _ProfileOnboardingScreenState
               controller: _accountContactAddr4Ctrl,
               decoration: const InputDecoration(
                 labelText: 'Postal Address Line 4',
-                prefixIcon: Icon(Icons.location_on_outlined),
+                prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.warning),
               ),
             ),
             const SizedBox(height: 14),
@@ -3308,7 +3299,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Postal Code *',
-                prefixIcon: Icon(Icons.pin_outlined),
+                prefixIcon: Icon(Icons.pin_outlined, color: AppColors.primary),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
@@ -3318,7 +3309,7 @@ class _ProfileOnboardingScreenState
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address *',
-                prefixIcon: Icon(Icons.email_outlined),
+                prefixIcon: Icon(Icons.email_outlined, color: AppColors.info),
               ),
               validator: (v) {
                 if (v?.trim().isEmpty == true) return 'Required';
@@ -3348,7 +3339,7 @@ class _ProfileOnboardingScreenState
               initialValue: _matricYear == 0 ? null : _matricYear,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Year (YYYY) *',
-                prefixIcon: Icon(Icons.calendar_today_outlined),
+                prefixIcon: Icon(Icons.calendar_today_outlined, color: AppColors.success),
               ),
               items: List.generate(31, (i) => 2000 + i)
                   .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
@@ -3362,7 +3353,7 @@ class _ProfileOnboardingScreenState
               initialValue: _applicationLevel.isEmpty ? null : _applicationLevel,
               decoration: const InputDecoration(
                 labelText: 'Applying for Undergraduate or Postgraduate? *',
-                prefixIcon: Icon(Icons.school_outlined),
+                prefixIcon: Icon(Icons.school_outlined, color: AppColors.primaryLight),
               ),
               items: const [
                 DropdownMenuItem(value: 'Undergraduate', child: Text('Undergraduate')),
@@ -3377,7 +3368,7 @@ class _ProfileOnboardingScreenState
               initialValue: _upgrading.isEmpty ? null : _upgrading,
               decoration: const InputDecoration(
                 labelText: 'Are you Upgrading? *',
-                prefixIcon: Icon(Icons.refresh_outlined),
+                prefixIcon: Icon(Icons.refresh_outlined, color: AppColors.warning),
               ),
               items: const [
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
@@ -3392,7 +3383,7 @@ class _ProfileOnboardingScreenState
               initialValue: _matricType.isEmpty ? null : _matricType,
               decoration: const InputDecoration(
                 labelText: 'Completing/Completed South African or International Matric *',
-                prefixIcon: Icon(Icons.public_outlined),
+                prefixIcon: Icon(Icons.public_outlined, color: AppColors.primary),
               ),
               items: const [
                 DropdownMenuItem(value: 'South African', child: Text('South African')),
@@ -3407,7 +3398,7 @@ class _ProfileOnboardingScreenState
               controller: _examinationNumberCtrl,
               decoration: const InputDecoration(
                 labelText: 'Matric/Grade 12 Examination Number',
-                prefixIcon: Icon(Icons.numbers_outlined),
+                prefixIcon: Icon(Icons.numbers_outlined, color: AppColors.info),
               ),
             ),
             const SizedBox(height: 14),
@@ -3417,7 +3408,7 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Final School Leaving Certificate *',
-                prefixIcon: Icon(Icons.verified_outlined),
+                prefixIcon: Icon(Icons.verified_outlined, color: AppColors.success),
                 suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
@@ -3597,7 +3588,7 @@ class _ProfileOnboardingScreenState
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Which school did you attend last? *',
-                prefixIcon: Icon(Icons.school_outlined),
+                prefixIcon: Icon(Icons.school_outlined, color: AppColors.primaryLight),
                 suffixIcon: Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
@@ -3614,7 +3605,7 @@ class _ProfileOnboardingScreenState
               initialValue: _currentlyDoing.isEmpty ? null : _currentlyDoing,
               decoration: const InputDecoration(
                 labelText: 'What are you currently doing? *',
-                prefixIcon: Icon(Icons.work_outlined),
+                prefixIcon: Icon(Icons.work_outlined, color: AppColors.warning),
               ),
               items: const [
                 DropdownMenuItem(value: 'Studying at school', child: Text('Studying at school')),
@@ -3638,7 +3629,7 @@ class _ProfileOnboardingScreenState
               initialValue: _studiedPreviously.isEmpty ? null : _studiedPreviously,
               decoration: const InputDecoration(
                 labelText: 'Have you studied at another institution previously? *',
-                prefixIcon: Icon(Icons.account_balance_outlined),
+                prefixIcon: Icon(Icons.account_balance_outlined, color: AppColors.primary),
               ),
               items: const [
                 DropdownMenuItem(value: 'Yes', child: Text('Yes')),
@@ -3669,7 +3660,7 @@ class _ProfileOnboardingScreenState
               initialValue: _academicYear == 0 ? null : _academicYear,
               decoration: const InputDecoration(
                 labelText: 'Academic Year *',
-                prefixIcon: Icon(Icons.calendar_today_outlined),
+                prefixIcon: Icon(Icons.calendar_today_outlined, color: AppColors.info),
               ),
               items: List.generate(6, (i) => DateTime.now().year + i)
                   .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
@@ -3683,7 +3674,7 @@ class _ProfileOnboardingScreenState
               initialValue: _facultyCtrl.text.isEmpty ? null : _facultyCtrl.text,
               decoration: const InputDecoration(
                 labelText: 'Limit your selection to a specific Faculty/School *',
-                prefixIcon: Icon(Icons.school_outlined),
+                prefixIcon: Icon(Icons.school_outlined, color: AppColors.success),
               ),
               items: const [
                 DropdownMenuItem(value: 'HEALTH SCIENCES', child: Text('HEALTH SCIENCES')),
@@ -3700,7 +3691,7 @@ class _ProfileOnboardingScreenState
               initialValue: _programmeCtrl.text.isEmpty ? null : _programmeCtrl.text,
               decoration: const InputDecoration(
                 labelText: 'Choose a programme *',
-                prefixIcon: Icon(Icons.auto_stories_outlined),
+                prefixIcon: Icon(Icons.auto_stories_outlined, color: AppColors.primaryLight),
               ),
               items: const [
                 DropdownMenuItem(value: 'HSBAMS', child: Text('HSBAMS - BA (MEDIA STUDIES)')),
@@ -3736,7 +3727,7 @@ class _ProfileOnboardingScreenState
               initialValue: _applicationPeriod.isEmpty ? null : _applicationPeriod,
               decoration: const InputDecoration(
                 labelText: 'For which period are you applying? *',
-                prefixIcon: Icon(Icons.date_range_outlined),
+                prefixIcon: Icon(Icons.date_range_outlined, color: AppColors.warning),
               ),
               items: const [
                 DropdownMenuItem(value: '1ST YEAR', child: Text('1ST YEAR')),
@@ -3750,7 +3741,7 @@ class _ProfileOnboardingScreenState
               initialValue: _studyMode.isEmpty ? null : _studyMode,
               decoration: const InputDecoration(
                 labelText: 'How would you like to study for this programme? *',
-                prefixIcon: Icon(Icons.school_outlined),
+                prefixIcon: Icon(Icons.school_outlined, color: AppColors.primary),
               ),
               items: const [
                 DropdownMenuItem(value: 'FULL-TIME', child: Text('FULL-TIME')),
@@ -3764,7 +3755,7 @@ class _ProfileOnboardingScreenState
               initialValue: _studyTiming.isEmpty ? null : _studyTiming,
               decoration: const InputDecoration(
                 labelText: 'When would you like to study for the qualification? *',
-                prefixIcon: Icon(Icons.access_time_outlined),
+                prefixIcon: Icon(Icons.access_time_outlined, color: AppColors.info),
               ),
               items: const [
                 DropdownMenuItem(value: 'YEAR', child: Text('YEAR')),
@@ -3798,7 +3789,7 @@ class _ProfileOnboardingScreenState
               controller: _loginPinCtrl,
               decoration: const InputDecoration(
                 labelText: 'Login Pin Number *',
-                prefixIcon: Icon(Icons.lock_outline),
+                prefixIcon: Icon(Icons.lock_outline, color: AppColors.success),
               ),
               keyboardType: TextInputType.number,
               obscureText: true,
@@ -3809,7 +3800,7 @@ class _ProfileOnboardingScreenState
               initialValue: _acceptanceStatus.isEmpty ? null : _acceptanceStatus,
               decoration: const InputDecoration(
                 labelText: 'Acceptance Status *',
-                prefixIcon: Icon(Icons.assignment_turned_in_outlined),
+                prefixIcon: Icon(Icons.assignment_turned_in_outlined, color: AppColors.primaryLight),
               ),
               items: const [
                 DropdownMenuItem(value: 'I Accept', child: Text('I Accept')),
@@ -4038,9 +4029,21 @@ class _ProfileOnboardingScreenState
   }
 
   Widget _buildBottomButtons() {
+    final hoverBg = WidgetStateProperty.resolveWith<Color?>((states) =>
+        states.contains(WidgetState.hovered) ? AppColors.primary : Colors.transparent);
+    final hoverFg = WidgetStateProperty.resolveWith<Color?>((states) =>
+        states.contains(WidgetState.hovered) ? AppColors.background : AppColors.primary);
+    const compact = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll<Size>(Size(0, 31)),
+      padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
+          EdgeInsets.symmetric(horizontal: 12, vertical: 5)),
+      textStyle: WidgetStatePropertyAll<TextStyle>(TextStyle(fontSize: 13)),
+    );
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (_currentPage > 0)
             Expanded(
@@ -4048,6 +4051,15 @@ class _ProfileOnboardingScreenState
                 onPressed: () => _pageController.previousPage(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                ).copyWith(
+                  minimumSize: compact.minimumSize,
+                  padding: compact.padding,
+                  textStyle: compact.textStyle,
+                  backgroundColor: hoverBg,
+                  foregroundColor: hoverFg,
                 ),
                 child: const Text('Back'),
               ),
@@ -4058,6 +4070,12 @@ class _ProfileOnboardingScreenState
               onPressed: _saving ? null : _saveCurrentPage,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primary),
+              ).copyWith(
+                minimumSize: compact.minimumSize,
+                padding: compact.padding,
+                textStyle: compact.textStyle,
+                backgroundColor: hoverBg,
+                foregroundColor: hoverFg,
               ),
               child: _saving
                   ? const SizedBox(
@@ -4070,15 +4088,42 @@ class _ProfileOnboardingScreenState
             ),
           ),
           const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _showStarHelp,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.starGold.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: const StarAvatar(size: 32, pulse: false),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: ElevatedButton(
               onPressed: _saving ? null : _saveAndContinue,
+              style: ElevatedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                elevation: 0,
+              ).copyWith(
+                minimumSize: compact.minimumSize,
+                padding: compact.padding,
+                textStyle: compact.textStyle,
+                backgroundColor: hoverBg,
+                foregroundColor: hoverFg,
+              ),
               child: _saving
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: AppColors.primary),
                     )
                   : Text(_currentPage < 6 ? 'Next' : 'Finish'),
             ),

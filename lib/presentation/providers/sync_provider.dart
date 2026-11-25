@@ -5,7 +5,7 @@ import 'package:studentsyncsa/services/sync_service.dart' as sync_service;
 class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatus>> {
   StreamSubscription? _sub;
 
-  SyncStatusNotifier() : super(const AsyncLoading()) {
+  SyncStatusNotifier() : super(const AsyncLoading<sync_service.SyncStatus>()) {
     _sub = sync_service.SyncService.statusStream.listen((status) {
       state = AsyncData(status);
     });
@@ -18,6 +18,6 @@ class SyncStatusNotifier extends StateNotifier<AsyncValue<sync_service.SyncStatu
   }
 }
 
-final syncStatusNotifierProvider = StateNotifierProvider<SyncStatusNotifier, AsyncValue<sync_service.SyncStatus>>((ref) {
-  return SyncStatusNotifier();
-});
+final syncStatusNotifierProvider = StateNotifierProvider<SyncStatusNotifier, AsyncValue<sync_service.SyncStatus>>(
+  (ref) => SyncStatusNotifier(),
+);

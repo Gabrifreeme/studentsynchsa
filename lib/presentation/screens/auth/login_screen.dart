@@ -106,7 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     StarAvatar(size: isShort ? 48 : 64, pulse: true),
                     SizedBox(height: isShort ? 8 : 16),
                     Text(
-                      'studentsyncsa',
+                      'LibSyncStudent',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: isShort ? 22 : 26,
@@ -115,7 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Powered by ${'Star'}',
+                      'Powered by ACEsi',
                       style: const TextStyle(
                         color: AppColors.starGold,
                         fontSize: 14,
@@ -154,7 +154,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
                                 labelText: 'Email',
-                                prefixIcon: Icon(Icons.email_outlined),
+                                prefixIcon: const Icon(Icons.email_outlined,
+                                    color: AppColors.info),
                               ),
                               validator: (v) =>
                                   v?.isEmpty == true ? 'Enter your email' : null,
@@ -165,12 +166,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 labelText: 'Password',
-                                prefixIcon: const Icon(Icons.lock_outlined),
+                                prefixIcon: const Icon(Icons.lock_outlined,
+                                  color: AppColors.info),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword
                                         ? Icons.visibility_off_outlined
                                         : Icons.visibility_outlined,
+                                    color: AppColors.info,
                                   ),
                                   onPressed: () => setState(
                                       () => _obscurePassword = !_obscurePassword),
@@ -198,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          color: AppColors.background,
                                         ),
                                       )
                                     : const Text('Login'),
@@ -227,8 +230,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               height: 42,
                               child: OutlinedButton.icon(
                                 onPressed: _loading ? null : _loginWithGoogle,
-                                icon: const Icon(Icons.g_mobiledata_rounded,
-                                    size: 24),
+                                icon: Image.asset('assets/icons/google_g.png',
+                                    width: 24, height: 24),
                                 label: const Text('Sign in with Google'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.textPrimary,
@@ -249,7 +252,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.apple_rounded, size: 24),
+                                icon: const Icon(Icons.apple_rounded,
+                                    size: 24, color: AppColors.info),
                                 label: const Text('Sign in with Apple'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.textMuted,

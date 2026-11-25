@@ -1,4 +1,4 @@
-# StudentSyncSA - Agent Instructions
+﻿# LibSyncStudent - Agent Instructions
 
 ## Project Overview
 Flutter app for South African university students. Uses WebView to load ITS (Oracle PL/SQL) university portals (UNIVEN, UL, TUT, NWU, etc.) with auto-fill functionality.
@@ -25,7 +25,7 @@ flutter run                     # Run app
 
 ## Auto-fill Implementation
 - WebView configured with `JavaScriptMode.unrestricted`
-- `[All]` button in WebView panel calls `_runAutofill()` → `star.buildAutofillScript(profile)`
+- `[All]` button in WebView panel calls `_runAutofill()` â†’ `star.buildAutofillScript(profile)`
 - Generated JS uses `pMap` to try both `oap*` and `P_*` field names (ITS portals use `P_*`)
 - `set()` handles text inputs, `setSelect()` handles radio buttons + selects
 - Portal patches run on `onPageFinished` before auto-fill
@@ -33,17 +33,17 @@ flutter run                     # Run app
 ## Common Issues
 1. **Auto-fill not working**: Check JS injection in `webview_impl.dart` line 239, verify `pMap` lookup in `autofill_script.dart`
 2. **Profile values mismatch dropdowns**: `auth_service.dart` hardcoded defaults must match dropdown items exactly
-3. **Hive stale data**: Migration in `main.dart` patches old values (`'Black'`→`'African'`, `'Full-Time'`→`'YEAR'`, `'Accepted'`→`'I Accept'`)
+3. **Hive stale data**: Migration in `main.dart` patches old values (`'Black'`â†’`'African'`, `'Full-Time'`â†’`'YEAR'`, `'Accepted'`â†’`'I Accept'`)
 4. **WebView permissions**: Requires `webview_flutter_android` for debugging
 
-## Profile Field Mapping (oap* → P_*)
+## Profile Field Mapping (oap* â†’ P_*)
 Key mappings in `autofill_script.dart` pMap:
-- `oapSurname` → `P_SURNAME`
-- `oapIdNumber` → `P_ID_NO`
-- `oapEmail` → `P_EMAIL`
-- `oapCellNo` → `P_CELL_NO`
-- `oapStreet` → `P_ADDRESS_1`
-- `oapCitizenType` → `P_CITIZEN_TYPE` (radio buttons)
+- `oapSurname` â†’ `P_SURNAME`
+- `oapIdNumber` â†’ `P_ID_NO`
+- `oapEmail` â†’ `P_EMAIL`
+- `oapCellNo` â†’ `P_CELL_NO`
+- `oapStreet` â†’ `P_ADDRESS_1`
+- `oapCitizenType` â†’ `P_CITIZEN_TYPE` (radio buttons)
 - etc.
 
 ## Testing
@@ -67,8 +67,8 @@ adb shell ip addr show wlan0 | findstr "inet "
 ```
 
 ## Execution Rules
-- Always run the app on the connected phone (ABR NX1) via ADB WiFi and launch screen mirroring with `scrcpy -e` in a separate command, unless specified otherwise by the user.
-- Always run the app after build, modify or bug fix, unless the user says otherwise.
+- Do NOT run any `flutter` commands (`flutter run`, `flutter analyze`, `flutter test`, `flutter build`), `adb`, or `scrcpy` after making edits unless the user explicitly asks you to.
+- Focus only on editing the requested files cleanly and directly.
 
 ## Web Dashboard (Next.js)
 - Located in `D:\Downloads\project_extracted` (companion web app)

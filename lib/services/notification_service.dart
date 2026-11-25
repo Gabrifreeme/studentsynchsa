@@ -33,8 +33,8 @@ class NotificationService {
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'studentsyncsa_channel',
-      'studentsyncsa Notifications',
-      channelDescription: 'Notifications from studentsyncsa',
+      'LibSyncStudent Notifications',
+      channelDescription: 'Notifications from LibSyncStudent',
       importance: Importance.high,
       priority: Priority.high,
     );

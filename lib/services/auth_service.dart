@@ -13,7 +13,8 @@ class AuthService implements AuthRepository {
     try {
       _googleSignIn = GoogleSignIn(
         scopes: ['email'],
-        clientId: '864470911027-46ogt1qabojutsfp698rr5kvs4acudl4.apps.googleusercontent.com',
+        clientId:
+            '864470911027-46ogt1qabojutsfp698rr5kvs4acudl4.apps.googleusercontent.com',
       );
     } catch (_) {}
   }
@@ -27,14 +28,16 @@ class AuthService implements AuthRepository {
       // If credentials exist, verify against them
       if (storedEmail.isNotEmpty && storedPassword.isNotEmpty) {
         if (storedEmail != email || storedPassword != password) {
-          return const AuthResult(success: false, error: 'Invalid email or password');
+          return const AuthResult(
+              success: false, error: 'Invalid email or password');
         }
       } else {
         // No stored credentials — likely signed out before the fix that
         // stopped deleting them. Check if a profile with this email exists.
         final profile = await _profileRepo.getProfile();
         if (profile == null || profile.contact.email != email) {
-          return const AuthResult(success: false, error: 'No account found — sign up first');
+          return const AuthResult(
+              success: false, error: 'No account found — sign up first');
         }
         // Recreate auth data so future sign-ins use stored credentials
         await _setAuthData(email: email, id: profile.id, password: password);
@@ -48,10 +51,11 @@ class AuthService implements AuthRepository {
       final existingProfile = await _profileRepo.getProfile();
       return AuthResult(
         success: true,
-        profile: existingProfile ?? StudentProfile(
-          id: userId ?? email.hashCode.toString(),
-          contact: ContactInfo(email: email),
-        ),
+        profile: existingProfile ??
+            StudentProfile(
+              id: userId ?? email.hashCode.toString(),
+              contact: ContactInfo(email: email),
+            ),
       );
     } catch (e) {
       return AuthResult(success: false, error: e.toString());
@@ -76,9 +80,10 @@ class AuthService implements AuthRepository {
   Future<AuthResult> signInWithGoogle() async {
     try {
       if (_googleSignIn == null) {
-        return const AuthResult(success: false, error: 'Google Sign-In not available on web');
+        return const AuthResult(
+            success: false, error: 'Google Sign-In not available on web');
       }
-      final account = await _googleSignIn?.signIn();
+      final account = await _googleSignIn!.signIn();
       if (account == null) {
         return const AuthResult(success: false, error: 'cancelled');
       }
@@ -86,15 +91,15 @@ class AuthService implements AuthRepository {
       final email = account.email;
       final firstName = account.displayName?.split(' ').first ?? '';
       final nameParts = account.displayName?.split(' ') ?? [];
-      final lastName = nameParts.length > 1
-          ? nameParts.skip(1).join(' ')
-          : '';
+      final lastName =
+          nameParts.length > 1 ? nameParts.skip(1).join(' ') : '';
       await _setAuthData(email: email, id: id);
       return AuthResult(
         success: true,
         profile: StudentProfile(
           id: id,
-          personal: PersonalDetails(firstName: firstName, lastName: lastName),
+          personal:
+              PersonalDetails(firstName: firstName, lastName: lastName),
           contact: ContactInfo(email: email),
         ),
       );
@@ -107,7 +112,8 @@ class AuthService implements AuthRepository {
   Future<AuthResult> signInWithApple() async {
     return const AuthResult(
       success: false,
-      error: 'Apple login requires Apple Developer Program — coming soon',
+      error:
+          'Apple login requires Apple Developer Program — coming soon',
     );
   }
 
@@ -130,7 +136,10 @@ class AuthService implements AuthRepository {
     return HiveDatabase.settings.get('auth_user_id');
   }
 
-  Future<void> _setAuthData({required String email, required String id, String? password}) async {
+  Future<void> _setAuthData(
+      {required String email,
+      required String id,
+      String? password}) async {
     await HiveDatabase.settings.put('auth_email', email);
     await HiveDatabase.settings.put('auth_user_id', id);
     if (password != null) {
@@ -141,91 +150,91 @@ class AuthService implements AuthRepository {
   @override
   Future<AuthResult> autoLogin() async {
     try {
+      // Only restore a session when a real saved login exists. Without this
+      // the app faked a "Test User" on every start and never showed Login.
+      final savedEmail = HiveDatabase.settings.get('auth_email');
+      final savedUserId = HiveDatabase.settings.get('auth_user_id');
+      if (savedEmail == null || savedEmail.toString().isEmpty ||
+          savedUserId == null || savedUserId.toString().isEmpty) {
+        return AuthResult(success: false, error: 'no saved session');
+      }
       var profile = await _profileRepo.getProfile();
       final existingId = profile?.id ?? const Uuid().v4();
       profile = StudentProfile(
-          id: existingId,
-          onboardingComplete: true,
-          personal: PersonalDetails(
-            title: 'Mr',
-            initials: 'T',
-            firstName: 'Test',
-            lastName: 'User',
-            gender: 'Male',
-            dateOfBirth: DateTime(1964, 4, 13),
-            idNumber: '6404135555555',
-          ),
-          contact: ContactInfo(
-            email: 'test.user@example.com',
-            phone: '0712345678',
-          ),
-          address: AddressInfo(
-            address: '123 Test Street',
-            addressLine2: 'Test Suburb',
-            province: 'Gauteng',
-            postalCode: '2000',
-          ),
-          demographic: DemographicInfo(
-            nationality: 'RSA',
-            countryOfBirth: 'South Africa',
-            homeLanguage: 'English',
-            populationGroup: 'African',
-            maritalStatus: 'Single',
-          ),
-          status: StatusInfo(
-            disabilityStatus: 'No',
-            bursaryRequired: 'Yes',
-            employmentStatus: 'Unemployed',
-          ),
-          school: SchoolInfo(
-            schoolName: 'Test High School',
-            currentGrade: 'Grade 12',
-            currentlyDoing: 'Studying at school',
-          ),
-          nextOfKin: NextOfKin(
-            name: 'Parent Test',
-            mobilePhone: '0712345679',
-            homePhone: '0211234567',
-            addressLine1: '123 Test Street',
-            addressLine2: 'Test Suburb',
-            postalCode: '2000',
-            email: 'parent@example.com',
-          ),
-          accountContact: AccountContact(
-            name: 'Account Contact',
-            mobilePhone: '0723456789',
-            homePhone: '0217654321',
-            addressLine1: '456 Account Street',
-            addressLine2: 'Account Suburb',
-            postalCode: '2001',
-            email: 'account@example.com',
-          ),
-          results: ResultsInfo(
-            matricYear: DateTime.now().year - 1,
-            applicationLevel: 'Undergraduate',
-            upgrading: 'No',
-            matricType: 'South African',
-            examinationNumber: '1234567890',
-            schoolLeavingCertificate: 'GRADE 12',
-          ),
-          qualification: QualificationInfo(
-            academicYear: DateTime.now().year,
-            applicationPeriod: '1ST YEAR',
-            studyMode: 'FULL-TIME',
-            studyTiming: 'YEAR',
-            choices: [
-              QualificationChoice(faculty: 'SCIENCE, ENGINEERING AND AGRIC', programme: 'SEBECP'),
-            ],
-          ),
-          agreement: AgreementInfo(
-            acceptanceStatus: 'I Accept',
-          ),
-        );
-        await _profileRepo.saveProfile(profile);
-      if (HiveDatabase.settings.get('auth_user_id') == null || 
-          (HiveDatabase.settings.get('auth_user_id') ?? '').isEmpty) {
-        await _setAuthData(email: profile.contact.email, id: profile.id);
-      }
+        id: existingId,
+        onboardingComplete: true,
+        personal: PersonalDetails(
+          title: 'Mr',
+          initials: 'T',
+          firstName: 'Test',
+          lastName: 'User',
+          gender: 'Male',
+          dateOfBirth: DateTime(1964, 4, 13),
+          idNumber: '6404135555555',
+        ),
+        contact: ContactInfo(
+          email: 'test.user@example.com',
+          phone: '0712345678',
+        ),
+        address: AddressInfo(
+          address: '123 Test Street',
+          addressLine2: 'Test Suburb',
+          province: 'Gauteng',
+          postalCode: '2000',
+        ),
+        demographic: DemographicInfo(
+          nationality: 'RSA',
+          countryOfBirth: 'South Africa',
+          homeLanguage: 'English',
+          populationGroup: 'African',
+          maritalStatus: 'Single',
+        ),
+        status: StatusInfo(
+          disabilityStatus: 'No',
+          bursaryRequired: 'Yes',
+          employmentStatus: 'Unemployed',
+        ),
+        school: SchoolInfo(
+          schoolName: 'Test High School',
+          currentGrade: 'Grade 12',
+          currentlyDoing: 'Studying at school',
+        ),
+        nextOfKin: NextOfKin(
+          name: 'Parent Test',
+          mobilePhone: '0712345679',
+          homePhone: '0211234567',
+          addressLine1: '123 Test Street',
+          addressLine2: 'Test Suburb',
+          postalCode: '2000',
+          email: 'parent@example.com',
+        ),
+        accountContact: AccountContact(
+          name: 'Account Contact',
+          mobilePhone: '0723456789',
+          homePhone: '0217654321',
+          addressLine1: '456 Account Street',
+          addressLine2: 'Account Suburb',
+          postalCode: '2001',
+          email: 'account@example.com',
+        ),
+        results: ResultsInfo(
+          matricYear: DateTime.now().year - 1,
+          applicationLevel: 'Undergraduate',
+          upgrading: 'No',
+          matricType: 'South African',
+          examinationNumber: '1234567890',
+          schoolLeavingCertificate: 'GRADE 12',
+        ),
+        qualification: QualificationInfo(
+          academicYear: DateTime.now().year,
+          applicationPeriod: '1ST YEAR',
+          studyMode: 'FULL-TIME',
+          studyTiming: 'YEAR',
+          choices: [
+            QualificationChoice(),
+          ],
+        ),
+      );
       return AuthResult(success: true, profile: profile);
     } catch (e) {
       return AuthResult(success: false, error: e.toString());

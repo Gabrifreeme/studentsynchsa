@@ -76,7 +76,12 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text('✨ Apply — ${uni.shortName}')),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.7,
+          ),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,6 +227,8 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
             ),
             const SizedBox(height: 40),
           ],
+        ),
+          ),
         ),
       ),
     );

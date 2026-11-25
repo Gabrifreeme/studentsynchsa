@@ -321,13 +321,12 @@ class _FirecrackerPainter extends CustomPainter {
       final angle = _random.nextDouble() * 2 * math.pi;
       final speed = 60.0 + _random.nextDouble() * 120.0;
       final colors = [
-        Colors.red,
+        AppColors.primary,
+        AppColors.primaryLight,
+        AppColors.info,
+        AppColors.success,
+        AppColors.primaryDark,
         Colors.white,
-        Colors.blue,
-        Colors.amber,
-        Colors.purple,
-        Colors.orange,
-        Colors.cyan,
       ];
       return _Particle(
         angle: angle,
