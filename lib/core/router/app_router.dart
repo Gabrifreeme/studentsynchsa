@@ -19,6 +19,7 @@ import 'package:studentsyncsa/presentation/screens/notifications/notifications_s
 import 'package:studentsyncsa/presentation/screens/chat/chat_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
+import 'package:studentsyncsa/presentation/screens/settings/about_screen.dart';
 import 'package:studentsyncsa/presentation/screens/universities/application_helper_screen.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
@@ -169,6 +170,11 @@ final appRouter = GoRouter(
       path: '/privacy',
       name: 'privacy',
       builder: (context, state) => const PrivacyScreen(),
+    ),
+    GoRoute(
+      path: '/about',
+      name: 'about',
+      builder: (context, state) => const AboutScreen(),
     ),
   ],
 );

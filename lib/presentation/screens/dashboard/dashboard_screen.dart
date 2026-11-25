@@ -153,6 +153,18 @@ class DashboardScreen extends ConsumerWidget {
           value: '',
           compact: true,
           onTap: () => context.push('/funding')),
+      AppListTile(
+          icon: Icons.settings_rounded,
+          label: 'Settings',
+          value: '',
+          compact: true,
+          onTap: () => context.push('/settings')),
+      AppListTile(
+          icon: Icons.info_outline_rounded,
+          label: 'About Us',
+          value: '',
+          compact: true,
+          onTap: () => context.push('/about')),
     ];
     return GridView.builder(
       shrinkWrap: true,
