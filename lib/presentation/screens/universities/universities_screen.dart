@@ -42,7 +42,12 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: SafeArea(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            child: SafeArea(
           child: universitiesAsync.when(
             data: (universities) {
               var filtered = universities.where((u) {
@@ -63,7 +68,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -76,12 +81,12 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         Text('All ${universities.length} SA public universities',
                             style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 14)),
+                                fontSize: 10)),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (_) => setState(() {}),
@@ -105,10 +110,10 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     ),
                   ),
                   SizedBox(
-                    height: 40,
+                    height: 32,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       itemCount: _provinces.length,
                       itemBuilder: (_, i) {
                         final p = _provinces[i];
@@ -134,10 +139,10 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     child: filtered.isEmpty
                         ? const Center(child: Text('No universities found', style: TextStyle(color: AppColors.textMuted)))
                         : GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
-                              mainAxisExtent: 156,
+                              mainAxisExtent: 118,
                               crossAxisSpacing: 8,
                               mainAxisSpacing: 8,
                             ),
@@ -159,6 +164,8 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
               icon: Icons.error_outline,
               title: 'Failed to load universities',
               subtitle: e.toString(),
+            ),
+          ),
             ),
           ),
         ),
@@ -188,8 +195,8 @@ class _UniversityCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppSpaces.radius),
               color: logoColor.withValues(alpha: 0.12),
@@ -199,20 +206,20 @@ class _UniversityCard extends StatelessWidget {
                   : null,
             ),
             child: uni.logoUrl.isEmpty
-                ? StarIcon(Icons.account_balance_outlined, size: 22)
+                ? StarIcon(Icons.account_balance_outlined, size: 18)
                 : null,
           ),
           const SizedBox(height: AppSpaces.xs + 2),
           Text(uni.shortName,
               style: const TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800),
               textAlign: TextAlign.center),
           const SizedBox(height: 2),
           Text(uni.name,
               style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 10),
+                  color: AppColors.textSecondary, fontSize: 9),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
@@ -220,12 +227,12 @@ class _UniversityCard extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const StarIcon(Icons.location_on_outlined, size: 11),
+              const StarIcon(Icons.location_on_outlined, size: 10),
               const SizedBox(width: 2),
               Flexible(
                 child: Text(uni.province,
                     style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 9),
+                        color: AppColors.textMuted, fontSize: 8),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
