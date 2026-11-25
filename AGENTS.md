@@ -77,6 +77,14 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## Funding / bursary applications
+- `funding_detail_screen.dart` "Apply Now" now opens `FundingWebViewScreen`,
+  which uses the same `AppWebView` + Star auto-fill as university portals
+  (NSFAS, Sasol, FNB, Anglo American, Funza Lushaka).
+- IMPORTANT: WebView is unavailable on web builds. On web the screen shows
+  "Open Portal" and launches the browser; auto-fill works on MOBILE only.
+  Final verification must be done on a phone, not Chrome.
+
 ## Auto-fill break points found and fixed (2026-11-25)
 Verified by extracting the real generated JS from `autofill_script.dart` and
 running it against a synthetic ITS form (fields in main document AND iframe):

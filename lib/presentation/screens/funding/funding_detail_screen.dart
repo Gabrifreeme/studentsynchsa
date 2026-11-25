@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/mock_bursary_data.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/presentation/screens/funding/funding_webview_screen.dart';
 
 class FundingDetailScreen extends StatelessWidget {
   final String bursaryId;
@@ -129,8 +130,15 @@ class FundingDetailScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(bursary.applicationUrl),
-                  icon: const Icon(Icons.open_in_new),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FundingWebViewScreen(
+                        url: bursary.applicationUrl,
+                        name: bursary.name,
+                      ),
+                    ),
+                  ),
+                  icon: const StarIcon(Icons.auto_awesome_rounded, size: 16),
                   label: const Text('Apply Now'),
                 ),
               ),
