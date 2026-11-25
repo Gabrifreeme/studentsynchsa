@@ -7,10 +7,10 @@ class AppColors {
   static const primaryLight = Color(0xFFFFC266); // light amber
   static const accent = Color(0xFFFFA500);
   static const starGold = Color(0xFFFFA500);
-  static const starRed = Color(0xFFE03A3E);
-  static const starBlue = Color(0xFF2E5C9E);
-  static const starGreen = Color(0xFF1B8A4B);
-  static const starYellow = Color(0xFFFFC107);
+  static const starRed = Color(0xFFEA4335);
+  static const starBlue = Color(0xFF4285F4);
+  static const starGreen = Color(0xFF34A853);
+  static const starYellow = Color(0xFFFFBC05);
 
   static const background = Color(0xFF000000);
   static const surface = Color(0xFF0A0A0A);
