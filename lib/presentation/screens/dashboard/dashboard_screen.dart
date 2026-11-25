@@ -116,14 +116,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildTileGrid(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AppSpaces.sm,
-      crossAxisSpacing: AppSpaces.sm,
-      childAspectRatio: 1.75,
-      children: [
+    final tiles = <Widget>[
         AppListTile(
             icon: Icons.auto_awesome_rounded,
             label: 'ACEsi',
@@ -154,13 +147,24 @@ class DashboardScreen extends ConsumerWidget {
             value: '',
             compact: true,
             onTap: () => context.push('/applications')),
-        AppListTile(
-            icon: Icons.account_balance_rounded,
-            label: 'Funding',
-            value: '',
-            compact: true,
-            onTap: () => context.push('/funding')),
-      ],
+      AppListTile(
+          icon: Icons.account_balance_rounded,
+          label: 'Funding',
+          value: '',
+          compact: true,
+          onTap: () => context.push('/funding')),
+    ];
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisExtent: 72,
+        crossAxisSpacing: AppSpaces.sm,
+        mainAxisSpacing: AppSpaces.sm,
+      ),
+      itemCount: tiles.length,
+      itemBuilder: (context, i) => tiles[i],
     );
   }
 
