@@ -123,8 +123,9 @@ class DashboardScreen extends ConsumerWidget {
         Row(
           children: [
             IconButton(
-              icon: Icon(isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
-                  size: 20, color: AppColors.primary),
+              icon: StarIcon(
+                  isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
+                  size: 20),
               onPressed: openMenu,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -135,8 +136,7 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(child: tile(Icons.person_rounded, 'My Profile', '/onboarding')),
             const SizedBox(width: AppSpaces.xs),
             IconButton(
-              icon: const Icon(Icons.notifications_outlined,
-                  size: 20, color: AppColors.primary),
+              icon: const StarIcon(Icons.notifications_outlined, size: 20),
               onPressed: () => context.push('/notifications'),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -174,7 +174,7 @@ class DashboardScreen extends ConsumerWidget {
               await ref.read(authProvider.notifier).signOut();
               if (context.mounted) context.go('/login');
             },
-            icon: const Icon(Icons.logout_rounded, size: 16),
+            icon: const StarIcon(Icons.logout_rounded, size: 16),
             label: const Text('Exit'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(120, 34),

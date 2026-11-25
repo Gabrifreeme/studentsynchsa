@@ -299,9 +299,7 @@ class AppListTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon,
-                  color: iconColor ?? AppColors.primaryLight,
-                  size: AppSpaces.tileIcon),
+              StarIcon(icon, size: AppSpaces.tileIcon),
               const SizedBox(height: AppSpaces.xs),
               Text(label,
                   textAlign: TextAlign.center,
