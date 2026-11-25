@@ -2982,7 +2982,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             // Postal Address: question + dropdown + switch
             const Text(
-              'Is your Postal Address the same as your Street address?',
+              'Is your Postal Address the same as your Street Address?',
               style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
             ),
             const SizedBox(height: 8),
