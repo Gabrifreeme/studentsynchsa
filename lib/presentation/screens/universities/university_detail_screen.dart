@@ -67,7 +67,14 @@ class UniversityDetailScreen extends ConsumerWidget {
           ),
           title: Text(uni.shortName),
         ),
-        body: SingleChildScrollView(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width < 600
+                  ? double.infinity
+                  : MediaQuery.of(context).size.width * 0.7,
+            ),
+            child: SingleChildScrollView(
           padding: const EdgeInsets.all(11),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,6 +166,8 @@ class UniversityDetailScreen extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+        ),
           ),
         ),
       ),
