@@ -2500,7 +2500,7 @@ class _ProfileOnboardingScreenState
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                     )
-                : () => context.pop(),
+                : () => context.go('/dashboard'),
           ),
         ),
         body: Stack(
