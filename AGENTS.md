@@ -75,3 +75,50 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Run: `npx --package=next@15.5.9 next dev -p 9002` from that directory
 - Open: `http://localhost:9002`
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
+
+
+## Design system (agreed 2026-11-25 — do not re-litigate)
+- App name everywhere: **LibSyncStudent**. Tagline: **Powered by ACEsi**.
+- Palette in `lib/core/theme/app_theme.dart` (`AppColors`):
+  - primary/amber `#FFA500`, muted `#995C00`, text amber, background `#000000`,
+    surface `#0A0A0A`, info/terminal blue `#8FD3FF`, success `#00FF88`.
+  - Google-colour icon palette: red `#EA4335`, blue `#4285F4`,
+    green `#34A853`, yellow `#FFBC05`.
+  - StarIcon (in `common_widgets.dart`) paints all icons with that 4-colour
+    gradient — use it for every new icon, never a plain blue `Icon`.
+- `GradientBackground` applies the global responsive width: full on phones
+  (<600px), 70% centered on desktop. Do not re-add per-screen constraints.
+- Mobile-first. Fonts and padding already reduced ~30% globally; don't inflate.
+- Shared widgets: `AppCard`, `AppListTile`, `AppSpaces`, `StarIcon`,
+  `SectionHeader`, `EmptyState`. Prefer these over custom markup.
+
+## Routes (`lib/core/router/app_router.dart`)
+`/login`, `/signup`, `/dashboard`, `/onboarding`, `/notifications`,
+`/ai-recommendations` (ACEsi), `/funding`, `/funding/:id`, `/universities`,
+`/universities/:id`, `/applications`, `/chat`, `/settings`, `/privacy`, `/about`.
+
+## Agreed screen layouts
+- **Dashboard**: title + Powered by ACEsi; Star CTA; 8 tiles in 2-column grid
+  (ACEsi, My Profile, Community, Universities, Applications, Funding, Settings,
+  About Us); Exit centered near the bottom. Cards sit between Star and Exit.
+- **University detail** (identical for all 26): back arrow inside content,
+  identity card, Offline Guide, Fee/NBT chips, two images side by side,
+  centered Apply button ~40px below. Location opens Google Maps. Apply opens
+  each university's own `applicationUrl` via `url_launcher`.
+- **Profile onboarding** (7 steps): back goes to previous page; on step 1 back
+  goes to `/dashboard`; Save/Next hover-only highlight; Star between buttons.
+- **Postal address**: question + Yes/No switch, default ON, address field dimmed
+  until switched off.
+
+## Assets
+- University logos: `assets/logos/{id}.png` (local, offline-safe) for the newest
+  entries; older ones use `assets/images/*`.
+- University detail images: `_uniImages` map in `university_detail_screen.dart`.
+- `assets/audio/` exists with `.gitkeep` — required by pubspec or hot restart fails.
+
+## Operational
+- ACEsi edits files; the user runs Flutter. Do not run flutter/adb/scrcpy.
+- Commit and push after every edit (user's standing instruction).
+- After 10 February 2026 ACEsi will run LibSyncStudent autonomously; see
+  `D:\projectscesi\AGENTS.md` for ACEsi's operational rules and the live
+  environment snapshot endpoint.
