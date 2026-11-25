@@ -11,16 +11,23 @@ class ChatScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('Community Chat')),
-        body: ListView(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width < 600
+                  ? double.infinity
+                  : MediaQuery.of(context).size.width * 0.7,
+            ),
+            child: ListView(
           padding: const EdgeInsets.all(11),
           children: [
             AppCard(
               onTap: () => _showComingSoon(context),
               child: const ListTile(
-                leading: Icon(Icons.chat_rounded, color: AppColors.primary),
+                leading: StarIcon(Icons.chat_rounded),
                 title: Text('General Chat',
                     style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: Text('Connect with students across SA',
+                subtitle: Text('Discuss with future classmates',
                     style: TextStyle(color: AppColors.textSecondary)),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: AppColors.textMuted),
@@ -31,7 +38,7 @@ class ChatScreen extends StatelessWidget {
               onTap: () => _showComingSoon(context),
               child: const ListTile(
                 leading:
-                    Icon(Icons.map_rounded, color: AppColors.success),
+                    StarIcon(Icons.map_rounded),
                 title: Text('Province-based',
                     style: TextStyle(color: AppColors.textPrimary)),
                 subtitle: Text('Chat with students from your province',
@@ -45,16 +52,18 @@ class ChatScreen extends StatelessWidget {
               onTap: () => _showComingSoon(context),
               child: const ListTile(
                 leading:
-                    Icon(Icons.school_rounded, color: AppColors.warning),
+                    StarIcon(Icons.school_rounded),
                 title: Text('University Interest Groups',
                     style: TextStyle(color: AppColors.textPrimary)),
-                subtitle: Text('Discuss with future classmates',
+                subtitle: Text('Connect with students across South Africa',
                     style: TextStyle(color: AppColors.textSecondary)),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: AppColors.textMuted),
               ),
             ),
           ],
+        ),
+          ),
         ),
       ),
     );
