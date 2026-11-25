@@ -204,7 +204,10 @@ class _UniversityCard extends StatelessWidget {
               color: logoColor.withValues(alpha: 0.12),
               image: uni.logoUrl.isNotEmpty
                   ? DecorationImage(
-                      image: NetworkImage(uni.logoUrl), fit: BoxFit.cover)
+                      image: uni.logoUrl.startsWith('assets/')
+                          ? AssetImage(uni.logoUrl) as ImageProvider
+                          : NetworkImage(uni.logoUrl),
+                      fit: BoxFit.contain)
                   : null,
             ),
             child: uni.logoUrl.isEmpty
