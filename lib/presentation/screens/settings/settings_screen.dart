@@ -7,6 +7,7 @@ import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/sync_service.dart';
+import 'package:studentsyncsa/presentation/screens/settings/chat_settings_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -63,6 +64,10 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 17),
+            const SectionHeader(title: 'COMMUNITY CHAT'),
+            const SizedBox(height: 6),
+            const ChatSettingsCard(),
             const SizedBox(height: 17),
             const SectionHeader(title: 'ACCOUNT'),
             const SizedBox(height: 6),

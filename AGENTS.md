@@ -79,9 +79,15 @@ adb shell ip addr show wlan0 | findstr "inet "
 
 ## Community Chat
 - General Chat is ACTIVE: `general_chat_screen.dart`, reached from the first
-  card in `chat_screen.dart`. Messages persist in Hive box `general_chat`.
-- It is DEVICE-LOCAL only — there is no community backend/sync. The UI says
-  "On this device" so this is not mistaken for a live shared chat.
+  card in `chat_screen.dart`.
+- Two modes:
+  - **Local** (default): messages persist in Hive box `general_chat`, UI says
+    "On this device".
+  - **Live multi-user**: enter Supabase Project URL + anon key in
+    Settings → COMMUNITY CHAT. `chat_service.dart` uses Supabase REST
+    (`app_messages` table), polls every 4s, and UI says "Live · all students".
+- Table setup SQL: `docs/supabase_chat.sql`. Run in Supabase SQL Editor first.
+- A stable device ID (`chatUserId`) distinguishes your own messages.
 - Province-based and University Interest Groups still show Coming Soon.
 
 ## WebView HTTP error capture (for the UNIVEN second-page 404)
