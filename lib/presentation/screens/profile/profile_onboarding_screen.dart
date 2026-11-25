@@ -2992,16 +2992,6 @@ class _ProfileOnboardingScreenState
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 Switch(
                   value: _postalSameAsResidential,
-                  trackColor: WidgetStateProperty.resolveWith<Color?>((states) =>
-                      states.contains(WidgetState.selected)
-                          ? AppColors.primary
-                          : AppColors.surfaceLight),
-                  thumbColor: WidgetStateProperty.resolveWith<Color?>((states) =>
-                      states.contains(WidgetState.selected)
-                          ? AppColors.background
-                          : AppColors.primary),
-                  hoverColor: AppColors.primaryLight,
-                  splashRadius: 24,
                   onChanged: (v) => setState(() {
                     _postalSameAsResidential = v;
                     if (v) _postalAddressCtrl.clear();

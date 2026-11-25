@@ -145,6 +145,24 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+            states.contains(WidgetState.selected)
+                ? AppColors.background
+                : AppColors.primary),
+        trackColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+            states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.surfaceLight),
+        trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+            states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.primaryDark),
+        overlayColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+            states.contains(WidgetState.hovered)
+                ? AppColors.primary.withValues(alpha: 0.18)
+                : null),
+      ),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
