@@ -2162,8 +2162,8 @@ class _ProfileOnboardingScreenState
             }).toList();
             return Dialog(
               backgroundColor: AppColors.surface,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 28),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2192,7 +2192,7 @@ class _ProfileOnboardingScreenState
                   const Divider(height: 1),
                   if (filtered.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.all(32),
+                      padding: EdgeInsets.all(22),
                       child: Text('No results found', style: TextStyle(color: AppColors.textMuted)),
                     )
                   else
@@ -2410,7 +2410,7 @@ class _ProfileOnboardingScreenState
 
   Widget _buildProgressBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 7),
       child: Row(
         children: List.generate(7, (i) {
           return Expanded(
@@ -2418,7 +2418,7 @@ class _ProfileOnboardingScreenState
               height: 2.5,
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(4),
                 color: i <= _currentPage
                     ? AppColors.primary
                     : AppColors.surfaceLight,
@@ -2455,7 +2455,7 @@ class _ProfileOnboardingScreenState
                         },
                         child: const StarAvatar(size: 96, pulse: true),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 28),
                       Text(
                         _greetingText.substring(0, _visibleChars.clamp(0, _greetingText.length)),
                         textAlign: TextAlign.center,
@@ -2465,7 +2465,7 @@ class _ProfileOnboardingScreenState
                           height: 1.6,
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 34),
                       if (_visibleChars >= _greetingText.length)
                         ElevatedButton.icon(
                           onPressed: _dismissGreeting,
@@ -2474,8 +2474,7 @@ class _ProfileOnboardingScreenState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.starGold,
                             foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
                             textStyle: const TextStyle(fontSize: 11),
                           ),
                         ),
@@ -2523,7 +2522,7 @@ class _ProfileOnboardingScreenState
                     fontSize: 9,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Expanded(
                   child: Center(
                     child: ConstrainedBox(
@@ -2574,11 +2573,11 @@ class _ProfileOnboardingScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Row(
           children: [
             StarAvatar(size: 28),
-            SizedBox(width: 8),
+            SizedBox(width: 6),
             Text('Star says:', style: TextStyle(color: AppColors.starGold)),
           ],
         ),
@@ -2609,10 +2608,10 @@ class _ProfileOnboardingScreenState
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             const Text("Let's get to know you",
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             // Title + Initials
             Row(
               children: [
@@ -2634,7 +2633,7 @@ class _ProfileOnboardingScreenState
                     onChanged: (v) => setState(() => _titleCtrl.text = v ?? ''),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   flex: 3,
                   child: TextFormField(
@@ -2646,7 +2645,7 @@ class _ProfileOnboardingScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // First + Last Name
             Row(
               children: [
@@ -2659,7 +2658,7 @@ class _ProfileOnboardingScreenState
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextFormField(
                     controller: _lastNameCtrl,
@@ -2671,7 +2670,7 @@ class _ProfileOnboardingScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Maiden Name (optional)
             TextFormField(
               controller: _maidenNameCtrl,
@@ -2680,7 +2679,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.person_outline),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Gender
             DropdownButtonFormField<String>(
               initialValue: _gender.isEmpty ? null : _gender,
@@ -2696,7 +2695,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _gender = v ?? ''),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Date of Birth
             InkWell(
               onTap: () async {
@@ -2736,7 +2735,7 @@ class _ProfileOnboardingScreenState
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // ID Number
             TextFormField(
               controller: _idCtrl,
@@ -2746,22 +2745,22 @@ class _ProfileOnboardingScreenState
               ),
             ),
             // --- Citizenship & Demographics ---
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               height: 1,
               color: AppColors.border,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Citizenship & Demographics',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             const Text('For South African universities',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             // Citizenship
             DropdownButtonFormField<String>(
               initialValue: _citizenship.isEmpty ? null : _citizenship,
@@ -2776,7 +2775,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _citizenship = v ?? 'SA Citizen'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Country of Birth
             TextFormField(
               controller: _countryOfBirthCtrl,
@@ -2794,7 +2793,7 @@ class _ProfileOnboardingScreenState
                 if (result != null) setState(() => _countryOfBirthCtrl.text = result);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Home Language
             TextFormField(
               controller: _homeLanguageCtrl,
@@ -2812,7 +2811,7 @@ class _ProfileOnboardingScreenState
                 if (result != null) setState(() => _homeLanguageCtrl.text = result);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Population Group
             DropdownButtonFormField<String>(
               value: ['African', 'Coloured', 'Indian/Asian', 'White', 'Other', 'Prefer not to say', 'Black']
@@ -2832,7 +2831,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _populationGroup = v ?? ''),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Marital Status
             DropdownButtonFormField<String>(
               initialValue: _maritalStatus.isEmpty ? null : _maritalStatus,
@@ -2849,22 +2848,22 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _maritalStatus = v ?? ''),
             ),
             // --- Contact Details ---
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               height: 1,
               color: AppColors.border,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Contact Details',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             const Text('How universities can reach you',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             // Email
             TextFormField(
               controller: _emailCtrl,
@@ -2874,7 +2873,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.email_outlined),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Cell Phone
             TextFormField(
               controller: _phoneCtrl,
@@ -2884,7 +2883,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.phone_outlined),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Work Phone (optional)
             TextFormField(
               controller: _workPhoneCtrl,
@@ -2895,22 +2894,22 @@ class _ProfileOnboardingScreenState
               ),
             ),
             // --- Residential Address ---
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               height: 1,
               color: AppColors.border,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Residential Address',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             const Text('Where you live',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             // Street Address
             TextFormField(
               controller: _addressCtrl,
@@ -2919,7 +2918,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.home_outlined),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Address Line 2
             TextFormField(
               controller: _addressLine2Ctrl,
@@ -2927,7 +2926,7 @@ class _ProfileOnboardingScreenState
                 labelText: 'Address Line 2 (optional)',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Address Line 3
             TextFormField(
               controller: _addressLine3Ctrl,
@@ -2935,7 +2934,7 @@ class _ProfileOnboardingScreenState
                 labelText: 'Street Address Line Three (Name of Town)',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Province + Postal Code
             Row(
               children: [
@@ -2954,7 +2953,7 @@ class _ProfileOnboardingScreenState
                     validator: (v) => v == null ? 'Select your province' : null,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
@@ -2979,13 +2978,13 @@ class _ProfileOnboardingScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Postal Address: question + dropdown + switch
             const Text(
               'Is your Postal Address the same as your Street Address?',
               style: TextStyle(color: AppColors.textPrimary, fontSize: 9),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 const Text('No',
@@ -3001,7 +3000,7 @@ class _ProfileOnboardingScreenState
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _postalAddressCtrl,
               enabled: !_postalSameAsResidential,
@@ -3017,7 +3016,7 @@ class _ProfileOnboardingScreenState
                         : AppColors.textPrimary),
                 prefixIcon: const StarIcon(Icons.mail_outlined),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
                       color: _postalSameAsResidential
                           ? AppColors.border
@@ -3026,19 +3025,19 @@ class _ProfileOnboardingScreenState
               ),
             ),
             // --- Additional Info ---
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               height: 1,
               color: AppColors.border,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Additional Information',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             // Disability
             DropdownButtonFormField<String>(
               initialValue: _disabilityStatus.isEmpty ? null : _disabilityStatus,
@@ -3057,7 +3056,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _disabilityStatus = v ?? ''),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Bursary Required
             DropdownButtonFormField<String>(
               initialValue: _bursaryRequired.isEmpty ? null : _bursaryRequired,
@@ -3072,7 +3071,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _bursaryRequired = v ?? ''),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Employment Status
             DropdownButtonFormField<String>(
               initialValue: _employmentStatus.isEmpty ? null : _employmentStatus,
@@ -3088,7 +3087,7 @@ class _ProfileOnboardingScreenState
               ],
               onChanged: (v) => setState(() => _employmentStatus = v ?? ''),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3105,13 +3104,13 @@ class _ProfileOnboardingScreenState
           children: [
             // ── Next of Kin Details ──
             const _SectionHeader(title: 'Next of Kin Details'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             const Text('Personal and Contact Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _nextOfKinNameCtrl,
               decoration: const InputDecoration(
@@ -3120,7 +3119,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinMobileCtrl,
               keyboardType: TextInputType.phone,
@@ -3130,7 +3129,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinHomePhoneCtrl,
               keyboardType: TextInputType.phone,
@@ -3140,7 +3139,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinWorkPhoneCtrl,
               keyboardType: TextInputType.phone,
@@ -3149,13 +3148,13 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.business_outlined),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Address Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _nextOfKinAddr1Ctrl,
               decoration: const InputDecoration(
@@ -3164,7 +3163,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinAddr2Ctrl,
               decoration: const InputDecoration(
@@ -3173,7 +3172,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinAddr3Ctrl,
               decoration: const InputDecoration(
@@ -3181,7 +3180,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.location_on_outlined),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinAddr4Ctrl,
               decoration: const InputDecoration(
@@ -3189,7 +3188,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.location_on_outlined),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinPostalCodeCtrl,
               keyboardType: TextInputType.number,
@@ -3199,7 +3198,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinEmailCtrl,
               keyboardType: TextInputType.emailAddress,
@@ -3214,17 +3213,17 @@ class _ProfileOnboardingScreenState
               },
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
 
             // ── Account Contact Details ──
             const _SectionHeader(title: 'Account Contact Details'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             const Text('Account Contact Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _accountContactNameCtrl,
               decoration: const InputDecoration(
@@ -3233,7 +3232,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactMobileCtrl,
               keyboardType: TextInputType.phone,
@@ -3243,7 +3242,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactHomePhoneCtrl,
               keyboardType: TextInputType.phone,
@@ -3253,13 +3252,13 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             const Text('Address Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _accountContactAddr1Ctrl,
               decoration: const InputDecoration(
@@ -3268,7 +3267,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactAddr2Ctrl,
               decoration: const InputDecoration(
@@ -3277,7 +3276,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactAddr3Ctrl,
               decoration: const InputDecoration(
@@ -3285,7 +3284,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.location_on_outlined),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactAddr4Ctrl,
               decoration: const InputDecoration(
@@ -3293,7 +3292,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.location_on_outlined),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactPostalCodeCtrl,
               keyboardType: TextInputType.number,
@@ -3303,7 +3302,7 @@ class _ProfileOnboardingScreenState
               ),
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactEmailCtrl,
               keyboardType: TextInputType.emailAddress,
@@ -3317,7 +3316,7 @@ class _ProfileOnboardingScreenState
                 return null;
               },
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3333,7 +3332,7 @@ class _ProfileOnboardingScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Results Details'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Matric Year
             DropdownButtonFormField<int>(
               initialValue: _matricYear == 0 ? null : _matricYear,
@@ -3347,7 +3346,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _matricYear = v ?? 0),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Undergraduate / Postgraduate
             DropdownButtonFormField<String>(
               initialValue: _applicationLevel.isEmpty ? null : _applicationLevel,
@@ -3362,7 +3361,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _applicationLevel = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Upgrading
             DropdownButtonFormField<String>(
               initialValue: _upgrading.isEmpty ? null : _upgrading,
@@ -3377,7 +3376,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _upgrading = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Matric Type
             DropdownButtonFormField<String>(
               initialValue: _matricType.isEmpty ? null : _matricType,
@@ -3392,7 +3391,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _matricType = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Examination Number
             TextFormField(
               controller: _examinationNumberCtrl,
@@ -3401,7 +3400,7 @@ class _ProfileOnboardingScreenState
                 prefixIcon: StarIcon(Icons.numbers_outlined),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // School Leaving Certificate
             TextFormField(
               controller: _schoolLeavingCertCtrl,
@@ -3422,13 +3421,13 @@ class _ProfileOnboardingScreenState
               },
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const Text('Subject Details (Repeated Entry List)',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // Subject list
             ..._resultsSubjects.asMap().entries.map((entry) {
               final i = entry.key;
@@ -3445,7 +3444,7 @@ class _ProfileOnboardingScreenState
                         decoration: const InputDecoration(
                           labelText: 'Subject *',
                           contentPadding:
-                              EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 7),
                         ),
                         items: _schoolSubjects
                             .map((s) => DropdownMenuItem(
@@ -3462,7 +3461,7 @@ class _ProfileOnboardingScreenState
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<String>(
@@ -3472,7 +3471,7 @@ class _ProfileOnboardingScreenState
                         decoration: const InputDecoration(
                           labelText: 'Grade *',
                           contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                              EdgeInsets.symmetric(horizontal: 4, vertical: 7),
                         ),
                         items: const [
                           DropdownMenuItem(value: 'NOT ACHIEVED', child: Text('NOT ACHIEVED', style: TextStyle(fontSize: 11))),
@@ -3493,7 +3492,7 @@ class _ProfileOnboardingScreenState
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Expanded(
                       flex: 1,
                       child: DropdownButtonFormField<int>(
@@ -3503,7 +3502,7 @@ class _ProfileOnboardingScreenState
                         decoration: const InputDecoration(
                           labelText: 'Level',
                           contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                              EdgeInsets.symmetric(horizontal: 4, vertical: 7),
                         ),
                         items: List.generate(7, (i) => i + 1)
                             .map((l) => DropdownMenuItem(
@@ -3519,7 +3518,7 @@ class _ProfileOnboardingScreenState
                         },
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Expanded(
                       flex: 1,
                       child: TextFormField(
@@ -3528,7 +3527,7 @@ class _ProfileOnboardingScreenState
                         decoration: const InputDecoration(
                           labelText: '% *',
                           contentPadding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                              EdgeInsets.symmetric(horizontal: 4, vertical: 7),
                         ),
                         onChanged: (v) {
                           setState(() => _resultsSubjects[i] =
@@ -3560,7 +3559,7 @@ class _ProfileOnboardingScreenState
                 side: const BorderSide(color: AppColors.border),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3576,13 +3575,13 @@ class _ProfileOnboardingScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Educational Institution Details'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             const Text('School Details',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             TextFormField(
               controller: _schoolCtrl,
               readOnly: true,
@@ -3600,7 +3599,7 @@ class _ProfileOnboardingScreenState
                 if (result != null) setState(() => _schoolCtrl.text = result);
               },
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _currentlyDoing.isEmpty ? null : _currentlyDoing,
               decoration: const InputDecoration(
@@ -3618,13 +3617,13 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _currentlyDoing = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const Text('Other Tertiary Institution Details',
                 style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _studiedPreviously.isEmpty ? null : _studiedPreviously,
               decoration: const InputDecoration(
@@ -3638,7 +3637,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _studiedPreviously = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3654,7 +3653,7 @@ class _ProfileOnboardingScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Qualification Details'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             // Academic Year
             DropdownButtonFormField<int>(
               initialValue: _academicYear == 0 ? null : _academicYear,
@@ -3668,7 +3667,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _academicYear = v ?? 0),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Faculty/School
             DropdownButtonFormField<String>(
               initialValue: _facultyCtrl.text.isEmpty ? null : _facultyCtrl.text,
@@ -3685,7 +3684,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _facultyCtrl.text = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Programme
             DropdownButtonFormField<String>(
               initialValue: _programmeCtrl.text.isEmpty ? null : _programmeCtrl.text,
@@ -3721,7 +3720,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _programmeCtrl.text = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Application Period
             DropdownButtonFormField<String>(
               initialValue: _applicationPeriod.isEmpty ? null : _applicationPeriod,
@@ -3735,7 +3734,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _applicationPeriod = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Study Mode
             DropdownButtonFormField<String>(
               initialValue: _studyMode.isEmpty ? null : _studyMode,
@@ -3749,7 +3748,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _studyMode = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             // Study Timing
             DropdownButtonFormField<String>(
               initialValue: _studyTiming.isEmpty ? null : _studyTiming,
@@ -3763,7 +3762,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _studyTiming = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3779,12 +3778,12 @@ class _ProfileOnboardingScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Rules and Agreement'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             const Text(
               'Before continuing, please review and accept the terms.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             TextFormField(
               controller: _loginPinCtrl,
               decoration: const InputDecoration(
@@ -3795,7 +3794,7 @@ class _ProfileOnboardingScreenState
               obscureText: true,
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _acceptanceStatus.isEmpty ? null : _acceptanceStatus,
               decoration: const InputDecoration(
@@ -3809,7 +3808,7 @@ class _ProfileOnboardingScreenState
               onChanged: (v) => setState(() => _acceptanceStatus = v ?? ''),
               validator: (v) => v == null ? 'Required' : null,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -3956,19 +3955,19 @@ class _ProfileOnboardingScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Upload Documents'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             const Text(
               'Please upload the following supporting documents.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             ...List.generate(3, (i) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
@@ -3978,7 +3977,7 @@ class _ProfileOnboardingScreenState
                         style: const TextStyle(
                             color: AppColors.primaryLight,
                             fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -4014,7 +4013,7 @@ class _ProfileOnboardingScreenState
                 ),
               );
             }),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
           ],
         ),
       ),
@@ -4036,12 +4035,12 @@ class _ProfileOnboardingScreenState
     const compact = ButtonStyle(
       minimumSize: WidgetStatePropertyAll<Size>(Size(0, 31)),
       padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
-          EdgeInsets.symmetric(horizontal: 12, vertical: 5)),
+          EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
       textStyle: WidgetStatePropertyAll<TextStyle>(TextStyle(fontSize: 9)),
     );
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -4064,7 +4063,7 @@ class _ProfileOnboardingScreenState
                 child: const Text('Back'),
               ),
             ),
-          if (_currentPage > 0) const SizedBox(width: 8),
+          if (_currentPage > 0) const SizedBox(width: 6),
           Expanded(
             child: OutlinedButton(
               onPressed: _saving ? null : _saveCurrentPage,
@@ -4087,7 +4086,7 @@ class _ProfileOnboardingScreenState
                   : const Text('Save'),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: _showStarHelp,
             child: AnimatedBuilder(
@@ -4114,7 +4113,7 @@ class _ProfileOnboardingScreenState
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: ElevatedButton(
               onPressed: _saving ? null : _saveAndContinue,

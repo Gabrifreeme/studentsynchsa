@@ -71,7 +71,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                             color: AppColors.textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text('${bursaries.length} programmes available',
                         style: const TextStyle(
                             color: AppColors.textSecondary,
@@ -80,7 +80,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (_) => setState(() {}),
@@ -97,7 +97,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                     fillColor: AppColors.card,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -127,14 +127,14 @@ class _FundingListScreenState extends State<FundingListScreen> {
                         checkmarkColor: AppColors.background,
                         side: BorderSide.none,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
+                            borderRadius: BorderRadius.circular(14)),
                         onSelected: (_) => setState(() => _selectedType = t),
                       ),
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Expanded(
                 child: filtered.isEmpty
                     ? const Center(
@@ -142,7 +142,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                             style: TextStyle(color: AppColors.textMuted)))
                     : GridView.builder(
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
@@ -248,10 +248,10 @@ class _FundingCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: AppSpaces.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             decoration: BoxDecoration(
               color: typeColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(4),
             ),
             child: Text(b.type,
                 style: TextStyle(

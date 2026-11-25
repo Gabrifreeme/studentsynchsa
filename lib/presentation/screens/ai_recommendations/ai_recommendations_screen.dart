@@ -215,7 +215,7 @@ class _AiRecommendationsScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               StarAvatar(size: 28),
-              SizedBox(width: 8),
+              SizedBox(width: 6),
               Text('Star'),
             ],
           ),
@@ -225,7 +225,7 @@ class _AiRecommendationsScreenState
             Expanded(
               child: ListView.builder(
                       controller: _scrollCtrl,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(11),
                       itemCount: _messages.length,
                       itemBuilder: (context, i) {
                         final msg = _messages[i];
@@ -265,12 +265,11 @@ class _AiRecommendationsScreenState
                       decoration: const InputDecoration(
                         hintText: 'Ask Star anything...',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   IconButton(
                     onPressed: _loading
                         ? null
@@ -322,11 +321,11 @@ class _ChatBubble extends StatelessWidget {
         children: [
           if (!message.isUser) ...[
             const StarAvatar(size: 28),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: message.isUser
                     ? AppColors.primary.withValues(alpha: 0.2)
@@ -352,7 +351,7 @@ class _ChatBubble extends StatelessWidget {
                     ),
                   ),
                   if (message.state == StarMessageState.error && onRetry != null) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 7),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -370,7 +369,7 @@ class _ChatBubble extends StatelessWidget {
               ),
             ),
           ),
-          if (message.isUser) const SizedBox(width: 8),
+          if (message.isUser) const SizedBox(width: 6),
         ],
       ),
     );

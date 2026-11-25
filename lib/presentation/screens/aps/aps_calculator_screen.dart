@@ -53,21 +53,21 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
           children: [
             // APS Score Display
             Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(24),
+              margin: const EdgeInsets.all(11),
+              padding: const EdgeInsets.all(17),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [AppColors.primary, AppColors.primaryDark],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
                 children: [
                   const Text('Your APS Score',
                       style: TextStyle(color: Colors.white70, fontSize: 10)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     '$_aps',
                     style: const TextStyle(
@@ -76,12 +76,12 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     'Based on ${_subjectsCounted()} subjects',
                     style: const TextStyle(color: Colors.white60, fontSize: 9),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _apsBars(),
                 ],
               ),
@@ -163,7 +163,7 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             SizedBox(
               width: 60,
               child: TextFormField(
@@ -171,14 +171,14 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: '%',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 7),
                 ),
                 onChanged: (v) {
                   setState(() => subject.mark = double.tryParse(v) ?? 0);
                 },
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             Text(
               '${_percentageToAps(subject.mark)}',
               style: const TextStyle(

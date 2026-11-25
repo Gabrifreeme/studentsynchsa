@@ -66,7 +66,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
         appBar: AppBar(title: Text('Apply — ${uni.shortName}')),
         body: const Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: EdgeInsets.all(17),
             child: Text('No profile found. Complete your profile first, then come back.',
                 textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
           ),
@@ -82,7 +82,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
             maxWidth: MediaQuery.of(context).size.width * 0.7,
           ),
           child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -90,31 +90,31 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
             _readOnlyRow('University', uni.name),
             _readOnlyRow('Faculty', uni.faculties.isNotEmpty ? (uni.faculties.length > 1 ? 'Select below' : uni.faculties.first) : '—'),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('Personal', Icons.person),
             _readOnlyRow('Name', '${profile.personal.title} ${profile.personal.firstName} ${profile.personal.lastName}'),
             if (profile.personal.gender.isNotEmpty) _readOnlyRow('Gender', profile.personal.gender),
             if (profile.personal.dateOfBirth != null) _readOnlyRow('Date of Birth', profile.personal.dateOfBirth!.toIso8601String().split('T').first),
             if (profile.personal.idNumber.isNotEmpty) _readOnlyRow('ID Number', profile.personal.idNumber),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('Contact', Icons.contact_mail),
             if (profile.contact.email.isNotEmpty) _readOnlyRow('Email', profile.contact.email),
             if (profile.contact.phone.isNotEmpty) _readOnlyRow('Phone', profile.contact.phone),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('Address', Icons.location_on),
             if (profile.address.address.isNotEmpty) _readOnlyRow('Address', profile.address.address),
             if (profile.address.province.isNotEmpty) _readOnlyRow('Province', profile.address.province),
             if (profile.address.postalCode.isNotEmpty) _readOnlyRow('Postal Code', profile.address.postalCode),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('School', Icons.school_outlined),
             if (profile.school.schoolName.isNotEmpty) _readOnlyRow('School', profile.school.schoolName),
             if (profile.school.currentGrade.isNotEmpty) _readOnlyRow('Current Grade', profile.school.currentGrade),
 
             if (profile.results.subjects.isNotEmpty) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               _sectionHeader('Subjects & Results', Icons.assignment),
               ...profile.results.subjects.map((s) =>
                 Padding(
@@ -130,18 +130,18 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               ),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('Your Choices', Icons.edit),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             InkWell(
               onTap: () => _showFacultyPicker(uni.faculties),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
@@ -159,16 +159,16 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             InkWell(
               onTap: () => _showCoursePicker(profile),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
@@ -186,7 +186,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _studyMode,
               decoration: _inputDecoration('Study Mode'),
@@ -196,9 +196,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               onChanged: (v) => setState(() => _studyMode = v ?? 'Full-Time'),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _sectionHeader('Declaration', Icons.check_circle_outline),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             CheckboxListTile(
               value: _agreed,
               onChanged: (v) => setState(() => _agreed = v ?? false),
@@ -209,7 +209,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               controlAffinity: ListTileControlAffinity.leading,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -225,7 +225,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 28),
           ],
         ),
           ),
@@ -239,9 +239,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
     hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 10),
     filled: true,
     fillColor: AppColors.surfaceLight,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       borderSide: BorderSide.none,
     ),
   );
@@ -256,11 +256,11 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(4))),
+          const SizedBox(height: 11),
           const Text('Select Faculty', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 400),
             child: ListView(
@@ -275,7 +275,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               )).toList(),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 11),
         ],
       ),
     );
@@ -309,11 +309,11 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               expand: false,
               builder: (ctx, scrollCtrl) => Column(
                 children: [
-                  const SizedBox(height: 12),
-                  Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(4))),
+                  const SizedBox(height: 11),
                   const Text('Select Course / Programme', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: TextField(
@@ -394,7 +394,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
     return Row(
       children: [
         Icon(icon, size: 16, color: AppColors.primaryLight),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
       ],
     );

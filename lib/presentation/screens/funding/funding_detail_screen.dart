@@ -24,7 +24,7 @@ class FundingDetailScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: Text(bursary.name)),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -37,17 +37,17 @@ class FundingDetailScreen extends StatelessWidget {
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(bursary.provider,
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 10)),
                     if (bursary.coverage.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 11),
                       const Text('Coverage',
                           style: TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(bursary.coverage,
                           style: const TextStyle(
                               color: AppColors.textSecondary, fontSize: 9)),
@@ -55,7 +55,7 @@ class FundingDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,14 +64,14 @@ class FundingDetailScreen extends StatelessWidget {
                         style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(bursary.description,
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 9)),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,24 +80,24 @@ class FundingDetailScreen extends StatelessWidget {
                         style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(bursary.eligibility,
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 9)),
                     if (bursary.fieldsOfStudy.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       const Text('Fields of Study',
                           style: TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       ...bursary.fieldsOfStudy.map((f) => Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Row(
                               children: [
                                 const Icon(Icons.check_circle_outline,
                                     size: 14, color: AppColors.success),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Text(f,
                                     style: const TextStyle(
                                         color: AppColors.textSecondary,
@@ -107,12 +107,12 @@ class FundingDetailScreen extends StatelessWidget {
                           )),
                     ],
                     if (bursary.deadline != null) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           const Icon(Icons.calendar_today_outlined,
                               size: 16, color: AppColors.warning),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Text(
                             'Deadline: ${bursary.deadline!.day}/${bursary.deadline!.month}/${bursary.deadline!.year}',
                             style: const TextStyle(
@@ -125,7 +125,7 @@ class FundingDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 17),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -135,7 +135,7 @@ class FundingDetailScreen extends StatelessWidget {
                 ),
               ),
               if (bursary.website.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(

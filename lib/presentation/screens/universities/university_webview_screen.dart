@@ -21,13 +21,13 @@ class UniversityWebViewScreen extends StatelessWidget {
         appBar: AppBar(title: Text(universityName)),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(17),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Open application portal in a new tab',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 FilledButton.icon(
                   onPressed: () async {
                     final uri = Uri.parse(url);

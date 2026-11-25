@@ -46,7 +46,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
         appBar: AppBar(title: const Text('Application Helper')),
         body: const Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: EdgeInsets.all(17),
             child: Text('No profile found. Go to My Profile and complete your details first.\n\nThen come back here.',
                 textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
           ),
@@ -56,29 +56,29 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.universityName} — Copy & Paste')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Tap a field to copy it, then paste into the university form.',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             if (profile.onboardingComplete)
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Row(
                   children: [
                     Icon(Icons.check_circle, size: 14, color: AppColors.success),
-                    SizedBox(width: 6),
+                    SizedBox(width: 4),
                     Text('Profile complete', style: TextStyle(fontSize: 11, color: AppColors.success)),
                   ],
                 ),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             _section('Personal', [
               _field(context, profile.personal.title, 'Title'),
               _field(context, profile.personal.firstName, 'First Name'),
@@ -143,13 +143,13 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
               _field(context, profile.qualification.studyMode, 'Study Mode'),
             ]),
             if (profile.results.subjects.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               const Text('Subjects', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               ...profile.results.subjects.map((s) =>
                 _field(context, s.subject, s.grade, trailing: '${s.result} ${s.symbol}')),
             ],
-            const SizedBox(height: 40),
+            const SizedBox(height: 28),
           ],
         ),
       ),
@@ -160,17 +160,17 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(title, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primary)),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         ...children,
       ],
     );
@@ -186,7 +186,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
         );
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Row(
           children: [
             SizedBox(

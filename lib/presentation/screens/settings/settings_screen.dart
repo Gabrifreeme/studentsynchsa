@@ -20,14 +20,14 @@ class SettingsScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('Settings')),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           children: [
             // Student Preferences
             const SectionHeader(title: 'STUDENT PREFERENCES'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -35,7 +35,7 @@ class SettingsScreen extends ConsumerWidget {
                       'Choose your dominant thumb for sidebar placement:',
                       style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -47,7 +47,7 @@ class SettingsScreen extends ConsumerWidget {
                             onTap: () => ref.read(sidebarProvider.notifier).setPosition(SidebarPosition.left),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _ThumbOption(
                             emoji: '👉',
@@ -63,9 +63,9 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const SectionHeader(title: 'ACCOUNT'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Column(
                 children: [
@@ -81,9 +81,9 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const SectionHeader(title: 'STORAGE'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Column(
                 children: [
@@ -96,9 +96,9 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const SectionHeader(title: 'SYNC'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Column(
                 children: [
@@ -116,9 +116,9 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
             const SectionHeader(title: 'ABOUT'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Column(
                 children: [
@@ -128,17 +128,17 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.shield_outlined, color: AppColors.success, size: 18),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         const Text('Privacy Status',
                             style: TextStyle(
                                 fontSize: 10,
@@ -146,15 +146,15 @@ class SettingsScreen extends ConsumerWidget {
                                 color: AppColors.textPrimary)),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     const Text(
                       'All data is processed on-device. Nothing is sent to external servers.',
                       style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     InkWell(
                       onTap: () => context.push('/privacy'),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       child: Row(
                         children: [
                           const Text('Full Privacy Notice',
@@ -162,7 +162,7 @@ class SettingsScreen extends ConsumerWidget {
                                   fontSize: 9,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w500)),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 3),
                           Icon(Icons.open_in_new, size: 14, color: AppColors.primary),
                         ],
                       ),
@@ -278,10 +278,10 @@ class _ThumbOption extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
             width: selected ? 2 : 1,
@@ -290,14 +290,14 @@ class _ThumbOption extends StatelessWidget {
         child: Column(
           children: [
             Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(label,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: selected ? AppColors.primary : AppColors.textPrimary,
                 )),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(subtitle,
                 style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
           ],

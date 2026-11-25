@@ -55,7 +55,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     title: 'No notifications yet',
                     subtitle: 'You\'ll see updates about deadlines, applications, and sync status here')
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(11),
                     itemCount: _notifications.length,
                     itemBuilder: (_, i) {
                       final n = _notifications[i] as dynamic;
@@ -67,7 +67,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               await NotificationService.markAsRead(n.id);
                               _load();
                             },
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(11),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -78,7 +78,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     color: n.read
                                         ? AppColors.surfaceLight
                                         : AppColors.primary.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     _iconForType(n.type),
@@ -88,7 +88,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     size: 20,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -106,7 +106,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                           fontSize: 10,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       Text(
                                         n.body ?? '',
                                         style: const TextStyle(
@@ -116,7 +116,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       Text(
                                         DateFormat('MMM d, HH:mm')
                                             .format(n.createdAt as DateTime),

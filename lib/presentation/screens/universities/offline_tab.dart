@@ -25,10 +25,10 @@ class _GuideCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: () => openAsset('assets/offline/guide.html'),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           child: Row(
             children: [
               Container(
@@ -36,11 +36,11 @@ class _GuideCard extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.menu_book_rounded, color: AppColors.primary, size: 24),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,7 +49,7 @@ class _GuideCard extends StatelessWidget {
                       'University Offline Guide',
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       'Fees, deadlines, applications, accommodation, student life — all in one place',
                       style: TextStyle(fontSize: 9, color: AppColors.textSecondary),

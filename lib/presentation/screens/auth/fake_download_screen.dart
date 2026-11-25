@@ -236,10 +236,10 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
           color: Colors.black54,
           child: Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFA500),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(11),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFFA500).withValues(alpha: 0.4),
@@ -266,10 +266,10 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
     return GestureDetector(
       onTap: togglePause,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: const Color(0xFF0D0D0D).withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0xFF995C00)),
         ),
         child: Icon(
@@ -321,7 +321,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF0D0D0D),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(11),
               border: Border.all(color: const Color(0xFF995C00), width: 1.5),
               boxShadow: [
                 BoxShadow(
@@ -335,7 +335,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                   decoration: const BoxDecoration(
                     color: Color(0xFF141414),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -344,13 +344,13 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                     children: [
                       Container(width: 12, height: 12,
                           decoration: const BoxDecoration(color: Color(0xFFFF5F57), shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Container(width: 12, height: 12,
                           decoration: const BoxDecoration(color: Color(0xFFFEBC2E), shape: BoxShape.circle)),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Container(width: 12, height: 12,
                           decoration: const BoxDecoration(color: Color(0xFF28C840), shape: BoxShape.circle)),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 11),
                       const Text('sssa.4me',
                           style: TextStyle(color: Color(0xFF995C00), fontSize: 9, fontWeight: FontWeight.w500)),
                     ],
@@ -364,18 +364,18 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                         width: 64, height: 64,
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFA500).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(13),
                         ),
                         child: const Icon(Icons.download_rounded, color: Color(0xFFFFA500), size: 32),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 17),
                       Column(
                         children: [
                           Text(
                             _isComplete ? 'Download complete!' : 'Downloading LibSyncStudent...',
                             style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
                             _isComplete ? 'Ready to launch' : '${(_progress * 100).round()}% complete',
                             style: TextStyle(
@@ -385,14 +385,14 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 17),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Container(
                           height: 32,
                           decoration: BoxDecoration(
                             color: const Color(0xFF000000),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: const Color(0xFF995C00)),
                           ),
                           child: FractionallySizedBox(
@@ -409,7 +409,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                         ),
                       ),
                       if (_speechText.isNotEmpty && !_isComplete) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
                         TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0, end: 1),
                           duration: const Duration(milliseconds: 300),
@@ -419,10 +419,10 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                               scale: 0.9 + v * 0.1,
                               child: Container(
                                 constraints: const BoxConstraints(maxWidth: 260),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF995C00),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: const Color(0xFF3B3F4E)),
                                 ),
                                 child: Text(_speechText,
@@ -433,7 +433,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                         ),
                       ],
                       if (_isComplete) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
                         TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0, end: 1),
                           duration: const Duration(milliseconds: 400),
@@ -443,7 +443,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.check_circle, color: const Color(0xFF00FF88), size: 20 + v * 4),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Text('LibSyncStudent downloaded!',
                                     style: TextStyle(color: const Color(0xFF00FF88), fontSize: 11, fontWeight: FontWeight.w700)),
                               ],
@@ -526,10 +526,10 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
             scale: v,
             child: Container(
               constraints: const BoxConstraints(maxWidth: 192),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: const Color(0xFF995C00),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF3B3F4E)),
               ),
               child: const Text(

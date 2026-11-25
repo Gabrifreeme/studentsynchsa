@@ -12,7 +12,7 @@ class ChatScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('Community Chat')),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           children: [
             AppCard(
               onTap: () => _showComingSoon(context),
@@ -26,7 +26,7 @@ class ChatScreen extends StatelessWidget {
                     color: AppColors.textMuted),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               onTap: () => _showComingSoon(context),
               child: const ListTile(
@@ -40,7 +40,7 @@ class ChatScreen extends StatelessWidget {
                     color: AppColors.textMuted),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             AppCard(
               onTap: () => _showComingSoon(context),
               child: const ListTile(
@@ -68,7 +68,7 @@ class ChatScreen extends StatelessWidget {
         title: const Row(
           children: [
             StarAvatar(size: 24),
-            SizedBox(width: 8),
+            SizedBox(width: 6),
             Text('Coming Soon', style: TextStyle(color: AppColors.textPrimary)),
           ],
         ),

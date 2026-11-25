@@ -86,7 +86,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                                 color: AppColors.textPrimary,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text('All ${universities.length} SA public universities',
                             style: const TextStyle(
                                 color: AppColors.textSecondary,
@@ -95,7 +95,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (_) => setState(() {}),
@@ -112,7 +112,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         fillColor: AppColors.card,
                         contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -136,19 +136,19 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                             backgroundColor: AppColors.surfaceLight,
                             checkmarkColor: AppColors.background,
                             side: BorderSide.none,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             onSelected: (_) => setState(() => _selectedProvince = p),
                           ),
                         );
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: filtered.isEmpty
                         ? const Center(child: Text('No universities found', style: TextStyle(color: AppColors.textMuted)))
                         : GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               mainAxisExtent: 118,

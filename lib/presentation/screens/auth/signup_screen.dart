@@ -98,7 +98,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             const Text(
                               'Fill in your details to get started',
                               style: TextStyle(
@@ -181,7 +181,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 11),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

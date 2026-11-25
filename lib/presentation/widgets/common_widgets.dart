@@ -192,12 +192,12 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 64, color: AppColors.textMuted),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
             Text(
               title,
               style: const TextStyle(
@@ -208,7 +208,7 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             if (subtitle.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 subtitle,
                 style: const TextStyle(
@@ -254,7 +254,7 @@ class SyncStatusBadge extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
+        const SizedBox(width: 3),
         Text(
           status == 'syncing' ? 'Syncing...' : status[0].toUpperCase() + status.substring(1),
           style: TextStyle(color: color, fontSize: 11),

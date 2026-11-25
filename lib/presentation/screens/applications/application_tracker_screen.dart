@@ -48,7 +48,7 @@ class _ApplicationTrackerScreenState
                 await Future.delayed(const Duration(milliseconds: 300));
               },
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(11),
                 itemCount: apps.length,
                 itemBuilder: (_, i) => _buildAppCard(apps[i]),
               ),
@@ -85,24 +85,24 @@ class _ApplicationTrackerScreenState
               ],
             ),
             if (app.course.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(app.course,
                   style: const TextStyle(
                       color: AppColors.textSecondary, fontSize: 9)),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 _InfoChip(Icons.monetization_on_outlined,
                     app.feePaid ? 'Fee Paid' : 'Fee Not Paid',
                     app.feePaid),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 _InfoChip(Icons.assignment_outlined,
                     app.nbtCompleted ? 'NBT Done' : 'NBT Pending',
                     app.nbtCompleted),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -147,7 +147,7 @@ class _ApplicationTrackerScreenState
                 decoration: const InputDecoration(labelText: 'University Name'),
                 validator: (v) => v?.isEmpty == true ? 'Required' : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: courseCtrl,
                 decoration: const InputDecoration(labelText: 'Course / Programme'),
@@ -206,13 +206,13 @@ class _ApplicationTrackerScreenState
                     decoration:
                         const InputDecoration(labelText: 'University Name'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: courseCtrl,
                     decoration:
                         const InputDecoration(labelText: 'Course / Programme'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   DropdownButtonFormField<ApplicationStatus>(
                     initialValue: status,
                     decoration: const InputDecoration(labelText: 'Status'),
@@ -223,7 +223,7 @@ class _ApplicationTrackerScreenState
                     onChanged: (v) =>
                         setDialogState(() => status = v ?? status),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   CheckboxListTile(
                     title: const Text('Application Fee Paid'),
                     value: feePaid,
@@ -288,10 +288,10 @@ class _StatusChip extends StatelessWidget {
         color = AppColors.textMuted;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(status.label,
           style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -308,11 +308,11 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: (active ? AppColors.success : AppColors.textMuted)
             .withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -320,7 +320,7 @@ class _InfoChip extends StatelessWidget {
           Icon(icon,
               size: 12,
               color: active ? AppColors.success : AppColors.textMuted),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(label,
               style: TextStyle(
                   color: active ? AppColors.success : AppColors.textMuted,

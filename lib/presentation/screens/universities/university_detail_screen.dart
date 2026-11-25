@@ -68,7 +68,7 @@ class UniversityDetailScreen extends ConsumerWidget {
           title: Text(uni.shortName),
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -76,15 +76,15 @@ class UniversityDetailScreen extends ConsumerWidget {
               _SparkleStar(
                 onTap: () => _launchUniv(context),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
 
               // Fee + NBT info
               _infoChip(Icons.monetization_on_outlined,
                 'Application Fee: R ${uni.hasApplicationFee ? uni.applicationFee?.toStringAsFixed(0) ?? '' : '0'}'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _infoChip(Icons.assignment_outlined,
                 'NBT: ${uni.requiresNbt ? "Required" : "Not Required"}'),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
 
               // Offline Resources
               AppCard(
@@ -92,17 +92,17 @@ class UniversityDetailScreen extends ConsumerWidget {
                   children: [
                     OfflineTab(universityId: uni.id),
                     if (_uniImages.containsKey(uni.id)) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Image.asset(_uniImages[uni.id]![0],
                             width: double.infinity,
                             height: 90,
                             fit: BoxFit.contain),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Image.asset(_uniImages[uni.id]![1],
                             width: double.infinity,
                             height: 90,
@@ -112,7 +112,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 11),
 
               // Header (logo + name, location, description below)
               AppCard(
@@ -122,14 +122,14 @@ class UniversityDetailScreen extends ConsumerWidget {
                     Row(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           child: Image.asset(
                             'assets/images/${uni.id}_logo.png',
                             width: 48, height: 48, fit: BoxFit.contain,
-                            errorBuilder: (_, _, _) => const SizedBox(width: 48),
+                            errorBuilder: (_, _, _) => const SizedBox(width: 34),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(uni.name,
                               style: const TextStyle(
@@ -139,18 +139,18 @@ class UniversityDetailScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         const Icon(Icons.location_on_outlined,
                             size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Text(uni.province,
                             style: const TextStyle(color: AppColors.textSecondary)),
                       ],
                     ),
                     if (uni.description.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Text(uni.description,
                           style: const TextStyle(
                               color: AppColors.textSecondary, fontSize: 9)),
@@ -171,13 +171,13 @@ class UniversityDetailScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.starGold),
-          const SizedBox(width: 10),
+          const SizedBox(width: 7),
           Flexible(
             child: Text(label,
                 style: const TextStyle(
@@ -262,9 +262,9 @@ class _SparkleStarState extends State<_SparkleStar>
           },
           child: Material(
             color: AppColors.primary,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(11),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(11),
               onTap: () {
                 if (!_controller.isAnimating) {
                   _controller.forward(from: 0);
@@ -274,7 +274,7 @@ class _SparkleStarState extends State<_SparkleStar>
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(11),
                   gradient: const LinearGradient(
                     colors: [AppColors.primary, AppColors.primaryDark],
                     begin: Alignment.topLeft,
@@ -293,7 +293,7 @@ class _SparkleStarState extends State<_SparkleStar>
                   children: [
                     Text('✨',
                         style: TextStyle(fontSize: 14)),
-                    SizedBox(width: 10),
+                    SizedBox(width: 7),
                     Text(
                       'Apply Now',
                       style: TextStyle(

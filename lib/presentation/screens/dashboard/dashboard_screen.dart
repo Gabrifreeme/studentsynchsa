@@ -36,13 +36,13 @@ class DashboardScreen extends ConsumerWidget {
                 : MediaQuery.of(context).size.width * 0.7,
             ),
             child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Column(
             children: [
               _buildStarCta(context, firstName),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
               _PrivacyConsentBanner(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
               _buildTileGrid(context, isRight, ref),
             ],
           ),
@@ -61,7 +61,7 @@ class DashboardScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
@@ -74,7 +74,7 @@ class DashboardScreen extends ConsumerWidget {
               ),
               child: const StarAvatar(size: 64, pulse: true),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'Welcome, $firstName!',
               style: const TextStyle(
@@ -84,7 +84,7 @@ class DashboardScreen extends ConsumerWidget {
                 letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             const Text(
               'Tap the Star to begin',
               style: TextStyle(
@@ -180,7 +180,7 @@ class DashboardScreen extends ConsumerWidget {
             label: const Text('Exit'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(120, 34),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
               textStyle: const TextStyle(fontSize: 9),
               side: const BorderSide(color: AppColors.primary),
             ),
@@ -223,11 +223,11 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
     if (!_initialized || _consented) return const SizedBox.shrink();
 
     return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
       child: Row(
         children: [
           Icon(Icons.info_outline, color: AppColors.starGold, size: 16),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(
             child: GestureDetector(
               onTap: () => context.push('/privacy'),

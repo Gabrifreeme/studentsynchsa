@@ -435,11 +435,11 @@ if (link) {
           // Header
           Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               children: [
                 const Text('📋', style: TextStyle(fontSize: 11)),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 const Expanded(
                   child: Text(
                     'My Profile',
@@ -450,7 +450,7 @@ if (link) {
                   ),
                 ),
                 _buildStatusChip(),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 // Fill All — long-press opens field debug scanner
                 GestureDetector(
                   onLongPress: _showFieldDebug,
@@ -475,7 +475,7 @@ if (link) {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
+                            borderRadius: BorderRadius.circular(11)),
                       ),
                     ),
                   ),
@@ -488,16 +488,16 @@ if (link) {
           Expanded(
             child: ListView(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               children: [
                 for (final sec in _sections) ...[
                   _buildSectionHeader(sec.label),
                   const SizedBox(height: 2),
                   for (final f in sec.fields) ...[
                     _buildFieldRow(f.$1, f.$2),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                   ],
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                 ],
               ],
             ),
@@ -521,10 +521,10 @@ if (link) {
   }
 
   Widget _chip(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(7),
         ),
         child: Text(label,
             style: TextStyle(color: color, fontSize: 11)),
@@ -553,7 +553,7 @@ if (link) {
     return GestureDetector(
       onTap: hasValue ? () => _injectField(oapName, raw) : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: BoxDecoration(
           color: filled
               ? Colors.green.withValues(alpha: 0.08)

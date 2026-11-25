@@ -113,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       'Powered by ACEsi',
                       style: const TextStyle(
@@ -140,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             const Text(
                               'Sign in to continue',
                               style: TextStyle(
@@ -182,7 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               validator: (v) =>
                                   v?.isEmpty == true ? 'Enter your password' : null,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
@@ -239,7 +239,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             SizedBox(
                               height: 42,
                               child: OutlinedButton.icon(
@@ -265,7 +265,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 11),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

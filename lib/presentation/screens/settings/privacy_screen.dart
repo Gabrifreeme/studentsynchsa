@@ -12,7 +12,7 @@ class PrivacyScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('Privacy & Compliance')),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(11),
           children: [
             // 1. Privacy Commitment
             _Section(
@@ -23,7 +23,7 @@ class PrivacyScreen extends StatelessWidget {
                 'Your data stays on your device by default. When you apply, information is shared only with the institution you choose. This notice explains what we collect, why, and your rights.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // 2. Data Rights Requests
             _Section(
@@ -40,7 +40,7 @@ class PrivacyScreen extends StatelessWidget {
                 'To exercise any of these rights, email us at privacy@studentsyncsa.app. We will respond within 72 hours.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // 3. Cookies & Tracking
             _Section(
@@ -52,7 +52,7 @@ class PrivacyScreen extends StatelessWidget {
                 'Third-party links (university websites, bursary portals) have their own cookie policies. We recommend reviewing them separately.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // 4. Data Security
             _Section(
@@ -66,7 +66,7 @@ class PrivacyScreen extends StatelessWidget {
                 'Regular Audits: We review our data practices regularly to ensure compliance with POPIA and evolving privacy best practices.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // 5. Contact Point
             _Section(
@@ -79,14 +79,14 @@ class PrivacyScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 12),
                 child: AppCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _ContactLine(label: 'Data Protection', value: 'Privacy Team'),
                         _ContactLine(label: 'Email', value: 'privacy@studentsyncsa.app'),
                         _ContactLine(label: 'Response time', value: 'Within 72 hours'),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         const Text(
                           'Or use the Settings → Clear All Local Data option to remove all stored information immediately.',
                           style: TextStyle(fontSize: 9, color: AppColors.textMuted),
@@ -97,7 +97,7 @@ class PrivacyScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Consent Banners & Granular Options
             _Section(
@@ -113,7 +113,7 @@ class PrivacyScreen extends StatelessWidget {
                 'Each option will default to off. You can change your choices at any time from Settings.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Privacy-by-Design
             _Section(
@@ -126,7 +126,7 @@ class PrivacyScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: AppCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -142,7 +142,7 @@ class PrivacyScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Implementation Patterns
             _Section(
@@ -155,7 +155,7 @@ class PrivacyScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: AppCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -169,7 +169,7 @@ class PrivacyScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Data Processing Agreements
             _Section(
@@ -181,7 +181,7 @@ class PrivacyScreen extends StatelessWidget {
                 'If future features introduce third-party services (e.g., cloud backup providers), we will publish Data Processing Agreements (DPAs) here and notify you before any data leaves your device.',
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Records of Processing
             _Section(
@@ -194,7 +194,7 @@ class PrivacyScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: AppCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -210,7 +210,7 @@ class PrivacyScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Data Retention (detailed)
             _Section(
@@ -223,7 +223,7 @@ class PrivacyScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: AppCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -233,7 +233,7 @@ class PrivacyScreen extends StatelessWidget {
                         _RetentionRow('Submitted applications', 'Until you delete or request removal'),
                         _RetentionRow('Document uploads', 'Until deleted'),
                         _RetentionRow('Usage analytics', 'Aggregated only, no personal data'),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         const Text(
                           'Disposal: when you clear data via Settings or uninstall the app, all stored information is permanently deleted. No residual copies are retained. For deletion requests, email privacy@studentsyncsa.app — we will confirm within 72 hours.',
                           style: TextStyle(fontSize: 9, color: AppColors.textMuted, height: 1.4),
@@ -244,7 +244,7 @@ class PrivacyScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 11),
 
             // Student Data & Consent
             _Section(
@@ -256,7 +256,7 @@ class PrivacyScreen extends StatelessWidget {
                 'We do not sell, rent, or trade your personal information to third parties. Your data is used exclusively for the purpose of facilitating your educational applications.',
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 17),
           ],
         ),
       ),
@@ -281,14 +281,14 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(icon, color: AppColors.primary, size: 20),
-                const SizedBox(width: 10),
+                const SizedBox(width: 7),
                 Text(
                   title,
                   style: const TextStyle(
@@ -299,7 +299,7 @@ class _Section extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ...children.map((text) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
