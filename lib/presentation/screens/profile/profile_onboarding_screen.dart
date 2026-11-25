@@ -2988,25 +2988,17 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 8),
             Row(
               children: [
-                DropdownButton<String>(
-                  value: _postalSameAsResidential ? 'Yes' : 'No',
-                  dropdownColor: AppColors.card,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                  items: const [
-                    DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                    DropdownMenuItem(value: 'No', child: Text('No')),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _postalSameAsResidential = v == 'Yes';
-                    if (_postalSameAsResidential) _postalAddressCtrl.clear();
-                  }),
-                ),
-                const SizedBox(width: 16),
                 const Text('No',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 Switch(
                   value: _postalSameAsResidential,
-                  activeColor: AppColors.primary,
+                  activeTrackColor: AppColors.primaryDark,
+                  inactiveTrackColor: AppColors.surfaceLight,
+                  hoverColor: AppColors.surfaceLight,
+                  thumbColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+                      states.contains(WidgetState.selected)
+                          ? AppColors.primary
+                          : AppColors.textSecondary),
                   onChanged: (v) => setState(() {
                     _postalSameAsResidential = v;
                     if (v) _postalAddressCtrl.clear();
