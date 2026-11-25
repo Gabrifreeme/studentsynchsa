@@ -18066,6 +18066,18 @@ html body #flutter-prompt-row {
 }
 /* Keep the last log line clear of the prompt row. */
 html body #terminal-split { padding-bottom:2px !important; }
+/* The Flutter console must never outgrow the split - otherwise it slides
+   underneath the pinned prompt row. */
+html body #flutter-console {
+  min-height:0 !important;
+  height:100% !important;
+  flex:1 1 auto !important;
+  overflow:hidden !important;
+}
+html body #flutter-console-output {
+  overflow:auto !important;
+  min-height:0 !important;
+}
 /* Hardware cards: six equal boxes filling the dashboard top to bottom. */
 html body #ace-term-dashboard {
   justify-content:stretch !important;
