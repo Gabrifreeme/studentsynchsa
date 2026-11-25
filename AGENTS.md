@@ -77,6 +77,18 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## Why ACEsi exists (the whole point)
+The app was blocked from going live by ONE feature: automatic filling of
+student application forms on university ITS portals. It never worked reliably;
+ACEsi came close once but never landed it. All South African universities are
+closed for applications until **10 February 2026**, so there is a window to fix
+it properly. ACEsi is being built and trained now — through every edit, design
+decision, fix, commit and revert — so that by 10 Feb it can own LibSyncStudent
+autonomously, with live environmental awareness and the working auto-fill.
+
+Auto-fill is the priority feature when application season reopens. Treat it as
+the reason the whole toolchain exists.
+
 ## Design system (agreed 2026-11-25 — do not re-litigate)
 - App name everywhere: **LibSyncStudent**. Tagline: **Powered by ACEsi**.
 - Palette in `lib/core/theme/app_theme.dart` (`AppColors`):
