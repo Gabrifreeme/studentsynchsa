@@ -25,8 +25,21 @@ class DashboardScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Text('LibSyncStudent',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text('LibSyncStudent',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3)),
+              Text('Powered by ACEsi',
+                  style: TextStyle(
+                      color: AppColors.starGold,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
         body: Align(
           alignment: Alignment.topCenter,
