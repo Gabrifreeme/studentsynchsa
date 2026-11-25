@@ -64,7 +64,10 @@ class UniversityDetailScreen extends ConsumerWidget {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: Text(uni.shortName)),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Text(uni.shortName),
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -194,7 +197,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 20),
 
                   // 4. Apply button centred under the image card
                   OutlinedButton.icon(
