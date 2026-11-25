@@ -10,6 +10,8 @@ import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 final _random = math.Random();
 
 
+const _bundledLogoIds = {'smu', 'ump', 'up', 'uwc'};
+
 const Map<String, List<String>> _uniImages = {
   'cput': ['assets/images/Cape.png', 'assets/images/Cape1.png'],
   'dut': ['assets/images/Durban.png', 'assets/images/Durban1.png'],
@@ -102,7 +104,9 @@ class UniversityDetailScreen extends ConsumerWidget {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
                                 child: Image.asset(
-                                  'assets/images/${uni.id}_logo.png',
+                                  (_bundledLogoIds.contains(uni.id)
+                                  ? 'assets/logos/${uni.id}.png'
+                                  : 'assets/images/${uni.id}_logo.png'),
                                   width: 40, height: 40, fit: BoxFit.contain,
                                   errorBuilder: (_, _, _) =>
                                       const SizedBox(width: 28),
