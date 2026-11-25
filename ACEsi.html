@@ -6539,8 +6539,14 @@ perspective: 900px;
         var ta = document.getElementById('ace-tab-acesi');
         var tf = document.getElementById('ace-tab-flutter');
         var showFlutter = (which === 'flutter');
-        if (flu) flu.style.display = showFlutter ? 'block' : 'none';
-        if (out) out.style.display = showFlutter ? 'none' : 'block';
+        if (flu) {
+          flu.style.display = showFlutter ? 'block' : 'none';
+          if (flu.classList) flu.classList.toggle('ace-acesi-hidden', !showFlutter);
+        }
+        if (out) {
+          out.style.display = showFlutter ? 'none' : 'block';
+          if (out.classList) out.classList.toggle('ace-flutter-hidden', showFlutter);
+        }
         if (ta) { ta.style.background = showFlutter ? '#000' : '#ffa500'; ta.style.color = showFlutter ? '#ffa500' : '#000'; }
         if (tf) { tf.style.background = showFlutter ? '#ffa500' : '#000'; tf.style.color = showFlutter ? '#000' : '#ffa500'; }
         window.__aceActiveTerminal = which;
@@ -18069,6 +18075,10 @@ html body #flutter-prompt-row {
 }
 /* Keep the last log line clear of the prompt row. */
 html body #terminal-split { padding-bottom:2px !important; }
+/* Tab visibility: older display:block !important rules keep the ACEsi output
+   visible on the Flutter tab. These class rules win and hide the inactive one. */
+html body #terminal-output.ace-flutter-hidden { display:none !important; }
+html body #flutter-console.ace-acesi-hidden { display:none !important; }
 /* The Flutter console must never outgrow the split - otherwise it slides
    underneath the pinned prompt row. */
 html body #flutter-console {
