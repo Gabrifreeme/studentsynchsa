@@ -322,9 +322,7 @@ class AppListTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          Icon(icon,
-              color: iconColor ?? AppColors.primaryLight,
-              size: AppSpaces.tileIcon),
+          StarIcon(icon, size: AppSpaces.tileIcon),
           const SizedBox(width: AppSpaces.md),
           Expanded(
             child: Column(
@@ -350,6 +348,33 @@ class AppListTile extends StatelessWidget {
               color: AppColors.textMuted, size: AppSpaces.tileChevron),
         ],
       ),
+    );
+  }
+}
+
+
+/// Icon painted with the South African Star palette. Use this for every icon
+/// so the UI keeps the same multicolour language as the Star / Google icons.
+class StarIcon extends StatelessWidget {
+  final IconData icon;
+  final double size;
+
+  const StarIcon(this.icon, {super.key, this.size = 18});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [
+          AppColors.starRed,
+          AppColors.starBlue,
+          AppColors.starGreen,
+          AppColors.starYellow,
+        ],
+        stops: [0.0, 0.34, 0.67, 1.0],
+      ).createShader(bounds),
+      blendMode: BlendMode.srcIn,
+      child: Icon(icon, size: size, color: Colors.white),
     );
   }
 }

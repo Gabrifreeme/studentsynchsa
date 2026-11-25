@@ -108,23 +108,9 @@ class DashboardScreen extends ConsumerWidget {
       }
     }
 
-    const tileColors = [
-      AppColors.primary,
-      AppColors.info,
-      AppColors.success,
-      AppColors.primaryLight,
-      AppColors.warning,
-      AppColors.error,
-      AppColors.primary,
-      AppColors.info,
-    ];
-    int colorIndex = 0;
     Widget tile(IconData icon, String label, String route) {
-      final color = tileColors[colorIndex % tileColors.length];
-      colorIndex++;
       return AppListTile(
         icon: icon,
-        iconColor: color,
         label: label,
         value: '',
         compact: true,
