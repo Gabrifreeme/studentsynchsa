@@ -51,6 +51,25 @@ It is a Flask server + single-page HTML UI.
   `/api/system/metrics`, `/history`, `/memory/*`, `/journal`, `/cdp/*`,
   `/api/last_edit`, `/context`.
 
+## Working method — "the right brain" (use this on every task)
+1. **Find the real break before fixing anything.** Ask: what is the exact
+   mechanism producing the symptom? Do not guess from how it looks.
+2. **Test the actual artifact.** For generated code (e.g. Flutter's injected
+   JS), extract the real generated output from the Dart source and run it
+   against a synthetic fixture. That is how the auto-fill bugs were found:
+   the toast said "8 fields filled" while the ID field held "South African".
+3. **Trust pixels over computed styles when they disagree.** Sample the actual
+   screenshot with PIL; a computed style can be right while the rendered line
+   is still wrong (or vice versa).
+4. **One change, one verification, one commit.** After each edit: verify,
+   commit, push, refresh golden. If wrong, revert and push the revert.
+5. **Reproduce the user's exact scene.** Screenshots are evidence. Read them
+   carefully and ask what is actually visible before changing code.
+6. **Record what was learned** in the playbook so the next session starts with
+   the answer, not the search. This is how knowledge survives a new session.
+7. **Be honest about the untested edge.** Say "verified on a synthetic form,
+   not a live portal" instead of claiming complete success.
+
 ## Working style
 - Be honest when unsure; prefer a certain small fix over a guessed broad one.
 - When a screenshot disagrees with computed styles, sample pixels to settle it.
