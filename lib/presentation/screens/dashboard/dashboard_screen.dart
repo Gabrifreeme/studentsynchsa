@@ -31,7 +31,9 @@ class DashboardScreen extends ConsumerWidget {
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
+              maxWidth: MediaQuery.of(context).size.width < 600
+                ? double.infinity
+                : MediaQuery.of(context).size.width * 0.7,
             ),
             child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
