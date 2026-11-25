@@ -16,7 +16,9 @@ String buildAutofillOnlyScript(String profileJson) {
 }
 
 String buildCompleteAutofillScript(String profileJson, {bool createStar = true}) {
-  return buildAutofillScript(profileJson);
+  // The in-page Star is intentionally disabled: auto-fill only starts when
+  // the student taps the Star in the app bar and confirms the prompt.
+  return buildAutofillOnlyScript(profileJson);
 }
 
 String _buildFullScript(String profileJson, {required bool createStar}) {

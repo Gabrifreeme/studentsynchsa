@@ -8,6 +8,7 @@ import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/services/autofill_script.dart' as star;
 import 'package:studentsyncsa/services/profile_validator.dart';
+import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class AppWebView extends StatefulWidget {
   final String url;
@@ -165,19 +166,6 @@ if (link) {
 }
 ''');
 
-          // ── Auto-fill injection: wait for the ITS form DOM, and never inject
-          // into an intermediate page that has no form fields. ──
-          await Future.delayed(const Duration(milliseconds: 1500));
-          final formCheck = (await _controller.runJavaScriptReturningResult(
-                  'document.querySelectorAll("input, select, textarea").length > 0'))
-              .toString()
-              .replaceAll('"', '');
-          if (_profile != null && formCheck == 'true') {
-            final profileJson = jsonEncode(_profile!.toJson());
-            final script = star.buildAutofillScript(profileJson);
-            await _controller.runJavaScript(script);
-            debugPrint("Autofill script injected successfully into: $url");
-          }
         },
       ))
       ..loadRequest(Uri.parse(widget.url));
@@ -278,6 +266,40 @@ if (link) {
   }
 
   // ── Fill All ──────────────────────────────────────────────────────────────
+
+
+  Future<void> _confirmAutofill() async {
+    if (_profile == null) {
+      _snack('No profile loaded yet.', isError: true);
+      return;
+    }
+    if (!mounted) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF000000),
+        title: const Text('Want me to auto fill this page for you?',
+            style: TextStyle(color: Color(0xFFFFA500), fontSize: 14)),
+        content: const Text(
+          'Some students prefer to complete fields themselves. '
+          'Nothing will be filled unless you say yes.',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Auto fill'),
+          ),
+        ],
+      ),
+    );
+    if (yes == true && mounted) _runAutofill();
+  }
 
   Future<void> _runAutofill() async {
     if (_profile == null) {
@@ -398,6 +420,13 @@ if (link) {
       appBar: AppBar(
         title: Text(widget.universityName),
         backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(
+            tooltip: 'Ask ACEsi to auto fill this page',
+            onPressed: _confirmAutofill,
+            icon: const StarIcon(Icons.auto_awesome_rounded, size: 22),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -464,7 +493,7 @@ if (link) {
                     child: ElevatedButton.icon(
                       onPressed: _autofillStatus == AutofillStatus.running
                           ? null
-                          : _runAutofill,
+                          : _confirmAutofill,
                       icon: _autofillStatus == AutofillStatus.running
                           ? const SizedBox(
                               width: 14,

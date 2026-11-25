@@ -77,6 +77,14 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## Auto-fill is OPT-IN (do not change)
+- Nothing fills automatically when a page opens.
+- A StarIcon sits top-right in the WebView app bar. Tapping it asks:
+  "Want me to auto fill this page for you?" with Not now / Auto fill.
+- The in-page floating Star created by the JS is disabled on purpose.
+- The bottom "Fill All" button also asks first.
+- Rationale: many students want to complete parts of the form themselves.
+
 ## Funding / bursary applications
 - `funding_detail_screen.dart` "Apply Now" now opens `FundingWebViewScreen`,
   which uses the same `AppWebView` + Star auto-fill as university portals
