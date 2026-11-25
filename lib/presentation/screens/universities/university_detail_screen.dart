@@ -130,6 +130,14 @@ class UniversityDetailScreen extends ConsumerWidget {
                                 Text(uni.province,
                                     style: const TextStyle(
                                         color: AppColors.textSecondary)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tap for directions',
+                                  style: TextStyle(
+                                      color: AppColors.primaryLight,
+                                      fontSize: 10,
+                                      decoration: TextDecoration.underline),
+                                ),
                               ],
                             ),
                           ),
@@ -159,27 +167,31 @@ class UniversityDetailScreen extends ConsumerWidget {
                   // 3. Image card - same width as every other card
                   if (_uniImages.containsKey(uni.id))
                     AppCard(
-                      child: Column(
+                      child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Image.asset(_uniImages[uni.id]![0],
-                                width: double.infinity,
-                                height: 80,
-                                fit: BoxFit.cover),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset(_uniImages[uni.id]![0],
+                                  width: double.infinity,
+                                  height: 120,
+                                  fit: BoxFit.cover),
+                            ),
                           ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Image.asset(_uniImages[uni.id]![1],
-                                width: double.infinity,
-                                height: 80,
-                                fit: BoxFit.cover),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset(_uniImages[uni.id]![1],
+                                  width: double.infinity,
+                                  height: 120,
+                                  fit: BoxFit.cover),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
                   // 4. Apply button centred under the image card
                   OutlinedButton.icon(
