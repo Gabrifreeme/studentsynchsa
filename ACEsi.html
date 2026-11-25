@@ -8897,7 +8897,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
           <!-- DevTool+: local-only developer utility toolkit (Lit, offline bundle) -->
           <devtool-plus-panel id="devtool-plus-panel"></devtool-plus-panel>
 
-    <div id="terminal-panel" style="display: none; flex-direction: column; height: 300px; min-height: 300px; max-height: 300px; background: #000; border-top: 1px solid #ffa500; position: relative;">
+    <div id="terminal-panel" style="display: none; flex-direction: column; height: 380px; min-height: 380px; max-height: 380px; background: #000; border-top: 1px solid #ffa500; position: relative;">
     <!-- Terminal title bar: one row, horizontally centred in the window -->
     <div id="terminal-header" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100%; padding: 4px 8px; background: #111; border-bottom: 1px solid #ffa500; flex: 0 0 auto; box-sizing: border-box;">
       <button id="ace-close-terminal-inline" type="button" onclick="if(window.closeAceTerminal)window.closeAceTerminal()" data-tooltip="Close Terminal" style="position:relative; background:#000; color:#ffa500; border:1px solid #ffa500; border-radius:6px; padding:2px 7px; font-family:inherit; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap;">Close Terminal</button>
@@ -15490,13 +15490,13 @@ window.toggleMinimize = function() {
     if (!p) return;
     
     // Check current height
-    var currentHeight = parseInt(p.style.height || '300px');
+    var currentHeight = parseInt(p.style.height || '380px');
     
     if (currentHeight <= 40) {
         // Expand
-        p.style.setProperty('height', '300px', 'important');
-        p.style.setProperty('min-height', '300px', 'important');
-        p.style.setProperty('max-height', '300px', 'important');
+        p.style.setProperty('height', '380px', 'important');
+        p.style.setProperty('min-height', '380px', 'important');
+        p.style.setProperty('max-height', '380px', 'important');
         p.style.setProperty('display', 'flex', 'important');
     } else {
         // Shrink
@@ -15510,9 +15510,9 @@ window.openAceTerminal = function() {
     var p = document.getElementById('terminal-panel');
     if (p) {
         p.style.setProperty('display', 'flex', 'important');
-        p.style.setProperty('height', '300px', 'important');
-        p.style.setProperty('min-height', '300px', 'important');
-        p.style.setProperty('max-height', '300px', 'important');
+        p.style.setProperty('height', '380px', 'important');
+        p.style.setProperty('min-height', '380px', 'important');
+        p.style.setProperty('max-height', '380px', 'important');
         p.removeAttribute('hidden');
     }
     if (!window.term && window.initAceTerminalFn) {
@@ -18051,6 +18051,9 @@ window.aceCheckForUpdates = function (install) {
 /* Keep the terminal a column flex box so the prompt row can never be pushed
    out of the panel by the older display:block !important rule. */
 html body #terminal-panel {
+  height:380px !important;
+  min-height:380px !important;
+  max-height:380px !important;
   display:flex !important;
   flex-direction:column !important;
   overflow:hidden !important;
