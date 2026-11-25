@@ -89,9 +89,9 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                       decoration: InputDecoration(
                         hintText: 'Search universities...',
                         hintStyle: const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 22),
+                        prefixIcon: const StarIcon(Icons.search_rounded, size: 22),
                         suffixIcon: IconButton(
-                          icon: const Icon(Icons.tune_rounded, color: AppColors.textMuted, size: 20),
+                          icon: const StarIcon(Icons.tune_rounded, size: 20),
                           onPressed: () {},
                         ),
                         filled: true,
@@ -120,7 +120,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                             selected: selected,
                             selectedColor: AppColors.primary,
                             backgroundColor: AppColors.surfaceLight,
-                            checkmarkColor: Colors.white,
+                            checkmarkColor: AppColors.background,
                             side: BorderSide.none,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             onSelected: (_) => setState(() => _selectedProvince = p),
@@ -208,7 +208,7 @@ class _UniversityCard extends StatelessWidget {
                             : null,
                       ),
                       child: uni.logoUrl.isEmpty
-                          ? Icon(Icons.account_balance_outlined, color: logoColor, size: 28)
+                          ? StarIcon(Icons.account_balance_outlined, size: 28)
                           : null,
                     ),
                     const SizedBox(width: 12),

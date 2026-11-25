@@ -88,9 +88,9 @@ class _FundingListScreenState extends State<FundingListScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search programmes...',
                     hintStyle: const TextStyle(color: AppColors.textMuted),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 22),
+                    prefixIcon: const StarIcon(Icons.search_rounded, size: 22),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.tune_rounded, color: AppColors.textMuted, size: 20),
+                      icon: const StarIcon(Icons.tune_rounded, size: 20),
                       onPressed: () {},
                     ),
                     filled: true,
@@ -119,12 +119,12 @@ class _FundingListScreenState extends State<FundingListScreen> {
                             style: TextStyle(
                                 fontSize: 12,
                                 color: selected
-                                    ? Colors.white
+                                    ? AppColors.background
                                     : AppColors.textSecondary)),
                         selected: selected,
                         selectedColor: AppColors.primary,
                         backgroundColor: AppColors.surfaceLight,
-                        checkmarkColor: Colors.white,
+                        checkmarkColor: AppColors.background,
                         side: BorderSide.none,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20)),
@@ -222,7 +222,7 @@ class _FundingCard extends StatelessWidget {
                         color: logoColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.school_outlined, color: logoColor, size: 24),
+                      child: StarIcon(Icons.school_outlined, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -249,8 +249,8 @@ class _FundingCard extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.open_in_new,
-                          size: 18, color: AppColors.textMuted),
+                      icon: const StarIcon(Icons.open_in_new,
+                          size: 18),
                       onPressed: onOpenLink,
                       splashRadius: 20,
                       padding: EdgeInsets.zero,

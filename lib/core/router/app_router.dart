@@ -336,11 +336,7 @@ class _SidebarItem extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: 22,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
-                ),
+                StarIcon(icon, size: 22),
                 const SizedBox(width: 14),
                 Text(
                   label,
