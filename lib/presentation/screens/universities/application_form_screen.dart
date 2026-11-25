@@ -121,9 +121,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Expanded(flex: 3, child: Text(s.subject, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
-                      Expanded(flex: 1, child: Text(s.grade, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
-                      SizedBox(width: 60, child: Text('${s.result} ${s.symbol}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                      Expanded(flex: 3, child: Text(s.subject, style: const TextStyle(fontSize: 9, color: AppColors.textPrimary))),
+                      Expanded(flex: 1, child: Text(s.grade, style: const TextStyle(fontSize: 9, color: AppColors.textSecondary))),
+                      SizedBox(width: 60, child: Text('${s.result} ${s.symbol}', style: const TextStyle(fontSize: 9, color: AppColors.textSecondary))),
                     ],
                   ),
                 ),
@@ -150,7 +150,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                         _selectedFaculty ?? 'Select Faculty',
                         style: TextStyle(
                           color: _selectedFaculty != null ? AppColors.textPrimary : AppColors.textMuted,
-                          fontSize: 14,
+                          fontSize: 10,
                         ),
                       ),
                     ),
@@ -177,7 +177,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                         _courseCtrl.text.isEmpty ? 'Course / Programme' : _courseCtrl.text,
                         style: TextStyle(
                           color: _courseCtrl.text.isNotEmpty ? AppColors.textPrimary : AppColors.textMuted,
-                          fontSize: 14,
+                          fontSize: 10,
                         ),
                       ),
                     ),
@@ -191,8 +191,8 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               initialValue: _studyMode,
               decoration: _inputDecoration('Study Mode'),
               dropdownColor: AppColors.card,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              items: _studyModes.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13)))).toList(),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 10),
+              items: _studyModes.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 9)))).toList(),
               onChanged: (v) => setState(() => _studyMode = v ?? 'Full-Time'),
             ),
 
@@ -203,7 +203,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
               value: _agreed,
               onChanged: (v) => setState(() => _agreed = v ?? false),
               title: const Text('I confirm that all the information above is correct to the best of my knowledge.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
               activeColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
@@ -236,7 +236,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 10),
     filled: true,
     fillColor: AppColors.surfaceLight,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -259,14 +259,14 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
           const SizedBox(height: 12),
           Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 16),
-          const Text('Select Faculty', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const Text('Select Faculty', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 400),
             child: ListView(
               shrinkWrap: true,
               children: faculties.map((f) => ListTile(
-                title: Text(f, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                title: Text(f, style: const TextStyle(fontSize: 10, color: AppColors.textPrimary)),
                 trailing: _selectedFaculty == f ? const Icon(Icons.check, color: AppColors.primary, size: 20) : null,
                 onTap: () {
                   setState(() => _selectedFaculty = f);
@@ -312,7 +312,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                   const SizedBox(height: 12),
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.textMuted, borderRadius: BorderRadius.circular(2))),
                   const SizedBox(height: 16),
-                  const Text('Select Course / Programme', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const Text('Select Course / Programme', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -340,7 +340,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
                             controller: scrollCtrl,
                             itemCount: filtered.length,
                             itemBuilder: (ctx, i) => ListTile(
-                              title: Text(filtered[i], style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                              title: Text(filtered[i], style: const TextStyle(fontSize: 10, color: AppColors.textPrimary)),
                               trailing: _courseCtrl.text == filtered[i] ? const Icon(Icons.check, color: AppColors.primary, size: 20) : null,
                               onTap: () {
                                 _courseCtrl.text = filtered[i];
@@ -395,7 +395,7 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       children: [
         Icon(icon, size: 16, color: AppColors.primaryLight),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
       ],
     );
   }
@@ -406,8 +406,8 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
+          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textMuted))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 9, color: AppColors.textPrimary))),
         ],
       ),
     );

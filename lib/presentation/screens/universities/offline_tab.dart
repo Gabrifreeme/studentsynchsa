@@ -47,12 +47,12 @@ class _GuideCard extends StatelessWidget {
                   children: [
                     const Text(
                       'University Offline Guide',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Fees, deadlines, applications, accommodation, student life — all in one place',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     ),
                   ],
                 ),

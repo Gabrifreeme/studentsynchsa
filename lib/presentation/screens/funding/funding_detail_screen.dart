@@ -34,13 +34,13 @@ class FundingDetailScreen extends StatelessWidget {
                   children: [
                     Text(bursary.name,
                         style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary)),
                     const SizedBox(height: 4),
                     Text(bursary.provider,
                         style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14)),
+                            color: AppColors.textSecondary, fontSize: 10)),
                     if (bursary.coverage.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       const Text('Coverage',
@@ -50,7 +50,7 @@ class FundingDetailScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(bursary.coverage,
                           style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13)),
+                              color: AppColors.textSecondary, fontSize: 9)),
                     ],
                   ],
                 ),
@@ -67,7 +67,7 @@ class FundingDetailScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(bursary.description,
                         style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
+                            color: AppColors.textSecondary, fontSize: 9)),
                   ],
                 ),
               ),
@@ -83,7 +83,7 @@ class FundingDetailScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(bursary.eligibility,
                         style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
+                            color: AppColors.textSecondary, fontSize: 9)),
                     if (bursary.fieldsOfStudy.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       const Text('Fields of Study',
@@ -101,7 +101,7 @@ class FundingDetailScreen extends StatelessWidget {
                                 Text(f,
                                     style: const TextStyle(
                                         color: AppColors.textSecondary,
-                                        fontSize: 12)),
+                                        fontSize: 9)),
                               ],
                             ),
                           )),

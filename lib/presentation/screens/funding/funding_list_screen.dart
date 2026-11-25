@@ -69,13 +69,13 @@ class _FundingListScreenState extends State<FundingListScreen> {
                     const Text('Funding & Bursaries',
                         style: TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 26,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     Text('${bursaries.length} programmes available',
                         style: const TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 14)),
+                            fontSize: 10)),
                   ],
                 ),
               ),
@@ -84,7 +84,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (_) => setState(() {}),
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 10),
                   decoration: InputDecoration(
                     hintText: 'Search programmes...',
                     hintStyle: const TextStyle(color: AppColors.textMuted),
@@ -117,7 +117,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                       child: FilterChip(
                         label: Text(t,
                             style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 9,
                                 color: selected
                                     ? AppColors.background
                                     : AppColors.textSecondary)),
@@ -227,7 +227,7 @@ class _FundingCard extends StatelessWidget {
                 child: Text(b.name,
                     style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 12,
+                        fontSize: 9,
                         fontWeight: FontWeight.w700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),

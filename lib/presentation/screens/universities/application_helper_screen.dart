@@ -61,7 +61,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Tap a field to copy it, then paste into the university form.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
             const SizedBox(height: 8),
             if (profile.onboardingComplete)
               Container(
@@ -144,7 +144,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
             ]),
             if (profile.results.subjects.isNotEmpty) ...[
               const SizedBox(height: 8),
-              const Text('Subjects', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              const Text('Subjects', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
               ...profile.results.subjects.map((s) =>
                 _field(context, s.subject, s.grade, trailing: '${s.result} ${s.symbol}')),
@@ -168,7 +168,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
             color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+          child: Text(title, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primary)),
         ),
         const SizedBox(height: 4),
         ...children,
@@ -194,7 +194,7 @@ class _ApplicationHelperScreenState extends State<ApplicationHelperScreen> {
               child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ),
             Expanded(
-              child: Text(value, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+              child: Text(value, style: const TextStyle(fontSize: 9, color: AppColors.textPrimary)),
             ),
             if (trailing != null)
               Padding(

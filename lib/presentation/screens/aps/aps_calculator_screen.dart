@@ -66,20 +66,20 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
               child: Column(
                 children: [
                   const Text('Your APS Score',
-                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      style: TextStyle(color: Colors.white70, fontSize: 10)),
                   const SizedBox(height: 8),
                   Text(
                     '$_aps',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 56,
+                      fontSize: 39,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Based on ${_subjectsCounted()} subjects',
-                    style: const TextStyle(color: Colors.white60, fontSize: 12),
+                    style: const TextStyle(color: Colors.white60, fontSize: 9),
                   ),
                   const SizedBox(height: 12),
                   _apsBars(),
@@ -146,11 +146,11 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
               flex: 3,
               child: DropdownButtonFormField<String>(
                 initialValue: subject.name.isEmpty ? null : subject.name,
-                hint: const Text('Subject', style: TextStyle(fontSize: 13)),
+                hint: const Text('Subject', style: TextStyle(fontSize: 9)),
                 items: AppConstants.subjects
                     .map((s) => DropdownMenuItem(
                         value: s,
-                        child: Text(s, style: const TextStyle(fontSize: 12))))
+                        child: Text(s, style: const TextStyle(fontSize: 9))))
                     .toList(),
                 onChanged: (v) {
                   if (v != null) {
@@ -184,7 +184,7 @@ class _ApsCalculatorScreenState extends State<ApsCalculatorScreen> {
               style: const TextStyle(
                 color: AppColors.primaryLight,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 11,
               ),
             ),
             IconButton(

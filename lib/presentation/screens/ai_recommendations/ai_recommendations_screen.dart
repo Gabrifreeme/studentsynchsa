@@ -347,7 +347,7 @@ class _ChatBubble extends StatelessWidget {
                     message.text,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 14,
+                      fontSize: 10,
                       height: 1.5,
                     ),
                   ),

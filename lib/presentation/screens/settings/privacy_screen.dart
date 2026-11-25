@@ -89,7 +89,7 @@ class PrivacyScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         const Text(
                           'Or use the Settings → Clear All Local Data option to remove all stored information immediately.',
-                          style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          style: TextStyle(fontSize: 9, color: AppColors.textMuted),
                         ),
                       ],
                     ),
@@ -236,7 +236,7 @@ class PrivacyScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         const Text(
                           'Disposal: when you clear data via Settings or uninstall the app, all stored information is permanently deleted. No residual copies are retained. For deletion requests, email privacy@studentsyncsa.app — we will confirm within 72 hours.',
-                          style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+                          style: TextStyle(fontSize: 9, color: AppColors.textMuted, height: 1.4),
                         ),
                       ],
                     ),
@@ -292,7 +292,7 @@ class _Section extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
@@ -305,7 +305,7 @@ class _Section extends StatelessWidget {
               child: Text(
                 text,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 9,
                   color: AppColors.textSecondary,
                   height: 1.5,
                 ),
@@ -334,13 +334,13 @@ class _ContactLine extends StatelessWidget {
             width: 110,
             child: Text(label,
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 9,
                     color: AppColors.textMuted)),
           ),
           Expanded(
             child: Text(value,
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 9,
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500)),
           ),
@@ -363,12 +363,12 @@ class _Bullet extends StatelessWidget {
         children: [
           const Text('• ',
               style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 9,
                   color: AppColors.textMuted)),
           Expanded(
             child: Text(text,
                 style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 9,
                     color: AppColors.textSecondary,
                     height: 1.4)),
           ),
@@ -394,13 +394,13 @@ class _RetentionRow extends StatelessWidget {
             width: 130,
             child: Text(category,
                 style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 9,
                     color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(period,
                 style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 9,
                     color: AppColors.textMuted)),
           ),
         ],
@@ -423,13 +423,13 @@ class _PrincipleRow extends StatelessWidget {
         children: [
           Text(title,
               style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 9,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary)),
           const SizedBox(height: 2),
           Text(description,
               style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 9,
                   color: AppColors.textSecondary,
                   height: 1.4)),
         ],

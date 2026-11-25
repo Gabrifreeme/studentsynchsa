@@ -2208,7 +2208,7 @@ class _ProfileOnboardingScreenState
                             dense: true,
                             selected: selected == item,
                             selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
-                            title: Text(display, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
+                            title: Text(display, style: const TextStyle(fontSize: 10, color: AppColors.textPrimary)),
                             onTap: () {
                               Navigator.pop(ctx, item);
                             },
@@ -2461,7 +2461,7 @@ class _ProfileOnboardingScreenState
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 20,
+                          fontSize: 14,
                           height: 1.6,
                         ),
                       ),
@@ -2476,7 +2476,7 @@ class _ProfileOnboardingScreenState
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 32, vertical: 16),
-                            textStyle: const TextStyle(fontSize: 16),
+                            textStyle: const TextStyle(fontSize: 11),
                           ),
                         ),
                     ],
@@ -2520,7 +2520,7 @@ class _ProfileOnboardingScreenState
                   'Step ${_currentPage + 1} of 7',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 12,
+                    fontSize: 9,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2584,7 +2584,7 @@ class _ProfileOnboardingScreenState
         ),
         content: Text(
           tips[_currentPage.clamp(0, tips.length - 1)],
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, height: 1.5),
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 10, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -2607,11 +2607,11 @@ class _ProfileOnboardingScreenState
             const Text('Personal Details',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text("Let's get to know you",
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
             const SizedBox(height: 20),
             // Title + Initials
             Row(
@@ -2756,11 +2756,11 @@ class _ProfileOnboardingScreenState
             const Text('Citizenship & Demographics',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text('For South African universities',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
             const SizedBox(height: 20),
             // Citizenship
             DropdownButtonFormField<String>(
@@ -2859,11 +2859,11 @@ class _ProfileOnboardingScreenState
             const Text('Contact Details',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text('How universities can reach you',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
             const SizedBox(height: 20),
             // Email
             TextFormField(
@@ -2905,11 +2905,11 @@ class _ProfileOnboardingScreenState
             const Text('Residential Address',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text('Where you live',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
             const SizedBox(height: 20),
             // Street Address
             TextFormField(
@@ -2983,13 +2983,13 @@ class _ProfileOnboardingScreenState
             // Postal Address: question + dropdown + switch
             const Text(
               'Is your Postal Address the same as your Street Address?',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 9),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
                 const Text('No',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
                 Switch(
                   value: _postalSameAsResidential,
                   onChanged: (v) => setState(() {
@@ -2998,7 +2998,7 @@ class _ProfileOnboardingScreenState
                   }),
                 ),
                 const Text('Yes',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
               ],
             ),
             const SizedBox(height: 8),
@@ -3036,7 +3036,7 @@ class _ProfileOnboardingScreenState
             const Text('Additional Information',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 18,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             // Disability
@@ -3109,7 +3109,7 @@ class _ProfileOnboardingScreenState
             const Text('Personal and Contact Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextFormField(
@@ -3153,7 +3153,7 @@ class _ProfileOnboardingScreenState
             const Text('Address Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextFormField(
@@ -3222,7 +3222,7 @@ class _ProfileOnboardingScreenState
             const Text('Account Contact Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextFormField(
@@ -3257,7 +3257,7 @@ class _ProfileOnboardingScreenState
             const Text('Address Information',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextFormField(
@@ -3426,7 +3426,7 @@ class _ProfileOnboardingScreenState
             const Text('Subject Details (Repeated Entry List)',
                 style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 16,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             // Subject list
@@ -3451,7 +3451,7 @@ class _ProfileOnboardingScreenState
                             .map((s) => DropdownMenuItem(
                                 value: s,
                                 child: Text(s,
-                                    style: const TextStyle(fontSize: 12))))
+                                    style: const TextStyle(fontSize: 9))))
                             .toList(),
                         onChanged: (v) {
                           if (v != null) {
@@ -3509,7 +3509,7 @@ class _ProfileOnboardingScreenState
                             .map((l) => DropdownMenuItem(
                                 value: l,
                                 child: Text('$l',
-                                    style: const TextStyle(fontSize: 12))))
+                                    style: const TextStyle(fontSize: 9))))
                             .toList(),
                         onChanged: (v) {
                           if (v != null) {
@@ -3580,7 +3580,7 @@ class _ProfileOnboardingScreenState
             const Text('School Details',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextFormField(
@@ -3622,7 +3622,7 @@ class _ProfileOnboardingScreenState
             const Text('Other Tertiary Institution Details',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 13,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -3782,7 +3782,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             const Text(
               'Before continuing, please review and accept the terms.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
             ),
             const SizedBox(height: 24),
             TextFormField(
@@ -3959,7 +3959,7 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 16),
             const Text(
               'Please upload the following supporting documents.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
             ),
             const SizedBox(height: 20),
             ...List.generate(3, (i) {
@@ -4037,7 +4037,7 @@ class _ProfileOnboardingScreenState
       minimumSize: WidgetStatePropertyAll<Size>(Size(0, 31)),
       padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
           EdgeInsets.symmetric(horizontal: 12, vertical: 5)),
-      textStyle: WidgetStatePropertyAll<TextStyle>(TextStyle(fontSize: 13)),
+      textStyle: WidgetStatePropertyAll<TextStyle>(TextStyle(fontSize: 9)),
     );
 
     return Padding(
@@ -4154,7 +4154,7 @@ class _SectionHeader extends StatelessWidget {
     return Text(title,
         style: const TextStyle(
             color: AppColors.textPrimary,
-            fontSize: 18,
+            fontSize: 13,
             fontWeight: FontWeight.bold));
   }
 }

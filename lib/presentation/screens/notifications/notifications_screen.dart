@@ -103,7 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                           fontWeight: n.read
                                               ? FontWeight.normal
                                               : FontWeight.bold,
-                                          fontSize: 14,
+                                          fontSize: 10,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -111,7 +111,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         n.body ?? '',
                                         style: const TextStyle(
                                           color: AppColors.textMuted,
-                                          fontSize: 12,
+                                          fontSize: 9,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,

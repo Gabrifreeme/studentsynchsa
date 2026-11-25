@@ -118,7 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       'Powered by ACEsi',
                       style: const TextStyle(
                         color: AppColors.starGold,
-                        fontSize: 14,
+                        fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -145,7 +145,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               'Sign in to continue',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 14,
+                                fontSize: 10,
                               ),
                             ),
                             SizedBox(height: isShort ? 12 : 20),
@@ -218,7 +218,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     'or',
                                     style: TextStyle(
                                       color: AppColors.textMuted,
-                                      fontSize: 12,
+                                      fontSize: 9,
                                     ),
                                   ),
                                 ),

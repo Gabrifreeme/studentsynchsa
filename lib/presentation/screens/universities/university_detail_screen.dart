@@ -97,16 +97,16 @@ class UniversityDetailScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(_uniImages[uni.id]![0],
                             width: double.infinity,
-                            height: 120,
-                            fit: BoxFit.cover),
+                            height: 90,
+                            fit: BoxFit.contain),
                       ),
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(_uniImages[uni.id]![1],
                             width: double.infinity,
-                            height: 120,
-                            fit: BoxFit.cover),
+                            height: 90,
+                            fit: BoxFit.contain),
                       ),
                     ],
                   ],
@@ -133,7 +133,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(uni.name,
                               style: const TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary)),
                         ),
@@ -153,7 +153,7 @@ class UniversityDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       Text(uni.description,
                           style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13)),
+                              color: AppColors.textSecondary, fontSize: 9)),
                     ],
                   ],
                 ),
@@ -181,7 +181,7 @@ class UniversityDetailScreen extends ConsumerWidget {
           Flexible(
             child: Text(label,
                 style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary)),
           ),
@@ -292,12 +292,12 @@ class _SparkleStarState extends State<_SparkleStar>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('✨',
-                        style: TextStyle(fontSize: 20)),
+                        style: TextStyle(fontSize: 14)),
                     SizedBox(width: 10),
                     Text(
                       'Apply Now',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),

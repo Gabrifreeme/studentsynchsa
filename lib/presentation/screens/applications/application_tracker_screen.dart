@@ -79,7 +79,7 @@ class _ApplicationTrackerScreenState
                       style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
-                          fontSize: 15)),
+                          fontSize: 10)),
                 ),
                 _StatusChip(app.status),
               ],
@@ -88,7 +88,7 @@ class _ApplicationTrackerScreenState
               const SizedBox(height: 4),
               Text(app.course,
                   style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 13)),
+                      color: AppColors.textSecondary, fontSize: 9)),
             ],
             const SizedBox(height: 8),
             Row(

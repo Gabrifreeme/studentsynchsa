@@ -26,7 +26,7 @@ class DashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('LibSyncStudent',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
         ),
         body: Center(
           child: ConstrainedBox(
@@ -79,7 +79,7 @@ class DashboardScreen extends ConsumerWidget {
               'Welcome, $firstName!',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 20,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.5,
               ),
@@ -181,7 +181,7 @@ class DashboardScreen extends ConsumerWidget {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(120, 34),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              textStyle: const TextStyle(fontSize: 12),
+              textStyle: const TextStyle(fontSize: 9),
               side: const BorderSide(color: AppColors.primary),
             ),
           ),

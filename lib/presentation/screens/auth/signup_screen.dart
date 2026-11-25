@@ -78,7 +78,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       'Join LibSyncStudent',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 24,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -94,7 +94,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               'Create Account',
                               style: TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 20,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -103,7 +103,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                               'Fill in your details to get started',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 14,
+                                fontSize: 10,
                               ),
                             ),
                             SizedBox(height: isShort ? 12 : 20),

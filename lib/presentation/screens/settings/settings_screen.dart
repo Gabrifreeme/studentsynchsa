@@ -33,7 +33,7 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     const Text(
                       'Choose your dominant thumb for sidebar placement:',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -141,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
                         const SizedBox(width: 8),
                         const Text('Privacy Status',
                             style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary)),
                       ],
@@ -149,7 +149,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 6),
                     const Text(
                       'All data is processed on-device. Nothing is sent to external servers.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 8),
                     InkWell(
@@ -159,7 +159,7 @@ class SettingsScreen extends ConsumerWidget {
                         children: [
                           const Text('Full Privacy Notice',
                               style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 9,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w500)),
                           const SizedBox(width: 4),
@@ -289,11 +289,11 @@ class _ThumbOption extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 28)),
+            Text(emoji, style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 8),
             Text(label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: selected ? AppColors.primary : AppColors.textPrimary,
                 )),

@@ -251,7 +251,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                 'Tap to Download LibSyncStudent',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -352,7 +352,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                           decoration: const BoxDecoration(color: Color(0xFF28C840), shape: BoxShape.circle)),
                       const SizedBox(width: 16),
                       const Text('sssa.4me',
-                          style: TextStyle(color: Color(0xFF995C00), fontSize: 13, fontWeight: FontWeight.w500)),
+                          style: TextStyle(color: Color(0xFF995C00), fontSize: 9, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
@@ -373,14 +373,14 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                         children: [
                           Text(
                             _isComplete ? 'Download complete!' : 'Downloading LibSyncStudent...',
-                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _isComplete ? 'Ready to launch' : '${(_progress * 100).round()}% complete',
                             style: TextStyle(
                               color: _isComplete ? const Color(0xFF00FF88) : const Color(0xFF995C00),
-                              fontSize: 14, fontWeight: FontWeight.w500,
+                              fontSize: 10, fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -426,7 +426,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                                   border: Border.all(color: const Color(0xFF3B3F4E)),
                                 ),
                                 child: Text(_speechText,
-                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500)),
                               ),
                             ),
                           ),
@@ -445,7 +445,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                                 Icon(Icons.check_circle, color: const Color(0xFF00FF88), size: 20 + v * 4),
                                 const SizedBox(width: 8),
                                 Text('LibSyncStudent downloaded!',
-                                    style: TextStyle(color: const Color(0xFF00FF88), fontSize: 16, fontWeight: FontWeight.w700)),
+                                    style: TextStyle(color: const Color(0xFF00FF88), fontSize: 11, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
@@ -537,7 +537,7 @@ class _FakeDownloadScreenState extends State<FakeDownloadScreen>
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 9,
                   fontWeight: FontWeight.w700,
                 ),
               ),

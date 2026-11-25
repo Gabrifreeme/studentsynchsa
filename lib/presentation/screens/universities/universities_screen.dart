@@ -42,12 +42,6 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
-            onPressed: () => context.pop(),
-          ),
-        ),
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -80,10 +74,17 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Universities',
+                        Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: GestureDetector(
+                        onTap: () => context.pop(),
+                        child: const StarIcon(Icons.arrow_back_rounded, size: 22),
+                      ),
+                    ),
+                    const Text('Universities',
                             style: TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 26,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text('All ${universities.length} SA public universities',
@@ -98,7 +99,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (_) => setState(() {}),
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 10),
                       decoration: InputDecoration(
                         hintText: 'Search universities...',
                         hintStyle: const TextStyle(color: AppColors.textMuted),
@@ -129,7 +130,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
-                            label: Text(p, style: TextStyle(fontSize: 12, color: selected ? Colors.white : AppColors.textSecondary)),
+                            label: Text(p, style: TextStyle(fontSize: 9, color: selected ? Colors.white : AppColors.textSecondary)),
                             selected: selected,
                             selectedColor: AppColors.primary,
                             backgroundColor: AppColors.surfaceLight,
@@ -224,7 +225,7 @@ class _UniversityCard extends StatelessWidget {
           Text(uni.shortName,
               style: const TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: 12,
+                  fontSize: 9,
                   fontWeight: FontWeight.w800),
               textAlign: TextAlign.center),
           const SizedBox(height: 2),

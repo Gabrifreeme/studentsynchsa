@@ -438,14 +438,14 @@ if (link) {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                const Text('📋', style: TextStyle(fontSize: 16)),
+                const Text('📋', style: TextStyle(fontSize: 11)),
                 const SizedBox(width: 6),
                 const Expanded(
                   child: Text(
                     'My Profile',
                     style: TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -468,7 +468,7 @@ if (link) {
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.auto_awesome, size: 16),
                       label: const Text('Fill All',
-                          style: TextStyle(fontSize: 12)),
+                          style: TextStyle(fontSize: 9)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFA500),
                         foregroundColor: Colors.white,
@@ -581,7 +581,7 @@ if (link) {
                       : hasValue
                           ? Colors.white
                           : const Color(0xFF555566),
-                  fontSize: 12,
+                  fontSize: 9,
                   fontWeight:
                       hasValue ? FontWeight.w500 : FontWeight.w300,
                 ),

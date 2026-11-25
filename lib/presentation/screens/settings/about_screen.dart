@@ -26,14 +26,14 @@ class AboutScreen extends StatelessWidget {
                     'LibSyncStudent',
                     style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 18,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: AppSpaces.sm),
                   const Text(
                     'Made for South African Students',
                     style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12),
+                        color: AppColors.textSecondary, fontSize: 9),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpaces.xl),
@@ -71,10 +71,10 @@ class _AboutRow extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(
-                  color: AppColors.textMuted, fontSize: 12)),
+                  color: AppColors.textMuted, fontSize: 9)),
           Text(value,
               style: const TextStyle(
-                  color: AppColors.textPrimary, fontSize: 12)),
+                  color: AppColors.textPrimary, fontSize: 9)),
         ],
       ),
     );

@@ -26,7 +26,7 @@ class UniversityWebViewScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Open application portal in a new tab',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
                 const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: () async {

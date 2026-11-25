@@ -166,7 +166,7 @@ class SectionHeader extends StatelessWidget {
               actionLabel!,
               style: const TextStyle(
                 color: AppColors.primaryLight,
-                fontSize: 12,
+                fontSize: 9,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -202,7 +202,7 @@ class EmptyState extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 18,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
@@ -213,7 +213,7 @@ class EmptyState extends StatelessWidget {
                 subtitle,
                 style: const TextStyle(
                   color: AppColors.textMuted,
-                  fontSize: 14,
+                  fontSize: 10,
                 ),
                 textAlign: TextAlign.center,
               ),
