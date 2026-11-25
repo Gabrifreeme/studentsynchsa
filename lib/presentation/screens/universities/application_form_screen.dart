@@ -79,7 +79,9 @@ class _ApplicationFormScreenState extends State<ApplicationFormScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.7,
+            maxWidth: MediaQuery.of(context).size.width < 600
+                ? double.infinity
+                : MediaQuery.of(context).size.width * 0.7,
           ),
           child: SingleChildScrollView(
         padding: const EdgeInsets.all(11),

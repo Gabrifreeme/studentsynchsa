@@ -70,9 +70,7 @@ class UniversityDetailScreen extends ConsumerWidget {
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width < 600
-                  ? double.infinity
-                  : MediaQuery.of(context).size.width * 0.7,
+              maxWidth: double.infinity,
             ),
             child: SingleChildScrollView(
           padding: const EdgeInsets.all(11),

@@ -2510,7 +2510,7 @@ class _ProfileOnboardingScreenState
                 Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      maxWidth: double.infinity,
                     ),
                     child: _buildProgressBar(),
                   ),
@@ -2527,7 +2527,7 @@ class _ProfileOnboardingScreenState
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                        maxWidth: double.infinity,
                       ),
                       child: PageView(
                     controller: _pageController,
@@ -2549,7 +2549,7 @@ class _ProfileOnboardingScreenState
                 Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      maxWidth: double.infinity,
                     ),
                     child: _buildBottomButtons(),
                   ),

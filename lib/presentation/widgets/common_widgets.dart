@@ -35,7 +35,18 @@ class GradientBackground extends StatelessWidget {
           ],
         ),
       ),
-      child: child,
+      // Every screen gets the same responsive width: full on phones,
+      // 70% centred on wider screens. Keeps all pages consistently sized.
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width < 600
+                ? double.infinity
+                : MediaQuery.of(context).size.width * 0.7,
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

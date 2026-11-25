@@ -45,9 +45,7 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
         body: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width < 600
-                ? double.infinity
-                : MediaQuery.of(context).size.width * 0.7,
+              maxWidth: double.infinity,
             ),
             child: SafeArea(
           child: universitiesAsync.when(
