@@ -59,7 +59,7 @@ class _ProfileOnboardingScreenState
   String _province = '';
   final _postalCodeCtrl = TextEditingController();
   final _postalAddressCtrl = TextEditingController();
-  bool _postalSameAsResidential = false;
+  bool _postalSameAsResidential = true;
 
   // Status
   String _disabilityStatus = '';
@@ -2992,13 +2992,16 @@ class _ProfileOnboardingScreenState
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 Switch(
                   value: _postalSameAsResidential,
-                  activeTrackColor: AppColors.primaryDark,
-                  inactiveTrackColor: AppColors.surfaceLight,
-                  hoverColor: AppColors.surfaceLight,
-                  thumbColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+                  trackColor: WidgetStateProperty.resolveWith<Color?>((states) =>
                       states.contains(WidgetState.selected)
                           ? AppColors.primary
-                          : AppColors.textSecondary),
+                          : AppColors.surfaceLight),
+                  thumbColor: WidgetStateProperty.resolveWith<Color?>((states) =>
+                      states.contains(WidgetState.selected)
+                          ? AppColors.background
+                          : AppColors.primary),
+                  hoverColor: AppColors.primaryLight,
+                  splashRadius: 24,
                   onChanged: (v) => setState(() {
                     _postalSameAsResidential = v;
                     if (v) _postalAddressCtrl.clear();
@@ -3012,9 +3015,27 @@ class _ProfileOnboardingScreenState
             TextFormField(
               controller: _postalAddressCtrl,
               enabled: !_postalSameAsResidential,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Postal Address',
-                prefixIcon: Icon(Icons.mail_outlined, color: AppColors.warning),
+                filled: true,
+                fillColor: _postalSameAsResidential
+                    ? AppColors.surfaceLight
+                    : AppColors.surface,
+                labelStyle: TextStyle(
+                    color: _postalSameAsResidential
+                        ? AppColors.textMuted
+                        : AppColors.textPrimary),
+                prefixIcon: Icon(Icons.mail_outlined,
+                    color: _postalSameAsResidential
+                        ? AppColors.textMuted
+                        : AppColors.warning),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                      color: _postalSameAsResidential
+                          ? AppColors.border
+                          : AppColors.primary),
+                ),
               ),
             ),
             // --- Additional Info ---
