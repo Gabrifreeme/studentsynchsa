@@ -16,7 +16,7 @@ class ChatScreen extends StatelessWidget {
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width < 600
                   ? double.infinity
-                  : MediaQuery.of(context).size.width * 0.7,
+                  : MediaQuery.of(context).size.width * 0.5,
             ),
             child: ListView(
           padding: const EdgeInsets.all(11),
@@ -24,7 +24,9 @@ class ChatScreen extends StatelessWidget {
             AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               onTap: () => _showComingSoon(context),
-              child: const ListTile(
+              child: const SizedBox(
+                height: 48,
+                child: ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 0),
@@ -36,13 +38,16 @@ class ChatScreen extends StatelessWidget {
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: AppColors.textMuted, size: 16),
+                ),
               ),
             ),
             const SizedBox(height: 6),
             AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               onTap: () => _showComingSoon(context),
-              child: const ListTile(
+              child: const SizedBox(
+                height: 48,
+                child: ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 0),
@@ -55,13 +60,16 @@ class ChatScreen extends StatelessWidget {
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: AppColors.textMuted, size: 16),
+                ),
               ),
             ),
             const SizedBox(height: 6),
             AppCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               onTap: () => _showComingSoon(context),
-              child: const ListTile(
+              child: const SizedBox(
+                height: 48,
+                child: ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
                 contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 0),
@@ -74,6 +82,7 @@ class ChatScreen extends StatelessWidget {
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
                 trailing: Icon(Icons.chevron_right_rounded,
                     color: AppColors.textMuted, size: 16),
+                ),
               ),
             ),
           ],
