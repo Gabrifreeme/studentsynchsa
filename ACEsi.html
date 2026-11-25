@@ -18048,6 +18048,20 @@ window.aceCheckForUpdates = function (install) {
   border:0 !important;
   box-shadow:none !important;
 }
+/* Keep the terminal a column flex box so the prompt row can never be pushed
+   out of the panel by the older display:block !important rule. */
+html body #terminal-panel {
+  display:flex !important;
+  flex-direction:column !important;
+  overflow:hidden !important;
+}
+html body #flutter-prompt-row {
+  display:flex !important;
+  flex:0 0 auto !important;
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:9999 !important;
+}
 /* Explorer header divider - bright amber (top-right second line). */
 html body #explorer-panel > .ace-header-divider { background:#ffa500 !important; }
 /* Bright divider just above the control row, reaching the left border. */
