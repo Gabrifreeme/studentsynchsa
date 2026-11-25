@@ -4090,18 +4090,28 @@ class _ProfileOnboardingScreenState
           const SizedBox(width: 8),
           GestureDetector(
             onTap: _showStarHelp,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.starGold.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
+            child: AnimatedBuilder(
+              animation: _floatAnim,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(0, _floatAnim.value * 0.6 - 0.3),
+                child: child,
               ),
-              child: const StarAvatar(size: 32, pulse: false),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.5), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.starGold.withValues(alpha: 0.55),
+                      blurRadius: 18,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const StarAvatar(size: 40, pulse: true),
+              ),
             ),
           ),
           const SizedBox(width: 8),
