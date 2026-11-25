@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -33,6 +34,7 @@ class _AppWebViewState extends State<AppWebView> {
   StudentProfile? _profile;
   AutofillStatus _autofillStatus = AutofillStatus.idle;
   final Set<String> _filledFields = {};
+  final List<String> _httpErrors = [];
 
   // ── Sections — mapKeys match StudentProfile.toJson() exactly ─────────────
   // Dot-notation: 'personal.lastName' → toJson()['personal']['lastName']
@@ -108,6 +110,16 @@ class _AppWebViewState extends State<AppWebView> {
         },
         onWebResourceError: (error) {
           debugPrint("PAGE LOAD ERROR: ${error.description} (code: ${error.errorCode})");
+          // Capture URL + code so a 404 on page two can be diagnosed instantly.
+          final msg = 'HTTP_ERROR code=${error.errorCode} '
+              'type=${error.errorType} url=${error.url} '
+              'desc=${error.description}';
+          if (mounted) {
+            setState(() {
+              _httpErrors.add(msg);
+              if (_httpErrors.length > 12) _httpErrors.removeAt(0);
+            });
+          }
           if (error.errorCode == -105 || error.description.contains("ERR_NAME_NOT_RESOLVED")) {
             showDialog(
               context: context,
@@ -430,6 +442,31 @@ if (link) {
       ),
       body: Column(
         children: [
+          if (_httpErrors.isNotEmpty)
+            Container(
+              color: const Color(0xFF2A0000),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 14),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _httpErrors.last,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.red, fontSize: 9),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Copy all HTTP errors',
+                    icon: const Icon(Icons.copy, size: 14, color: Colors.red),
+                    onPressed: () => Clipboard.setData(
+                        ClipboardData(text: _httpErrors.join('\n'))),
+                  ),
+                ],
+              ),
+            ),
           // Top pane — university form
           Expanded(
             child: Stack(

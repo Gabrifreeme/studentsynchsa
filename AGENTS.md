@@ -77,6 +77,16 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Note: `NODE_ENV=production` doesn't work in Windows cmd - use `$env:NODE_ENV="production"` in PowerShell or omit it for dev
 
 
+## WebView HTTP error capture (for the UNIVEN second-page 404)
+- `onWebResourceError` now records code, type, URL and description for every
+  failed resource, shows the latest in a red banner, and offers "Copy all
+  HTTP errors" to the clipboard. Give that text to ACEsi.
+- When diagnosing an ITS 404, first inspect the captured URL — a relative
+  `gen.gw1pkg` link on page two, or a lost session cookie, are prime suspects.
+- `onPageStarted` calls `_controller.clearCache()` on every navigation; this
+  is a suspect for breaking ITS session state. Verify before changing it.
+- `initState` clears ALL cookies for a fresh session.
+
 ## Auto-fill is OPT-IN (do not change)
 - Nothing fills automatically when a page opens.
 - A StarIcon sits top-right in the WebView app bar. Tapping it asks:
