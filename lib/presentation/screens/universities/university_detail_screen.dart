@@ -137,7 +137,7 @@ class UniversityDetailScreen extends ConsumerWidget {
               // 3. Images on the left, Apply button beside them
               if (_uniImages.containsKey(uni.id))
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       flex: 3,
@@ -166,16 +166,29 @@ class UniversityDetailScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       flex: 2,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _launchUniv(context, uni),
-                        icon: const StarIcon(Icons.auto_awesome_rounded, size: 16),
-                        label: const Text('Apply'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 40),
-                          side: const BorderSide(color: AppColors.primary),
-                          foregroundColor: AppColors.primary,
-                          textStyle: const TextStyle(fontSize: 12),
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _launchUniv(context, uni),
+                            icon: const StarIcon(Icons.auto_awesome_rounded,
+                                size: 16),
+                            label: const Text('Apply'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 40),
+                              side: const BorderSide(color: AppColors.primary),
+                              foregroundColor: AppColors.primary,
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Opens ${uni.shortName}\'s official application page',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 9),
+                          ),
+                        ],
                       ),
                     ),
                   ],
