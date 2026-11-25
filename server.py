@@ -493,6 +493,36 @@ _PROCS = {}
 _PROCS_LOCK = threading.RLock()
 # The currently running flutter/dart dev session (started via /run).
 _ACTIVE_RUN = {"proc": None, "log": "", "cmd": ""}
+
+
+def _flutter_direct_argv(command):
+    """Return argv that runs Flutter directly, without a cmd.exe wrapper.
+
+    With shell=True the child is cmd.exe; keystrokes written to its stdin are
+    swallowed (or kill the shell), so r/R/q never reach Flutter and the run
+    appears to die. Running flutter_tools.dart with dart.exe keeps a real stdin
+    pipe attached to Flutter itself.
+    """
+    try:
+        parts = __import__('shlex').split(command, posix=False)
+    except Exception:
+        parts = command.split()
+    if not parts:
+        return None
+    exe = os.path.basename(parts[0]).strip('"').strip("'").lower()
+    if exe not in ('flutter', 'flutter.bat', 'flutter.exe'):
+        return None
+    bat = shutil.which('flutter') or shutil.which('flutter.bat')
+    if not bat:
+        return None
+    sdk = os.path.dirname(os.path.dirname(bat))
+    dart = os.path.join(sdk, 'bin', 'cache', 'dart-sdk', 'bin', 'dart.exe')
+    tools = os.path.join(sdk, 'packages', 'flutter_tools', 'bin', 'flutter_tools.dart')
+    if not (os.path.isfile(dart) and os.path.isfile(tools)):
+        return None
+    args = [p.strip('"').strip("'") for p in parts[1:]]
+    return [dart, tools] + args
+
 def _track_proc(p):
     with _PROCS_LOCK:
         _PROCS[p.pid] = p
@@ -8658,9 +8688,19 @@ def run_command():
             # own folder - otherwise flutter run builds the wrong app.
             # Direct Popen streams stdout/stderr into the log live so the user
             # can watch the build progress from ACEsi's terminal.
-            proc = subprocess.Popen(command, shell=True, stdout=log,
-                                    stderr=subprocess.STDOUT, cwd=_IDE_ROOT,
-                                    stdin=subprocess.PIPE, bufsize=0)
+            argv = _flutter_direct_argv(command)
+            popen_env = os.environ.copy()
+            if argv:
+                _bat = shutil.which('flutter') or shutil.which('flutter.bat')
+                if _bat:
+                    popen_env['FLUTTER_ROOT'] = os.path.dirname(os.path.dirname(_bat))
+                proc = subprocess.Popen(argv, stdout=log,
+                                        stderr=subprocess.STDOUT, cwd=_IDE_ROOT,
+                                        stdin=subprocess.PIPE, bufsize=0, env=popen_env)
+            else:
+                proc = subprocess.Popen(command, shell=True, stdout=log,
+                                        stderr=subprocess.STDOUT, cwd=_IDE_ROOT,
+                                        stdin=subprocess.PIPE, bufsize=0)
             # Track the live run so ACEsi's terminal can tail its log and send
             # hot-reload keys (r/R/q) straight to Flutter's stdin.
             with _PROCS_LOCK:
@@ -20998,10 +21038,19 @@ def api_run_input():
         with _PROCS_LOCK:
             _ACTIVE_RUN["proc"] = None
     try:
-        # shell=True means the direct child is cmd.exe; write to its stdin.
+        # Direct dart.exe child: keystrokes reach Flutter itself.
         proc.stdin.write(key.encode('utf-8') + b'\n')
         proc.stdin.flush()
-        return jsonify({'ok': True, 'sent': key})
+        label = {'r': 'HOT RELOAD', 'R': 'HOT RESTART', 'q': 'QUIT'}.get(key, 'INPUT')
+        try:
+            _lp = _ACTIVE_RUN.get('log', '')
+            if _lp and os.path.isfile(_lp):
+                with open(_lp, 'a', encoding='utf-8') as _fh:
+                    _fh.write('[ACEsi] >>> %s (%s) sent at %s\n' %
+                              (label, key, time.strftime('%H:%M:%S')))
+        except Exception:
+            pass
+        return jsonify({'ok': True, 'sent': key, 'label': label})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

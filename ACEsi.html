@@ -6558,7 +6558,13 @@ perspective: 900px;
           });
           const d = await res.json();
           var box = document.getElementById('flutter-console-output');
-          if (box) box.textContent += (d.ok ? '[sent ' + key + ']' : '[error: ' + (d.error||'failed') + ']') + '\n';
+          var label = (key === 'R') ? 'HOT RESTART' : (key === 'r') ? 'HOT RELOAD'
+                    : (key.toLowerCase() === 'q') ? 'QUIT' : 'INPUT';
+          if (box) {
+            box.textContent += '\n[ACEsi] >>> ' + (d.ok ? label + ' SENT' : 'ERROR: ' + (d.error || 'failed'))
+              + '  ' + new Date().toLocaleTimeString() + '\n';
+            box.scrollTop = box.scrollHeight;
+          }
           if (/^q$/i.test(key)) window.stopAceFlutterFollow();
         } catch (e) {
           var b = document.getElementById('flutter-console-output');
