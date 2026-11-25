@@ -42,6 +42,15 @@ It is a Flask server + single-page HTML UI.
 - Wait for `Flutter run key commands` in the log before sending `R`; pressing
   keys during startup causes hot-restart timeouts and a white page.
 
+## Auto-fill self-test (run before any live application)
+- Command: `python tools/autofill_selftest.py` (from `D:\projects\acesi`)
+- Endpoint: `GET /api/autofill/selftest` (JSON with per-field PASS/FAIL)
+- It extracts the REAL generated JS from `autofill_script.dart`, runs it
+  against a 15-field ITS-style fixture (main doc + iframe), and reports each
+  field. Current result: 15/15 PASS.
+- If any field fails, fix the alias in `autofill_script.dart` and re-run.
+  Never work on auto-fill blind — run this first.
+
 ## Environmental awareness
 - `GET /api/environment/snapshot` returns a compact live snapshot (git state for
   both repos, Flutter run state + log tail, ports 5000/55793, ACEsi.html/golden

@@ -16462,6 +16462,25 @@ def _environment_snapshot():
     return '\n'.join(lines)
 
 
+@app.route('/api/autofill/selftest', methods=['GET'])
+@require_token
+def api_autofill_selftest():
+    """Run the Star auto-fill self-test and return the per-field report."""
+    script = os.path.join(PROJECT_ROOT, 'tools', 'autofill_selftest.py')
+    if not os.path.isfile(script):
+        return jsonify({'ok': False, 'error': 'selftest script missing'}), 500
+    try:
+        r = subprocess.run([sys.executable, script], capture_output=True,
+                           text=True, timeout=120)
+        return jsonify({
+            'ok': r.returncode == 0,
+            'output': r.stdout.strip(),
+            'error': r.stderr.strip()[-1500:],
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @app.route('/api/environment/snapshot', methods=['GET'])
 @require_token
 def api_environment_snapshot():
