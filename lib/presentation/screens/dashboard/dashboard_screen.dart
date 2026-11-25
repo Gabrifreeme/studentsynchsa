@@ -35,7 +35,7 @@ class DashboardScreen extends ConsumerWidget {
               maxWidth: double.infinity,
             ),
             child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 40),
           child: Column(
             children: [
               _buildStarCta(context, firstName),
@@ -168,7 +168,7 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(child: tile(Icons.info_outline_rounded, 'About Us', '/about')),
           ],
         ),
-        const SizedBox(height: 200),
+        const SizedBox(height: 166),
         Center(
           child: OutlinedButton.icon(
             onPressed: () async {
