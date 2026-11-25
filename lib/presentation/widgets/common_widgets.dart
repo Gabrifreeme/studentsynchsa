@@ -273,6 +273,7 @@ class AppListTile extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? iconColor;
   final Widget? trailing;
+  final bool compact;
 
   const AppListTile({
     super.key,
@@ -282,10 +283,39 @@ class AppListTile extends StatelessWidget {
     this.onTap,
     this.iconColor,
     this.trailing,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return AppCard(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpaces.sm, vertical: AppSpaces.md),
+        onTap: onTap,
+        child: SizedBox(
+          height: 52,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  color: iconColor ?? AppColors.primaryLight,
+                  size: AppSpaces.tileIcon),
+              const SizedBox(height: AppSpaces.xs),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: AppSpaces.tileTitle,
+                      fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
+      );
+    }
     return AppCard(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpaces.md, vertical: AppSpaces.sm + 2),

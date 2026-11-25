@@ -51,18 +51,14 @@ class DashboardScreen extends ConsumerWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.7,
             ),
             child: SingleChildScrollView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
             children: [
-              const SizedBox(height: 22),
               _buildStarCta(context, firstName),
-              const SizedBox(height: 34),
+              const SizedBox(height: 10),
               _PrivacyConsentBanner(),
-              const SizedBox(height: 17),
-              _buildQuickLinks(context),
-              const SizedBox(height: 6),
-              _buildProgressCards(context),
-              const SizedBox(height: 22),
+              const SizedBox(height: 10),
+              _buildTileGrid(context),
             ],
           ),
         ),
@@ -91,9 +87,9 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: const StarAvatar(size: 84, pulse: true),
+              child: const StarAvatar(size: 64, pulse: true),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Text(
               'Welcome, $firstName!',
               style: const TextStyle(
@@ -119,59 +115,55 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickLinks(BuildContext context) {
-    return Column(
+  Widget _buildTileGrid(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: AppSpaces.sm,
+      crossAxisSpacing: AppSpaces.sm,
+      childAspectRatio: 1.75,
       children: [
         AppListTile(
-          icon: Icons.auto_awesome_rounded,
-          label: 'ACEsi',
-          value: 'Ask your Star adviser',
-          onTap: () => context.push('/ai-recommendations'),
-        ),
-        const SizedBox(height: 8),
+            icon: Icons.auto_awesome_rounded,
+            label: 'ACEsi',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/ai-recommendations')),
         AppListTile(
-          icon: Icons.person_rounded,
-          label: 'My Profile',
-          value: 'View and edit your profile',
-          onTap: () => context.push('/onboarding'),
-        ),
-        const SizedBox(height: 8),
+            icon: Icons.person_rounded,
+            label: 'My Profile',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/onboarding')),
         AppListTile(
-          icon: Icons.chat_rounded,
-          label: 'Community',
-          value: 'Chat with other students',
-          onTap: () => context.push('/chat'),
-        ),
+            icon: Icons.chat_rounded,
+            label: 'Community',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/chat')),
+        AppListTile(
+            icon: Icons.school_rounded,
+            label: 'Universities',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/universities')),
+        AppListTile(
+            icon: Icons.assignment_rounded,
+            label: 'Applications',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/applications')),
+        AppListTile(
+            icon: Icons.account_balance_rounded,
+            label: 'Funding',
+            value: '',
+            compact: true,
+            onTap: () => context.push('/funding')),
       ],
     );
   }
 
-  Widget _buildProgressCards(BuildContext context) {
-    return Column(
-      children: [
-        AppListTile(
-          icon: Icons.school_rounded,
-          label: 'Universities',
-          value: '26 available',
-          onTap: () => context.push('/universities'),
-        ),
-        const SizedBox(height: 8),
-        AppListTile(
-          icon: Icons.assignment_rounded,
-          label: 'Applications',
-          value: 'Track your progress',
-          onTap: () => context.push('/applications'),
-        ),
-        const SizedBox(height: 8),
-        AppListTile(
-          icon: Icons.account_balance_rounded,
-          label: 'Funding',
-          value: 'Bursaries & scholarships',
-          onTap: () => context.push('/funding'),
-        ),
-      ],
-    );
-  }
 }
 
 class _PrivacyConsentBanner extends StatefulWidget {
@@ -205,86 +197,30 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
     if (!_initialized || _consented) return const SizedBox.shrink();
 
     return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: AppColors.starGold, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                        height: 1.4,
-                      ),
-                      children: [
-                        const TextSpan(
-                          text: 'Star recommends reviewing your ',
-                        ),
-                        WidgetSpan(
-                          child: GestureDetector(
-                            onTap: () => context.push('/privacy'),
-                            child: const Text(
-                              'Privacy Status',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const TextSpan(text: ' here.'),
-                      ],
-                    ),
-                    textScaler: TextScaler.linear(0.92),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: _giveConsent,
-              borderRadius: BorderRadius.circular(8),
-              child: Row(
-                children: [
-                  Icon(
-                    _consented
-                        ? Icons.check_box_rounded
-                        : Icons.check_box_outline_blank_rounded,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'I have read and consent to the privacy policy',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: AppColors.starGold, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => context.push('/privacy'),
+              child: const Text(
+                'Review your Privacy Status here.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 11),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'You can review consent anytime via Settings > Privacy & Compliance.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textMuted,
-              ),
+          ),
+          InkWell(
+            onTap: _giveConsent,
+            child: const Icon(
+              Icons.check_box_outline_blank_rounded,
+              color: AppColors.primary,
+              size: 20,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
