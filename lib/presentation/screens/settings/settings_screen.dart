@@ -146,7 +146,7 @@ class SettingsScreen extends ConsumerWidget {
                         const SizedBox(width: 6),
                         const Text('Privacy Status',
                             style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary)),
                       ],
@@ -154,7 +154,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     const Text(
                       'All data is processed on-device. Nothing is sent to external servers.',
-                      style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     InkWell(
@@ -164,7 +164,7 @@ class SettingsScreen extends ConsumerWidget {
                         children: [
                           const Text('Full Privacy Notice',
                               style: TextStyle(
-                                  fontSize: 9,
+                                  fontSize: 11,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w500)),
                           const SizedBox(width: 3),
