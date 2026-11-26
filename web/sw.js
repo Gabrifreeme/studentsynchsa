@@ -14,7 +14,6 @@ self.addEventListener('push', function (event) {
     self.registration.showNotification(data.title || 'New email', {
       body: data.body || '',
       icon: 'icons/Icon-192.png',
-      badge: 'icons/Icon-192.png',
       tag: 'acesi-email',
       data: { url: data.url || '/' },
     })
