@@ -308,6 +308,7 @@ class AppListTile extends StatelessWidget {
             horizontal: AppSpaces.sm, vertical: AppSpaces.md),
         onTap: onTap,
         child: Stack(
+        alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
           SizedBox(
