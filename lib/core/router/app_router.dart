@@ -213,13 +213,13 @@ class DashboardShell extends ConsumerWidget {
     final navItems = [
       _NavItemData(icon: Icons.home_rounded, label: 'Home', route: '/dashboard', index: 0),
       _NavItemData(icon: Icons.person_rounded, label: 'My Profile', route: '/onboarding'),
-      _NavItemData(icon: Icons.notifications_rounded, label: 'Notifications', route: '/notifications'),
       _NavItemData(icon: Icons.auto_awesome_rounded, label: 'ACEsi', route: '/ai-recommendations'),
       _NavItemData(icon: Icons.account_balance_wallet_rounded, label: 'Funding', route: '/funding', index: 3),
       _NavItemData(icon: Icons.school_rounded, label: 'Universities', route: '/universities', index: 1),
-      _NavItemData(icon: Icons.assignment_rounded, label: 'Applications', route: '/applications', index: 2),
+      _NavItemData(icon: Icons.assignment_rounded, label: 'Your Progress', route: '/applications', index: 2),
       _NavItemData(icon: Icons.chat_rounded, label: 'Community', route: '/chat'),
       _NavItemData(icon: Icons.settings_rounded, label: 'Settings', route: '/settings'),
+      _NavItemData(icon: Icons.info_outline_rounded, label: 'About Us', route: '/about'),
     ];
 
     return Drawer(

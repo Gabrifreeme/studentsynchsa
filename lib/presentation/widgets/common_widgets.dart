@@ -304,25 +304,46 @@ class AppListTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpaces.sm, vertical: AppSpaces.md),
         onTap: onTap,
-        child: SizedBox(
-          height: 52,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              StarIcon(icon, size: AppSpaces.tileIcon),
-              const SizedBox(height: AppSpaces.xs),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: AppSpaces.tileTitle,
-                      fontWeight: FontWeight.w800)),
-            ],
+        child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SizedBox(
+            height: 52,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                StarIcon(icon, size: AppSpaces.tileIcon),
+                const SizedBox(height: AppSpaces.xs),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: AppSpaces.tileTitle,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
           ),
-        ),
+          if (value.isNotEmpty)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: const BoxDecoration(
+                    color: Color(0xFFFF4444), shape: BoxShape.circle),
+                child: Text(value,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ],
+      ),
       );
     }
     return AppCard(

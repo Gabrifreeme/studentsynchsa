@@ -1,13 +1,36 @@
+import 'dart:convert';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/domain/models/notification_item.dart';
-import 'dart:convert';
+import 'package:studentsyncsa/services/chat_service.dart';
+
+/// A notification pushed by ACEsi when a watched university/bursary email
+/// arrives. This is an in-app message, not a connection to the mailbox.
+class AppNotification {
+  final int id;
+  final String title;
+  final String body;
+  final String? sender;
+  final DateTime createdAt;
+
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    this.sender,
+    required this.createdAt,
+  });
+}
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static const _remoteTable = 'app_notifications';
+  static const _remoteReadKey = 'notif_remote_read_ids';
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -101,5 +124,57 @@ class NotificationService {
     final updated = notifications.map((n) => n.copyWith(read: true)).toList();
     final json = jsonEncode(updated.map((n) => n.toJson()).toList());
     await HiveDatabase.notifications.put('all', json);
+  }
+
+  // ---- Email alerts pushed by ACEsi -------------------------------------
+
+  static Map<String, String> get _remoteHeaders => {
+        'apikey': ChatService.key,
+        'Authorization': 'Bearer ${ChatService.key}',
+        'Content-Type': 'application/json',
+      };
+
+  static Future<List<AppNotification>> fetchRemote() async {
+    if (!ChatService.isConfigured) return [];
+    final uri = Uri.parse('${ChatService.url}/rest/v1/$_remoteTable')
+        .replace(queryParameters: {
+      'select': 'id,created_at,title,body,sender',
+      'order': 'created_at.desc',
+      'limit': '20',
+    });
+    final res = await http.get(uri, headers: _remoteHeaders).timeout(
+          const Duration(seconds: 12),
+        );
+    if (res.statusCode < 200 || res.statusCode >= 300) return [];
+    final list = jsonDecode(res.body) as List<dynamic>;
+    return list.map((e) {
+      final m = Map<String, dynamic>.from(e as Map);
+      return AppNotification(
+        id: (m['id'] as num?)?.toInt() ?? 0,
+        title: '${m['title'] ?? ''}',
+        body: '${m['body'] ?? ''}',
+        sender: m['sender'] as String?,
+        createdAt: DateTime.tryParse('${m['created_at'] ?? ''}') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+    }).toList();
+  }
+
+  static Set<String> _remoteReadIds() {
+    final raw = HiveDatabase.settings.get(_remoteReadKey) ?? '';
+    return raw.isEmpty ? <String>{} : raw.split(',').toSet();
+  }
+
+  static bool isRemoteRead(String id) => _remoteReadIds().contains(id);
+
+  static Future<void> markRemoteRead(String id) async {
+    final ids = _remoteReadIds();
+    ids.add(id);
+    await HiveDatabase.settings.put(_remoteReadKey, ids.join(','));
+  }
+
+  static Future<int> remoteUnreadCount() async {
+    final rows = await fetchRemote();
+    return rows.where((n) => !isRemoteRead('${n.id}')).length;
   }
 }

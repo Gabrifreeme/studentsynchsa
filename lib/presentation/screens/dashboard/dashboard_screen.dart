@@ -7,6 +7,7 @@ import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
+import 'package:studentsyncsa/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -142,11 +143,12 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildTileGrid(BuildContext context, bool isRight, WidgetRef ref) {
-    Widget tile(IconData icon, String label, String route) {
+    Widget tile(IconData icon, String label, String route,
+        {String badge = ''}) {
       return AppListTile(
         icon: icon,
         label: label,
-        value: '',
+        value: badge,
         compact: true,
         onTap: () => context.push(route),
       );
@@ -174,7 +176,20 @@ class DashboardScreen extends ConsumerWidget {
         const SizedBox(height: AppSpaces.sm),
         Row(
           children: [
-            Expanded(child: tile(Icons.assignment_rounded, 'Applications', '/applications')),
+            Expanded(
+              child: FutureBuilder<int>(
+                future: NotificationService.remoteUnreadCount(),
+                builder: (context, snap) {
+                  final count = snap.data ?? 0;
+                  return tile(
+                    Icons.assignment_rounded,
+                    'Your Progress',
+                    '/applications',
+                    badge: count > 0 ? '$count' : '',
+                  );
+                },
+              ),
+            ),
             const SizedBox(width: AppSpaces.sm),
             Expanded(child: tile(Icons.account_balance_rounded, 'Funding', '/funding')),
           ],
