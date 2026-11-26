@@ -62,10 +62,17 @@ class _FundingListScreenState extends State<FundingListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: GestureDetector(
+                        onTap: () => context.pop(),
+                        child: const StarIcon(Icons.arrow_back_rounded, size: 22),
+                      ),
+                    ),
                     const Text('Funding & Bursaries',
                         style: TextStyle(
                             color: AppColors.textPrimary,
@@ -80,7 +87,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (_) => setState(() {}),
@@ -104,10 +111,10 @@ class _FundingListScreenState extends State<FundingListScreen> {
                 ),
               ),
               SizedBox(
-                height: 40,
+                height: 32,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: _filterTypes.length,
                   itemBuilder: (_, i) {
                     final t = _filterTypes[i];
@@ -142,7 +149,7 @@ class _FundingListScreenState extends State<FundingListScreen> {
                             style: TextStyle(color: AppColors.textMuted)))
                     : GridView.builder(
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
