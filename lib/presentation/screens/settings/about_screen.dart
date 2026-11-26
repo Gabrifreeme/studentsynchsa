@@ -43,7 +43,7 @@ class AboutScreen extends StatelessWidget {
                       children: const [
                         _AboutRow('Version', '1.0.0'),
                         _AboutRow('Powered by', 'ACEsi'),
-                        _AboutRow('Assistant', 'Star'),
+                        _AboutRow('Assistant', 'ACEsi'),
                       ],
                     ),
                   ),
