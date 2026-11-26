@@ -17,7 +17,7 @@ class _AiRecommendationsScreenState
     extends ConsumerState<AiRecommendationsScreen> {
   final List<_ChatMessage> _messages = [
     _ChatMessage(
-      text: "Hi there! I'm Star ⭐\n\n"
+      text: "Hi there! I'm ACEsi\n\n"
           "First things first — complete your profile so I can give you the best recommendations for your needs!",
       isUser: false,
     ),
@@ -37,10 +37,10 @@ class _AiRecommendationsScreenState
       final isProfileComplete = profile != null && profile.personal.firstName.isNotEmpty &&
           profile.grade12Subjects.isNotEmpty;
       final greeting = isProfileComplete
-          ? "Hi there $name! I'm Star ⭐\n\n"
+          ? "Hi there $name! I'm ACEsi\n\n"
               "I can help you find the right university/bursary that fits your needs and style. "
               "I can do more than that — wherever you see me, just tap/click on me and ask away."
-          : "Hi there $name! I'm Star ⭐\n\n"
+          : "Hi there $name! I'm ACEsi\n\n"
               "First things first — complete your profile so I can give you the best recommendations for your needs!";
       if (_messages.isNotEmpty && !_messages.first.text.contains(name)) {
         setState(() {
@@ -69,7 +69,7 @@ class _AiRecommendationsScreenState
     String accumulated = '';
     try {
       await AiService.askStream(
-        prompt: 'You are Star, a friendly South African university advisor. '
+        prompt: 'You are ACEsi, a friendly South African university advisor. '
             'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
             '$contextInfo\nStudent asks: $text',
         onToken: (token) {
@@ -113,7 +113,8 @@ class _AiRecommendationsScreenState
     if (profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Complete your profile first so Star can help you!'),
+          content:
+              Text('Complete your profile first so ACEsi can help you!'),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -216,7 +217,7 @@ class _AiRecommendationsScreenState
             children: [
               StarAvatar(size: 28),
               SizedBox(width: 6),
-              Text('Star'),
+              Text('ACEsi'),
             ],
           ),
         ),
@@ -265,7 +266,7 @@ class _AiRecommendationsScreenState
                               }
                             },
                       decoration: const InputDecoration(
-                        hintText: 'Ask Star anything...',
+                        hintText: 'Ask ACEsi anything...',
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                       ),
