@@ -6552,6 +6552,10 @@ perspective: 900px;
         if (ta) { ta.style.background = showFlutter ? '#000' : '#ffa500'; ta.style.color = showFlutter ? '#ffa500' : '#000'; }
         if (tf) { tf.style.background = showFlutter ? '#ffa500' : '#000'; tf.style.color = showFlutter ? '#000' : '#ffa500'; }
         window.__aceActiveTerminal = which;
+        if (showFlutter) {
+          var fb = document.getElementById('flutter-console-output');
+          if (fb) requestAnimationFrame(function () { fb.scrollTop = fb.scrollHeight; });
+        }
       };
 
       window.aceFlutterSend = async function () {
@@ -6576,7 +6580,7 @@ perspective: 900px;
           if (/^q$/i.test(key)) window.stopAceFlutterFollow();
         } catch (e) {
           var b = document.getElementById('flutter-console-output');
-          if (b) b.textContent += '[error: ' + e.message + ']\n';
+          if (b) { b.textContent += '[error: ' + e.message + ']\n'; b.scrollTop = b.scrollHeight; }
         }
       };
 
@@ -18126,15 +18130,22 @@ html body #terminal-output.ace-flutter-hidden { display:none !important; }
 html body #flutter-console.ace-acesi-hidden { display:none !important; }
 /* The Flutter console must never outgrow the split - otherwise it slides
    underneath the pinned prompt row. */
+/* The console must be a real flex column: otherwise <pre> sizes to its whole
+   content, the parent clips it, and there is no scrollbar to auto-scroll. */
 html body #flutter-console {
+  display:flex !important;
+  flex-direction:column !important;
   min-height:0 !important;
   height:100% !important;
   flex:1 1 auto !important;
   overflow:hidden !important;
 }
 html body #flutter-console-output {
-  overflow:auto !important;
+  flex:1 1 auto !important;
+  height:0 !important;
   min-height:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
 }
 /* Hardware cards: six equal boxes filling the dashboard top to bottom. */
 html body #ace-term-dashboard {
