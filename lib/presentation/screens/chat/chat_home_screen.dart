@@ -6,8 +6,9 @@ import 'package:studentsyncsa/presentation/screens/chat/general_chat_screen.dart
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/chat_service.dart';
 
-/// Community opens with a left panel that really slides in and out.
-/// The panel shows the room icons and the current chat list.
+/// Community chat. The room panel is a real Flutter Drawer, so it gets the
+/// built-in left-to-right slide animation and scrim instead of a hand-rolled
+/// transform that could appear to "pop" open.
 class ChatHomeScreen extends StatefulWidget {
   const ChatHomeScreen({super.key});
 
@@ -15,30 +16,21 @@ class ChatHomeScreen extends StatefulWidget {
   State<ChatHomeScreen> createState() => _ChatHomeScreenState();
 }
 
-class _ChatHomeScreenState extends State<ChatHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _ChatHomeScreenState extends State<ChatHomeScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selected = 0; // General Chat is the open conversation
-  bool _panelOpen = false;
   final Map<String, int> _unread = {};
   Timer? _poll;
 
-  /// Explicit controller: AnimatedPositioned could not be relied on because
-  /// the first open happened during the route transition and looked like a pop.
-  late final AnimationController _panelController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 450),
-  );
-  late final Animation<Offset> _panelSlide = Tween<Offset>(
-    begin: const Offset(-1, 0),
-    end: Offset.zero,
-  ).animate(
-    CurvedAnimation(parent: _panelController, curve: Curves.easeOutCubic),
-  );
+  // Example badge counts shown on the room icons for the build demo.
+  static const _demoUnread = {'province': 2, 'university': 3};
 
+  /// Current and history chats only - no "University Chat" entry.
   static const _sampleChats = [
     ('Sipho Dlamini', 'Anyone applying to UCT this year?', '11:25', 2),
     ('Thandi Mokoena', 'NSFAS closes soon, check your profile', '10:42', 1),
-    ('University Chat', 'Future classmates group is live', '09:15', 0),
+    ('Lerato Nkosi', 'See you at registration!', '09:15', 0),
+    ('Kabelo Sithole', 'Sent you the NSFAS checklist', 'Yesterday', 0),
   ];
 
   static const _rooms = [
@@ -50,9 +42,9 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
   @override
   void initState() {
     super.initState();
-    // Wait for the dashboard-to-chat route transition, then slide in.
-    Future<void>.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _openPanel();
+    // Let the dashboard route transition finish, then slide the panel in.
+    Future<void>.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _scaffoldKey.currentState?.openDrawer();
     });
     if (ChatService.isConfigured) {
       _checkUnread();
@@ -63,21 +55,10 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
   @override
   void dispose() {
     _poll?.cancel();
-    _panelController.dispose();
     super.dispose();
   }
 
-  void _openPanel() {
-    if (!mounted) return;
-    setState(() => _panelOpen = true);
-    _panelController.forward();
-  }
-
-  void _closePanel() {
-    if (!mounted) return;
-    setState(() => _panelOpen = false);
-    _panelController.reverse();
-  }
+  void _openDrawer() => _scaffoldKey.currentState?.openDrawer();
 
   Future<void> _checkUnread() async {
     for (final room in _rooms) {
@@ -91,63 +72,52 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
     }
   }
 
+  int _badgeCount(String room) =>
+      _demoUnread[room] ?? _unread[room] ?? 0;
+
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final panelWidth = w < 600 ? w * 0.82 : 300.0;
-    return Stack(
-      children: [
-        GeneralChatScreen(
-          room: _rooms[_selected].$2,
-          title: _rooms[_selected].$1,
-          topStrip: _topStrip(),
-        ),
-        // Scrim exists ONLY while the panel is open. An always-mounted
-        // AbsorbPointer kept swallowing taps even when faded out, which made
-        // the chat screen completely unresponsive after closing the panel.
-        if (_panelOpen)
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _closePanel,
-              child: Container(color: Colors.black54),
-            ),
-          ),
-        Positioned(
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: panelWidth,
-          child: SlideTransition(
-            position: _panelSlide,
-            child: SizedBox(width: panelWidth, child: _panel()),
-          ),
-        ),
-      ],
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: Colors.black,
+      drawer: Drawer(
+        width: w < 600 ? w * 0.82 : 300.0,
+        backgroundColor: const Color(0xFF080808),
+        child: _panel(),
+      ),
+      body: GeneralChatScreen(
+        room: _rooms[_selected].$2,
+        title: _rooms[_selected].$1,
+        topStrip: _topStrip(),
+      ),
     );
   }
 
-  /// Icons + permanently highlighted "Open chats" button under the title.
+  /// Icons + permanently highlighted multicolour "Open chats" button.
   Widget _topStrip() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Tooltip(
-              message: 'Open chats',
-              child: GestureDetector(
-                onTap: _openPanel,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    border: Border.all(color: AppColors.primary, width: 1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.menu_rounded,
-                      size: 20, color: Colors.black),
+            GestureDetector(
+              onTap: _openDrawer,
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.18),
+                  border: Border.all(color: AppColors.primary, width: 2),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
+                child: const StarIcon(Icons.menu_rounded, size: 20),
               ),
             ),
             ...List.generate(_rooms.length, (i) => _icon(i)),
@@ -155,16 +125,19 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
         ),
       );
 
-  Widget _icon(int i) {
+  Widget _icon(int i, {bool fromPanel = false}) {
     final room = _rooms[i];
     final active = _selected == i;
-    final unread = _unread[room.$2] ?? 0;
+    final unread = _badgeCount(room.$2);
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: () {
+          if (!mounted) return;
           setState(() => _selected = i);
-          _closePanel();
+          if (fromPanel && mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
         },
         child: Stack(
           clipBehavior: Clip.none,
@@ -205,43 +178,35 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
                 color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
       );
 
-  Widget _panel() => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF080808),
-          border: Border(right: BorderSide(color: AppColors.border, width: 1)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
-              child: Row(
-                children: [
-                  const Text('CHATS',
-                      style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 10,
-                          letterSpacing: 1.5)),
-                  const Spacer(),
-                ],
-              ),
+  Widget _panel() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
+            child: Text(
+              'CHATS',
+              style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 10,
+                  letterSpacing: 1.5),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: List.generate(_rooms.length, (i) => _icon(i)),
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: List.generate(
+                  _rooms.length, (i) => _icon(i, fromPanel: true)),
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(8),
-                children:
-                    List.generate(_sampleChats.length, (i) => _sampleTile(i)),
-              ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(8),
+              children:
+                  List.generate(_sampleChats.length, (i) => _sampleTile(i)),
             ),
-          ],
-        ),
+          ),
+        ],
       );
 
   Widget _sampleTile(int i) {
