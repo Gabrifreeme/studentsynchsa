@@ -32,14 +32,7 @@ class _ApplicationTrackerScreenState
             Expanded(
               child: appsAsync.when(
                 data: (apps) {
-                  if (apps.isEmpty) {
-                    return const EmptyState(
-                      icon: Icons.assignment_outlined,
-                      title: 'No applications yet',
-                      subtitle:
-                          'Applications are added automatically as you apply',
-                    );
-                  }
+                  if (apps.isEmpty) return const SizedBox.shrink();
                   return RefreshIndicator(
                     onRefresh: () async {
                       ref.invalidate(applicationsProvider);
