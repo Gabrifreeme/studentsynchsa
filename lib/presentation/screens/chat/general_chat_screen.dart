@@ -176,7 +176,11 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
             ),
             child: Column(
               children: [
-                if (widget.topStrip != null) widget.topStrip!,
+                if (widget.topStrip != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: widget.topStrip!,
+                  ),
                 if (_error != null)
                   Container(
                     width: double.infinity,
