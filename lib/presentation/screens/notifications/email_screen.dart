@@ -55,10 +55,8 @@ class _EmailScreenState extends State<EmailScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 8),
                       onTap: () async {
-                        // One tap clears the unread highlight, then asks.
-                        await NotificationService.markRemoteRead('${n.id}');
-                        await _refresh();
-                        await showDialog<bool>(
+                        // Tapping only asks; the user decides when to clear it.
+                        final open = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             backgroundColor: AppColors.surface,
@@ -86,6 +84,9 @@ class _EmailScreenState extends State<EmailScreen> {
                             ],
                           ),
                         );
+                        if (open != true) return;
+                        await NotificationService.markRemoteRead('${n.id}');
+                        await _refresh();
                       },
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
