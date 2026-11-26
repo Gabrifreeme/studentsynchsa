@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
 import 'package:studentsyncsa/presentation/providers/application_provider.dart';
@@ -25,12 +24,6 @@ class _ApplicationTrackerScreenState
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('My Applications'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add_rounded),
-              onPressed: () => _showAddDialog(),
-            ),
-          ],
         ),
         body: appsAsync.when(
           data: (apps) {
@@ -38,7 +31,7 @@ class _ApplicationTrackerScreenState
               return const EmptyState(
                 icon: Icons.assignment_outlined,
                 title: 'No applications yet',
-                subtitle: 'Tap + to add your first university application',
+                subtitle: 'Applications are added automatically as you apply',
               );
             }
             return RefreshIndicator(
@@ -122,60 +115,6 @@ class _ApplicationTrackerScreenState
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showAddDialog() {
-    final uniCtrl = TextEditingController();
-    final courseCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('New Application',
-            style: TextStyle(color: AppColors.textPrimary)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: uniCtrl,
-                decoration: const InputDecoration(labelText: 'University Name'),
-                validator: (v) => v?.isEmpty == true ? 'Required' : null,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: courseCtrl,
-                decoration: const InputDecoration(labelText: 'Course / Programme'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final app = UniversityApplication(
-                  id: const Uuid().v4(),
-                  universityId: uniCtrl.text.trim(),
-                  universityName: uniCtrl.text.trim(),
-                  course: courseCtrl.text.trim(),
-                );
-                ref.read(applicationsProvider.notifier).save(app);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
