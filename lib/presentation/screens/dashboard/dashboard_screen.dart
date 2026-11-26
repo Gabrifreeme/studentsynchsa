@@ -242,8 +242,6 @@ class _EmailCard extends StatefulWidget {
 class _EmailCardState extends State<_EmailCard> {
   Timer? _timer;
   List<AppNotification> _rows = [];
-  int? _lastCount;
-  bool _loaded = false;
 
   @override
   void initState() {
@@ -262,26 +260,7 @@ class _EmailCardState extends State<_EmailCard> {
     try {
       final rows = await NotificationService.fetchRemote();
       if (!mounted) return;
-      final count = rows
-          .where((n) => !NotificationService.isRemoteRead('${n.id}'))
-          .length;
-      if (_loaded && count > (_lastCount ?? 0) && rows.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'New email notification: ${rows.first.title}',
-              style: const TextStyle(
-                  color: AppColors.textPrimary, fontSize: 11),
-            ),
-            backgroundColor: AppColors.surfaceLight,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-      _lastCount = count;
       _rows = rows;
-      _loaded = true;
       setState(() {});
     } catch (_) {}
   }
