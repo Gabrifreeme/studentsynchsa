@@ -21731,7 +21731,10 @@ def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
                 pass
             raise RuntimeError("HTTP %d %s" % (r.status_code, body))
         got_any = False
-        for line in r.iter_lines(decode_unicode=True):
+        for raw_line in r.iter_lines(decode_unicode=False):
+            # SSE has no charset header; requests would guess Latin-1 and turn
+            # UTF-8 apostrophes into mojibake. Decode explicitly as UTF-8.
+            line = raw_line.decode('utf-8', 'replace') if isinstance(raw_line, bytes) else raw_line
             if not line:
                 continue
             if not line.startswith("data:"):
