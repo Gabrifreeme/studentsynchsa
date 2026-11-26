@@ -1,3 +1,9 @@
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+
 window.acePushSupported = function () {
   return 'serviceWorker' in navigator && 'PushManager' in window &&
     typeof Notification !== 'undefined';
