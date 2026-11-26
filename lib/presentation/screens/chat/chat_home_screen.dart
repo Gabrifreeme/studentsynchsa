@@ -78,46 +78,44 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     final active = _selected == i;
     final unread = _unread[room.$2] ?? 0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-      child: AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.fromLTRB(8, 5, 0, 0),
+      child: GestureDetector(
         onTap: () => setState(() => _selected = i),
-        child: ListTile(
-          dense: true,
-          visualDensity: VisualDensity.compact,
-          leading: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              StarIcon(room.$3, size: 20),
-              if (unread > 0)
-                Positioned(
-                  right: -6,
-                  top: -6,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: const BoxDecoration(
-                        color: Color(0xFFFF4444), shape: BoxShape.circle),
-                    child: Text('$unread',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w700)),
-                  ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active
+                    ? AppColors.primary.withValues(alpha: 0.16)
+                    : AppColors.surfaceLight,
+                border: Border.all(
+                    color: active ? AppColors.primary : AppColors.border,
+                    width: 1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: StarIcon(room.$3, size: 21),
+            ),
+            if (unread > 0)
+              Positioned(
+                right: -5,
+                top: -5,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFFF4444), shape: BoxShape.circle),
+                  child: Text('$unread',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700)),
                 ),
-            ],
-          ),
-          title: Text(room.$1,
-              style: TextStyle(
-                  color: active ? AppColors.primary : AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-          subtitle: Text(room.$4,
-              style: const TextStyle(
-                  color: AppColors.textMuted, fontSize: 9)),
-          trailing: Icon(Icons.chevron_right_rounded,
-              color: active ? AppColors.primary : AppColors.textMuted,
-              size: 16),
+              ),
+          ],
         ),
       ),
     );
