@@ -156,7 +156,6 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          automaticallyImplyLeading: false,
           title: Text(widget.title),
           actions: [
             Padding(

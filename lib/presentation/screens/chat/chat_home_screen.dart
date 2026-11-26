@@ -102,20 +102,16 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
           title: _rooms[_selected].$1,
           topStrip: _topStrip(),
         ),
-        // Scrim: fades with the panel and closes it when tapped.
-        Positioned.fill(
-          child: AnimatedOpacity(
-            opacity: _panelOpen ? 1 : 0,
-            duration: const Duration(milliseconds: 300),
-            child: AbsorbPointer(
-              absorbing: !_panelOpen,
-              child: GestureDetector(
-                onTap: _closePanel,
-                child: Container(color: Colors.black54),
-              ),
+        // Scrim exists ONLY while the panel is open. An always-mounted
+        // AbsorbPointer kept swallowing taps even when faded out, which made
+        // the chat screen completely unresponsive after closing the panel.
+        if (_panelOpen)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _closePanel,
+              child: Container(color: Colors.black54),
             ),
           ),
-        ),
         Positioned(
           left: 0,
           top: 0,
