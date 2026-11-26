@@ -241,13 +241,15 @@ class _EmailCard extends StatefulWidget {
 
 class _EmailCardState extends State<_EmailCard> {
   Timer? _timer;
+  List<AppNotification> _rows = [];
+  int? _lastCount;
+  bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) setState(() {});
-    });
+    _check();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _check());
   }
 
   @override
@@ -256,71 +258,93 @@ class _EmailCardState extends State<_EmailCard> {
     super.dispose();
   }
 
+  Future<void> _check() async {
+    try {
+      final rows = await NotificationService.fetchRemote();
+      if (!mounted) return;
+      final count = rows
+          .where((n) => !NotificationService.isRemoteRead('${n.id}'))
+          .length;
+      if (_loaded && count > (_lastCount ?? 0) && rows.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'New email notification: ${rows.first.title}',
+              style: const TextStyle(
+                  color: AppColors.textPrimary, fontSize: 11),
+            ),
+            backgroundColor: AppColors.surfaceLight,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      _lastCount = count;
+      _rows = rows;
+      _loaded = true;
+      setState(() {});
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<AppNotification>>(
-        future: NotificationService.fetchRemote(),
-        builder: (context, snap) {
-          final rows = snap.data ?? const <AppNotification>[];
-          final count = rows
-              .where((n) => !NotificationService.isRemoteRead('${n.id}'))
-              .length;
-          final latest = rows.isNotEmpty ? rows.first : null;
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340),
-              child: SizedBox(
-                width: double.infinity,
-                child: AppCard(
-                  onTap: () => context.push('/email-notifications'),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Row(
+    final rows = _rows;
+    final count = rows
+        .where((n) => !NotificationService.isRemoteRead('${n.id}'))
+        .length;
+    final latest = rows.isNotEmpty ? rows.first : null;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: SizedBox(
+          width: double.infinity,
+          child: AppCard(
+            onTap: () => context.push('/email-notifications'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              children: [
+                const StarIcon(Icons.mail_outline_rounded, size: 18),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const StarIcon(Icons.mail_outline_rounded, size: 18),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Email',
-                              style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            if (latest != null)
-                              Text(
-                                latest.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: AppColors.textMuted, fontSize: 9),
-                              ),
-                          ],
-                        ),
+                      const Text(
+                        'Email',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700),
                       ),
-                      if (count > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: const BoxDecoration(
-                              color: Color(0xFFFF4444), shape: BoxShape.circle),
-                          child: Text('$count',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700)),
+                      if (latest != null)
+                        Text(
+                          latest.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.textMuted, fontSize: 9),
                         ),
                     ],
                   ),
                 ),
-              ),
+                if (count > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFFF4444), shape: BoxShape.circle),
+                    child: Text('$count',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700)),
+                  ),
+              ],
             ),
-          );
-        },
-      );
+          ),
+        ),
+      ),
+    );
   }
 }
 
