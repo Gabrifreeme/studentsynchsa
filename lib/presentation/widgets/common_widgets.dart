@@ -66,6 +66,9 @@ class StarAvatar extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.high,
+        // Some cached web builds cannot find the PNG. Never leave a dead star.
+        errorBuilder: (_, __, ___) =>
+            StarIcon(Icons.star_rounded, size: size),
       ),
     );
     if (pulse) {
