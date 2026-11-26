@@ -5,7 +5,15 @@ import 'package:http/http.dart' as http;
 class AiService {
   // ACEsi's own Groq -> Gemini stream endpoint, proxied by the app's web
   // server so the phone never talks to a third-party API directly.
-  static Uri get _endpoint => Uri.base.resolve('api/ai/ask');
+  static Uri get _endpoint {
+    final base = Uri.base;
+    // The Flutter debug server (55793) has no AI route; use the release
+    // server on 8080 in that case.
+    if (base.port == 55793) {
+      return Uri.parse('http://127.0.0.1:8080/api/ai/ask');
+    }
+    return base.resolve('api/ai/ask');
+  }
 
   static Future<void> warmUp() async {}
 
