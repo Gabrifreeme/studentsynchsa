@@ -1966,7 +1966,7 @@ def _send_web_pushes(title, body):
                         "body": body,
                         "url": "/#/dashboard",
                     }),
-                    vapid_private_key=vapid["private"],
+                    vapid_private_key=os.path.join(base, "tools", "vapid_private.pem"),
                     vapid_claims={
                         "sub": "mailto:gabrieltrollip200@gmail.com"
                     },

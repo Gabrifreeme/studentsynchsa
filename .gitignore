@@ -87,6 +87,8 @@ emails.json
 .email_watch_state.json
 email_notify_rules.local.json
 tools/notif_config.json
+tools/vapid_keys.json
+tools/vapid_private.pem
 server_stdout.txt
 server_stderr.txt
 server_stdout.txt.*
