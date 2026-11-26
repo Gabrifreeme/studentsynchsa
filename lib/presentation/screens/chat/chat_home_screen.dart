@@ -69,6 +69,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   Widget _roomStrip() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: List.generate(_rooms.length, (i) => _roomIcon(i)),
         ),
       );
