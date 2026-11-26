@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -242,6 +244,9 @@ class _EmailCard extends StatefulWidget {
 class _EmailCardState extends State<_EmailCard> {
   Timer? _timer;
   List<AppNotification> _rows = [];
+  final AudioPlayer _player = AudioPlayer();
+  int? _lastCount;
+  bool _loaded = false;
 
   @override
   void initState() {
@@ -253,6 +258,7 @@ class _EmailCardState extends State<_EmailCard> {
   @override
   void dispose() {
     _timer?.cancel();
+    _player.dispose();
     super.dispose();
   }
 
@@ -260,6 +266,17 @@ class _EmailCardState extends State<_EmailCard> {
     try {
       final rows = await NotificationService.fetchRemote();
       if (!mounted) return;
+      final count = rows
+          .where((n) => !NotificationService.isRemoteRead('${n.id}'))
+          .length;
+      // Two-dong bell only for genuinely new mail after first load.
+      if (_loaded && count > (_lastCount ?? 0)) {
+        try {
+          await _player.play(AssetSource('audio/email_ding.wav'));
+        } catch (_) {}
+      }
+      _lastCount = count;
+      _loaded = true;
       _rows = rows;
       setState(() {});
     } catch (_) {}
