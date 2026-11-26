@@ -1887,11 +1887,27 @@ def _push_app_notification(title, body, sender=None):
         key = str(cfg.get("supabase_key", ""))
         if not url or not key:
             return False
-        payload = _json.dumps({
+        item = {
             "title": str(title or "")[:120],
             "body": str(body or "")[:500],
             "sender": str(sender or "")[:120],
-        }).encode("utf-8")
+        }
+        # A forced re-check must not create a second copy of the same email.
+        try:
+            check = _urlreq.Request(
+                url + "/rest/v1/app_notifications?select=title,body,sender&limit=200",
+                headers={"apikey": key, "Authorization": "Bearer " + key},
+            )
+            with _urlreq.urlopen(check, timeout=10) as resp:
+                existing = _json.loads(resp.read().decode("utf-8"))
+            for row in existing:
+                if (row.get("title") == item["title"]
+                        and row.get("body") == item["body"]
+                        and row.get("sender") == item["sender"]):
+                    return True
+        except Exception:
+            pass
+        payload = _json.dumps(item).encode("utf-8")
         req = _urlreq.Request(
             url + "/rest/v1/app_notifications",
             data=payload,
