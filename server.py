@@ -2111,7 +2111,9 @@ def check_email_now(force_all=False):
                    % (name, sender, subject, ("\n\n" + snippet) if snippet else ""))
             ok = send_ntfy("ACEsi", msg)
             app_ok = _push_app_notification(
-                "%s: %s" % (name, sender), subject or "New email", snippet)
+                subject or ("New email from " + sender),
+                snippet or "You received a new email.",
+                sender)
             print("📧 email watch: matched %r on %s -> ntfy ok=%s, app ok=%s"
                   % (_email_rule_label(matched[0], sender, subject, body),
                      name, ok, app_ok))
