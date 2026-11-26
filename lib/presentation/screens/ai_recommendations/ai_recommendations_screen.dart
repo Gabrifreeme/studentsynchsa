@@ -253,6 +253,8 @@ class _AiRecommendationsScreenState
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
+                      style: const TextStyle(
+                          color: AppColors.textPrimary, fontSize: 13),
                       textInputAction: TextInputAction.send,
                       onSubmitted: _loading
                           ? null
@@ -346,8 +348,8 @@ class _ChatBubble extends StatelessWidget {
                     message.text,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 10,
-                      height: 1.5,
+                      fontSize: 13,
+                      height: 1.45,
                     ),
                   ),
                   if (message.state == StarMessageState.error && onRetry != null) ...[
