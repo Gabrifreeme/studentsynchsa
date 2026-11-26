@@ -6,8 +6,8 @@ import 'package:studentsyncsa/presentation/screens/chat/general_chat_screen.dart
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/chat_service.dart';
 
-/// WhatsApp-style chat home. The room panel is hidden until the menu button
-/// is tapped. Each room shows an unread badge when new messages arrive.
+/// Opens straight into General Chat. A compact strip of room icons with
+/// unread badges sits at the top; the full room panel is opt-in via a button.
 class ChatHomeScreen extends StatefulWidget {
   const ChatHomeScreen({super.key});
 
@@ -16,15 +16,15 @@ class ChatHomeScreen extends StatefulWidget {
 }
 
 class _ChatHomeScreenState extends State<ChatHomeScreen> {
-  int? _selected;
+  int _selected = 0; // General Chat by default
   bool _menuOpen = false;
   final Map<String, int> _unread = {};
   Timer? _poll;
 
   static const _rooms = [
-    ('General Chat', 'general', Icons.chat_rounded),
+    ('General Chat', 'general', Icons.forum_rounded),
     ('Province-based', 'province', Icons.map_rounded),
-    ('University Interest Groups', 'university', Icons.school_rounded),
+    ('University', 'university', Icons.school_rounded),
   ];
 
   @override
@@ -46,10 +46,10 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     for (final room in _rooms) {
       try {
         final rows = await ChatService.fetchMessages(room.$2);
-        final count = rows.length;
         final read = ChatService.readCount(room.$2);
         if (!mounted) return;
-        setState(() => _unread[room.$2] = count > read ? count - read : 0);
+        setState(() =>
+            _unread[room.$2] = rows.length > read ? rows.length - read : 0);
       } catch (_) {}
     }
   }
@@ -58,46 +58,91 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   Widget build(BuildContext context) {
     final wide = MediaQuery.of(context).size.width >= 700;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Community Chat'),
-        leading: IconButton(
-          tooltip: 'Open conversations',
-          icon: const StarIcon(Icons.menu_rounded, size: 20),
-          onPressed: () {
-            if (wide) {
-              setState(() => _menuOpen = !_menuOpen);
-            } else {
-              setState(() => _selected = null);
-            }
-          },
-        ),
+      appBar: AppBar(title: const Text('Community Chat')),
+      body: Column(
+        children: [
+          _roomStrip(),
+          if (wide && _menuOpen)
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(width: 230, child: _list()),
+                  const VerticalDivider(width: 1, color: AppColors.border),
+                  Expanded(child: _pane()),
+                ],
+              ),
+            )
+          else
+            Expanded(child: _pane()),
+        ],
       ),
-      body: wide ? _wideLayout() : (_selected == null ? _list() : _pane(_selected!)),
     );
   }
 
-  Widget _wideLayout() {
-    if (!_menuOpen) {
-      return _selected == null
-          ? const Center(
-              child: Text('Tap the menu to open conversations',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12)))
-          : _pane(_selected!);
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(width: 260, child: _list()),
-        const VerticalDivider(width: 1, color: AppColors.border),
-        Expanded(
-          child: _selected == null
-              ? const Center(
-                  child: Text('Select a conversation',
-                      style: TextStyle(
-                          color: AppColors.textMuted, fontSize: 12)))
-              : _pane(_selected!),
+  /// Compact row of room icons with red unread badges + the panel button.
+  Widget _roomStrip() => Container(
+        decoration: const BoxDecoration(
+            border: Border(
+                bottom: BorderSide(color: AppColors.border, width: 1))),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            ...List.generate(_rooms.length, (i) => _stripButton(i)),
+            const Spacer(),
+            IconButton(
+              tooltip: _menuOpen ? 'Close rooms' : 'Open rooms',
+              icon: StarIcon(
+                  _menuOpen ? Icons.close_rounded : Icons.menu_rounded,
+                  size: 19),
+              onPressed: () => setState(() => _menuOpen = !_menuOpen),
+            ),
+          ],
         ),
-      ],
+      );
+
+  Widget _stripButton(int i) {
+    final room = _rooms[i];
+    final active = _selected == i;
+    final unread = _unread[room.$2] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: GestureDetector(
+        onTap: () => setState(() => _selected = i),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
+                border: Border.all(
+                    color: active ? AppColors.primary : AppColors.border,
+                    width: 1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: StarIcon(room.$3, size: 20),
+            ),
+            if (unread > 0)
+              Positioned(
+                right: -5,
+                top: -5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFFF4444), shape: BoxShape.circle),
+                  child: Text('$unread',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -120,27 +165,24 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     final name = _rooms[i].$1;
     final icon = _rooms[i].$3;
     final room = _rooms[i].$2;
-    final active = _selected == i;
     final unread = _unread[room] ?? 0;
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      onTap: () => _open(i),
+      onTap: () => setState(() => _selected = i),
       child: ListTile(
         dense: true,
         visualDensity: VisualDensity.compact,
         leading: StarIcon(icon, size: 18),
-        title: Text(name,
-            style: TextStyle(
-                color: active ? AppColors.primary : AppColors.textPrimary,
-                fontSize: 12)),
+        title: Text(name, style: const TextStyle(
+            color: AppColors.textPrimary, fontSize: 12)),
         trailing: unread > 0
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: const BoxDecoration(
-                    color: AppColors.primary, shape: BoxShape.circle),
+                    color: Color(0xFFFF4444), shape: BoxShape.circle),
                 child: Text('$unread',
                     style: const TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontSize: 9,
                         fontWeight: FontWeight.w700)),
               )
@@ -150,16 +192,6 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     );
   }
 
-  void _open(int i) {
-    final wide = MediaQuery.of(context).size.width >= 700;
-    if (wide) {
-      setState(() => _selected = i);
-      return;
-    }
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GeneralChatScreen(room: _rooms[i].$2, title: _rooms[i].$1),
-    ));
-  }
-
-  Widget _pane(int i) => GeneralChatScreen(room: _rooms[i].$2, title: _rooms[i].$1);
+  Widget _pane() =>
+      GeneralChatScreen(room: _rooms[_selected].$2, title: _rooms[_selected].$1);
 }
