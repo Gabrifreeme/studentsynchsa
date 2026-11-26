@@ -136,25 +136,41 @@ class DashboardScreen extends ConsumerWidget {
     return Column(
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            IconButton(
-              icon: StarIcon(
-                  isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
-                  size: 20),
-              onPressed: openMenu,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    icon: StarIcon(
+                        isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
+                        size: 20),
+                    onPressed: openMenu,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                  ),
+                  tile(Icons.auto_awesome_rounded, 'ACEsi',
+                      '/ai-recommendations'),
+                ],
+              ),
             ),
-            const SizedBox(width: AppSpaces.xs),
-            Expanded(child: tile(Icons.auto_awesome_rounded, 'ACEsi', '/ai-recommendations')),
             const SizedBox(width: AppSpaces.sm),
-            Expanded(child: tile(Icons.person_rounded, 'My Profile', '/onboarding')),
-            const SizedBox(width: AppSpaces.xs),
-            IconButton(
-              icon: const StarIcon(Icons.notifications_outlined, size: 20),
-              onPressed: () => context.push('/notifications'),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const StarIcon(Icons.notifications_outlined, size: 20),
+                    onPressed: () => context.push('/notifications'),
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                  ),
+                  tile(Icons.person_rounded, 'My Profile', '/onboarding'),
+                ],
+              ),
             ),
           ],
         ),
