@@ -15,7 +15,13 @@ function aceUrlBase64ToUint8Array(base64String) {
 window.acePushRegister = async function (vapidPublicKey) {
   try {
     if (!window.acePushSupported()) {
-      return JSON.stringify({ ok: false, error: 'Push not supported here' });
+      return JSON.stringify({
+        ok: false,
+        error: 'Push unavailable: secure=' + window.isSecureContext +
+          ', sw=' + ('serviceWorker' in navigator) +
+          ', push=' + ('PushManager' in window) +
+          ', notify=' + (typeof Notification !== 'undefined'),
+      });
     }
     var permission = await Notification.requestPermission();
     if (permission !== 'granted') {
