@@ -12,11 +12,13 @@ class GeneralChatScreen extends StatefulWidget {
   final String room;
   final String title;
   final Widget? topStrip;
+  final VoidCallback? onBack;
   const GeneralChatScreen({
     super.key,
     this.room = 'general',
     this.title = 'General Chat',
     this.topStrip,
+    this.onBack,
   });
 
   @override
@@ -154,6 +156,14 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: widget.onBack != null
+              ? IconButton(
+                  tooltip: 'Open chats',
+                  icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
+                  onPressed: widget.onBack,
+                )
+              : null,
           title: Text(widget.title),
           actions: [
             Padding(
