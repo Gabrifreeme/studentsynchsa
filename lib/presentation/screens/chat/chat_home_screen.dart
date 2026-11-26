@@ -21,6 +21,12 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   final Map<String, int> _unread = {};
   Timer? _poll;
 
+  static const _sampleChats = [
+    ('Sipho Dlamini', 'Anyone applying to UCT this year?', '11:25', 2),
+    ('Thandi Mokoena', 'NSFAS closes soon, check your profile', '10:42', 1),
+    ('University Chat', 'Future classmates group is live', '09:15', 0),
+  ];
+
   static const _rooms = [
     ('General Chat', 'general', Icons.forum_rounded, 'Talk to all students'),
     ('Province Base Chat', 'province', Icons.map_rounded,
@@ -32,7 +38,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
       if (mounted) setState(() => _panelOpen = true);
     });
     if (ChatService.isConfigured) {
@@ -191,7 +197,11 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(8),
-                children: List.generate(_rooms.length, (i) => _chatTile(i)),
+                children: [
+                  ...List.generate(_sampleChats.length, (i) => _sampleTile(i)),
+                  const SizedBox(height: 6),
+                  ...List.generate(_rooms.length, (i) => _chatTile(i)),
+                ],
               ),
             ),
           ],
@@ -219,6 +229,38 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
         subtitle: Text(room.$4,
             style: const TextStyle(color: AppColors.textMuted, fontSize: 9)),
         trailing: unread > 0 ? _badge(unread) : null,
+      ),
+    );
+  }
+
+  Widget _sampleTile(int i) {
+    final c = _sampleChats[i];
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        leading: CircleAvatar(
+          radius: 14,
+          backgroundColor: AppColors.primaryDark,
+          child: Text(c.$1[0],
+              style: const TextStyle(color: AppColors.primary, fontSize: 11)),
+        ),
+        title: Text(c.$1,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 11)),
+        subtitle: Text(c.$2,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 9)),
+        trailing: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(c.$3,
+                style: const TextStyle(
+                    color: AppColors.textMuted, fontSize: 8)),
+            if (c.$4 > 0) _badge(c.$4),
+          ],
+        ),
       ),
     );
   }
