@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/notification_service.dart';
@@ -87,6 +88,16 @@ class _EmailScreenState extends State<EmailScreen> {
                         if (open != true) return;
                         await NotificationService.markRemoteRead('${n.id}');
                         await _refresh();
+                        // Open the real mailbox, filtered to this sender.
+                        final sender = n.sender?.trim() ?? '';
+                        final query = Uri.encodeComponent(
+                            sender.isEmpty ? n.title : 'from:($sender)');
+                        final url = Uri.parse(
+                            'https://mail.google.com/mail/u/0/#search/$query');
+                        try {
+                          await launchUrl(url,
+                              mode: LaunchMode.externalApplication);
+                        } catch (_) {}
                       },
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
