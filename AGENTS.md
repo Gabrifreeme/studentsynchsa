@@ -38,7 +38,7 @@ It is a Flask server + single-page HTML UI.
   - lives inside the left pane, only on the Flutter tab, no border lines,
   - no Send button — Enter sends `r`/`R`/`q`,
   - hardware cards must fill the right column with no strip under them.
-- Flutter run command: `flutter run -d web-server --web-hostname 127.0.0.1 --web-port 55793`
+- Flutter run command: `flutter run -d web-server --web-hostname 0.0.0.0 --web-port 55793`
 - Wait for `Flutter run key commands` in the log before sending `R`; pressing
   keys during startup causes hot-restart timeouts and a white page.
 
@@ -83,3 +83,11 @@ It is a Flask server + single-page HTML UI.
 - Be honest when unsure; prefer a certain small fix over a guessed broad one.
 - When a screenshot disagrees with computed styles, sample pixels to settle it.
 - Keep both repos committed and pushed at all times.
+
+
+## LAN testing
+- The Flutter command binds `0.0.0.0` so another device on the same Wi-Fi can
+  open `http://<PC-LAN-IP>:55793`. Find the IP with:
+  `Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*"}`
+- Chrome on this PC still uses `http://127.0.0.1:55793`.
+- Each device needs its own Supabase URL/key in Settings → Community Chat.
