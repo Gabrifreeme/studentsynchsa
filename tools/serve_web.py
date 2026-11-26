@@ -50,14 +50,63 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         finally:
             conn.close()
 
+    def _ai_ask(self):
+        """Collect ACEsi's stream and return one plain JSON reply."""
+        length = int(self.headers.get('Content-Length') or 0)
+        body = self.rfile.read(length) if length else b''
+        reply = ''
+        error = ''
+        conn = http.client.HTTPConnection('127.0.0.1', 5000, timeout=120)
+        try:
+            conn.request(
+                'POST', '/api/ai/chat', body=body,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Content-Length': str(len(body)),
+                },
+            )
+            resp = conn.getresponse()
+            for raw in resp:
+                line = raw.decode('utf-8', 'replace').strip()
+                if not line.startswith('data:'):
+                    continue
+                payload = line[5:].strip()
+                if payload == '[DONE]':
+                    break
+                data = json.loads(payload)
+                if 'token' in data:
+                    reply += data['token']
+                if 'error' in data:
+                    error = data['error']
+        except Exception as exc:
+            error = str(exc)
+        finally:
+            conn.close()
+        if not reply and not error:
+            error = 'ACEsi returned an empty reply'
+        result = json.dumps({
+            'ok': not bool(error),
+            'reply': reply,
+            'error': error,
+        }).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(result)))
+        self.end_headers()
+        self.wfile.write(result)
+
     def do_POST(self):
-        if self.path.split('?')[0] == '/api/ai/chat':
+        path = self.path.split('?')[0]
+        if path == '/api/ai/chat':
             self._proxy_ai_chat()
+            return
+        if path == '/api/ai/ask':
+            self._ai_ask()
             return
         super().do_POST()
 
     def do_OPTIONS(self):
-        if self.path.split('?')[0] == '/api/ai/chat':
+        if self.path.split('?')[0] in ('/api/ai/chat', '/api/ai/ask'):
             self.send_response(204)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
