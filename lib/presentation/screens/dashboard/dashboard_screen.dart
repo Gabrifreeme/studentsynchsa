@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -95,70 +97,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   /// Bottom-centre card for email alerts pushed by ACEsi.
-  Widget _buildEmailCard(BuildContext context) =>
-      FutureBuilder<List<AppNotification>>(
-        future: NotificationService.fetchRemote(),
-        builder: (context, snap) {
-          final rows = snap.data ?? const <AppNotification>[];
-          final count = rows
-              .where((n) => !NotificationService.isRemoteRead('${n.id}'))
-              .length;
-          final latest = rows.isNotEmpty ? rows.first : null;
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340),
-              child: SizedBox(
-                width: double.infinity,
-                child: AppCard(
-                  onTap: () => context.push('/email-notifications'),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Row(
-                    children: [
-                      const StarIcon(Icons.mail_outline_rounded, size: 18),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Email',
-                              style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            if (latest != null)
-                              Text(
-                                latest.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: AppColors.textMuted, fontSize: 9),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (count > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: const BoxDecoration(
-                              color: Color(0xFFFF4444), shape: BoxShape.circle),
-                          child: Text('$count',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700)),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      );
+  Widget _buildEmailCard(BuildContext context) => const _EmailCard();
 
   Widget _buildStarCta(BuildContext context, String firstName) {
     final mobile = MediaQuery.of(context).size.width < 600;
@@ -291,6 +230,98 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+}
+
+class _EmailCard extends StatefulWidget {
+  const _EmailCard();
+
+  @override
+  State<_EmailCard> createState() => _EmailCardState();
+}
+
+class _EmailCardState extends State<_EmailCard> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<AppNotification>>(
+        future: NotificationService.fetchRemote(),
+        builder: (context, snap) {
+          final rows = snap.data ?? const <AppNotification>[];
+          final count = rows
+              .where((n) => !NotificationService.isRemoteRead('${n.id}'))
+              .length;
+          final latest = rows.isNotEmpty ? rows.first : null;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: SizedBox(
+                width: double.infinity,
+                child: AppCard(
+                  onTap: () => context.push('/email-notifications'),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: [
+                      const StarIcon(Icons.mail_outline_rounded, size: 18),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Email',
+                              style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            if (latest != null)
+                              Text(
+                                latest.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: AppColors.textMuted, fontSize: 9),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (count > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFFF4444), shape: BoxShape.circle),
+                          child: Text('$count',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+  }
 }
 
 class _PrivacyConsentBanner extends StatefulWidget {
