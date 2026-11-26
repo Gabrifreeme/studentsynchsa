@@ -132,20 +132,22 @@ class _ChatHomeScreenState extends State<ChatHomeScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                border: Border.all(color: AppColors.primary, width: 1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: IconButton(
-                tooltip: 'Open chats',
-                icon: const Icon(Icons.menu_rounded, size: 20, color: Colors.black),
-                padding: EdgeInsets.zero,
-                onPressed: _openPanel,
+            Tooltip(
+              message: 'Open chats',
+              child: GestureDetector(
+                onTap: _openPanel,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    border: Border.all(color: AppColors.primary, width: 1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.menu_rounded,
+                      size: 20, color: Colors.black),
+                ),
               ),
             ),
             ...List.generate(_rooms.length, (i) => _icon(i)),
