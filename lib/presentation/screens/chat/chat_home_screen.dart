@@ -68,7 +68,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
 
   Widget _roomStrip() => Padding(
         padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
-        child: Column(
+        child: Row(
           children: List.generate(_rooms.length, (i) => _roomIcon(i)),
         ),
       );
@@ -78,7 +78,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     final active = _selected == i;
     final unread = _unread[room.$2] ?? 0;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: () => setState(() => _selected = i),
         child: Stack(
