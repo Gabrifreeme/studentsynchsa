@@ -6,8 +6,8 @@ import 'package:studentsyncsa/presentation/screens/chat/general_chat_screen.dart
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/chat_service.dart';
 
-/// Community opens with a left slide-out panel showing room icons and the
-/// chat/contact list. Selecting a room closes the panel and opens that chat.
+/// Community opens with a left panel that really slides in and out.
+/// The panel shows the room icons and the current chat list.
 class ChatHomeScreen extends StatefulWidget {
   const ChatHomeScreen({super.key});
 
@@ -15,11 +15,25 @@ class ChatHomeScreen extends StatefulWidget {
   State<ChatHomeScreen> createState() => _ChatHomeScreenState();
 }
 
-class _ChatHomeScreenState extends State<ChatHomeScreen> {
+class _ChatHomeScreenState extends State<ChatHomeScreen>
+    with SingleTickerProviderStateMixin {
   int _selected = 0; // General Chat is the open conversation
   bool _panelOpen = false;
   final Map<String, int> _unread = {};
   Timer? _poll;
+
+  /// Explicit controller: AnimatedPositioned could not be relied on because
+  /// the first open happened during the route transition and looked like a pop.
+  late final AnimationController _panelController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
+  late final Animation<Offset> _panelSlide = Tween<Offset>(
+    begin: const Offset(-1, 0),
+    end: Offset.zero,
+  ).animate(
+    CurvedAnimation(parent: _panelController, curve: Curves.easeOutCubic),
+  );
 
   static const _sampleChats = [
     ('Sipho Dlamini', 'Anyone applying to UCT this year?', '11:25', 2),
@@ -28,18 +42,17 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   ];
 
   static const _rooms = [
-    ('General Chat', 'general', Icons.forum_rounded, 'Talk to all students'),
-    ('Province Base Chat', 'province', Icons.map_rounded,
-        'Students in your province'),
-    ('University Chat', 'university', Icons.school_rounded,
-        'Future classmates'),
+    ('General Chat', 'general', Icons.forum_rounded),
+    ('Province Base Chat', 'province', Icons.map_rounded),
+    ('University Chat', 'university', Icons.school_rounded),
   ];
 
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 350), () {
-      if (mounted) setState(() => _panelOpen = true);
+    // Wait for the dashboard-to-chat route transition, then slide in.
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _openPanel();
     });
     if (ChatService.isConfigured) {
       _checkUnread();
@@ -50,7 +63,20 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _panelController.dispose();
     super.dispose();
+  }
+
+  void _openPanel() {
+    if (!mounted) return;
+    setState(() => _panelOpen = true);
+    _panelController.forward();
+  }
+
+  void _closePanel() {
+    if (!mounted) return;
+    setState(() => _panelOpen = false);
+    _panelController.reverse();
   }
 
   Future<void> _checkUnread() async {
@@ -76,37 +102,55 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
           title: _rooms[_selected].$1,
           topStrip: _topStrip(),
         ),
-        // Scrim closes the panel.
-        if (_panelOpen)
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: () => setState(() => _panelOpen = false),
-              child: Container(color: Colors.black54),
+        // Scrim: fades with the panel and closes it when tapped.
+        Positioned.fill(
+          child: AnimatedOpacity(
+            opacity: _panelOpen ? 1 : 0,
+            duration: const Duration(milliseconds: 300),
+            child: AbsorbPointer(
+              absorbing: !_panelOpen,
+              child: GestureDetector(
+                onTap: _closePanel,
+                child: Container(color: Colors.black54),
+              ),
             ),
           ),
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          left: _panelOpen ? 0 : -panelWidth,
+        ),
+        Positioned(
+          left: 0,
           top: 0,
           bottom: 0,
           width: panelWidth,
-          child: _panel(),
+          child: SlideTransition(
+            position: _panelSlide,
+            child: SizedBox(width: panelWidth, child: _panel()),
+          ),
         ),
       ],
     );
   }
 
-  /// Icons + a button to reopen the panel, shown under the chat title.
+  /// Icons + permanently highlighted "Open chats" button under the title.
   Widget _topStrip() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              tooltip: 'Open chats',
-              icon: const StarIcon(Icons.menu_rounded, size: 19),
-              onPressed: () => setState(() => _panelOpen = true),
+            Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                border: Border.all(color: AppColors.primary, width: 1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: IconButton(
+                tooltip: 'Open chats',
+                icon: const Icon(Icons.menu_rounded, size: 20, color: Colors.black),
+                padding: EdgeInsets.zero,
+                onPressed: _openPanel,
+              ),
             ),
             ...List.generate(_rooms.length, (i) => _icon(i)),
           ],
@@ -121,10 +165,8 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: () {
-          setState(() {
-            _selected = i;
-            _panelOpen = false;
-          });
+          setState(() => _selected = i);
+          _closePanel();
         },
         child: Stack(
           clipBehavior: Clip.none,
@@ -189,49 +231,20 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
-                children:
-                    List.generate(_rooms.length, (i) => _icon(i)),
+                children: List.generate(_rooms.length, (i) => _icon(i)),
               ),
             ),
             const SizedBox(height: 10),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(8),
-                children: [
-                  ...List.generate(_sampleChats.length, (i) => _sampleTile(i)),
-                  const SizedBox(height: 6),
-                  ...List.generate(_rooms.length, (i) => _chatTile(i)),
-                ],
+                children:
+                    List.generate(_sampleChats.length, (i) => _sampleTile(i)),
               ),
             ),
           ],
         ),
       );
-
-
-  Widget _chatTile(int i) {
-    final room = _rooms[i];
-    final unread = _unread[room.$2] ?? 0;
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      onTap: () {
-        setState(() {
-          _selected = i;
-          _panelOpen = false;
-        });
-      },
-      child: ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        leading: StarIcon(room.$3, size: 18),
-        title: Text(room.$1,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12)),
-        subtitle: Text(room.$4,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 9)),
-        trailing: unread > 0 ? _badge(unread) : null,
-      ),
-    );
-  }
 
   Widget _sampleTile(int i) {
     final c = _sampleChats[i];
@@ -264,5 +277,4 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       ),
     );
   }
-
 }
