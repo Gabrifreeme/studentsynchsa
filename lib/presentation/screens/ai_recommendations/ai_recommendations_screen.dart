@@ -74,7 +74,7 @@ class _AiRecommendationsScreenState
             '$contextInfo\nStudent asks: $text',
         onToken: (token) {
           accumulated += token;
-          if (accumulated.startsWith('Star AI error:')) return;
+          if (accumulated.startsWith('ACEsi error:')) return;
           setState(() {
             _messages.last = _ChatMessage(
               text: accumulated,
@@ -85,7 +85,7 @@ class _AiRecommendationsScreenState
         },
       );
 
-      if (accumulated.startsWith('Star AI error:')) {
+      if (accumulated.startsWith('ACEsi error:')) {
         throw Exception(accumulated);
       }
 
@@ -144,7 +144,7 @@ class _AiRecommendationsScreenState
         prompt: prompt,
         onToken: (token) {
           accumulated += token;
-          if (accumulated.startsWith('Star AI error:')) return;
+          if (accumulated.startsWith('ACEsi error:')) return;
           setState(() {
             _messages.last = _ChatMessage(
               text: accumulated,
@@ -155,7 +155,7 @@ class _AiRecommendationsScreenState
         },
       );
 
-      if (accumulated.startsWith('Star AI error:')) {
+      if (accumulated.startsWith('ACEsi error:')) {
         throw Exception(accumulated);
       }
 

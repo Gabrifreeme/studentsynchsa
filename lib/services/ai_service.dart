@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AiService {
-  static const _apiKey = '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';
-  static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const _model = 'meta/llama-3.1-70b-instruct';
+  // ACEsi's own Groq -> Gemini stream endpoint, proxied by the app's web
+  // server so the phone never talks to a third-party API directly.
+  static Uri get _endpoint => Uri.base.resolve('api/ai/chat');
 
   static Future<void> warmUp() async {}
 
@@ -16,28 +16,13 @@ class AiService {
     try {
       final client = http.Client();
       try {
-        final uri = Uri.parse('$_baseUrl/chat/completions');
-        final body = jsonEncode({
-          'model': _model,
-          'messages': [
-            {
-              'role': 'system',
-              'content': 'You are Star, a friendly South African university application advisor. You help students with applications, university choices, bursaries, and career guidance. Keep responses helpful and concise.',
-            },
-            {'role': 'user', 'content': prompt},
-          ],
-          'max_tokens': 1024,
-          'stream': true,
-        });
-
-        final request = http.Request('POST', uri)
+        final request = http.Request('POST', _endpoint)
           ..headers['Content-Type'] = 'application/json'
-          ..headers['Authorization'] = 'Bearer $_apiKey'
-          ..body = body;
+          ..body = jsonEncode({'prompt': prompt});
 
         final response = await client
             .send(request)
-            .timeout(const Duration(seconds: 30));
+            .timeout(const Duration(seconds: 120));
 
         final stream = response.stream
             .transform(utf8.decoder)
@@ -45,14 +30,18 @@ class AiService {
 
         await for (final line in stream) {
           if (line.trim().isEmpty) continue;
-          if (line == 'data: [DONE]') break;
-          if (!line.startsWith('data: ')) continue;
+          if (!line.startsWith('data:')) continue;
+          final payload = line.substring(5).trim();
+          if (payload == '[DONE]') break;
           try {
-            final data = jsonDecode(line.substring(6)) as Map<String, dynamic>;
-            final delta = data['choices']?[0]?['delta'] as Map<String, dynamic>?;
-            final token = delta?['content'] as String?;
+            final data = jsonDecode(payload) as Map<String, dynamic>;
+            final token = data['token'] as String?;
             if (token != null && token.isNotEmpty) {
               onToken(token);
+            }
+            final error = data['error'] as String?;
+            if (error != null) {
+              onToken('ACEsi error: $error');
             }
           } catch (_) {}
         }
@@ -60,9 +49,9 @@ class AiService {
         client.close();
       }
     } on TimeoutException {
-      onToken('Star AI is taking too long. Please try again.');
+      onToken('ACEsi is taking too long. Please try again.');
     } catch (e) {
-      onToken('Could not connect to Star AI. Check your internet connection.');
+      onToken('Could not reach ACEsi. Check your connection and try again.');
     }
   }
 
