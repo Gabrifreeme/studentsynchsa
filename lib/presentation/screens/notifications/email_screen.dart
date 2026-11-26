@@ -55,79 +55,131 @@ class _EmailScreenState extends State<EmailScreen> {
                     child: AppCard(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 8),
-                      onTap: () async {
-                        // Tapping only asks; the user decides when to clear it.
-                        final open = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: AppColors.surface,
-                            title: const Text(
-                              'Open Email?',
-                              style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            content: Text(
-                              '${n.title}\n\n${n.body}',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 12),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Open'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (open != true) return;
-                        await NotificationService.markRemoteRead('${n.id}');
-                        await _refresh();
-                        // Open the real mailbox, filtered to this sender.
-                        final sender = n.sender?.trim() ?? '';
-                        final query = Uri.encodeComponent(
-                            sender.isEmpty ? n.title : 'from:($sender)');
-                        final url = Uri.parse(
-                            'https://mail.google.com/mail/u/0/#search/$query');
-                        try {
-                          await launchUrl(url,
-                              mode: LaunchMode.externalApplication);
-                        } catch (_) {}
-                      },
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.mail_outline_rounded,
-                              size: 20,
-                              color: unread
-                                  ? AppColors.primary
-                                  : AppColors.textMuted),
-                          const SizedBox(width: 8),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n.title,
-                                    style: TextStyle(
-                                        color: unread
-                                            ? AppColors.primary
-                                            : AppColors.textPrimary,
-                                        fontSize: 12,
-                                        fontWeight: unread
-                                            ? FontWeight.w700
-                                            : FontWeight.w500)),
-                                const SizedBox(height: 4),
-                                Text(n.body,
-                                    style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 11)),
-                              ],
+                            child: InkWell(
+                              onTap: () async {
+                                final open = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: AppColors.surface,
+                                    title: const Text(
+                                      'Open Email?',
+                                      style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                    content: Text(
+                                      '${n.title}\n\n${n.body}',
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('Open'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (open != true) return;
+                                await NotificationService.markRemoteRead(
+                                    '${n.id}');
+                                await _refresh();
+                                final sender = n.sender?.trim() ?? '';
+                                final query = Uri.encodeComponent(
+                                    sender.isEmpty ? n.title : 'from:($sender)');
+                                final url = Uri.parse(
+                                    'https://mail.google.com/mail/u/0/#search/$query');
+                                try {
+                                  await launchUrl(url,
+                                      mode: LaunchMode.externalApplication);
+                                } catch (_) {}
+                              },
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.mail_outline_rounded,
+                                      size: 20,
+                                      color: unread
+                                          ? AppColors.primary
+                                          : AppColors.textMuted),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(n.title,
+                                            style: TextStyle(
+                                                color: unread
+                                                    ? AppColors.primary
+                                                    : AppColors.textPrimary,
+                                                fontSize: 12,
+                                                fontWeight: unread
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500)),
+                                        const SizedBox(height: 4),
+                                        Text(n.body,
+                                            style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete notification',
+                            icon: const Icon(Icons.close_rounded,
+                                size: 18, color: AppColors.textMuted),
+                            onPressed: () async {
+                              final del = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: AppColors.surface,
+                                  title: const Text(
+                                    'Delete this notification?',
+                                    style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  content: const Text(
+                                    'This email alert will be removed.',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (del != true) return;
+                              try {
+                                await NotificationService.deleteRemote(n.id);
+                              } catch (_) {}
+                              await _refresh();
+                            },
                           ),
                         ],
                       ),

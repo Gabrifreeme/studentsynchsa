@@ -20,4 +20,9 @@ create policy "anon insert notifications"
   on public.app_notifications for insert to anon with check (true);
 
 grant usage on schema public to anon;
-grant select, insert on public.app_notifications to anon;
+grant select, insert, delete on public.app_notifications to anon;
+
+-- Allow the app's X button to delete an email notification.
+drop policy if exists "anon delete notifications" on public.app_notifications;
+create policy "anon delete notifications"
+  on public.app_notifications for delete to anon using (true);

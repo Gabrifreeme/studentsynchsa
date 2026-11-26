@@ -160,6 +160,18 @@ class NotificationService {
     }).toList();
   }
 
+  static Future<void> deleteRemote(int id) async {
+    if (!ChatService.isConfigured) return;
+    final uri = Uri.parse('${ChatService.url}/rest/v1/$_remoteTable')
+        .replace(queryParameters: {'id': 'eq.$id'});
+    final res = await http.delete(uri, headers: _remoteHeaders).timeout(
+          const Duration(seconds: 12),
+        );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('Delete failed (${res.statusCode}): ${res.body}');
+    }
+  }
+
   static Set<String> _remoteReadIds() {
     final raw = HiveDatabase.settings.get(_remoteReadKey) ?? '';
     return raw.isEmpty ? <String>{} : raw.split(',').toSet();
