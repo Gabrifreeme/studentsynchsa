@@ -107,15 +107,9 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
                 height: 36,
                 margin: const EdgeInsets.only(right: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.18),
-                  border: Border.all(color: AppColors.primary, width: 2),
+                  color: AppColors.surfaceLight,
+                  border: Border.all(color: AppColors.border, width: 1),
                   borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 8,
-                    ),
-                  ],
                 ),
                 child: const StarIcon(Icons.menu_rounded, size: 20),
               ),
