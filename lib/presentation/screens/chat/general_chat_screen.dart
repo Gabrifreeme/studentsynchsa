@@ -273,7 +273,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
           children: emojis
               .map((e) => InkWell(
                     onTap: () {
-                      _ctrl.text = '$_ctrl.text$e';
+                      _ctrl.text = '${_ctrl.text}$e';
                       _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
                       Navigator.pop(ctx);
                     },
