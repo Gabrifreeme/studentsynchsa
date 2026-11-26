@@ -129,7 +129,8 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _AboutRow('Version', '1.0.0'),
                   _AboutRow('Made for', 'South African Students'),
-                  _AboutRow('AI Assistant', 'Star ⭐'),
+                  _AboutRow('AI Assistant', 'ACEsi',
+                      trailing: const StarAvatar(size: 16)),
                 ],
               ),
             ),
@@ -245,7 +246,8 @@ class _SettingTile extends StatelessWidget {
 class _AboutRow extends StatelessWidget {
   final String label;
   final String value;
-  const _AboutRow(this.label, this.value);
+  final Widget? trailing;
+  const _AboutRow(this.label, this.value, {this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +257,16 @@ class _AboutRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: AppColors.textSecondary)),
-          Text(value, style: const TextStyle(color: AppColors.textPrimary)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(value, style: const TextStyle(color: AppColors.textPrimary)),
+              if (trailing != null) ...[
+                const SizedBox(width: 6),
+                trailing!,
+              ],
+            ],
+          ),
         ],
       ),
     );
