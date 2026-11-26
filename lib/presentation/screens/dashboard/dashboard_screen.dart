@@ -95,43 +95,64 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   /// Bottom-centre card for email alerts pushed by ACEsi.
-  Widget _buildEmailCard(BuildContext context) => FutureBuilder<int>(
-        future: NotificationService.remoteUnreadCount(),
+  Widget _buildEmailCard(BuildContext context) =>
+      FutureBuilder<List<AppNotification>>(
+        future: NotificationService.fetchRemote(),
         builder: (context, snap) {
-          final count = snap.data ?? 0;
+          final rows = snap.data ?? const <AppNotification>[];
+          final count = rows
+              .where((n) => !NotificationService.isRemoteRead('${n.id}'))
+              .length;
+          final latest = rows.isNotEmpty ? rows.first : null;
           return Center(
-            child: SizedBox(
-              width: 200,
-              child: AppCard(
-                onTap: () => context.push('/email-notifications'),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const StarIcon(Icons.mail_outline_rounded, size: 18),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Email',
-                      style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700),
-                    ),
-                    const Spacer(),
-                    if (count > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: const BoxDecoration(
-                            color: Color(0xFFFF4444), shape: BoxShape.circle),
-                        child: Text('$count',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: SizedBox(
+                width: double.infinity,
+                child: AppCard(
+                  onTap: () => context.push('/email-notifications'),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: [
+                      const StarIcon(Icons.mail_outline_rounded, size: 18),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Email',
+                              style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            if (latest != null)
+                              Text(
+                                latest.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: AppColors.textMuted, fontSize: 9),
+                              ),
+                          ],
+                        ),
                       ),
-                  ],
+                      if (count > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFFF4444), shape: BoxShape.circle),
+                          child: Text('$count',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
