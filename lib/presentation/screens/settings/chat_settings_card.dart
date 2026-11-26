@@ -80,7 +80,7 @@ class _ChatSettingsCardState extends State<ChatSettingsCard> {
               obscureText: true,
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
               decoration: const InputDecoration(
-                  labelText: 'Anon key',
+                  labelText: 'Anon / publishable key',
                   labelStyle: TextStyle(color: AppColors.textSecondary)),
             ),
             const SizedBox(height: 6),
