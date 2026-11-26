@@ -1,3 +1,6 @@
+// A fetch handler makes the site installable as a PWA on Android Chrome.
+self.addEventListener('fetch', function () {});
+
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (event) {
   event.waitUntil(self.clients.claim());
