@@ -74,9 +74,7 @@ class _AiRecommendationsScreenState
             '$contextInfo\nStudent asks: $text',
         onToken: (token) {
           accumulated += token;
-          if (accumulated.startsWith('ACEsi error:')) {
-            accumulated = 'ACEsi could not reply right now. Please try again.';
-          }
+          // Keep the real error visible so we can diagnose it.
           setState(() {
             _messages.last = _ChatMessage(
               text: accumulated,
@@ -147,9 +145,7 @@ class _AiRecommendationsScreenState
         prompt: prompt,
         onToken: (token) {
           accumulated += token;
-          if (accumulated.startsWith('ACEsi error:')) {
-            accumulated = 'ACEsi could not reply right now. Please try again.';
-          }
+          // Keep the real error visible so we can diagnose it.
           setState(() {
             _messages.last = _ChatMessage(
               text: accumulated,
