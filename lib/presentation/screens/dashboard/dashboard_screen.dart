@@ -267,10 +267,31 @@ class _PrivacyConsentBannerState extends State<_PrivacyConsentBanner> {
           Expanded(
             child: GestureDetector(
               onTap: () => context.push('/privacy'),
-              child: const Text(
-                'Review your Privacy Status here.',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 11),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Review your Privacy Status ',
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                    TextSpan(
+                      text: 'HERE',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        background: Paint()
+                          ..color = AppColors.primary.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    const TextSpan(
+                      text: '.',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
