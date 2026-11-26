@@ -195,6 +195,16 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
                       horizontal: 10, vertical: 6),
                   child: Row(
                     children: [
+                      IconButton(
+                        tooltip: 'Attach a file',
+                        icon: const StarIcon(Icons.attach_file_rounded, size: 19),
+                        onPressed: () => _soon('Attachments coming soon'),
+                      ),
+                      IconButton(
+                        tooltip: 'Add an emoji',
+                        icon: const StarIcon(Icons.emoji_emotions_outlined, size: 19),
+                        onPressed: _showEmojiPicker,
+                      ),
                       Expanded(
                         child: TextField(
                           controller: _ctrl,
@@ -212,6 +222,11 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Voice message',
+                        icon: const StarIcon(Icons.mic_none_rounded, size: 19),
+                        onPressed: () => _soon('Voice messages coming soon'),
+                      ),
+                      IconButton(
                         tooltip: 'Send message',
                         onPressed: _busy ? null : _send,
                         icon: const StarIcon(Icons.send_rounded, size: 20),
@@ -222,6 +237,48 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+
+  void _soon(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.surfaceLight),
+    );
+  }
+
+  void _showEmojiPicker() {
+    const emojis = ['😀', '😂', '😍', '👍', '🙌', '🎉', '🔥', '❤️', '⭐', '✅', '🙏', '💯'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(10),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: emojis
+              .map((e) => InkWell(
+                    onTap: () {
+                      _ctrl.text = '$_ctrl.text$e';
+                      _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+                      Navigator.pop(ctx);
+                    },
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 20)),
+                    ),
+                  ))
+              .toList(),
         ),
       ),
     );
