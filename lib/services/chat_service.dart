@@ -36,6 +36,12 @@ class ChatService {
     await _settings.put(_keyKey, key.trim());
   }
 
+  static int readCount(String room) =>
+      int.tryParse(_settings.get('chat_read_$room') ?? '0') ?? 0;
+
+  static Future<void> markRead(String room, int count) =>
+      _settings.put('chat_read_$room', '$count');
+
   static String get myId {
     var id = _settings.get(_uidKey) ?? '';
     if (id.isEmpty) {

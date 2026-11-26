@@ -77,6 +77,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
     try {
       final rows = await ChatService.fetchMessages(widget.room);
       if (!mounted) return;
+      ChatService.markRead(widget.room, rows.length);
       setState(() {
         _error = null;
         _messages
