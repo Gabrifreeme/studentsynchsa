@@ -17,6 +17,15 @@
       "body": "",
       "enabled": true,
       "notifyOnce": true
+    },
+    {
+      "name": "Venda University",
+      "account": "gmail",
+      "from": "univen.ac.za",
+      "subject": "",
+      "body": "",
+      "enabled": true,
+      "notifyOnce": true
     }
   ]
 }

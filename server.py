@@ -1874,6 +1874,42 @@ def _save_email_state(state):
         print("⚠️ could not save email watch state: %s" % e)
 
 
+def _push_app_notification(title, body, sender=None):
+    """Mirror a matched email into LibSyncStudent's in-app notifications."""
+    try:
+        import json as _json
+        import urllib.request as _urlreq
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "tools", "notif_config.json")
+        with open(path, "r", encoding="utf-8") as _fh:
+            cfg = _json.load(_fh)
+        url = str(cfg.get("supabase_url", "")).rstrip("/")
+        key = str(cfg.get("supabase_key", ""))
+        if not url or not key:
+            return False
+        payload = _json.dumps({
+            "title": str(title or "")[:120],
+            "body": str(body or "")[:500],
+            "sender": str(sender or "")[:120],
+        }).encode("utf-8")
+        req = _urlreq.Request(
+            url + "/rest/v1/app_notifications",
+            data=payload,
+            headers={
+                "apikey": key,
+                "Authorization": "Bearer " + key,
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            method="POST",
+        )
+        with _urlreq.urlopen(req, timeout=15) as resp:
+            return 200 <= resp.status < 300
+    except Exception as e:
+        print("⚠️ app notification push failed: %s" % e)
+        return False
+
+
 def _strip_html(html):
     import re as _re2
     txt = _re2.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html or "")
@@ -2074,9 +2110,11 @@ def check_email_now(force_all=False):
             msg = ("New email in your %s inbox\n\nFrom: %s\nSubject: %s%s"
                    % (name, sender, subject, ("\n\n" + snippet) if snippet else ""))
             ok = send_ntfy("ACEsi", msg)
-            print("📧 email watch: matched %r on %s -> ntfy ok=%s"
+            app_ok = _push_app_notification(
+                "%s: %s" % (name, sender), subject or "New email", snippet)
+            print("📧 email watch: matched %r on %s -> ntfy ok=%s, app ok=%s"
                   % (_email_rule_label(matched[0], sender, subject, body),
-                     name, ok))
+                     name, ok, app_ok))
             hits.append("%s: %s — %s" % (name, sender, subject))
         # Sort numerically: these are IMAP sequence numbers, and a plain
         # string sort puts "10" before "9", which would keep the wrong window.

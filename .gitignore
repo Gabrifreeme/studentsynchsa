@@ -86,6 +86,7 @@ cookies.txt
 emails.json
 .email_watch_state.json
 email_notify_rules.local.json
+tools/notif_config.json
 server_stdout.txt
 server_stderr.txt
 server_stdout.txt.*
