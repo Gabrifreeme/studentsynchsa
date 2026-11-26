@@ -69,7 +69,6 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
           room: _rooms[_selected].$2,
           title: _rooms[_selected].$1,
           topStrip: _topStrip(),
-          onBack: () => setState(() => _panelOpen = true),
         ),
         // Scrim closes the panel.
         if (_panelOpen)
@@ -178,10 +177,6 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
                           fontSize: 10,
                           letterSpacing: 1.5)),
                   const Spacer(),
-                  IconButton(
-                    icon: const StarIcon(Icons.close_rounded, size: 18),
-                    onPressed: () => setState(() => _panelOpen = false),
-                  ),
                 ],
               ),
             ),
@@ -193,10 +188,39 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Expanded(child: SizedBox.shrink()),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(8),
+                children: List.generate(_rooms.length, (i) => _chatTile(i)),
+              ),
+            ),
           ],
         ),
       );
 
+
+  Widget _chatTile(int i) {
+    final room = _rooms[i];
+    final unread = _unread[room.$2] ?? 0;
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      onTap: () {
+        setState(() {
+          _selected = i;
+          _panelOpen = false;
+        });
+      },
+      child: ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        leading: StarIcon(room.$3, size: 18),
+        title: Text(room.$1,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12)),
+        subtitle: Text(room.$4,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 9)),
+        trailing: unread > 0 ? _badge(unread) : null,
+      ),
+    );
+  }
 
 }

@@ -157,13 +157,6 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          leading: widget.onBack != null
-              ? IconButton(
-                  tooltip: 'Open chats',
-                  icon: const StarIcon(Icons.arrow_back_rounded, size: 20),
-                  onPressed: widget.onBack,
-                )
-              : null,
           title: Text(widget.title),
           actions: [
             Padding(
