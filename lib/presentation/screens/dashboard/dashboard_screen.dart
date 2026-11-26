@@ -25,6 +25,34 @@ class DashboardScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: IconButton(
+            icon: StarIcon(
+                isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
+                size: 20),
+            tooltip: 'Open menu',
+            onPressed: () {
+              // The drawer lives on the shell Scaffold, not on this screen's
+              // own Scaffold, so walk up to the one that actually has it.
+              ScaffoldState? shell;
+              context.visitAncestorElements((element) {
+                if (element is StatefulElement &&
+                    element.state is ScaffoldState) {
+                  final s = element.state as ScaffoldState;
+                  if (s.widget.drawer != null || s.widget.endDrawer != null) {
+                    shell = s;
+                    return false;
+                  }
+                }
+                return true;
+              });
+              if (shell == null) return;
+              if (isRight) {
+                shell!.openEndDrawer();
+              } else {
+                shell!.openDrawer();
+              }
+            },
+          ),
           title: Column(
             mainAxisSize: MainAxisSize.min,
             children: const [
@@ -114,15 +142,6 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildTileGrid(BuildContext context, bool isRight, WidgetRef ref) {
-    void openMenu() {
-      final scaffold = Scaffold.of(context);
-      if (isRight) {
-        scaffold.openEndDrawer();
-      } else {
-        scaffold.openDrawer();
-      }
-    }
-
     Widget tile(IconData icon, String label, String route) {
       return AppListTile(
         icon: icon,
@@ -136,49 +155,12 @@ class DashboardScreen extends ConsumerWidget {
     return Column(
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: StarIcon(
-                          isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
-                          size: 20),
-                      onPressed: openMenu,
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 28, minHeight: 28),
-                    ),
-                  ),
-                  tile(Icons.auto_awesome_rounded, 'ACEsi',
-                      '/ai-recommendations'),
-                ],
-              ),
-            ),
+                child: tile(Icons.auto_awesome_rounded, 'ACEsi',
+                    '/ai-recommendations')),
             const SizedBox(width: AppSpaces.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: const StarIcon(
-                          Icons.notifications_outlined, size: 20),
-                      onPressed: () => context.push('/notifications'),
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 28, minHeight: 28),
-                    ),
-                  ),
-                  tile(Icons.person_rounded, 'My Profile', '/onboarding'),
-                ],
-              ),
-            ),
+            Expanded(child: tile(Icons.person_rounded, 'My Profile', '/onboarding')),
           ],
         ),
         const SizedBox(height: AppSpaces.sm),
