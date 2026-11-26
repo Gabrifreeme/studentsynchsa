@@ -20,7 +20,6 @@ self.addEventListener('push', function (event) {
       silent: false,
       vibrate: [250, 120, 250],
       requireInteraction: true,
-      tag: 'acesi-email',
       data: { url: data.url || '/' },
     })
   );
