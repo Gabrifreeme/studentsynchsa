@@ -17,7 +17,17 @@ class ChatService {
 
   static Box<String> get _settings => Hive.box<String>(AppConstants.settingsBox);
 
-  static String get url => (_settings.get(_urlKey) ?? '').trim();
+  static String get url {
+    var u = (_settings.get(_urlKey) ?? '').trim();
+    // Accept a full Data API URL or a dashboard URL and reduce it to the
+    // base https://<ref>.supabase.co form the REST calls expect.
+    if (u.endsWith('/')) u = u.substring(0, u.length - 1);
+    u = u.replaceFirst(RegExp(r'/rest/v1/?$'), '');
+    final dashboard = RegExp(r'^https://supabase\.com/dashboard/project/([^/]+)');
+    final match = dashboard.firstMatch(u);
+    if (match != null) u = 'https://${match.group(1)}.supabase.co';
+    return u;
+  }
   static String get key => (_settings.get(_keyKey) ?? '').trim();
   static bool get isConfigured => url.isNotEmpty && key.isNotEmpty;
 
