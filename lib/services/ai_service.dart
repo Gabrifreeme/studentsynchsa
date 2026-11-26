@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 class AiService {
   // ACEsi's own Groq -> Gemini stream endpoint, proxied by the app's web
   // server so the phone never talks to a third-party API directly.
-  static Uri get _endpoint => Uri.base.resolve('api/ai/chat');
+  static Uri get _endpoint => Uri.base.resolve('api/ai/ask');
 
   static Future<void> warmUp() async {}
 
@@ -14,40 +14,26 @@ class AiService {
     required void Function(String token) onToken,
   }) async {
     try {
-      final client = http.Client();
-      try {
-        final request = http.Request('POST', _endpoint)
-          ..headers['Content-Type'] = 'application/json'
-          ..body = jsonEncode({'prompt': prompt});
+      final response = await http
+          .post(
+            _endpoint,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'prompt': prompt}),
+          )
+          .timeout(const Duration(seconds: 150));
 
-        final response = await client
-            .send(request)
-            .timeout(const Duration(seconds: 120));
-
-        final stream = response.stream
-            .transform(utf8.decoder)
-            .transform(const LineSplitter());
-
-        await for (final line in stream) {
-          if (line.trim().isEmpty) continue;
-          if (!line.startsWith('data:')) continue;
-          final payload = line.substring(5).trim();
-          if (payload == '[DONE]') break;
-          try {
-            final data = jsonDecode(payload) as Map<String, dynamic>;
-            final token = data['token'] as String?;
-            if (token != null && token.isNotEmpty) {
-              onToken(token);
-            }
-            final error = data['error'] as String?;
-            if (error != null) {
-              onToken('ACEsi error: $error');
-            }
-          } catch (_) {}
-        }
-      } finally {
-        client.close();
+      if (response.statusCode != 200) {
+        onToken('ACEsi error: HTTP ${response.statusCode}');
+        return;
       }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final error = data['error'] as String?;
+      if (error != null && error.isNotEmpty) {
+        onToken('ACEsi error: $error');
+        return;
+      }
+      final reply = data['reply'] as String? ?? '';
+      if (reply.isNotEmpty) onToken(reply);
     } on TimeoutException {
       onToken('ACEsi is taking too long. Please try again.');
     } catch (e) {
