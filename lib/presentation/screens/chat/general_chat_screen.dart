@@ -164,7 +164,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
                 child: Text(_live ? 'Live · all students' : 'On this device',
                     style: TextStyle(
                         color: _live ? AppColors.success : AppColors.textMuted,
-                        fontSize: 9)),
+                        fontSize: 11)),
               ),
             ),
           ],
@@ -188,7 +188,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
                     child: Text(_error!,
                         maxLines: 2,
                         style: const TextStyle(
-                            color: Colors.red, fontSize: 9)),
+                            color: Colors.red, fontSize: 10)),
                   ),
                 Expanded(
                   child: ListView.builder(
@@ -223,11 +223,11 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
                           minLines: 1,
                           maxLines: 3,
                           style: const TextStyle(
-                              color: AppColors.textPrimary, fontSize: 12),
+                              color: AppColors.textPrimary, fontSize: 14),
                           decoration: const InputDecoration(
                             hintText: 'Write a message...',
                             hintStyle: TextStyle(
-                                color: AppColors.textMuted, fontSize: 11),
+                                color: AppColors.textMuted, fontSize: 13),
                             border: InputBorder.none,
                           ),
                           onSubmitted: (_) => _send(),
@@ -307,7 +307,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
             m.text,
             style: TextStyle(
                 color: m.isUser ? AppColors.primary : AppColors.textSecondary,
-                fontSize: 11),
+                fontSize: 13),
           ),
         ),
       ),
