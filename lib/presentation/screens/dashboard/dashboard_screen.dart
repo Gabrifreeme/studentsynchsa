@@ -140,16 +140,19 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  IconButton(
-                    icon: StarIcon(
-                        isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
-                        size: 20),
-                    onPressed: openMenu,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: StarIcon(
+                          isRight ? Icons.menu_open_rounded : Icons.menu_rounded,
+                          size: 20),
+                      onPressed: openMenu,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
                   ),
                   tile(Icons.auto_awesome_rounded, 'ACEsi',
                       '/ai-recommendations'),
@@ -159,14 +162,18 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(width: AppSpaces.sm),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  IconButton(
-                    icon: const StarIcon(Icons.notifications_outlined, size: 20),
-                    onPressed: () => context.push('/notifications'),
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const StarIcon(
+                          Icons.notifications_outlined, size: 20),
+                      onPressed: () => context.push('/notifications'),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
                   ),
                   tile(Icons.person_rounded, 'My Profile', '/onboarding'),
                 ],
