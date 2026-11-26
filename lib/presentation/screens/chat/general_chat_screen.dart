@@ -9,7 +9,13 @@ import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/chat_service.dart';
 
 class GeneralChatScreen extends StatefulWidget {
-  const GeneralChatScreen({super.key});
+  final String room;
+  final String title;
+  const GeneralChatScreen({
+    super.key,
+    this.room = 'general',
+    this.title = 'General Chat',
+  });
 
   @override
   State<GeneralChatScreen> createState() => _GeneralChatScreenState();
@@ -69,7 +75,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
   Future<void> _refresh() async {
     if (!_live || !mounted) return;
     try {
-      final rows = await ChatService.fetchMessages();
+      final rows = await ChatService.fetchMessages(widget.room);
       if (!mounted) return;
       setState(() {
         _error = null;
@@ -116,7 +122,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
           'Student';
       setState(() => _busy = true);
       try {
-        await ChatService.sendMessage(text, name);
+        await ChatService.sendMessage(text, name, widget.room);
         await _refresh();
       } catch (e) {
         if (mounted) setState(() => _error = '$e');
@@ -145,7 +151,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Text('General Chat'),
+          title: Text(widget.title),
           actions: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),

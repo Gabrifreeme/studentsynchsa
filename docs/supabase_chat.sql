@@ -7,8 +7,12 @@ create table if not exists public.app_messages (
   created_at timestamptz not null default now(),
   text text not null,
   user_name text not null,
-  user_id text not null
+  user_id text not null,
+  room text not null default 'general'
 );
+
+-- Add the room column to an existing table (safe to re-run).
+alter table public.app_messages add column if not exists room text not null default 'general';
 
 -- Table-level grants are required as well as RLS policies.
 grant usage on schema public to anon;

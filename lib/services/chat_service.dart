@@ -13,6 +13,7 @@ class ChatService {
   static const _keyKey = 'supabaseAnonKey';
   static const _uidKey = 'chatUserId';
   static const _table = 'app_messages';
+  static const defaultRoom = 'general';
 
   static Box<String> get _settings => Hive.box<String>(AppConstants.settingsBox);
 
@@ -40,11 +41,13 @@ class ChatService {
         'Content-Type': 'application/json',
       };
 
-  static Future<List<Map<String, dynamic>>> fetchMessages() async {
+  static Future<List<Map<String, dynamic>>> fetchMessages(
+      [String room = defaultRoom]) async {
     if (!isConfigured) return [];
     final uri = Uri.parse('$url/rest/v1/$_table')
         .replace(queryParameters: {
-      'select': 'id,created_at,text,user_name,user_id',
+      'select': 'id,created_at,text,user_name,user_id,room',
+      'room': 'eq.$room',
       'order': 'created_at.asc',
       'limit': '100',
     });
@@ -58,7 +61,8 @@ class ChatService {
     return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
-  static Future<void> sendMessage(String text, String userName) async {
+  static Future<void> sendMessage(String text, String userName,
+      [String room = defaultRoom]) async {
     if (!isConfigured) return;
     final res = await http
         .post(
@@ -68,6 +72,7 @@ class ChatService {
             'text': text,
             'user_name': userName,
             'user_id': myId,
+            'room': room,
           }),
         )
         .timeout(const Duration(seconds: 12));

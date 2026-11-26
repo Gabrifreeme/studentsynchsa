@@ -90,6 +90,14 @@ adb shell ip addr show wlan0 | findstr "inet "
 - A stable device ID (`chatUserId`) distinguishes your own messages.
 - Province-based and University Interest Groups still show Coming Soon.
 
+## Chat home panel
+- `/chat` now opens `chat_home_screen.dart`: left room list, right conversation
+  on desktop; on phones the list fills the screen and a tap opens the chat.
+- Rooms: general, province, university (all in Supabase `app_messages`, filtered
+  by the `room` column) plus a Notifications panel.
+- If the app reports a missing `room` column, run:
+  `alter table public.app_messages add column if not exists room text not null default 'general';`
+
 ## WebView HTTP error capture (for the UNIVEN second-page 404)
 - `onWebResourceError` now records code, type, URL and description for every
   failed resource, shows the latest in a red banner, and offers "Copy all
