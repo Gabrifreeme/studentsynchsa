@@ -11,10 +11,12 @@ import 'package:studentsyncsa/services/chat_service.dart';
 class GeneralChatScreen extends StatefulWidget {
   final String room;
   final String title;
+  final Widget? topStrip;
   const GeneralChatScreen({
     super.key,
     this.room = 'general',
     this.title = 'General Chat',
+    this.topStrip,
   });
 
   @override
@@ -174,6 +176,7 @@ class _GeneralChatScreenState extends State<GeneralChatScreen> {
             ),
             child: Column(
               children: [
+                if (widget.topStrip != null) widget.topStrip!,
                 if (_error != null)
                   Container(
                     width: double.infinity,

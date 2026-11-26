@@ -58,35 +58,35 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Community Chat')),
-      body: Column(
-        children: [
-          ...List.generate(_rooms.length, (i) => _roomCard(i)),
-          Expanded(
-            child: GeneralChatScreen(
-              room: _rooms[_selected].$2,
-              title: _rooms[_selected].$1,
-            ),
-          ),
-        ],
+      body: GeneralChatScreen(
+        room: _rooms[_selected].$2,
+        title: _rooms[_selected].$1,
+        topStrip: _roomStrip(),
       ),
     );
   }
 
-  Widget _roomCard(int i) {
+  Widget _roomStrip() => Padding(
+        padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
+        child: Column(
+          children: List.generate(_rooms.length, (i) => _roomIcon(i)),
+        ),
+      );
+
+  Widget _roomIcon(int i) {
     final room = _rooms[i];
     final active = _selected == i;
     final unread = _unread[room.$2] ?? 0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 5, 0, 0),
+      padding: const EdgeInsets.only(bottom: 5),
       child: GestureDetector(
         onTap: () => setState(() => _selected = i),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: active
@@ -97,7 +97,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
                     width: 1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: StarIcon(room.$3, size: 21),
+              child: StarIcon(room.$3, size: 20),
             ),
             if (unread > 0)
               Positioned(
