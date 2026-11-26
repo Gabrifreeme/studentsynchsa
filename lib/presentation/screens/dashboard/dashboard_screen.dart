@@ -85,8 +85,6 @@ class DashboardScreen extends ConsumerWidget {
               _PrivacyConsentBanner(),
               const SizedBox(height: 16),
               _buildTileGrid(context, isRight, ref),
-              const SizedBox(height: 8),
-              _buildEmailCard(context),
             ],
           ),
         ),
@@ -249,7 +247,9 @@ class DashboardScreen extends ConsumerWidget {
             Expanded(child: tile(Icons.info_outline_rounded, 'About Us', '/about')),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        _buildEmailCard(context),
+        const SizedBox(height: 8),
         Center(
           child: OutlinedButton.icon(
             onPressed: () async {
