@@ -6,8 +6,8 @@ import 'package:studentsyncsa/presentation/screens/chat/general_chat_screen.dart
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/chat_service.dart';
 
-/// Chat home: a vertical list of three room buttons with unread badges.
-/// Tapping one opens that conversation immediately — no slide-out menu.
+/// Community opens with a left slide-out panel showing room icons and the
+/// chat/contact list. Selecting a room closes the panel and opens that chat.
 class ChatHomeScreen extends StatefulWidget {
   const ChatHomeScreen({super.key});
 
@@ -16,7 +16,8 @@ class ChatHomeScreen extends StatefulWidget {
 }
 
 class _ChatHomeScreenState extends State<ChatHomeScreen> {
-  int _selected = 0; // General Chat by default
+  int _selected = 0; // General Chat is the open conversation
+  bool _panelOpen = true; // panel is open when Community is tapped
   final Map<String, int> _unread = {};
   Timer? _poll;
 
@@ -57,31 +58,65 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: GeneralChatScreen(
-        room: _rooms[_selected].$2,
-        title: _rooms[_selected].$1,
-        topStrip: _roomStrip(),
-      ),
+    final w = MediaQuery.of(context).size.width;
+    final panelWidth = w < 600 ? w * 0.82 : 300.0;
+    return Stack(
+      children: [
+        GeneralChatScreen(
+          room: _rooms[_selected].$2,
+          title: _rooms[_selected].$1,
+          topStrip: _topStrip(),
+        ),
+        // Scrim closes the panel.
+        if (_panelOpen)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => setState(() => _panelOpen = false),
+              child: Container(color: Colors.black54),
+            ),
+          ),
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          left: _panelOpen ? 0 : -panelWidth,
+          top: 0,
+          bottom: 0,
+          width: panelWidth,
+          child: _panel(),
+        ),
+      ],
     );
   }
 
-  Widget _roomStrip() => Padding(
+  /// Icons + a button to reopen the panel, shown under the chat title.
+  Widget _topStrip() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: List.generate(_rooms.length, (i) => _roomIcon(i)),
+          children: [
+            IconButton(
+              tooltip: 'Open chats',
+              icon: const StarIcon(Icons.menu_rounded, size: 19),
+              onPressed: () => setState(() => _panelOpen = true),
+            ),
+            ...List.generate(_rooms.length, (i) => _icon(i)),
+          ],
         ),
       );
 
-  Widget _roomIcon(int i) {
+  Widget _icon(int i) {
     final room = _rooms[i];
     final active = _selected == i;
     final unread = _unread[room.$2] ?? 0;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
-        onTap: () => setState(() => _selected = i),
+        onTap: () {
+          setState(() {
+            _selected = i;
+            _panelOpen = false;
+          });
+        },
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -104,20 +139,86 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
               Positioned(
                 right: -5,
                 top: -5,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: const BoxDecoration(
-                      color: Color(0xFFFF4444), shape: BoxShape.circle),
-                  child: Text('$unread',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700)),
-                ),
+                child: _badge(unread),
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _badge(int n) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: const BoxDecoration(
+            color: Color(0xFFFF4444), shape: BoxShape.circle),
+        child: Text('$n',
+            style: const TextStyle(
+                color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
+      );
+
+  Widget _panel() => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF080808),
+          border: Border(right: BorderSide(color: AppColors.border, width: 1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
+              child: Row(
+                children: [
+                  const Text('CHATS',
+                      style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                          letterSpacing: 1.5)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const StarIcon(Icons.close_rounded, size: 18),
+                    onPressed: () => setState(() => _panelOpen = false),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children:
+                    List.generate(_rooms.length, (i) => _icon(i)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(8),
+                children: List.generate(_rooms.length, (i) => _chatTile(i)),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _chatTile(int i) {
+    final room = _rooms[i];
+    final unread = _unread[room.$2] ?? 0;
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      onTap: () {
+        setState(() {
+          _selected = i;
+          _panelOpen = false;
+        });
+      },
+      child: ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        leading: StarIcon(room.$3, size: 18),
+        title: Text(room.$1,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 12)),
+        subtitle: Text(room.$4,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 9)),
+        trailing: unread > 0 ? _badge(unread) : null,
       ),
     );
   }
