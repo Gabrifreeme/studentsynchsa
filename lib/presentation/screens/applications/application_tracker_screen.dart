@@ -4,7 +4,6 @@ import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/domain/models/application.dart';
 import 'package:studentsyncsa/presentation/providers/application_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
-import 'package:studentsyncsa/services/notification_service.dart';
 
 class ApplicationTrackerScreen extends ConsumerStatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -26,120 +25,31 @@ class _ApplicationTrackerScreenState
         appBar: AppBar(
           title: const Text('Your Progress'),
         ),
-        body: Column(
-          children: [
-            _notificationSection(),
-            Expanded(
-              child: appsAsync.when(
-                data: (apps) {
-                  if (apps.isEmpty) return const SizedBox.shrink();
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(applicationsProvider);
-                      await Future.delayed(const Duration(milliseconds: 300));
-                      setState(() {});
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(11),
-                      itemCount: apps.length,
-                      itemBuilder: (_, i) => _buildAppCard(apps[i]),
-                    ),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => EmptyState(
-                  icon: Icons.error_outline,
-                  title: 'Error loading applications',
-                  subtitle: e.toString(),
-                ),
+        body: appsAsync.when(
+          data: (apps) {
+            if (apps.isEmpty) return const SizedBox.shrink();
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(applicationsProvider);
+                await Future.delayed(const Duration(milliseconds: 300));
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.all(11),
+                itemCount: apps.length,
+                itemBuilder: (_, i) => _buildAppCard(apps[i]),
               ),
-            ),
-          ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => EmptyState(
+            icon: Icons.error_outline,
+            title: 'Error loading applications',
+            subtitle: e.toString(),
+          ),
         ),
       ),
     );
   }
-
-  Widget _notificationSection() => Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'NOTIFICATIONS',
-              style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 10,
-                  letterSpacing: 1.5),
-            ),
-            const SizedBox(height: 4),
-            FutureBuilder<List<AppNotification>>(
-              future: NotificationService.fetchRemote(),
-              builder: (context, snap) {
-                final rows = snap.data ?? const <AppNotification>[];
-                if (rows.isEmpty) {
-                  return AppCard(
-                    padding: const EdgeInsets.all(10),
-                    child: Text(
-                      'No notifications yet. Email alerts from universities '
-                      'and bursaries will appear here.',
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 10),
-                    ),
-                  );
-                }
-                return Column(
-                  children: rows.take(5).map((n) {
-                    final unread = !NotificationService.isRemoteRead('${n.id}');
-                    return AppCard(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      onTap: () async {
-                        await NotificationService.markRemoteRead('${n.id}');
-                        if (mounted) setState(() {});
-                      },
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.mail_outline_rounded,
-                              size: 16,
-                              color: unread
-                                  ? AppColors.primary
-                                  : AppColors.textMuted),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n.title,
-                                    style: TextStyle(
-                                        color: unread
-                                            ? AppColors.primary
-                                            : AppColors.textPrimary,
-                                        fontSize: 11,
-                                        fontWeight: unread
-                                            ? FontWeight.w700
-                                            : FontWeight.w500)),
-                                const SizedBox(height: 2),
-                                Text(n.body,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        color: AppColors.textMuted,
-                                        fontSize: 9)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-          ],
-        ),
-      );
 
   Widget _buildAppCard(UniversityApplication app) {
     return Padding(

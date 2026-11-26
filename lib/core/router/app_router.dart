@@ -16,6 +16,7 @@ import 'package:studentsyncsa/presentation/screens/funding/funding_list_screen.d
 import 'package:studentsyncsa/presentation/screens/funding/funding_detail_screen.dart';
 import 'package:studentsyncsa/presentation/screens/ai_recommendations/ai_recommendations_screen.dart';
 import 'package:studentsyncsa/presentation/screens/notifications/notifications_screen.dart';
+import 'package:studentsyncsa/presentation/screens/notifications/email_screen.dart';
 import 'package:studentsyncsa/presentation/screens/chat/chat_home_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/settings_screen.dart';
 import 'package:studentsyncsa/presentation/screens/settings/privacy_screen.dart';
@@ -155,6 +156,11 @@ final appRouter = GoRouter(
       path: '/notifications',
       name: 'notifications',
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/email-notifications',
+      name: 'email-notifications',
+      builder: (context, state) => const EmailScreen(),
     ),
     GoRoute(
       path: '/chat',

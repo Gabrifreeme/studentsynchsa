@@ -85,6 +85,8 @@ class DashboardScreen extends ConsumerWidget {
               _PrivacyConsentBanner(),
               const SizedBox(height: 16),
               _buildTileGrid(context, isRight, ref),
+              const SizedBox(height: 8),
+              _buildEmailCard(context),
             ],
           ),
         ),
@@ -93,6 +95,51 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  /// Bottom-centre card for email alerts pushed by ACEsi.
+  Widget _buildEmailCard(BuildContext context) => FutureBuilder<int>(
+        future: NotificationService.remoteUnreadCount(),
+        builder: (context, snap) {
+          final count = snap.data ?? 0;
+          return Center(
+            child: SizedBox(
+              width: 200,
+              child: AppCard(
+                onTap: () => context.push('/email-notifications'),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const StarIcon(Icons.mail_outline_rounded, size: 18),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Email',
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    if (count > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFFF4444), shape: BoxShape.circle),
+                        child: Text('$count',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
 
   Widget _buildStarCta(BuildContext context, String firstName) {
     final mobile = MediaQuery.of(context).size.width < 600;
