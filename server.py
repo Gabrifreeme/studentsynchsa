@@ -1920,10 +1920,62 @@ def _push_app_notification(title, body, sender=None):
             method="POST",
         )
         with _urlreq.urlopen(req, timeout=15) as resp:
-            return 200 <= resp.status < 300
+            ok = 200 <= resp.status < 300
+        if ok:
+            _send_web_pushes(item["title"], item["body"])
+        return ok
     except Exception as e:
         print("⚠️ app notification push failed: %s" % e)
         return False
+
+
+def _send_web_pushes(title, body):
+    """Send browser push notifications to every registered device."""
+    try:
+        import json as _json
+        import urllib.request as _urlreq
+        from pywebpush import webpush
+
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "tools", "notif_config.json"),
+                  "r", encoding="utf-8") as _fh:
+            cfg = _json.load(_fh)
+        with open(os.path.join(base, "tools", "vapid_keys.json"),
+                  "r", encoding="utf-8") as _fh:
+            vapid = _json.load(_fh)
+        url = str(cfg.get("supabase_url", "")).rstrip("/")
+        key = str(cfg.get("supabase_key", ""))
+        req = _urlreq.Request(
+            url + "/rest/v1/push_subscriptions?select=endpoint,p256dh,auth",
+            headers={"apikey": key, "Authorization": "Bearer " + key},
+        )
+        with _urlreq.urlopen(req, timeout=10) as resp:
+            rows = _json.loads(resp.read().decode("utf-8"))
+        for row in rows:
+            try:
+                webpush(
+                    subscription_info={
+                        "endpoint": row["endpoint"],
+                        "keys": {
+                            "p256dh": row["p256dh"],
+                            "auth": row["auth"],
+                        },
+                    },
+                    data=_json.dumps({
+                        "title": title,
+                        "body": body,
+                        "url": "/#/dashboard",
+                    }),
+                    vapid_private_key=vapid["private"],
+                    vapid_claims={
+                        "sub": "mailto:gabrieltrollip200@gmail.com"
+                    },
+                )
+                print("📱 web push sent to %s" % row["endpoint"][:60])
+            except Exception as e:
+                print("⚠️ web push failed: %s" % e)
+    except Exception as e:
+        print("⚠️ web push setup failed: %s" % e)
 
 
 def _strip_html(html):
