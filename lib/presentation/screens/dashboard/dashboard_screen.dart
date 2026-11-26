@@ -66,6 +66,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildStarCta(BuildContext context, String firstName) {
+    final mobile = MediaQuery.of(context).size.width < 600;
     return GestureDetector(
       onTap: () => context.push('/ai-recommendations'),
       child: Center(
@@ -89,21 +90,21 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               'Welcome, $firstName!',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 14,
+                fontSize: mobile ? 18 : 14,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.5,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Tap the Star to begin',
               style: TextStyle(
                 color: AppColors.textMuted,
-                fontSize: 10,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w500,
+                fontSize: mobile ? 12 : 10,
+                letterSpacing: mobile ? 1.4 : 2,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
