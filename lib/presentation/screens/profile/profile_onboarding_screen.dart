@@ -4617,19 +4617,11 @@ class _ProfileOnboardingScreenState
       return;
     }
     final p = profile;
-    // Restore the exact page the student was on, and skip the greeting, so a
-    // hot reload ("r") never sends them back to the start of the form.
-    final savedPage = int.tryParse(
-            HiveDatabase.settings.get('profileWizardPage') ?? '0') ??
-        0;
-    final page = savedPage.clamp(0, 6);
+    // Always open on page one. The data is restored; the page position is not,
+    // so page one correctly has no Back button.
     setState(() {
       _applyProfile(p);
-      // Keep ACEsi's greeting on every entry; only the form data is restored.
-      _currentPage = page;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_pageController.hasClients) _pageController.jumpToPage(page);
+      _currentPage = 0;
     });
     _profileLoaded = true;
   }
