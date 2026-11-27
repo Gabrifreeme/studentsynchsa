@@ -4869,7 +4869,19 @@ class _ProfileOnboardingScreenState
   }
 
   Future<void> _saveAndContinue() async {
-    if (!_validateCurrentPage()) return;
+    if (!_validateCurrentPage()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Please complete the required fields before continuing.'),
+            backgroundColor: AppColors.warning,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
     // Save every page as soon as Next is tapped. Without this, a hot reload
     // ("r") throws away everything typed on the current page.
     await _saveCurrentPage(showMessage: false);
