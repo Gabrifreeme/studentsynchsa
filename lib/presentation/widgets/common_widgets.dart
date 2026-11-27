@@ -59,17 +59,16 @@ class StarAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget image = ClipOval(
-      child: Image.asset(
-        'assets/images/star_avatar.png',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        filterQuality: FilterQuality.high,
-        // Some cached web builds cannot find the PNG. Never leave a dead star.
-        errorBuilder: (_, __, ___) =>
-            StarIcon(Icons.star_rounded, size: size),
-      ),
+    // No ClipOval here: the PNG is already a shaped star, and clipping the
+    // fallback icon would cut off most of the South African colours.
+    Widget image = Image.asset(
+      'assets/images/star_avatar.png',
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.high,
+      // Some cached web builds cannot find the PNG. Never leave a dead star.
+      errorBuilder: (_, __, ___) => StarIcon(Icons.star_rounded, size: size),
     );
     if (pulse) {
       image = _PulseWrapper(child: image);
