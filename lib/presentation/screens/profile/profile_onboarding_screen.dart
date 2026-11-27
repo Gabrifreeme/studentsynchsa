@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import 'package:studentsyncsa/core/constants/app_constants.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
 import 'package:studentsyncsa/data/repositories/profile_repository_impl.dart';
 import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
@@ -126,6 +127,8 @@ class _ProfileOnboardingScreenState
   final _uploadedFiles = List<String>.filled(3, '');
 
   bool _saving = false;
+  bool _profileLoaded = false;
+  Timer? _autoSaveTimer;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
   static const _greetingBeforeStar =
@@ -2021,6 +2024,12 @@ class _ProfileOnboardingScreenState
     );
     _startTextReveal();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingProfile());
+    // Keep typed data safe even if a hot reload happens before Next/Save.
+    _autoSaveTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted && _profileLoaded && !_saving && !_showGreeting) {
+        _saveCurrentPage(showMessage: false);
+      }
+    });
   }
 
   void _loadExistingProfile() async {
@@ -2043,9 +2052,26 @@ class _ProfileOnboardingScreenState
         } catch (_) {}
       }
     }
-    if (profile == null) return;
+    if (profile == null) {
+      _profileLoaded = true;
+      return;
+    }
     final p = profile;
-    setState(() { _applyProfile(p); });
+    // Restore the exact page the student was on, and skip the greeting, so a
+    // hot reload ("r") never sends them back to the start of the form.
+    final savedPage = int.tryParse(
+            HiveDatabase.settings.get('profileWizardPage') ?? '0') ??
+        0;
+    final page = savedPage.clamp(0, 6);
+    setState(() {
+      _applyProfile(p);
+      _showGreeting = false;
+      _currentPage = page;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) _pageController.jumpToPage(page);
+    });
+    _profileLoaded = true;
   }
 
   void _applyProfile(StudentProfile p) {
@@ -2232,6 +2258,7 @@ class _ProfileOnboardingScreenState
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     _floatCtrl.dispose();
     _pageController.dispose();
     _titleCtrl.dispose();
@@ -2284,6 +2311,11 @@ class _ProfileOnboardingScreenState
 
   Future<void> _saveAndContinue() async {
     if (!_validateCurrentPage()) return;
+    // Save every page as soon as Next is tapped. Without this, a hot reload
+    // ("r") throws away everything typed on the current page.
+    await _saveCurrentPage(showMessage: false);
+    final nextPage = (_currentPage + 1).clamp(0, 6);
+    await HiveDatabase.settings.put('profileWizardPage', '$nextPage');
     if (_currentPage < 6) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -3812,7 +3844,7 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  Future<void> _saveCurrentPage() async {
+  Future<void> _saveCurrentPage({bool showMessage = true}) async {
     setState(() => _saving = true);
     try {
       final authState = ref.read(authProvider);
@@ -3919,7 +3951,7 @@ class _ProfileOnboardingScreenState
       );
 
       await ref.read(profileProvider.notifier).saveProfile(profile);
-      if (mounted) {
+      if (mounted && showMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Progress saved!'),
