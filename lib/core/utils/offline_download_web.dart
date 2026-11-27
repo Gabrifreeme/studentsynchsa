@@ -17,7 +17,7 @@ Future<void> downloadAsset(String assetPath) async {
     anchor.remove();
     html.Url.revokeObjectUrl(url);
   } catch (e) {
-    final url = '/${assetPath.startsWith('/') ? assetPath.substring(1) : assetPath}';
+    final url = _webAssetUrl(assetPath);
     final anchor = html.AnchorElement(href: url)
       ..setAttribute('download', assetPath.split('/').last)
       ..style.display = 'none';
@@ -27,7 +27,13 @@ Future<void> downloadAsset(String assetPath) async {
   }
 }
 
+String _webAssetUrl(String assetPath) {
+  final clean =
+      assetPath.startsWith('/') ? assetPath.substring(1) : assetPath;
+  // Flutter serves declared assets under the web root's /assets/ folder.
+  return '/assets/$clean';
+}
+
 Future<void> openAsset(String assetPath) async {
-  final url = '/${assetPath.startsWith('/') ? assetPath.substring(1) : assetPath}';
-  html.window.open(url, '_blank');
+  html.window.open(_webAssetUrl(assetPath), '_blank');
 }
