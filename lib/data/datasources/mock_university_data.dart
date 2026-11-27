@@ -89,7 +89,7 @@ class MockUniversityData {
     University(
       id: 'mandela', name: 'Nelson Mandela University',
       shortName: 'NMU', province: 'Eastern Cape',
-      website: 'https://www.mandela.ac.za', applicationUrl: 'https://www.mandela.ac.za/apply',
+      website: 'https://www.mandela.ac.za', applicationUrl: 'https://apps.mandela.ac.za/e-portal/Profile/CreateProfile',
       logoUrl: 'assets/logos/mandela.png',
       hasApplicationFee: true, applicationFee: 250,
       requiresNbt: false, minimumAps: 25,
