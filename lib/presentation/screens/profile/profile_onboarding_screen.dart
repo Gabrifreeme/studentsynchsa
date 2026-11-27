@@ -6195,20 +6195,29 @@ class _ProfileOnboardingScreenState
                     const SizedBox(width: 3),
                     Expanded(
                       flex: 1,
-                      child: TextFormField(
-                        initialValue: _resultsSubjects[i].symbol,
-                        keyboardType: TextInputType.number,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _resultsSubjects[i].symbol.isEmpty
+                            ? null
+                            : int.tryParse(_resultsSubjects[i].symbol),
                         decoration: const InputDecoration(
                           labelText: '% *',
                           contentPadding:
                               EdgeInsets.symmetric(horizontal: 4, vertical: 7),
                         ),
+                        items: List.generate(101, (p) => p)
+                            .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text('$p',
+                                      style: const TextStyle(fontSize: 9)),
+                                ))
+                            .toList(),
                         onChanged: (v) {
-                          setState(() => _resultsSubjects[i] =
-                              _resultsSubjects[i].copyWith(symbol: v));
+                          if (v != null) {
+                            setState(() => _resultsSubjects[i] =
+                                _resultsSubjects[i].copyWith(symbol: '$v'));
+                          }
                         },
-                        validator: (v) =>
-                            v?.trim().isEmpty == true ? 'Required' : null,
+                        validator: (v) => v == null ? 'Required' : null,
                       ),
                     ),
                     IconButton(
