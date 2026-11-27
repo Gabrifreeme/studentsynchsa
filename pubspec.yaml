@@ -46,6 +46,7 @@ flutter:
     - assets/images/
     - assets/audio/
     - assets/offline/guide.html
+    - assets/offline/guides/
     - assets/offline/cput/
     - assets/offline/cut/
     - assets/offline/dut/

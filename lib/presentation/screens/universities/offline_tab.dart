@@ -26,7 +26,8 @@ class _GuideCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => openAsset('assets/offline/guide.html'),
+        onTap: () => openAsset(
+            'assets/offline/guides/$universityId.html'),
         child: Padding(
           padding: const EdgeInsets.all(11),
           child: Row(
