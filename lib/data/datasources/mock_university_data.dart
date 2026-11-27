@@ -202,7 +202,7 @@ class MockUniversityData {
     University(
       id: 'uj', name: 'University of Johannesburg',
       shortName: 'UJ', province: 'Gauteng',
-      website: 'https://www.uj.ac.za', applicationUrl: 'https://www.uj.ac.za/Apply',
+      website: 'https://www.uj.ac.za', applicationUrl: 'https://registration.uj.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'https://logoapi.sh/icon/uj.ac.za',
       hasApplicationFee: true, applicationFee: 300,
       requiresNbt: false, minimumAps: 27,
