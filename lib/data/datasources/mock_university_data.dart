@@ -230,7 +230,7 @@ class MockUniversityData {
     University(
       id: 'ul', name: 'University of Limpopo',
       shortName: 'UL', province: 'Limpopo',
-      website: 'https://www.ul.ac.za', applicationUrl: 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+      website: 'https://www.ul.ac.za', applicationUrl: 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'https://logoapi.sh/icon/ul.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
