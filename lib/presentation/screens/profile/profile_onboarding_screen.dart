@@ -134,6 +134,9 @@ class _ProfileOnboardingScreenState
   static const _greetingBeforeStar =
       "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the "
       "perfect universities and bursaries for your future!\n\n"
+      "The application form is long, but it is compulsory for all "
+      "universities and worth the wait. The good thing is that it works "
+      "offline, so no data is needed.\n\n"
       "Wherever you see me — ";
   static const _greetingAfterStar = " — tap on me and I will guide you.";
   static const _greetingText = _greetingBeforeStar + _greetingAfterStar;
