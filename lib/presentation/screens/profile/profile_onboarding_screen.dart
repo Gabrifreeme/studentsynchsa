@@ -2640,7 +2640,8 @@ class _ProfileOnboardingScreenState
         ),
         content: const Text(
           'Yes, you are in the right place. Complete the form — all fields '
-          'are compulsory. When done, tap Save, then Next.',
+          'are compulsory. When done, tap Save, then Next. '
+          'Remember to look for me on the next page!',
           style: TextStyle(
               color: AppColors.textPrimary, fontSize: 11, height: 1.5),
         ),
@@ -4107,7 +4108,8 @@ class _ProfileOnboardingScreenState
         children: [
           const Text(
             'ACEsi says: Yes, you are in the right place. Complete the form — '
-            'all fields are compulsory. When done, tap Save, then Next.',
+            'all fields are compulsory. When done, tap Save, then Next. '
+            'Remember to look for me on the next page!',
             style: TextStyle(color: AppColors.starGold, fontSize: 9),
           ),
           const SizedBox(height: 6),
