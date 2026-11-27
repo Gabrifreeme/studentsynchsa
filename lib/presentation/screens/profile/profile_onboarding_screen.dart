@@ -5207,9 +5207,13 @@ class _ProfileOnboardingScreenState
       context.push('/ai-recommendations');
       return;
     }
-    final helpText = _currentPage == 4
-        ? 'Add what you want to study. All fields are self-explanatory. '
-            'Once your paperwork is ready, the next page is for uploads.'
+    final helpText = _currentPage == 5
+        ? "This is it — you've done it. Your profile is saved and ready. "
+            "Now I can use your saved profile to auto-fill university "
+            "application forms :-)"
+        : _currentPage == 4
+            ? 'Add what you want to study. All fields are self-explanatory. '
+                'Once your paperwork is ready, the next page is for uploads.'
         : _currentPage == 3
             ? 'You are halfway there — you are doing great!'
             : _currentPage == 1
