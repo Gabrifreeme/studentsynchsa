@@ -2064,7 +2064,7 @@ class _ProfileOnboardingScreenState
     final page = savedPage.clamp(0, 6);
     setState(() {
       _applyProfile(p);
-      _showGreeting = false;
+      // Keep ACEsi's greeting on every entry; only the form data is restored.
       _currentPage = page;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
