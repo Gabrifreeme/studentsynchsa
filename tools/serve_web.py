@@ -2,7 +2,44 @@ import functools
 import http.client
 import json
 import mimetypes
+import os
+import threading
+import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+SOURCE_DIR = r'C:\Users\gabri\Documents\LibSyncStudent'
+SIGNAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'reload_signal.txt')
+
+
+def _latest_source_mtime():
+    # Watch the built bundle, not the source: only a finished build can change
+    # what the browser actually runs.
+    latest = 0.0
+    for name in ('main.dart.js', 'index.html', 'flutter_bootstrap.js'):
+        path = os.path.join(SOURCE_DIR, 'build', 'web', name)
+        try:
+            latest = max(latest, os.path.getmtime(path))
+        except Exception:
+            pass
+    return latest
+
+
+def _watch_source():
+    last = _latest_source_mtime()
+    while True:
+        time.sleep(1)
+        try:
+            now = _latest_source_mtime()
+            if now > last:
+                last = now
+                with open(SIGNAL_FILE, 'w', encoding='utf-8') as f:
+                    f.write(str(time.time()))
+        except Exception:
+            pass
+
+
+threading.Thread(target=_watch_source, daemon=True).start()
 
 mimetypes.add_type('application/wasm', '.wasm')
 mimetypes.add_type('application/javascript', '.js')
