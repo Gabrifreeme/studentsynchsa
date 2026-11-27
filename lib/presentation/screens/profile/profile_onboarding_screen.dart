@@ -5183,6 +5183,28 @@ class _ProfileOnboardingScreenState
     );
   }
 
+  Widget _starButton() {
+    return GestureDetector(
+      onTap: _showStarHelp,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.5), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.starGold.withValues(alpha: 0.55),
+              blurRadius: 18,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
+        child: const StarAvatar(size: 40, pulse: true),
+      ),
+    );
+  }
+
   void _showStarHelp() {
     final helpText = _currentPage == 1
         ? 'Some fields are duplicated — that is true, as I cater for all universities.'
@@ -6745,25 +6767,7 @@ class _ProfileOnboardingScreenState
             ),
           ),
           const SizedBox(width: 6),
-          GestureDetector(
-            onTap: _showStarHelp,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.5), width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.starGold.withValues(alpha: 0.55),
-                    blurRadius: 18,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: const StarAvatar(size: 40, pulse: true),
-            ),
-          ),
+          if (_currentPage < 2) ...[const SizedBox(width: 6), _starButton()],
           const SizedBox(width: 6),
           Expanded(
             child: ElevatedButton(
@@ -6788,6 +6792,7 @@ class _ProfileOnboardingScreenState
                   : Text(_currentPage < 6 ? 'Next' : 'Finish'),
             ),
           ),
+          if (_currentPage >= 2) ...[const SizedBox(width: 6), _starButton()],
           ],
           ),
         ],
