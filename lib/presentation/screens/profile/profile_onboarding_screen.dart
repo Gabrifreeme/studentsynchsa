@@ -129,7 +129,6 @@ class _ProfileOnboardingScreenState
   bool _saving = false;
   String? _validationMessage;
   bool _profileLoaded = false;
-  Timer? _autoSaveTimer;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
   static const _greetingBeforeStar =
@@ -4585,12 +4584,6 @@ class _ProfileOnboardingScreenState
     );
     _startTextReveal();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingProfile());
-    // Keep typed data safe even if a hot reload happens before Next/Save.
-    _autoSaveTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted && _profileLoaded && !_saving && !_showGreeting) {
-        _saveCurrentPage(showMessage: false);
-      }
-    });
   }
 
   void _loadExistingProfile() async {
@@ -4810,7 +4803,6 @@ class _ProfileOnboardingScreenState
 
   @override
   void dispose() {
-    _autoSaveTimer?.cancel();
     _floatCtrl.dispose();
     _pageController.dispose();
     _titleCtrl.dispose();
@@ -6734,13 +6726,6 @@ class _ProfileOnboardingScreenState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_currentPage != 2)
-            const Text(
-              'ACEsi says: Yes, you are in the right place. Complete the form — '
-              'all fields are compulsory. When done, tap Save, then Next. '
-              'Remember to look for me on the next page!',
-              style: TextStyle(color: AppColors.starGold, fontSize: 9),
-            ),
           if (_validationMessage != null) ...[
             const SizedBox(height: 4),
             Text(_validationMessage!,
