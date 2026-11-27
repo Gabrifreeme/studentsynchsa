@@ -158,83 +158,12 @@ class AuthService implements AuthRepository {
           savedUserId == null || savedUserId.toString().isEmpty) {
         return AuthResult(success: false, error: 'no saved session');
       }
-      var profile = await _profileRepo.getProfile();
-      final existingId = profile?.id ?? const Uuid().v4();
-      profile = StudentProfile(
-        id: existingId,
-        onboardingComplete: true,
-        personal: PersonalDetails(
-          title: 'Mr',
-          initials: 'T',
-          firstName: 'Test',
-          lastName: 'User',
-          gender: 'Male',
-          dateOfBirth: DateTime(1964, 4, 13),
-          idNumber: '6404135555555',
-        ),
-        contact: ContactInfo(
-          email: 'test.user@example.com',
-          phone: '0712345678',
-        ),
-        address: AddressInfo(
-          address: '123 Test Street',
-          addressLine2: 'Test Suburb',
-          province: 'Gauteng',
-          postalCode: '2000',
-        ),
-        demographic: DemographicInfo(
-          nationality: 'RSA',
-          countryOfBirth: 'South Africa',
-          homeLanguage: 'English',
-          populationGroup: 'African',
-          maritalStatus: 'Single',
-        ),
-        status: StatusInfo(
-          disabilityStatus: 'No',
-          bursaryRequired: 'Yes',
-          employmentStatus: 'Unemployed',
-        ),
-        school: SchoolInfo(
-          schoolName: 'Test High School',
-          currentGrade: 'Grade 12',
-          currentlyDoing: 'Studying at school',
-        ),
-        nextOfKin: NextOfKin(
-          name: 'Parent Test',
-          mobilePhone: '0712345679',
-          homePhone: '0211234567',
-          addressLine1: '123 Test Street',
-          addressLine2: 'Test Suburb',
-          postalCode: '2000',
-          email: 'parent@example.com',
-        ),
-        accountContact: AccountContact(
-          name: 'Account Contact',
-          mobilePhone: '0723456789',
-          homePhone: '0217654321',
-          addressLine1: '456 Account Street',
-          addressLine2: 'Account Suburb',
-          postalCode: '2001',
-          email: 'account@example.com',
-        ),
-        results: ResultsInfo(
-          matricYear: DateTime.now().year - 1,
-          applicationLevel: 'Undergraduate',
-          upgrading: 'No',
-          matricType: 'South African',
-          examinationNumber: '1234567890',
-          schoolLeavingCertificate: 'GRADE 12',
-        ),
-        qualification: QualificationInfo(
-          academicYear: DateTime.now().year,
-          applicationPeriod: '1ST YEAR',
-          studyMode: 'FULL-TIME',
-          studyTiming: 'YEAR',
-          choices: [
-            QualificationChoice(),
-          ],
-        ),
-      );
+      // Always restore the student's real saved profile. Fabricating a
+      // "Test User" here overwrote their work on every reload / hot reload.
+      final profile = await _profileRepo.getProfile();
+      if (profile == null) {
+        return AuthResult(success: false, error: 'no saved profile');
+      }
       return AuthResult(success: true, profile: profile);
     } catch (e) {
       return AuthResult(success: false, error: e.toString());

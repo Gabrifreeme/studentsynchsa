@@ -2033,13 +2033,12 @@ class _ProfileOnboardingScreenState
   }
 
   void _loadExistingProfile() async {
-    var profile = ref.read(profileProvider).valueOrNull
-        ?? ref.read(authProvider).valueOrNull?.profile;
+    // The saved profile is the source of truth — never let an in-memory
+    // provider profile overwrite what the student actually saved.
+    var profile = await ProfileRepositoryImpl().getProfile();
     if (profile == null) {
-      // Try reading directly from Hive in case providers haven't loaded yet
-      try {
-        profile = await ProfileRepositoryImpl().getProfile();
-      } catch (_) {}
+      profile = ref.read(profileProvider).valueOrNull
+          ?? ref.read(authProvider).valueOrNull?.profile;
     }
     if (profile == null) {
       // Retry once after a short delay
