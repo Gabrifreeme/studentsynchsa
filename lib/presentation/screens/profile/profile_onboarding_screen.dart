@@ -128,7 +128,7 @@ class _ProfileOnboardingScreenState
   bool _saving = false;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
-  static const _greetingText = "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
+  static const _greetingText = "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!\n\nWherever you see me — the Star — tap on me and I will guide you.";
 
   static const _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
