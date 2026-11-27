@@ -1034,6 +1034,7 @@ class _ProfileOnboardingScreenState
     '0235 - Scotton, North West',
     '0236 - Broederstroom, North West',
     '0237 - Marikana, North West',
+    '2197 - The Hill, Gauteng',
     '0238 - Rietfontein, North West',
     '0239 - Sefikeng, North West',
     '0240 - Bela Bela (Warmbaths), Limpopo',
