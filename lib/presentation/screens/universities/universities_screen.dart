@@ -13,9 +13,12 @@ class UniversitiesScreen extends ConsumerStatefulWidget {
   ConsumerState<UniversitiesScreen> createState() => _UniversitiesScreenState();
 }
 
-class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
+class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen>
+    with SingleTickerProviderStateMixin {
   final _searchCtrl = TextEditingController();
   String _selectedProvince = 'All';
+  late AnimationController _floatCtrl;
+  late Animation<double> _floatAnim;
 
   static const _provinces = [
     'All', 'Eastern Cape', 'Free State', 'Gauteng',
@@ -30,7 +33,20 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _floatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _floatAnim = Tween<double>(begin: -6, end: 6).animate(
+      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
   void dispose() {
+    _floatCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -67,6 +83,20 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _floatAnim,
+                      builder: (context, child) => Transform.translate(
+                        offset: Offset(0, _floatAnim.value),
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTap: () => context.push('/ai-recommendations'),
+                        child: const StarAvatar(size: 44, pulse: true),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                     child: Column(
