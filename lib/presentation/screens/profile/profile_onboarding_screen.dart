@@ -128,7 +128,7 @@ class _ProfileOnboardingScreenState
   bool _saving = false;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
-  static const _greetingText = "Hi there! I'm Star ⭐\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
+  static const _greetingText = "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!";
 
   static const _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
@@ -2564,10 +2564,10 @@ class _ProfileOnboardingScreenState
 
   void _showStarHelp() {
     final tips = [
-      'Tell Star about yourself! Your name, ID, and contact info help universities reach you.',
-      'Your school and grade info help Star recommend the right programmes.',
-      'Add your Grade 12 (or Grade 11) subjects and marks so Star can calculate your APS score.',
-      'Pick your interests and career goals — Star will find the best match for you!',
+      'Tell ACEsi about yourself! Your name, ID, and contact info help universities reach you.',
+      'Your school and grade info help ACEsi recommend the right programmes.',
+      'Add your Grade 12 (or Grade 11) subjects and marks so ACEsi can calculate your APS score.',
+      'Pick your interests and career goals — ACEsi will find the best match for you!',
     ];
     showDialog(
       context: context,
@@ -2578,7 +2578,7 @@ class _ProfileOnboardingScreenState
           children: [
             StarAvatar(size: 28),
             SizedBox(width: 6),
-            Text('Star says:', style: TextStyle(color: AppColors.starGold)),
+            Text('ACEsi says:', style: TextStyle(color: AppColors.starGold)),
           ],
         ),
         content: Text(
