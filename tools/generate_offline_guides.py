@@ -56,7 +56,7 @@ APPLY = {
  'tut': 'https://www.tut.ac.za/index.php/apply/apply-online',
  'cut': 'https://www.cut.ac.za/admission-online',
  'vut': 'https://www.vut.ac.za/apply',
- 'mru': 'https://www.mut.ac.za/apply',
+ 'mru': 'https://www.cao.ac.za/',
  'zululand': 'https://www.cao.ac.za/',
  'mandela': 'https://apps.mandela.ac.za/e-portal/Profile/CreateProfile',
  'uj': 'https://registration.uj.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
