@@ -26,6 +26,15 @@
       "body": "",
       "enabled": true,
       "notifyOnce": true
+    },
+    {
+      "name": "Live Test Alert",
+      "account": "gmail",
+      "from": "",
+      "subject": "TEST ALERT",
+      "body": "",
+      "enabled": true,
+      "notifyOnce": false
     }
   ]
 }

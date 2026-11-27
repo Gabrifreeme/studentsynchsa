@@ -89,6 +89,9 @@ email_notify_rules.local.json
 tools/notif_config.json
 tools/vapid_keys.json
 tools/vapid_private.pem
+tools/cloudflared.exe
+tools/cloudflared_*.log
+tools/cloudflared_*.err
 server_stdout.txt
 server_stderr.txt
 server_stdout.txt.*
