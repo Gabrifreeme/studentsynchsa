@@ -69,9 +69,7 @@ class _AiRecommendationsScreenState
     String accumulated = '';
     try {
       await AiService.askStream(
-        prompt: 'You are ACEsi, a friendly South African university advisor. '
-            'Keep answers warm, encouraging, and practical (2-3 sentences max per point).\n'
-            '$contextInfo\nStudent asks: $text',
+        prompt: '$contextInfo\nStudent asks: $text',
         onToken: (token) {
           accumulated += token;
           // Keep the real error visible so we can diagnose it.
