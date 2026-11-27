@@ -5062,7 +5062,7 @@ class _ProfileOnboardingScreenState
                       const SizedBox(height: 28),
                       _buildGreetingText(),
                       const SizedBox(height: 34),
-                      if (_visibleChars >= _greetingText.length)
+                      if (_visibleChars >= _greetingText.length) ...[
                         ElevatedButton.icon(
                           onPressed: _profileComplete
                               ? () => context.go('/dashboard')
@@ -5078,6 +5078,17 @@ class _ProfileOnboardingScreenState
                             textStyle: const TextStyle(fontSize: 11),
                           ),
                         ),
+                        if (_profileComplete)
+                          TextButton.icon(
+                            onPressed: _dismissGreeting,
+                            icon: const Icon(Icons.edit_rounded, size: 14),
+                            label: const Text('Edit My Profile'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.starGold,
+                              textStyle: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                      ],
                     ],
                   ),
                 ),
