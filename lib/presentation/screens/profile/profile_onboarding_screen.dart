@@ -2562,39 +2562,6 @@ class _ProfileOnboardingScreenState
     );
   }
 
-  void _showStarHelp() {
-    final tips = [
-      'Tell ACEsi about yourself! Your name, ID, and contact info help universities reach you.',
-      'Your school and grade info help ACEsi recommend the right programmes.',
-      'Add your Grade 12 (or Grade 11) subjects and marks so ACEsi can calculate your APS score.',
-      'Pick your interests and career goals — ACEsi will find the best match for you!',
-    ];
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Row(
-          children: [
-            StarAvatar(size: 28),
-            SizedBox(width: 6),
-            Text('ACEsi says:', style: TextStyle(color: AppColors.starGold)),
-          ],
-        ),
-        content: Text(
-          tips[_currentPage.clamp(0, tips.length - 1)],
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 10, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Got it!', style: TextStyle(color: AppColors.primaryLight)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPersonalInfo() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -4041,8 +4008,18 @@ class _ProfileOnboardingScreenState
 
     return Padding(
       padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'ACEsi says: Yes, you are in the right place. Complete the form — '
+            'all fields are compulsory. When done, tap Save, then Next.',
+            style: TextStyle(color: AppColors.starGold, fontSize: 9),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (_currentPage > 0)
             Expanded(
@@ -4087,33 +4064,6 @@ class _ProfileOnboardingScreenState
             ),
           ),
           const SizedBox(width: 6),
-          GestureDetector(
-            onTap: _showStarHelp,
-            child: AnimatedBuilder(
-              animation: _floatAnim,
-              builder: (context, child) => Transform.translate(
-                offset: Offset(0, _floatAnim.value * 0.6 - 0.3),
-                child: child,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.5), width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.starGold.withValues(alpha: 0.55),
-                      blurRadius: 18,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const StarAvatar(size: 40, pulse: true),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
           Expanded(
             child: ElevatedButton(
               onPressed: _saving ? null : _saveAndContinue,
@@ -4136,6 +4086,8 @@ class _ProfileOnboardingScreenState
                     )
                   : Text(_currentPage < 6 ? 'Next' : 'Finish'),
             ),
+          ),
+          ],
           ),
         ],
       ),
