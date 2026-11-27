@@ -96,6 +96,25 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(result)
 
+    def do_GET(self):
+        if self.path.split('?')[0] == '/__reload_signal':
+            try:
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       'reload_signal.txt'),
+                          'r', encoding='utf-8') as f:
+                    value = f.read().strip()
+            except Exception:
+                value = '0'
+            data = value.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        super().do_GET()
+
     def do_POST(self):
         path = self.path.split('?')[0]
         if path == '/api/ai/chat':

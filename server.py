@@ -21267,6 +21267,17 @@ def api_run_input():
         proc.stdin.write(key.encode('utf-8') + b'\n')
         proc.stdin.flush()
         label = {'r': 'HOT RELOAD', 'R': 'HOT RESTART', 'q': 'QUIT'}.get(key, 'INPUT')
+        # Tell the browser to reload itself. Flutter web's -d web-server mode
+        # needs a debug extension for real hot reload; this gives the same
+        # result for development without one.
+        if key.lower() in ('r', 'R'):
+            try:
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       'tools', 'reload_signal.txt'),
+                          'w', encoding='utf-8') as _sf:
+                    _sf.write(str(time.time()))
+            except Exception:
+                pass
         try:
             _lp = _ACTIVE_RUN.get('log', '')
             if _lp and os.path.isfile(_lp):
