@@ -83,6 +83,26 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen>
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _floatAnim,
+                      builder: (context, child) => Transform.translate(
+                        offset: Offset(0, _floatAnim.value),
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          final message =
+                              'Search for a university by name, or just scroll '
+                              'down to find the one you are looking for. '
+                              'Remember, I am here if you want to ask a question.';
+                          context.push(
+                              '/ai-recommendations?message=${Uri.encodeComponent(message)}');
+                        },
+                        child: const StarAvatar(size: 44, pulse: true),
+                      ),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                     child: Column(
@@ -106,26 +126,6 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen>
                                 color: AppColors.textSecondary,
                                 fontSize: 10)),
                       ],
-                    ),
-                  ),
-                  Center(
-                    child: AnimatedBuilder(
-                      animation: _floatAnim,
-                      builder: (context, child) => Transform.translate(
-                        offset: Offset(0, _floatAnim.value),
-                        child: child,
-                      ),
-                      child: GestureDetector(
-                        onTap: () {
-                          final message =
-                              'Search for a university by name, or just scroll '
-                              'down to find the one you are looking for. '
-                              'Remember, I am here if you want to ask a question.';
-                          context.push(
-                              '/ai-recommendations?message=${Uri.encodeComponent(message)}');
-                        },
-                        child: const StarAvatar(size: 44, pulse: true),
-                      ),
                     ),
                   ),
                   Padding(
