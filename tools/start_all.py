@@ -65,7 +65,7 @@ if not cloudflared_running():
 
 urls = []
 for name in os.listdir(LOG_DIR):
-    if name.startswith('cloudflared_') and name.endswith('.log'):
+    if name.startswith('cloudflared_') and name.endswith(('.log', '.err')):
         try:
             text = open(os.path.join(LOG_DIR, name), 'r',
                         encoding='utf-8', errors='replace').read()
