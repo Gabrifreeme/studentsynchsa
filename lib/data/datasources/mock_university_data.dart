@@ -259,7 +259,7 @@ class MockUniversityData {
     University(
       id: 'univen', name: 'University of Venda',
       shortName: 'UNIVEN', province: 'Limpopo',
-      website: 'https://www.univen.ac.za', applicationUrl: 'https://www.univen.ac.za/students/student-support-services/how-to-apply/apply-online/',
+      website: 'https://www.univen.ac.za', applicationUrl: 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'assets/logos/univen.png',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
