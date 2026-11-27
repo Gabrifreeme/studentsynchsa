@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/presentation/providers/university_provider.dart';
 import 'package:studentsyncsa/presentation/screens/universities/offline_tab.dart';
@@ -204,17 +205,35 @@ class UniversityDetailScreen extends ConsumerWidget {
                     ),
                   const SizedBox(height: 40),
 
-                  // 4. Apply button centred under the image card
-                  OutlinedButton.icon(
-                    onPressed: () => _launchUniv(context, uni),
-                    icon: const StarIcon(Icons.auto_awesome_rounded, size: 16),
-                    label: const Text('Apply'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(120, 36),
-                      side: const BorderSide(color: AppColors.primary),
-                      foregroundColor: AppColors.primary,
-                      textStyle: const TextStyle(fontSize: 12),
-                    ),
+                  // 4. Apply button with ACEsi Star alongside it
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _launchUniv(context, uni),
+                        icon: const StarIcon(
+                            Icons.auto_awesome_rounded, size: 16),
+                        label: const Text('Apply'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(120, 36),
+                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: AppColors.primary,
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          final message =
+                              'Ask me anything about ${uni.name}, its courses '
+                              'or how to apply.';
+                          context.push(
+                              '/ai-recommendations?message=${Uri.encodeComponent(message)}');
+                        },
+                        child: const StarAvatar(size: 40, pulse: true),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
