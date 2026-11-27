@@ -7,7 +7,7 @@ os.makedirs(OUT, exist_ok=True)
 U = {
  'uchenn': ("UCT", "University of Cape Town", "Western Cape", "Rondebosch, Cape Town", "https://www.uct.ac.za", "Opened 1 April 2026; undergraduate applications closed 31 July 2026. No late applications. Residence applications also closed 31 July 2026. Postgraduate applications close 31 October 2026.", "First-year tuition roughly R62,340 to R113,510 depending on faculty (2026 local-student figures). Astronomy, engineering and medicine are at the higher end.", "Traditional university"),
  'wits': ("Wits", "University of the Witwatersrand", "Gauteng", "Braamfontein & East Campus, Johannesburg", "https://www.wits.ac.za", "Health Sciences, Architecture, Audiology, Speech-Language Pathology and Film & TV closed 30 June 2026. All other undergraduate programmes and residence applications closed 30 September 2026. No late applications.", "Average first-year tuition about R47,930 to R83,760 (2026), charged per course or module.", "Traditional university"),
- 'su': ("SUN", "Stellenbosch University", "Western Cape", "Stellenbosch, with satellite campuses", "https://www.sun.ac.za", "2027 undergraduate applications closed 31 July 2026. No late applications. Residence applications closed on the same date.", "First-year tuition roughly R52,900 to R87,950 (2026), depending on faculty.", "Traditional university"),
+ 'su': ("SUN", "Stellenbosch University", "Western Cape", "Stellenbosch, with satellite campuses", "https://www.su.ac.za", "2027 undergraduate applications closed 31 July 2026. No late applications. Residence applications closed on the same date.", "First-year tuition roughly R52,900 to R87,950 (2026), depending on faculty.", "Traditional university"),
  'up': ("UP", "University of Pretoria", "Gauteng", "Hatfield, Pretoria (multiple campuses)", "https://www.up.ac.za", "Applications opened 1 April 2026 and closed 30 June 2026 — the earliest major closing date. Veterinary Science closed 31 May 2026. No late applications.", "Estimated first-year tuition R30,000 to R98,000 depending on faculty (2026). Initial fee payable before registration.", "Traditional university"),
  'ukzn': ("UKZN", "University of KwaZulu-Natal", "KwaZulu-Natal", "Pietermaritzburg, Durban, Westville, Edgewood", "https://ukzn.ac.za", "Undergraduate applications via CAO closed 30 September 2026. Medicine (MBChB) closed 30 June 2026.", "Approximate full-time first-year fees R47,854 to R68,224 (2026); engineering around R64,167 to R64,910. Residence R48,896 to R59,168 per year.", "Traditional university"),
  'nwu': ("NWU", "North-West University", "North West", "Potchefstroom, Mahikeng, Vanderbijlpark", "https://www.nwu.ac.za", "Applications opened 1 June 2026 and closed 31 August 2026. Selection courses closed 30 June 2026. Postgraduate applications open until 30 November 2026.", "Estimated first-year tuition R51,865 to R80,071 (2026) depending on qualification, e.g. Accounting R80,072, Engineering R70,345, Education R61,912.", "Traditional university"),
@@ -31,6 +31,35 @@ U = {
  'zululand': ("UNIZULU", "University of Zululand", "KwaZulu-Natal", "KwaDlangezwa, near Richards Bay", "https://www.unizulu.ac.za", "Standing undergraduate deadline through CAO is 30 September 2026. No 2027-specific notice published — confirm on the official site.", "Check the official UNIZULU fees page for your programme.", "Traditional university"),
  'mandela': ("NMU", "Nelson Mandela University", "Eastern Cape", "Gqeberha (Port Elizabeth), with George campus", "https://www.mandela.ac.za", "Applications for 2027 opened 13 April 2026. The final closing date was not confirmed on the official site — check before relying on a date. Online applications for 2027 are free.", "Check the official NMU student accounts guide for your faculty; fees vary by programme. No application fee for 2027 online applications.", "Comprehensive university"),
  'uj': ("UJ", "University of Johannesburg", "Gauteng", "Auckland Park, Doornfontein and Soweto campuses", "https://www.uj.ac.za", "Applications opened 1 April 2026 and closed 31 October 2026 at 12:00. UJ does not accept late applications.", "Estimated first-year tuition R49,800 to R87,000 (2026), depending on faculty and programme.", "Comprehensive university"),
+}
+
+APPLY = {
+ 'uchenn': 'https://applyonline.uct.ac.za/',
+ 'wits': 'https://www.wits.ac.za/undergraduate/apply-to-wits/',
+ 'su': 'https://www.su.ac.za/en/apply/undergrad',
+ 'up': 'https://www.up.ac.za/apply',
+ 'ukzn': 'https://applications.ukzn.ac.za/',
+ 'nwu': 'https://www.nwu.ac.za/apply',
+ 'ufs': 'https://www.ufs.ac.za/apply',
+ 'ru': 'https://ross.ru.ac.za/',
+ 'ufh': 'https://www.ufh.ac.za/apply',
+ 'ul': 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+ 'univen': 'https://www.univen.ac.za/students/student-support-services/how-to-apply/apply-online/',
+ 'wsu': 'https://applications.wsu.ac.za/',
+ 'uwc': 'https://student.uwc.ac.za/',
+ 'unisa': 'https://www.unisa.ac.za/apply',
+ 'spu': 'https://applications-prod.spu.ac.za/',
+ 'smu': 'https://www.smu.ac.za/apply',
+ 'ump': 'https://www.ump.ac.za/apply',
+ 'cput': 'https://www.cput.ac.za/study-at-cput/undergraduate/apply',
+ 'dut': 'https://onlineapps.dut.ac.za/',
+ 'tut': 'https://applications-prod.tut.ac.za/',
+ 'cut': 'https://www.cut.ac.za/admission-online',
+ 'vut': 'https://www.vut.ac.za/apply',
+ 'mru': 'https://www.mut.ac.za/apply',
+ 'zululand': 'https://www.cao.ac.za/',
+ 'mandela': 'https://www.mandela.ac.za/apply',
+ 'uj': 'https://www.uj.ac.za/Apply',
 }
 
 TMPL = '''<!DOCTYPE html>
@@ -79,7 +108,9 @@ footer{{text-align:center;color:var(--muted);font-size:.8rem;padding:18px}}
 <li>{life}</li>
 <li>Use the campus health service, counselling and academic support early — you do not have to wait until you are struggling.</li>
 <li>Part-time work and study support are available; ask the student affairs office.</li></ul></div>
-<div class="section"><h2>6. Official links</h2><p><a href="{site}">{site}</a></p>
+<div class="section"><h2>6. Official links</h2>
+<p><a href="{site}">Official university website: {site}</a></p>
+<p><a href="{apply}">Apply online - official application page</a></p>
 <p class="note">This guide is for offline planning only. The official website is the final source of truth for fees, deadlines and entry requirements.</p></div>
 <footer>ACEsi offline guide &middot; compiled November 2026 &middot; verify all details at {site}</footer>
 </body></html>
@@ -95,7 +126,7 @@ LIFE = {
 
 for uid, (short, full, province, campus, site, deadline, fees, kind) in U.items():
     html = TMPL.format(short=short, full=full, province=province, campus=campus,
-                       site=site, deadline=deadline, fees=fees,
+                       site=site, apply=APPLY[uid], deadline=deadline, fees=fees,
                        life=LIFE.get(kind, ''), kind=kind)
     with open(os.path.join(OUT, uid + '.html'), 'w', encoding='utf-8') as f:
         f.write(html)
