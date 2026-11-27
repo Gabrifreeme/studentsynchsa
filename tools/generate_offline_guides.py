@@ -47,7 +47,7 @@ APPLY = {
  'univen': 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
  'wsu': 'https://applications.wsu.ac.za/',
  'uwc': 'https://student.uwc.ac.za/',
- 'unisa': 'https://www.unisa.ac.za/apply',
+ 'unisa': 'https://myadmin.unisa.ac.za/tool/e7dac559-0533-4ed7-b1aa-2f289a965352/default.do',
  'spu': 'https://applications-prod.spu.ac.za/',
  'smu': 'https://www.smu.ac.za/apply',
  'ump': 'https://www.ump.ac.za/apply',
