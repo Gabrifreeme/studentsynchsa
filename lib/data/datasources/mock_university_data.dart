@@ -142,7 +142,7 @@ class MockUniversityData {
     University(
       id: 'su', name: 'Stellenbosch University',
       shortName: 'SUN', province: 'Western Cape',
-      website: 'https://www.su.ac.za', applicationUrl: 'https://www.su.ac.za/en/apply/undergrad',
+      website: 'https://www.su.ac.za', applicationUrl: 'https://student.sun.ac.za/signup/',
       logoUrl: 'https://logoapi.sh/icon/sun.ac.za',
       hasApplicationFee: true, applicationFee: 350,
       requiresNbt: true, minimumAps: 35,
