@@ -5184,6 +5184,11 @@ class _ProfileOnboardingScreenState
   }
 
   void _showStarHelp() {
+    final helpText = _currentPage == 1
+        ? 'Some fields are duplicated — that is true, as I cater for all universities.'
+        : 'Yes, you are in the right place. Complete the form — all fields '
+            'are compulsory. When done, tap Save, then Next. '
+            'Remember to look for me on the next page!';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -5195,11 +5200,9 @@ class _ProfileOnboardingScreenState
             Text('ACEsi says:', style: TextStyle(color: AppColors.starGold)),
           ],
         ),
-        content: const Text(
-          'Yes, you are in the right place. Complete the form — all fields '
-          'are compulsory. When done, tap Save, then Next. '
-          'Remember to look for me on the next page!',
-          style: TextStyle(
+        content: Text(
+          helpText,
+          style: const TextStyle(
               color: AppColors.textPrimary, fontSize: 11, height: 1.5),
         ),
         actions: [
