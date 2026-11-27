@@ -59,7 +59,7 @@ APPLY = {
  'mru': 'https://www.mut.ac.za/apply',
  'zululand': 'https://www.cao.ac.za/',
  'mandela': 'https://www.mandela.ac.za/apply',
- 'uj': 'https://www.uj.ac.za/Apply',
+ 'uj': 'https://registration.uj.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
 }
 
 TMPL = '''<!DOCTYPE html>
