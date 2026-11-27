@@ -32,6 +32,27 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen>
     Color(0xFF00FF88), Color(0xFFFFA500),
   ];
 
+  Widget _universitiesStar() {
+    return AnimatedBuilder(
+      animation: _floatAnim,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, _floatAnim.value),
+        child: child,
+      ),
+      child: GestureDetector(
+        onTap: () {
+          final message =
+              'Search for a university by name, or just scroll down to find '
+              'the one you are looking for. Remember, I am here if you want '
+              'to ask a question.';
+          context.push(
+              '/ai-recommendations?message=${Uri.encodeComponent(message)}');
+        },
+        child: const StarAvatar(size: 40, pulse: true),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,48 +104,36 @@ class _UniversitiesScreenState extends ConsumerState<UniversitiesScreen>
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: AnimatedBuilder(
-                      animation: _floatAnim,
-                      builder: (context, child) => Transform.translate(
-                        offset: Offset(0, _floatAnim.value),
-                        child: child,
-                      ),
-                      child: GestureDetector(
-                        onTap: () {
-                          final message =
-                              'Search for a university by name, or just scroll '
-                              'down to find the one you are looking for. '
-                              'Remember, I am here if you want to ask a question.';
-                          context.push(
-                              '/ai-recommendations?message=${Uri.encodeComponent(message)}');
-                        },
-                        child: const StarAvatar(size: 44, pulse: true),
-                      ),
-                    ),
-                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: GestureDetector(
-                        onTap: () => context.pop(),
-                        child: const StarIcon(Icons.arrow_back_rounded, size: 22),
-                      ),
-                    ),
-                    const Text('Universities',
-                            style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 3),
-                        Text('All ${universities.length} SA public universities',
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 10)),
+                        GestureDetector(
+                          onTap: () => context.pop(),
+                          child: const StarIcon(Icons.arrow_back_rounded, size: 22),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Universities',
+                                  style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 3),
+                              Text(
+                                'All ${universities.length} SA public universities',
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _universitiesStar(),
                       ],
                     ),
                   ),
