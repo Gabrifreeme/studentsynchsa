@@ -36,7 +36,7 @@ U = {
 APPLY = {
  'uchenn': 'https://applyonline.uct.ac.za/',
  'wits': 'https://www.wits.ac.za/undergraduate/apply-to-wits/',
- 'su': 'https://www.su.ac.za/en/apply/undergrad',
+ 'su': 'https://student.sun.ac.za/signup/',
  'up': 'https://www.up.ac.za/apply',
  'ukzn': 'https://applications.ukzn.ac.za/',
  'nwu': 'https://www.nwu.ac.za/apply',
