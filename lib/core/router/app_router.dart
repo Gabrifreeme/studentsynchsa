@@ -150,7 +150,9 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/ai-recommendations',
       name: 'ai-recommendations',
-      builder: (context, state) => const AiRecommendationsScreen(),
+      builder: (context, state) => AiRecommendationsScreen(
+        initialMessage: state.uri.queryParameters['message'],
+      ),
     ),
     GoRoute(
       path: '/notifications',

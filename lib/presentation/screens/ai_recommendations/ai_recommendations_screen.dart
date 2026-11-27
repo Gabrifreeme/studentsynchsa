@@ -6,7 +6,8 @@ import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/ai_service.dart';
 
 class AiRecommendationsScreen extends ConsumerStatefulWidget {
-  const AiRecommendationsScreen({super.key});
+  final String? initialMessage;
+  const AiRecommendationsScreen({super.key, this.initialMessage});
 
   @override
   ConsumerState<AiRecommendationsScreen> createState() =>
@@ -32,6 +33,16 @@ class _AiRecommendationsScreenState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (widget.initialMessage != null &&
+          widget.initialMessage!.trim().isNotEmpty) {
+        setState(() {
+          _messages[0] = _ChatMessage(
+            text: widget.initialMessage!.trim(),
+            isUser: false,
+          );
+        });
+        return;
+      }
       final profile = ref.read(profileProvider).valueOrNull;
       final name = profile?.personal.firstName.isNotEmpty == true ? profile!.personal.firstName : 'there';
       final isProfileComplete = profile != null && profile.personal.firstName.isNotEmpty &&

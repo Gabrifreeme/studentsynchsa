@@ -5211,6 +5211,12 @@ class _ProfileOnboardingScreenState
   }
 
   void _showStarHelp() {
+    if (_currentPage == 2) {
+      final message = 'You are doing great — if you get stuck, just ask me here.';
+      context.push(
+          '/ai-recommendations?message=${Uri.encodeComponent(message)}');
+      return;
+    }
     final helpText = _currentPage == 1
         ? 'Some fields are duplicated — that is true, as I cater for all universities.'
         : 'Yes, you are in the right place. Complete the form — all fields '
@@ -6728,12 +6734,13 @@ class _ProfileOnboardingScreenState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'ACEsi says: Yes, you are in the right place. Complete the form — '
-            'all fields are compulsory. When done, tap Save, then Next. '
-            'Remember to look for me on the next page!',
-            style: TextStyle(color: AppColors.starGold, fontSize: 9),
-          ),
+          if (_currentPage != 2)
+            const Text(
+              'ACEsi says: Yes, you are in the right place. Complete the form — '
+              'all fields are compulsory. When done, tap Save, then Next. '
+              'Remember to look for me on the next page!',
+              style: TextStyle(color: AppColors.starGold, fontSize: 9),
+            ),
           if (_validationMessage != null) ...[
             const SizedBox(height: 4),
             Text(_validationMessage!,
