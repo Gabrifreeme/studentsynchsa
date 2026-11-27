@@ -236,28 +236,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              height: 42,
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Apple login requires Apple Developer Program — coming soon',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.apple_rounded,
-                                    size: 24, color: AppColors.info),
-                                label: const Text('Sign in with Apple'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.textMuted,
-                                  side: const BorderSide(color: AppColors.border),
-                                ),
-                              ),
-                            ),
+                            // Apple sign-in parked until an Apple Developer
+                            // account is set up. Restore this block later.
+                            // const SizedBox(height: 6),
+                            // SizedBox(
+                            //   height: 42,
+                            //   child: OutlinedButton.icon(
+                            //     onPressed: () {
+                            //       ScaffoldMessenger.of(context).showSnackBar(
+                            //         const SnackBar(
+                            //           content: Text(
+                            //             'Apple login requires Apple Developer Program — coming soon',
+                            //           ),
+                            //         ),
+                            //       );
+                            //     },
+                            //     icon: const Icon(Icons.apple_rounded,
+                            //         size: 24, color: AppColors.info),
+                            //     label: const Text('Sign in with Apple'),
+                            //     style: OutlinedButton.styleFrom(
+                            //       foregroundColor: AppColors.textMuted,
+                            //       side: const BorderSide(color: AppColors.border),
+                            //     ),
+                            //   ),
+                            // ),
                           ],
                         ),
                       ),
