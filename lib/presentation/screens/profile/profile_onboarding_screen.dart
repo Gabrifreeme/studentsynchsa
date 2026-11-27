@@ -128,7 +128,12 @@ class _ProfileOnboardingScreenState
   bool _saving = false;
 
   final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
-  static const _greetingText = "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the perfect universities and bursaries for your future!\n\nWherever you see me — the Star — tap on me and I will guide you.";
+  static const _greetingBeforeStar =
+      "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the "
+      "perfect universities and bursaries for your future!\n\n"
+      "Wherever you see me — ";
+  static const _greetingAfterStar = " — tap on me and I will guide you.";
+  static const _greetingText = _greetingBeforeStar + _greetingAfterStar;
 
   static const _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
@@ -2456,15 +2461,7 @@ class _ProfileOnboardingScreenState
                         child: const StarAvatar(size: 96, pulse: true),
                       ),
                       const SizedBox(height: 28),
-                      Text(
-                        _greetingText.substring(0, _visibleChars.clamp(0, _greetingText.length)),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          height: 1.6,
-                        ),
-                      ),
+                      _buildGreetingText(),
                       const SizedBox(height: 34),
                       if (_visibleChars >= _greetingText.length)
                         ElevatedButton.icon(
@@ -2558,6 +2555,39 @@ class _ProfileOnboardingScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Greeting with the real South African Star image inline.
+  Widget _buildGreetingText() {
+    final visible = _visibleChars.clamp(0, _greetingText.length);
+    final beforeEnd = visible < _greetingBeforeStar.length
+        ? visible
+        : _greetingBeforeStar.length;
+    final afterEnd = visible > _greetingBeforeStar.length
+        ? (visible - _greetingBeforeStar.length).clamp(0, _greetingAfterStar.length)
+        : 0;
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: const TextStyle(
+            color: AppColors.textPrimary, fontSize: 14, height: 1.6),
+        children: [
+          TextSpan(text: _greetingBeforeStar.substring(0, beforeEnd)),
+          if (visible > _greetingBeforeStar.length)
+            WidgetSpan(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Image.asset(
+                  'assets/images/star_avatar.png',
+                  width: 18,
+                  height: 18,
+                ),
+              ),
+            ),
+          TextSpan(text: _greetingAfterStar.substring(0, afterEnd)),
+        ],
       ),
     );
   }
@@ -4000,7 +4030,7 @@ class _ProfileOnboardingScreenState
     final hoverFg = WidgetStateProperty.resolveWith<Color?>((states) =>
         states.contains(WidgetState.hovered) ? AppColors.background : AppColors.primary);
     const compact = ButtonStyle(
-      minimumSize: WidgetStatePropertyAll<Size>(Size(0, 31)),
+      minimumSize: WidgetStatePropertyAll<Size>(Size(0, 38)),
       padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
           EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
       textStyle: WidgetStatePropertyAll<TextStyle>(TextStyle(fontSize: 9)),
