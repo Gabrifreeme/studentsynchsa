@@ -73,7 +73,7 @@ class MockUniversityData {
     University(
       id: 'dut', name: 'Durban University of Technology',
       shortName: 'DUT', province: 'KwaZulu-Natal',
-      website: 'https://www.dut.ac.za', applicationUrl: 'https://www.dut.ac.za/apply',
+      website: 'https://www.dut.ac.za', applicationUrl: 'https://onlineapps.dut.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/dut.ac.za',
       hasApplicationFee: true, applicationFee: 210,
       requiresNbt: false, minimumAps: 24,
@@ -121,7 +121,7 @@ class MockUniversityData {
     University(
       id: 'ru', name: 'Rhodes University',
       shortName: 'RU', province: 'Eastern Cape',
-      website: 'https://www.ru.ac.za', applicationUrl: 'https://www.ru.ac.za/apply',
+      website: 'https://www.ru.ac.za', applicationUrl: 'https://ross.ru.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/ru.ac.za',
       hasApplicationFee: true, applicationFee: 245,
       requiresNbt: false, minimumAps: 30,
@@ -132,7 +132,7 @@ class MockUniversityData {
     University(
       id: 'spu', name: 'Sol Plaatje University',
       shortName: 'SPU', province: 'Northern Cape',
-      website: 'https://www.spu.ac.za', applicationUrl: 'https://www.spu.ac.za/apply',
+      website: 'https://www.spu.ac.za', applicationUrl: 'https://applications-prod.spu.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/spu.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
@@ -142,7 +142,7 @@ class MockUniversityData {
     University(
       id: 'su', name: 'Stellenbosch University',
       shortName: 'SUN', province: 'Western Cape',
-      website: 'https://www.sun.ac.za', applicationUrl: 'https://www.sun.ac.za/apply',
+      website: 'https://www.su.ac.za', applicationUrl: 'https://www.su.ac.za/en/apply/undergrad',
       logoUrl: 'https://logoapi.sh/icon/sun.ac.za',
       hasApplicationFee: true, applicationFee: 350,
       requiresNbt: true, minimumAps: 35,
@@ -158,7 +158,7 @@ class MockUniversityData {
     University(
       id: 'tut', name: 'Tshwane University of Technology',
       shortName: 'TUT', province: 'Gauteng',
-      website: 'https://www.tut.ac.za', applicationUrl: 'https://www.tut.ac.za/apply',
+      website: 'https://www.tut.ac.za', applicationUrl: 'https://applications-prod.tut.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/tut.ac.za',
       hasApplicationFee: true, applicationFee: 240,
       requiresNbt: false, minimumAps: 23,
@@ -172,7 +172,7 @@ class MockUniversityData {
     University(
       id: 'uchenn', name: 'University of Cape Town',
       shortName: 'UCT', province: 'Western Cape',
-      website: 'https://www.uct.ac.za', applicationUrl: 'https://www.uct.ac.za/apply',
+      website: 'https://www.uct.ac.za', applicationUrl: 'https://applyonline.uct.ac.za/',
       logoUrl: 'assets/logos/uct.png',
       hasApplicationFee: true, applicationFee: 750,
       requiresNbt: true, minimumAps: 38,
@@ -202,7 +202,7 @@ class MockUniversityData {
     University(
       id: 'uj', name: 'University of Johannesburg',
       shortName: 'UJ', province: 'Gauteng',
-      website: 'https://www.uj.ac.za', applicationUrl: 'https://www.uj.ac.za/apply',
+      website: 'https://www.uj.ac.za', applicationUrl: 'https://www.uj.ac.za/Apply',
       logoUrl: 'https://logoapi.sh/icon/uj.ac.za',
       hasApplicationFee: true, applicationFee: 300,
       requiresNbt: false, minimumAps: 27,
@@ -216,7 +216,7 @@ class MockUniversityData {
     University(
       id: 'ukzn', name: 'University of KwaZulu-Natal',
       shortName: 'UKZN', province: 'KwaZulu-Natal',
-      website: 'https://www.ukzn.ac.za', applicationUrl: 'https://www.ukzn.ac.za/apply',
+      website: 'https://www.ukzn.ac.za', applicationUrl: 'https://applications.ukzn.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/ukzn.ac.za',
       hasApplicationFee: true, applicationFee: 250,
       requiresNbt: false, minimumAps: 28,
@@ -230,7 +230,7 @@ class MockUniversityData {
     University(
       id: 'ul', name: 'University of Limpopo',
       shortName: 'UL', province: 'Limpopo',
-      website: 'https://www.ul.ac.za', applicationUrl: 'https://www.ul.ac.za/apply',
+      website: 'https://www.ul.ac.za', applicationUrl: 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
       logoUrl: 'https://logoapi.sh/icon/ul.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
@@ -259,7 +259,7 @@ class MockUniversityData {
     University(
       id: 'univen', name: 'University of Venda',
       shortName: 'UNIVEN', province: 'Limpopo',
-      website: 'https://www.univen.ac.za', applicationUrl: 'https://univenerp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
+      website: 'https://www.univen.ac.za', applicationUrl: 'https://www.univen.ac.za/students/student-support-services/how-to-apply/apply-online/',
       logoUrl: 'assets/logos/univen.png',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
@@ -288,7 +288,7 @@ class MockUniversityData {
     University(
       id: 'wsu', name: 'Walter Sisulu University',
       shortName: 'WSU', province: 'Eastern Cape',
-      website: 'https://www.wsu.ac.za', applicationUrl: 'https://www.wsu.ac.za/apply',
+      website: 'https://www.wsu.ac.za', applicationUrl: 'https://applications.wsu.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/wsu.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
@@ -302,7 +302,7 @@ class MockUniversityData {
     University(
       id: 'wits', name: 'University of the Witwatersrand',
       shortName: 'WITS', province: 'Gauteng',
-      website: 'https://www.wits.ac.za', applicationUrl: 'https://www.wits.ac.za/apply',
+      website: 'https://www.wits.ac.za', applicationUrl: 'https://www.wits.ac.za/undergraduate/apply-to-wits/',
       logoUrl: 'assets/logos/wits.png',
       hasApplicationFee: true, applicationFee: 500,
       requiresNbt: true, minimumAps: 38,
@@ -318,7 +318,7 @@ class MockUniversityData {
     University(
       id: 'zululand', name: 'University of Zululand',
       shortName: 'UNIZULU', province: 'KwaZulu-Natal',
-      website: 'https://www.unizulu.ac.za', applicationUrl: 'https://www.unizulu.ac.za/apply',
+      website: 'https://www.unizulu.ac.za', applicationUrl: 'https://www.cao.ac.za/',
       logoUrl: 'assets/logos/unizulu.png',
       hasApplicationFee: true, applicationFee: 250,
       requiresNbt: false, minimumAps: 24,
@@ -346,7 +346,7 @@ class MockUniversityData {
     University(
       id: 'cut', name: 'Central University of Technology',
       shortName: 'CUT', province: 'Free State',
-      website: 'https://www.cut.ac.za', applicationUrl: 'https://www.cut.ac.za/apply',
+      website: 'https://www.cut.ac.za', applicationUrl: 'https://www.cut.ac.za/admission-online',
       logoUrl: 'https://logoapi.sh/icon/cut.ac.za',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 24,
@@ -407,7 +407,7 @@ class MockUniversityData {
     University(
       id: 'uwc', name: 'University of the Western Cape',
       shortName: 'UWC', province: 'Western Cape',
-      website: 'https://www.uwc.ac.za', applicationUrl: 'https://www.uwc.ac.za/apply',
+      website: 'https://www.uwc.ac.za', applicationUrl: 'https://student.uwc.ac.za/',
       logoUrl: 'https://logoapi.sh/icon/uwc.ac.za',
       hasApplicationFee: true, applicationFee: 100,
       requiresNbt: false, minimumAps: 23,
