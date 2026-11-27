@@ -43,7 +43,7 @@ APPLY = {
  'ufs': 'https://www.ufs.ac.za/apply',
  'ru': 'https://ross.ru.ac.za/ugadmissions',
  'ufh': 'https://www.ufh.ac.za/apply',
- 'ul': 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
+ 'ul': 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
  'univen': 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
  'wsu': 'https://applications.wsu.ac.za/',
  'uwc': 'https://student.uwc.ac.za/',
