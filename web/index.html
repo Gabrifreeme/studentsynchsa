@@ -41,6 +41,26 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    // ACEsi "r" writes a new signal; reload the page so code edits appear
+    // immediately, even without Flutter's browser debug extension.
+    (function () {
+      var key = 'acesi_reload_signal';
+      function check() {
+        fetch('/__reload_signal', {cache: 'no-store'})
+          .then(function (r) { return r.text(); })
+          .then(function (v) {
+            v = v.trim();
+            var old = localStorage.getItem(key);
+            if (old === null) localStorage.setItem(key, v);
+            else if (old !== v) { localStorage.setItem(key, v); location.reload(); }
+          })
+          .catch(function () {});
+      }
+      check();
+      setInterval(check, 1000);
+    })();
+  </script>
   <script src="push.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
