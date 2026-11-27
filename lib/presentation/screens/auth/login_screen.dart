@@ -27,6 +27,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  /// A returning student may have a saved Hive profile even when the auth
+  /// provider has not loaded it yet. Check both before choosing the route.
+  Future<void> _routeAfterLogin() async {
+    var complete =
+        ref.read(authProvider).valueOrNull?.profile?.onboardingComplete == true;
+    if (!complete) {
+      try {
+        final saved = await ProfileRepositoryImpl().getProfile();
+        complete = saved != null &&
+            (saved.onboardingComplete || saved.personal.firstName.isNotEmpty);
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    context.go(complete ? '/dashboard' : '/onboarding');
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -40,12 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
       } else if (mounted) {
-        final authState = ref.read(authProvider).valueOrNull;
-        if (authState?.profile?.onboardingComplete == true) {
-          context.go('/dashboard');
-        } else {
-          context.go('/onboarding');
-        }
+        await _routeAfterLogin();
       }
     } catch (e) {
       if (mounted) {
@@ -67,12 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
       } else if (mounted) {
-        final authState = ref.read(authProvider).valueOrNull;
-        if (authState?.profile?.onboardingComplete == true) {
-          context.go('/dashboard');
-        } else {
-          context.go('/onboarding');
-        }
+        await _routeAfterLogin();
       }
     } catch (e) {
       if (mounted) {
