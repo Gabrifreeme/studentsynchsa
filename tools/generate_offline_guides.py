@@ -41,7 +41,7 @@ APPLY = {
  'ukzn': 'https://applications.ukzn.ac.za/',
  'nwu': 'https://www.nwu.ac.za/apply',
  'ufs': 'https://www.ufs.ac.za/apply',
- 'ru': 'https://ross.ru.ac.za/',
+ 'ru': 'https://ross.ru.ac.za/ugadmissions',
  'ufh': 'https://www.ufh.ac.za/apply',
  'ul': 'https://ulc-prod-webserver.ul.ac.za/pls/prodi41/gen.gw1pkg.gw1view',
  'univen': 'https://univenierp01.univen.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
