@@ -68,6 +68,11 @@ NOTES = {
          'was checked on 27 November 2026. If it refuses to connect, please '
          'try again later or contact TUT on 086 110 2421 / '
          'general@tut.ac.za.</p>'),
+ 'wits': ('<p class="note">Important: the Wits application portal '
+          '(self-service.wits.ac.za) showed "Service Unavailable" when this '
+          'guide was checked on 27 November 2026. If it is still down, please '
+          'try again later or contact Wits on +27 11 717 1888 / '
+          'askwits@wits.ac.za.</p>'),
 }
 
 TMPL = '''<!DOCTYPE html>
