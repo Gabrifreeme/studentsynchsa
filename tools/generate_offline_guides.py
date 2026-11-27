@@ -58,7 +58,7 @@ APPLY = {
  'vut': 'https://www.vut.ac.za/apply',
  'mru': 'https://www.mut.ac.za/apply',
  'zululand': 'https://www.cao.ac.za/',
- 'mandela': 'https://www.mandela.ac.za/apply',
+ 'mandela': 'https://apps.mandela.ac.za/e-portal/Profile/CreateProfile',
  'uj': 'https://registration.uj.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
 }
 
