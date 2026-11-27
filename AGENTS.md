@@ -112,7 +112,9 @@ adb shell ip addr show wlan0 | findstr "inet "
 - Nothing fills automatically when a page opens.
 - A StarIcon sits top-right in the WebView app bar. Tapping it asks:
   "Want me to auto fill this page for you?" with Not now / Auto fill.
-- The in-page floating Star created by the JS is disabled on purpose.
+- The in-page floating Star created by `buildAcesiStarScript()` is enabled for
+  GUIDANCE only: it opens ACEsi chat with the page title/URL via the `AcesiStar`
+  JavaScript channel. It never calls auto-fill.
 - The bottom "Fill All" button also asks first.
 - Rationale: many students want to complete parts of the form themselves.
 
