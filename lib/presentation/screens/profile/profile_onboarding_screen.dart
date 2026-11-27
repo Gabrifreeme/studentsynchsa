@@ -28,6 +28,7 @@ class _ProfileOnboardingScreenState
   final _pageController = PageController();
   int _currentPage = 0;
   bool _showGreeting = true;
+  bool _profileComplete = false;
   int _visibleChars = 0;
   late AnimationController _floatCtrl;
   late Animation<double> _floatAnim;
@@ -4590,6 +4591,7 @@ class _ProfileOnboardingScreenState
       if (raw != null && raw.isNotEmpty) {
         final p = StudentProfile.fromJson(jsonDecode(raw));
         if (p.onboardingComplete || p.personal.firstName.isNotEmpty) {
+          _profileComplete = true;
           _greetingBeforeStar =
               "Now that your profile is done, let's find you a university.\n\n"
               "Click the University card on the dashboard and we will start "
@@ -5062,9 +5064,13 @@ class _ProfileOnboardingScreenState
                       const SizedBox(height: 34),
                       if (_visibleChars >= _greetingText.length)
                         ElevatedButton.icon(
-                          onPressed: _dismissGreeting,
+                          onPressed: _profileComplete
+                              ? () => context.go('/dashboard')
+                              : _dismissGreeting,
                           icon: const Icon(Icons.arrow_forward_rounded),
-                          label: const Text("Let's Get Started"),
+                          label: Text(_profileComplete
+                              ? 'Go To Dashboard'
+                              : "Let's Get Started"),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.starGold,
                             foregroundColor: Colors.black,
