@@ -5186,21 +5186,28 @@ class _ProfileOnboardingScreenState
   Widget _starButton() {
     return GestureDetector(
       onTap: _showStarHelp,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.5), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.starGold.withValues(alpha: 0.55),
-              blurRadius: 18,
-              spreadRadius: 4,
-            ),
-          ],
+      child: AnimatedBuilder(
+        animation: _floatAnim,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, _floatAnim.value * 0.6 - 0.3),
+          child: child,
         ),
-        child: const StarAvatar(size: 40, pulse: true),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.5), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.starGold.withValues(alpha: 0.55),
+                blurRadius: 18,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: const StarAvatar(size: 40, pulse: true),
+        ),
       ),
     );
   }
