@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:studentsyncsa/core/utils/file_upload.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -131,7 +132,7 @@ class _ProfileOnboardingScreenState
   bool _profileLoaded = false;
 
   final _formKeys = List.generate(6, (_) => GlobalKey<FormState>());
-  static const _greetingBeforeStar =
+  String _greetingBeforeStar =
       "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the "
       "perfect universities and bursaries for your future!\n\n"
       "The application form is long, but it is compulsory for all "
@@ -139,7 +140,7 @@ class _ProfileOnboardingScreenState
       "offline, so no data is needed.\n\n"
       "Wherever you see me — ";
   static const _greetingAfterStar = " — tap on me and I will guide you.";
-  static const _greetingText = _greetingBeforeStar + _greetingAfterStar;
+  String get _greetingText => _greetingBeforeStar + _greetingAfterStar;
 
   static const _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
@@ -4583,6 +4584,20 @@ class _ProfileOnboardingScreenState
     _floatAnim = Tween<double>(begin: -8, end: 8).animate(
       CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
     );
+    // If the profile is already complete, greet them with the next step.
+    try {
+      final raw = HiveDatabase.profile.get('profile');
+      if (raw != null && raw.isNotEmpty) {
+        final p = StudentProfile.fromJson(jsonDecode(raw));
+        if (p.onboardingComplete || p.personal.firstName.isNotEmpty) {
+          _greetingBeforeStar =
+              "Now that your profile is done, let's find you a university.\n\n"
+              "Click the University card on the dashboard and we will start "
+              "from there.\n\n"
+              "Wherever you see me — ";
+        }
+      }
+    } catch (_) {}
     _startTextReveal();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingProfile());
   }
@@ -4702,7 +4717,7 @@ class _ProfileOnboardingScreenState
 
   void _startTextReveal() {
     Future.delayed(const Duration(milliseconds: 500), () {
-      const total = _greetingText.length;
+      final total = _greetingText.length;
       const interval = Duration(milliseconds: 30);
       Timer.periodic(interval, (timer) {
         if (_visibleChars >= total || !mounted) {
