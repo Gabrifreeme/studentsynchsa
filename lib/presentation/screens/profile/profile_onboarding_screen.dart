@@ -130,7 +130,7 @@ class _ProfileOnboardingScreenState
   String? _validationMessage;
   bool _profileLoaded = false;
 
-  final _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
+  final _formKeys = List.generate(6, (_) => GlobalKey<FormState>());
   static const _greetingBeforeStar =
       "Hi there! I'm ACEsi\n\nLet's get to know you so I can help find the "
       "perfect universities and bursaries for your future!\n\n"
@@ -4864,9 +4864,9 @@ class _ProfileOnboardingScreenState
     // Save every page as soon as Next is tapped. Without this, a hot reload
     // ("r") throws away everything typed on the current page.
     await _saveCurrentPage(showMessage: false);
-    final nextPage = (_currentPage + 1).clamp(0, 6);
+    final nextPage = (_currentPage + 1).clamp(0, 5);
     await HiveDatabase.settings.put('profileWizardPage', '$nextPage');
-    if (_currentPage < 6) {
+    if (_currentPage < 5) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -4999,7 +4999,7 @@ class _ProfileOnboardingScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 7),
       child: Row(
-        children: List.generate(7, (i) {
+        children: List.generate(6, (i) {
           return Expanded(
             child: Container(
               height: 2.5,
@@ -5095,7 +5095,7 @@ class _ProfileOnboardingScreenState
                   ),
                 ),
                 Text(
-                  'Step ${_currentPage + 1} of 7',
+                  'Step ${_currentPage + 1} of 6',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 9,
@@ -5118,7 +5118,6 @@ class _ProfileOnboardingScreenState
                       _buildSubjectsPage(),
                       _buildPreferencesPage(),
                       _buildQualificationPage(),
-                      _buildAgreementPage(),
                       _buildUploadDocumentsPage(),
                     ],
                       ),
@@ -5208,9 +5207,12 @@ class _ProfileOnboardingScreenState
       context.push('/ai-recommendations');
       return;
     }
-    final helpText = _currentPage == 3
-        ? 'You are halfway there — you are doing great!'
-        : _currentPage == 1
+    final helpText = _currentPage == 4
+        ? 'Add what you want to study. All fields are self-explanatory. '
+            'Once your paperwork is ready, the next page is for uploads.'
+        : _currentPage == 3
+            ? 'You are halfway there — you are doing great!'
+            : _currentPage == 1
             ? 'Some fields are duplicated — that is true, as I cater for all universities.'
             : 'Yes, you are in the right place. Complete the form — all fields '
                 'are compulsory. When done, tap Save, then Next. '
@@ -6632,7 +6634,7 @@ class _ProfileOnboardingScreenState
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
-        key: _formKeys[6],
+        key: _formKeys[5],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -6801,7 +6803,7 @@ class _ProfileOnboardingScreenState
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: AppColors.primary),
                     )
-                  : Text(_currentPage < 6 ? 'Next' : 'Finish'),
+                  : Text(_currentPage < 5 ? 'Next' : 'Finish'),
             ),
           ),
           if (_currentPage >= 2) ...[const SizedBox(width: 6), _starButton()],
