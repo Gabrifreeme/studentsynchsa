@@ -374,7 +374,7 @@ class MockUniversityData {
     University(
       id: 'smu', name: 'Sefako Makgatho Health Sciences University',
       shortName: 'SMU', province: 'Gauteng',
-      website: 'https://www.smu.ac.za', applicationUrl: 'https://www.smu.ac.za/apply',
+      website: 'https://www.smu.ac.za', applicationUrl: 'https://onlineapplication.smu.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
       logoUrl: 'https://logoapi.sh/icon/smu.ac.za',
       hasApplicationFee: true, applicationFee: 150,
       requiresNbt: false, minimumAps: 25,
