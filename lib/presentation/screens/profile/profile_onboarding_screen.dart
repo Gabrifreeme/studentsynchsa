@@ -2626,6 +2626,35 @@ class _ProfileOnboardingScreenState
     );
   }
 
+  void _showStarHelp() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            StarAvatar(size: 28),
+            SizedBox(width: 6),
+            Text('ACEsi says:', style: TextStyle(color: AppColors.starGold)),
+          ],
+        ),
+        content: const Text(
+          'Yes, you are in the right place. Complete the form — all fields '
+          'are compulsory. When done, tap Save, then Next.',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontSize: 11, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it!',
+                style: TextStyle(color: AppColors.primaryLight)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPersonalInfo() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -4125,6 +4154,26 @@ class _ProfileOnboardingScreenState
                           strokeWidth: 2, color: AppColors.primary),
                     )
                   : const Text('Save'),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _showStarHelp,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.5), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.starGold.withValues(alpha: 0.55),
+                    blurRadius: 18,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: const StarAvatar(size: 40, pulse: true),
             ),
           ),
           const SizedBox(width: 6),
