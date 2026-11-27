@@ -332,7 +332,7 @@ class MockUniversityData {
     University(
       id: 'mru', name: 'Mangosuthu University of Technology',
       shortName: 'MUT', province: 'KwaZulu-Natal',
-      website: 'https://www.mut.ac.za', applicationUrl: 'https://www.mut.ac.za/apply',
+      website: 'https://www.mut.ac.za', applicationUrl: 'https://www.cao.ac.za/',
       logoUrl: 'assets/logos/mut.png',
       hasApplicationFee: true, applicationFee: 200,
       requiresNbt: false, minimumAps: 23,
