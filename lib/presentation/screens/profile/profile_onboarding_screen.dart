@@ -5204,7 +5204,11 @@ class _ProfileOnboardingScreenState
 
   void _showStarHelp() {
     if (_currentPage == 2) {
-      context.push('/ai-recommendations');
+      final message =
+          'This is the time to ask me something you are unsure about. '
+          'Ask me — I will answer!';
+      context.push(
+          '/ai-recommendations?message=${Uri.encodeComponent(message)}');
       return;
     }
     final helpText = _currentPage == 5
