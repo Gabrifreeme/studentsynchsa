@@ -62,6 +62,14 @@ APPLY = {
  'uj': 'https://registration.uj.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
 }
 
+NOTES = {
+ 'tut': ('<p class="note">Important: the TUT application portal '
+         '(applications-prod.tut.ac.za) was not reachable when this guide '
+         'was checked on 27 November 2026. If it refuses to connect, please '
+         'try again later or contact TUT on 086 110 2421 / '
+         'general@tut.ac.za.</p>'),
+}
+
 TMPL = '''<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -111,6 +119,7 @@ footer{{text-align:center;color:var(--muted);font-size:.8rem;padding:18px}}
 <div class="section"><h2>6. Official links</h2>
 <p><a href="{site}">Official university website: {site}</a></p>
 <p><a href="{apply}">Apply online - official application page</a></p>
+{note}
 <p class="note">This guide is for offline planning only. The official website is the final source of truth for fees, deadlines and entry requirements.</p></div>
 <footer>ACEsi offline guide &middot; compiled November 2026 &middot; verify all details at {site}</footer>
 </body></html>
@@ -127,7 +136,8 @@ LIFE = {
 for uid, (short, full, province, campus, site, deadline, fees, kind) in U.items():
     html = TMPL.format(short=short, full=full, province=province, campus=campus,
                        site=site, apply=APPLY[uid], deadline=deadline, fees=fees,
-                       life=LIFE.get(kind, ''), kind=kind)
+                       life=LIFE.get(kind, ''), kind=kind,
+                       note=NOTES.get(uid, ''))
     with open(os.path.join(OUT, uid + '.html'), 'w', encoding='utf-8') as f:
         f.write(html)
     print(uid, len(html))
