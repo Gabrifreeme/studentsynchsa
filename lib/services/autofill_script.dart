@@ -916,6 +916,36 @@ String buildWizardResyncPatch() => '''
 })();
 ''';
 
+/// Injected into every university web page so ACEsi is one tap away.
+/// This Star only opens guidance — it never fills a form by itself.
+String buildAcesiStarScript() => r'''
+(function() {
+  var id = 'libsync-acesi-star';
+  if (document.getElementById(id)) return;
+  var btn = document.createElement('div');
+  btn.id = id;
+  btn.setAttribute('role', 'button');
+  btn.setAttribute('aria-label', 'Ask ACEsi for help on this page');
+  btn.title = 'Ask ACEsi for help on this page';
+  btn.innerHTML = '<span id="libsync-acesi-star-glyph" style="font-size:34px;line-height:1;background:linear-gradient(135deg,#FF4B3E 0%,#FFD700 40%,#1E9E4F 70%,#2A6FDB 100%);-webkit-background-clip:text;background-clip:text;color:transparent;">★</span>';
+  btn.style.cssText = 'position:fixed;right:14px;bottom:18px;width:52px;height:52px;border-radius:50%;background:#070707;border:2px solid #FFA500;z-index:2147483647;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;';
+  btn.onclick = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var payload;
+    try {
+      payload = JSON.stringify({
+        title: document.title || '',
+        url: location.href || ''
+      });
+      if (window.AcesiStar && window.AcesiStar.postMessage) {
+        window.AcesiStar.postMessage(payload);
+      }
+    } catch (err) {}
+  };
+  (document.body || document.documentElement).appendChild(btn);
+})();
+''';
+
 String buildViewportPatch() => '''
 (function() {
   var meta = document.querySelector('meta[name="viewport"]');

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -96,6 +97,28 @@ class _AppWebViewState extends State<AppWebView> {
       androidController.setTextZoom(175);
     }
 
+    // The in-page Star sends the current page context here, then we open
+    // ACEsi chat. It never triggers auto-fill — that stays opt-in.
+    _controller.addJavaScriptChannel(
+      'AcesiStar',
+      onMessageReceived: (JavaScriptMessage message) {
+        if (!mounted) return;
+        String title = '';
+        String url = '';
+        try {
+          final info = jsonDecode(message.message) as Map<String, dynamic>;
+          title = (info['title'] as String?) ?? '';
+          url = (info['url'] as String?) ?? '';
+        } catch (_) {}
+        final page = title.isNotEmpty ? ' ($title)' : '';
+        final prompt = 'I am on the ${widget.universityName} application page$page. '
+            'Please guide me through this page step by step and tell me what '
+            'to fill in. The page address is $url.';
+        context.push(
+            '/ai-recommendations?message=${Uri.encodeComponent(prompt)}');
+      },
+    );
+
     _controller
       ..setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: (request) {
@@ -166,6 +189,9 @@ for (var i = 0; i < links.length; i++) {
 ''');
 
           await _runPortalPatches();
+
+          // ── ACEsi Star on this page (guidance only, never auto-fills) ──
+          await _controller.runJavaScript(star.buildAcesiStarScript());
 
           // ── Navigate to ITS application portal ──
           await _controller.runJavaScript('''
