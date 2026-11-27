@@ -127,6 +127,7 @@ class _ProfileOnboardingScreenState
   final _uploadedFiles = List<String>.filled(3, '');
 
   bool _saving = false;
+  String? _validationMessage;
   bool _profileLoaded = false;
   Timer? _autoSaveTimer;
 
@@ -4870,18 +4871,11 @@ class _ProfileOnboardingScreenState
 
   Future<void> _saveAndContinue() async {
     if (!_validateCurrentPage()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Please complete the required fields before continuing.'),
-            backgroundColor: AppColors.warning,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
+      setState(() => _validationMessage =
+          'Please complete the required fields before continuing.');
       return;
     }
+    setState(() => _validationMessage = null);
     // Save every page as soon as Next is tapped. Without this, a hot reload
     // ("r") throws away everything typed on the current page.
     await _saveCurrentPage(showMessage: false);
@@ -6739,6 +6733,11 @@ class _ProfileOnboardingScreenState
             'Remember to look for me on the next page!',
             style: TextStyle(color: AppColors.starGold, fontSize: 9),
           ),
+          if (_validationMessage != null) ...[
+            const SizedBox(height: 4),
+            Text(_validationMessage!,
+                style: const TextStyle(color: AppColors.error, fontSize: 9)),
+          ],
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
