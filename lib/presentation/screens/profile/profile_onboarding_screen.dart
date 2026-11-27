@@ -281,6 +281,7 @@ class _ProfileOnboardingScreenState
     'GIDJANA SECONDARY SCHOOL',
     'GIYANI SECONDARY SCHOOL',
     'GLEN-COWIE SECONDARY SCHOOL',
+    'GLENVISTA HIGH SCHOOL',
     'GOBOLIBI SEN. SEC. SCHOOL',
     'GODIDE SECONDARY SCHOOL',
     'GOJELA SECONDARY SCHOOL',
@@ -5204,16 +5205,16 @@ class _ProfileOnboardingScreenState
 
   void _showStarHelp() {
     if (_currentPage == 2) {
-      final message = 'You are doing great — if you get stuck, just ask me here.';
-      context.push(
-          '/ai-recommendations?message=${Uri.encodeComponent(message)}');
+      context.push('/ai-recommendations');
       return;
     }
-    final helpText = _currentPage == 1
-        ? 'Some fields are duplicated — that is true, as I cater for all universities.'
-        : 'Yes, you are in the right place. Complete the form — all fields '
-            'are compulsory. When done, tap Save, then Next. '
-            'Remember to look for me on the next page!';
+    final helpText = _currentPage == 3
+        ? 'You are halfway there — you are doing great!'
+        : _currentPage == 1
+            ? 'Some fields are duplicated — that is true, as I cater for all universities.'
+            : 'Yes, you are in the right place. Complete the form — all fields '
+                'are compulsory. When done, tap Save, then Next. '
+                'Remember to look for me on the next page!';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
