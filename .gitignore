@@ -92,6 +92,7 @@ tools/vapid_private.pem
 tools/cloudflared.exe
 tools/cloudflared_*.log
 tools/cloudflared_*.err
+tools/reload_signal.txt
 server_stdout.txt
 server_stderr.txt
 server_stdout.txt.*

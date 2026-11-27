@@ -21270,14 +21270,10 @@ def api_run_input():
         # Tell the browser to reload itself. Flutter web's -d web-server mode
         # needs a debug extension for real hot reload; this gives the same
         # result for development without one.
-        if key.lower() in ('r', 'R'):
-            try:
-                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                       'tools', 'reload_signal.txt'),
-                          'w', encoding='utf-8') as _sf:
-                    _sf.write(str(time.time()))
-            except Exception:
-                pass
+        if key.lower() == 'r':
+            with open(r'D:\projects\acesi\tools\reload_signal.txt',
+                      'w', encoding='utf-8') as _sf:
+                _sf.write(str(time.time()))
         try:
             _lp = _ACTIVE_RUN.get('log', '')
             if _lp and os.path.isfile(_lp):
