@@ -121,7 +121,7 @@ class MockUniversityData {
     University(
       id: 'ru', name: 'Rhodes University',
       shortName: 'RU', province: 'Eastern Cape',
-      website: 'https://www.ru.ac.za', applicationUrl: 'https://ross.ru.ac.za/',
+      website: 'https://www.ru.ac.za', applicationUrl: 'https://ross.ru.ac.za/ugadmissions',
       logoUrl: 'https://logoapi.sh/icon/ru.ac.za',
       hasApplicationFee: true, applicationFee: 245,
       requiresNbt: false, minimumAps: 30,
