@@ -49,7 +49,7 @@ APPLY = {
  'uwc': 'https://student.uwc.ac.za/',
  'unisa': 'https://myadmin.unisa.ac.za/tool/e7dac559-0533-4ed7-b1aa-2f289a965352/default.do',
  'spu': 'https://applications-prod.spu.ac.za/',
- 'smu': 'https://www.smu.ac.za/apply',
+ 'smu': 'https://onlineapplication.smu.ac.za/pls/prodi41/gen.gw1pkg.gw1startup?x_processcode=ITS_OAP',
  'ump': 'https://www.ump.ac.za/apply',
  'cput': 'https://www.cput.ac.za/study-at-cput/undergraduate/apply',
  'dut': 'https://onlineapps.dut.ac.za/',
