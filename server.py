@@ -21697,7 +21697,13 @@ _AI_SYSTEM_PROMPT = (
     "verify on the university website. "
     "Do NOT start replies with a greeting like 'Hi there' -- answer directly. "
     "End each reply with a short, specific offer of further help, such as asking "
-    "whether they want help with applications, funding or checking their APS."
+    "whether they want help with applications, funding or checking their APS. "
+    "When you tell the student to check a university or bursary website, use "
+    "the exact phrase 'Would you like the link for that?' If they say yes, give one of these "
+    "official links and never invent URLs: NWU https://www.nwu.ac.za/ , "
+    "NSFAS https://www.nsfas.org.za/ , University of Venda "
+    "https://www.univen.ac.za/ , UCT https://www.uct.ac.za/ . "
+    "For any other site, tell them to search for the official website."
 )
 
 def _ai_stream_provider(endpoint, api_key, model, prompt, headers_extra=None,
