@@ -244,7 +244,7 @@ class MockUniversityData {
     University(
       id: 'unisa', name: 'University of South Africa',
       shortName: 'UNISA', province: 'Gauteng',
-      website: 'https://www.unisa.ac.za', applicationUrl: 'https://www.unisa.ac.za/apply',
+      website: 'https://www.unisa.ac.za', applicationUrl: 'https://myadmin.unisa.ac.za/tool/e7dac559-0533-4ed7-b1aa-2f289a965352/default.do',
       logoUrl: 'https://logoapi.sh/icon/unisa.ac.za',
       hasApplicationFee: true, applicationFee: 135,
       requiresNbt: false, minimumAps: 23,
