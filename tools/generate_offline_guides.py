@@ -53,7 +53,7 @@ APPLY = {
  'ump': 'https://www.ump.ac.za/apply',
  'cput': 'https://www.cput.ac.za/study-at-cput/undergraduate/apply',
  'dut': 'https://onlineapps.dut.ac.za/',
- 'tut': 'https://applications-prod.tut.ac.za/',
+ 'tut': 'https://www.tut.ac.za/index.php/apply/apply-online',
  'cut': 'https://www.cut.ac.za/admission-online',
  'vut': 'https://www.vut.ac.za/apply',
  'mru': 'https://www.mut.ac.za/apply',
