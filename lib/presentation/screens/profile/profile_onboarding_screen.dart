@@ -5809,11 +5809,24 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 10),
             TextFormField(
               controller: _nextOfKinPostalCodeCtrl,
-              keyboardType: TextInputType.number,
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Postal Code *',
                 prefixIcon: StarIcon(Icons.pin_outlined),
+                suffixIcon:
+                    Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
+              onTap: () async {
+                final result = await _showSearchablePicker(context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _nextOfKinPostalCodeCtrl.text,
+                  displayTransformer: (p) => p);
+                if (result != null) {
+                  setState(() => _nextOfKinPostalCodeCtrl.text =
+                      result.split(' - ').first.trim());
+                }
+              },
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
             const SizedBox(height: 10),
@@ -5913,11 +5926,24 @@ class _ProfileOnboardingScreenState
             const SizedBox(height: 10),
             TextFormField(
               controller: _accountContactPostalCodeCtrl,
-              keyboardType: TextInputType.number,
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Postal Code *',
                 prefixIcon: StarIcon(Icons.pin_outlined),
+                suffixIcon:
+                    Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
               ),
+              onTap: () async {
+                final result = await _showSearchablePicker(context,
+                  title: 'Postal Code',
+                  options: _postalCodes,
+                  initialValue: _accountContactPostalCodeCtrl.text,
+                  displayTransformer: (p) => p);
+                if (result != null) {
+                  setState(() => _accountContactPostalCodeCtrl.text =
+                      result.split(' - ').first.trim());
+                }
+              },
               validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
             ),
             const SizedBox(height: 10),
