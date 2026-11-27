@@ -158,7 +158,7 @@ class MockUniversityData {
     University(
       id: 'tut', name: 'Tshwane University of Technology',
       shortName: 'TUT', province: 'Gauteng',
-      website: 'https://www.tut.ac.za', applicationUrl: 'https://applications-prod.tut.ac.za/',
+      website: 'https://www.tut.ac.za', applicationUrl: 'https://www.tut.ac.za/index.php/apply/apply-online',
       logoUrl: 'https://logoapi.sh/icon/tut.ac.za',
       hasApplicationFee: true, applicationFee: 240,
       requiresNbt: false, minimumAps: 23,
