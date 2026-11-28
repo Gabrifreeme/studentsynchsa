@@ -1,4 +1,4 @@
-r"""Start ACEsi, the LibSyncStudent web server and the HTTPS tunnel.
+r"""Start ACEsi, the LibSyncStudent web server and BOTH HTTPS tunnels.
 
 Run: python D:\projects\acesi\tools\start_all.py
 Safe to run when some or all are already running.
@@ -24,12 +24,12 @@ def listening(port):
     return ok
 
 
-def cloudflared_running():
+def cloudflared_count():
     out = subprocess.run(
         ['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe'],
         capture_output=True, text=True, timeout=15,
     ).stdout
-    return 'cloudflared.exe' in out
+    return out.count('cloudflared.exe')
 
 
 def detach(args, stdout=None, stderr=None):
@@ -39,6 +39,35 @@ def detach(args, stdout=None, stderr=None):
     if stderr:
         kw['stderr'] = open(stderr, 'a', encoding='utf-8')
     subprocess.Popen(args, **kw)
+
+
+def start_tunnel(name, target):
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    out_log = os.path.join(LOG_DIR, 'cloudflared_%s_%s.log' % (name, stamp))
+    err_log = os.path.join(LOG_DIR, 'cloudflared_%s_%s.err' % (name, stamp))
+    detach(
+        [CLOUDFLARED, 'tunnel', '--url', target],
+        stdout=out_log, stderr=err_log,
+    )
+    print('started %s HTTPS tunnel' % name)
+
+
+def newest_url(marker):
+    files = [n for n in os.listdir(LOG_DIR)
+             if n.startswith('cloudflared_') and n.endswith(('.log', '.err'))]
+    for name in sorted(files,
+                       key=lambda n: os.path.getmtime(os.path.join(LOG_DIR, n)),
+                       reverse=True):
+        try:
+            text = open(os.path.join(LOG_DIR, name), 'r',
+                        encoding='utf-8', errors='replace').read()
+        except Exception:
+            continue
+        if marker in text:
+            found = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', text)
+            if found:
+                return found[-1]
+    return None
 
 
 if not listening(5000):
@@ -53,37 +82,27 @@ if not listening(int(PORT)):
 else:
     print('app already running')
 
-if not cloudflared_running():
-    stamp = time.strftime('%Y%m%d-%H%M%S')
-    out_log = os.path.join(LOG_DIR, 'cloudflared_%s.log' % stamp)
-    err_log = os.path.join(LOG_DIR, 'cloudflared_%s.err' % stamp)
-    detach(
-        [CLOUDFLARED, 'tunnel', '--url', 'http://127.0.0.1:' + PORT],
-        stdout=out_log, stderr=err_log,
-    )
-    print('started HTTPS tunnel')
-    time.sleep(8)
+count = cloudflared_count()
+if count < 2:
+    if count == 0:
+        start_tunnel('app', 'http://127.0.0.1:' + PORT)
+        start_tunnel('acesi', 'http://127.0.0.1:5000')
+    else:
+        # One tunnel alive: start whichever target is missing.
+        app_marker = 'url:http://127.0.0.1:' + PORT
+        if not newest_url(app_marker):
+            start_tunnel('app', 'http://127.0.0.1:' + PORT)
+        if not newest_url('url:http://127.0.0.1:5000'):
+            start_tunnel('acesi', 'http://127.0.0.1:5000')
+    print('waiting for tunnels...')
+    time.sleep(10)
 
-# Only report the newest tunnel URL. Old quick-tunnel URLs stop working when
-# cloudflared restarts, and printing them all is misleading.
-url = None
-files = [n for n in os.listdir(LOG_DIR)
-         if n.startswith('cloudflared_') and n.endswith(('.log', '.err'))]
-for name in sorted(files,
-                   key=lambda n: os.path.getmtime(os.path.join(LOG_DIR, n)),
-                   reverse=True):
-    try:
-        text = open(os.path.join(LOG_DIR, name), 'r',
-                    encoding='utf-8', errors='replace').read()
-    except Exception:
-        continue
-    found = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', text)
-    if found:
-        url = found[-1]
-        break
+app_url = newest_url('url:http://127.0.0.1:' + PORT)
+acesi_url = newest_url('url:http://127.0.0.1:5000')
 
 print()
-print('PC app:    http://127.0.0.1:' + PORT)
-print('Phone LAN: http://192.168.0.117:' + PORT)
-print('HTTPS (current quick tunnel, changes on restart):')
-print('  ' + (url or 'not available yet'))
+print('PC app:      http://127.0.0.1:' + PORT)
+print('Phone LAN:   http://192.168.0.117:' + PORT)
+print('HTTPS app:   ' + (app_url or 'not available yet'))
+print('HTTPS ACEsi: ' + (acesi_url or 'not available yet'))
+print('(quick-tunnel URLs change on every restart)')
