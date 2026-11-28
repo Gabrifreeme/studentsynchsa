@@ -15,7 +15,11 @@ import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 
 class ProfileOnboardingScreen extends ConsumerStatefulWidget {
-  const ProfileOnboardingScreen({super.key});
+  /// When a completed profile is being edited, skip the greeting and open
+  /// the form straight away.
+  final bool skipGreeting;
+
+  const ProfileOnboardingScreen({super.key, this.skipGreeting = false});
 
   @override
   ConsumerState<ProfileOnboardingScreen> createState() =>
@@ -4578,6 +4582,7 @@ class _ProfileOnboardingScreenState
   @override
   void initState() {
     super.initState();
+    _showGreeting = !widget.skipGreeting;
     _floatCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),

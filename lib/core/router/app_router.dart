@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
+import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
+import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/screens/auth/signup_screen.dart';
 import 'package:studentsyncsa/presentation/screens/auth/login_screen.dart';
@@ -30,6 +35,23 @@ final _authRefresh = ValueNotifier<int>(0);
 
 void triggerAuthRedirect() {
   _authRefresh.value++;
+}
+
+bool _profileIsComplete(WidgetRef ref) {
+  final profile = ref.read(profileProvider).valueOrNull ??
+      ref.read(authProvider).valueOrNull?.profile;
+  if (profile != null &&
+      (profile.onboardingComplete || profile.personal.firstName.isNotEmpty)) {
+    return true;
+  }
+  try {
+    final raw = HiveDatabase.profile.get('profile');
+    if (raw != null && raw.isNotEmpty) {
+      final saved = StudentProfile.fromJson(jsonDecode(raw));
+      return saved.onboardingComplete || saved.personal.firstName.isNotEmpty;
+    }
+  } catch (_) {}
+  return false;
 }
 
 final appRouter = GoRouter(
@@ -70,7 +92,9 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/onboarding',
       name: 'onboarding',
-      builder: (context, state) => const ProfileOnboardingScreen(),
+      builder: (context, state) => ProfileOnboardingScreen(
+        skipGreeting: state.uri.queryParameters['edit'] == '1',
+      ),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
@@ -218,10 +242,15 @@ class DashboardShell extends ConsumerWidget {
   }
 
   Widget _buildDrawer(BuildContext context, WidgetRef ref, int currentIndex) {
+    final editProfile = _profileIsComplete(ref);
     final navItems = [
       _NavItemData(icon: Icons.home_rounded, label: 'Home', route: '/dashboard', index: 0),
       _NavItemData(icon: Icons.auto_awesome_rounded, label: 'ACEsi', route: '/ai-recommendations'),
-      _NavItemData(icon: Icons.person_rounded, label: 'My Profile', route: '/onboarding'),
+      _NavItemData(
+        icon: Icons.person_rounded,
+        label: editProfile ? 'Edit Profile' : 'My Profile',
+        route: editProfile ? '/onboarding?edit=1' : '/onboarding',
+      ),
       _NavItemData(icon: Icons.chat_rounded, label: 'Community', route: '/chat'),
       _NavItemData(icon: Icons.school_rounded, label: 'Universities', route: '/universities', index: 1),
       _NavItemData(icon: Icons.assignment_rounded, label: 'Your Progress', route: '/applications', index: 2),

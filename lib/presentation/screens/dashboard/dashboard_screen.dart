@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
 
@@ -7,11 +8,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:studentsyncsa/core/theme/app_theme.dart';
 import 'package:studentsyncsa/data/datasources/local/hive_database.dart';
+import 'package:studentsyncsa/domain/models/student_profile.dart';
 import 'package:studentsyncsa/presentation/providers/auth_provider.dart';
 import 'package:studentsyncsa/presentation/providers/profile_provider.dart';
 import 'package:studentsyncsa/presentation/providers/sidebar_provider.dart';
 import 'package:studentsyncsa/presentation/widgets/common_widgets.dart';
 import 'package:studentsyncsa/services/notification_service.dart';
+
+/// A returning student's saved Hive profile is the source of truth, even when
+/// the auth/profile providers have not loaded it yet.
+bool _profileIsComplete(WidgetRef ref) {
+  final profile = ref.read(profileProvider).valueOrNull ??
+      ref.read(authProvider).valueOrNull?.profile;
+  if (profile != null &&
+      (profile.onboardingComplete || profile.personal.firstName.isNotEmpty)) {
+    return true;
+  }
+  try {
+    final raw = HiveDatabase.profile.get('profile');
+    if (raw != null && raw.isNotEmpty) {
+      final saved = StudentProfile.fromJson(jsonDecode(raw));
+      return saved.onboardingComplete || saved.personal.firstName.isNotEmpty;
+    }
+  } catch (_) {}
+  return false;
+}
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -161,6 +182,8 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
+    final editProfile = _profileIsComplete(ref);
+
     return Column(
       children: [
         Row(
@@ -169,7 +192,13 @@ class DashboardScreen extends ConsumerWidget {
                 child: tile(Icons.auto_awesome_rounded, 'ACEsi',
                     '/ai-recommendations')),
             const SizedBox(width: AppSpaces.sm),
-            Expanded(child: tile(Icons.person_rounded, 'My Profile', '/onboarding')),
+            Expanded(
+              child: tile(
+                Icons.person_rounded,
+                editProfile ? 'Edit Profile' : 'My Profile',
+                editProfile ? '/onboarding?edit=1' : '/onboarding',
+              ),
+            ),
           ],
         ),
         const SizedBox(height: AppSpaces.sm),
