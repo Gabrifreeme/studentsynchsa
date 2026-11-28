@@ -20960,6 +20960,26 @@ def api_logs():
                 
     return Response(generate(), mimetype='text/event-stream; charset=utf-8', headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
 
+
+@app.route('/api/logs/recent')
+def api_logs_recent():
+    """Polling fallback: SSE does not stream through quick tunnels reliably."""
+    after_arg = request.args.get('after', '0')
+    with _LOG_QUEUE._cond:
+        next_seq = _LOG_QUEUE._next_seq
+        if str(after_arg) == 'latest':
+            after = next_seq
+        else:
+            try:
+                after = int(after_arg)
+            except (TypeError, ValueError):
+                after = 0
+        oldest = next_seq - len(_LOG_QUEUE._lines)
+        lines = [{'seq': seq, 'log': text}
+                 for seq, text in _LOG_QUEUE._lines
+                 if seq > after and seq >= oldest]
+    return jsonify({'lines': lines, 'next': next_seq})
+
 import sys
 import re
 import queue

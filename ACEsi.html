@@ -16645,7 +16645,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.aceAppendTerminalLine = function (text, color) {
     try { if (typeof window.aceTermHeartbeatInit === 'function') window.aceTermHeartbeatInit(); } catch (e) {}
-    var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, '');
+    // Type the log only as far as the HTTP status (the final green 200).
+    // The server appends " - 😊 | " for its animated pipe; that trailing
+    // marker is what left a stray "1"/cursor line after the line finished.
+    var s = String(text == null ? '' : text)
+      .replace(/\uD83D\uDE0A/g, '')
+      .replace(/\s*[|\u2502]\s*$/, '')
+      .replace(/\s+-\s*$/, '');
     var segs = window.aceColorizeLogLine ? window.aceColorizeLogLine(s) : [{ text: s, color: color || '#8fd3ff' }];
     window.__aceLogQueue.push({ text: s, segs: segs, color: color || '#8fd3ff' });
     // Every line types in order - no instant flood dump (it caused multiple
@@ -16658,48 +16664,57 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btn) btn.textContent = on ? 'Live Logs: ON' : 'Live Logs: OFF';
   }
 
+  // Poll instead of EventSource: SSE does not stream through quick tunnels,
+  // so live logs only worked on 127.0.0.1. Polling works everywhere.
+  window._aceLogPollSeq = null;
+  window._aceLogPollTimer = null;
+
+  window._acePollLogsOnce = function () {
+    var after = window._aceLogPollSeq === null
+      ? 'latest' : String(window._aceLogPollSeq);
+    fetch('/api/logs/recent?after=' + encodeURIComponent(after),
+          { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d) return;
+        if (window._aceLogPollSeq === null) {
+          // First poll seeds the cursor; do not dump old history.
+          window._aceLogPollSeq = d.next;
+          return;
+        }
+        (d.lines || []).forEach(function (item) {
+          var text = window.aceStripAnsi(item.log || '');
+          // Heartbeat lines are shown by the animated spinner instead.
+          if (/^\s*\[SERVER\]/.test(text)) return;
+          if (!text.trim()) return;
+          window.aceAppendTerminalLine(text);
+        });
+        if (typeof d.next === 'number') window._aceLogPollSeq = d.next;
+      })
+      .catch(function () {});
+  };
+
   window.startAceLiveLogs = function () {
-    if (window._aceLogSource && window._aceLogSource.readyState !== 2) return;
-    if (typeof EventSource === 'undefined') return;
-    var source = new EventSource('/api/logs');
-    window._aceLogSource = source;
+    if (window._aceLogPollTimer) return;
+    window._aceLogPollSeq = null;
     setLiveLogButton(true);
     window.aceAppendTerminalLine('📜 Live server logs connected.', '#00ffaa');
-    source.onmessage = function (e) {
-      var raw = e && e.data;
-      if (typeof raw !== 'string' || raw.charAt(0) === ':') return;
-      var text = raw;
-      try {
-        var parsed = JSON.parse(raw);
-        if (parsed && parsed.log !== undefined) text = parsed.log;
-      } catch (err) {}
-      text = window.aceStripAnsi(text);
-      // The static "[SERVER]" heartbeat lines are replaced by the animated
-      // heartbeat spinner (see aceTermHeartbeatInit) - drop them from the feed.
-      if (/^\s*\[SERVER\]/.test(text)) return;
-      if (!text.trim()) return;
-      window.aceAppendTerminalLine(text);
-    };
-    source.onerror = function () {
-      if (!window._aceLogWarned) {
-        window._aceLogWarned = true;
-        window.aceAppendTerminalLine('⚠️ Live logs disconnected; retrying...', '#ff9d00');
-      }
-    };
-    source.onopen = function () { window._aceLogWarned = false; };
+    window._acePollLogsOnce();
+    window._aceLogPollTimer = setInterval(window._acePollLogsOnce, 1000);
   };
 
   window.stopAceLiveLogs = function () {
-    if (window._aceLogSource) {
-      try { window._aceLogSource.close(); } catch (e) {}
-      window._aceLogSource = null;
+    if (window._aceLogPollTimer) {
+      clearInterval(window._aceLogPollTimer);
+      window._aceLogPollTimer = null;
     }
+    window._aceLogPollSeq = null;
     setLiveLogButton(false);
     window.aceAppendTerminalLine('📜 Live server logs stopped.', '#ff9d00');
   };
 
   window.toggleAceLiveLogs = function () {
-    if (window._aceLogSource) window.stopAceLiveLogs();
+    if (window._aceLogPollTimer) window.stopAceLiveLogs();
     else window.startAceLiveLogs();
   };
 
