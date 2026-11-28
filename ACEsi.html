@@ -8324,7 +8324,7 @@ window.aceExplorerNotify = function (message, existing, highlightTail) {
             if (color) line.style.color = color;
             line.textContent = text;
             hist.appendChild(line);
-            while (hist.children.length > 1000) hist.removeChild(hist.firstChild);
+            while (hist.children.length > 200) hist.removeChild(hist.firstChild);
             if (window.__aceTermFollow !== false) hist.scrollTop = hist.scrollHeight;
             hist.scrollLeft = 0;
             return true;
@@ -16071,7 +16071,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
           // Live logs also stream into this element; keep the DOM bounded so a
           // long session plus a big dir listing cannot stall the terminal.
-          while (termHistory.children.length > 1000) {
+          while (termHistory.children.length > 200) {
             termHistory.removeChild(termHistory.firstChild);
           }
           if (window.__aceTermFollow !== false) termHistory.scrollTop = termHistory.scrollHeight;
@@ -16492,6 +16492,21 @@ document.addEventListener('DOMContentLoaded', function() {
     return segs;
   };
 
+  // Only the newest log line may own the running "|" animation. Older lines
+  // keep a plain pipe so the animation never multiplies down the history.
+  window.aceSetPipeTarget = function () {
+    var h = document.getElementById('term-history');
+    if (!h) return;
+    var last = h.lastElementChild;
+    var runs = h.querySelectorAll('.ace-pipe-run');
+    for (var i = 0; i < runs.length; i++) {
+      var r = runs[i];
+      if (last && last.contains(r)) continue;
+      var p = r.parentNode;
+      if (p) p.replaceChild(document.createTextNode('|'), r);
+    }
+  };
+
   window.aceFillTerminalLine = function (line, segs) {
     try {
       line.textContent = "";
@@ -16519,7 +16534,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (var pi = allSpans.length - 1; pi >= 0; pi--) {
           if (allSpans[pi].textContent.indexOf('|') !== -1) { pipeSpan = allSpans[pi]; break; }
         }
-        if (pipeSpan) {
+        if (pipeSpan && line === line.parentNode.lastElementChild) {
           var pt = pipeSpan.textContent;
           var pidx = pt.indexOf('|');
           var frag = document.createDocumentFragment();
@@ -16549,6 +16564,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
       }
+      if (typeof window.aceSetPipeTarget === 'function') window.aceSetPipeTarget();
       if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(line);
     } catch (e) {}
   };
@@ -16595,7 +16611,20 @@ document.addEventListener('DOMContentLoaded', function() {
           if (done) done();
           return;
         }
-        line.textContent = text.slice(0, idx) + '\u2588';
+        // Keep the running pipe on the line being typed (always the bottom
+        // line) instead of leaving it on the previous, completed line.
+        line.textContent = '';
+        line.appendChild(document.createTextNode(text.slice(0, idx) + '\u2588'));
+        var livePipe = document.createElement('span');
+        livePipe.className = 'ace-pipe-run';
+        livePipe.textContent = '|';
+        line.appendChild(livePipe);
+        if (!document.getElementById('acePipeRunKeyframe')) {
+          var liveStyle = document.createElement('style');
+          liveStyle.id = 'acePipeRunKeyframe';
+          liveStyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(100vw);}}';
+          document.head.appendChild(liveStyle);
+        }
         // Re-pin the viewport as the line grows, otherwise long wrapped lines
         // push the newest text below the visible area.
         var hist = line.parentNode;
@@ -16620,9 +16649,10 @@ document.addEventListener('DOMContentLoaded', function() {
       fastLine.style.color = fast.color || '#8fd3ff';
       fastLine.setAttribute('data-ace-text', fast.text);
       history.appendChild(fastLine);
+      if (typeof window.aceSetPipeTarget === 'function') window.aceSetPipeTarget();
       if (typeof window.aceTerminalFindAddLine === 'function') window.aceTerminalFindAddLine(fastLine);
       window.aceFillTerminalLine(fastLine, fast.segs);
-      while (history.children.length > 1000) history.removeChild(history.firstChild);
+      while (history.children.length > 200) history.removeChild(history.firstChild);
       if (window.__aceTermFollow !== false) history.scrollTop = history.scrollHeight;
     }
     var item = window.__aceLogQueue.shift();
@@ -16635,7 +16665,8 @@ document.addEventListener('DOMContentLoaded', function() {
     line.style.color = item.color || '#8fd3ff';
     line.setAttribute('data-ace-text', item.text);
     history.appendChild(line);
-    while (history.children.length > 1000) history.removeChild(history.firstChild);
+    if (typeof window.aceSetPipeTarget === 'function') window.aceSetPipeTarget();
+    while (history.children.length > 200) history.removeChild(history.firstChild);
     if (window.__aceTermFollow !== false) history.scrollTop = history.scrollHeight;
     window.aceTypeTerminalLine(line, item.text, item.segs, function () {
       window.__aceTypingBusy = false;
