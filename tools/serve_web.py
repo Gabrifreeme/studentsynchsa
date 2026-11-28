@@ -178,4 +178,5 @@ handler = functools.partial(
     directory=r'C:\Users\gabri\Documents\LibSyncStudent\build\web',
 )
 
-ThreadingHTTPServer(('0.0.0.0', 8080), handler).serve_forever()
+port = int(os.environ.get('APP_PORT', '8080'))
+ThreadingHTTPServer(('0.0.0.0', port), handler).serve_forever()

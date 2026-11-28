@@ -63,19 +63,28 @@ if not cloudflared_running():
     print('started HTTPS tunnel')
     time.sleep(8)
 
-urls = []
-for name in os.listdir(LOG_DIR):
-    if name.startswith('cloudflared_') and name.endswith(('.log', '.err')):
-        try:
-            text = open(os.path.join(LOG_DIR, name), 'r',
-                        encoding='utf-8', errors='replace').read()
-            urls += re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', text)
-        except Exception:
-            pass
+port = os.environ.get('APP_PORT', '8080')
+
+# Only report the newest tunnel URL. Old quick-tunnel URLs stop working when
+# cloudflared restarts, and printing them all is misleading.
+url = None
+files = [n for n in os.listdir(LOG_DIR)
+         if n.startswith('cloudflared_') and n.endswith(('.log', '.err'))]
+for name in sorted(files,
+                   key=lambda n: os.path.getmtime(os.path.join(LOG_DIR, n)),
+                   reverse=True):
+    try:
+        text = open(os.path.join(LOG_DIR, name), 'r',
+                    encoding='utf-8', errors='replace').read()
+    except Exception:
+        continue
+    found = re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', text)
+    if found:
+        url = found[-1]
+        break
 
 print()
-print('PC app:    http://127.0.0.1:8080')
-print('Phone LAN: http://192.168.0.117:8080')
-print('HTTPS URLs seen:')
-for u in dict.fromkeys(urls):
-    print('  ' + u)
+print('PC app:    http://127.0.0.1:' + port)
+print('Phone LAN: http://192.168.0.117:' + port)
+print('HTTPS (current quick tunnel, changes on restart):')
+print('  ' + (url or 'not available yet'))
