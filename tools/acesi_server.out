@@ -1,0 +1,21 @@
+[chat] init ok users=1 rooms=10 messages=0
+🧠 ace_config.yaml loaded: contexts=lipsyncstudent, generic, web_only, code default=lipsyncstudent
+🧠 Deep memory bootstrapped (consolidate + seed + prune done)
+------------------------------------------------------------------
+[boot] pid       : 12092
+[boot] git HEAD  : 28fd324  (clean)
+[boot] server.py : mtime=12:43:32  1038800 bytes
+[boot] devtools_service.py: mtime=20:59:28  45590 bytes
+[boot] ace_config.yaml: mtime=20:37:26  6600 bytes
+[boot] cdp tools : 9  [cdp_connect, cdp_console_logs, cdp_dom_state, cdp_evaluate, cdp_get_response_body, cdp_navigate, cdp_network_requests, cdp_screenshot, cdp_status]
+[boot] python    : 3.12.10
+------------------------------------------------------------------
+🟢 Kill switch: safe (disarmed) at boot.
+[chat] patch_02 ok rooms=10 users=1 messages=0
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.117:5000 ✅
+Press CTRL+C to quit
+📧 email watch: primed mailboxes, now polling every 120s
+127.0.0.1 - - [28/Nov/2026 10:41:02] "GET / HTTP/1.1" 200 - 😊
