@@ -133,6 +133,41 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(result)
 
+    def _proxy_api_get(self):
+        """Stream any ACEsi API GET (including /api/logs SSE) from Flask."""
+        conn = http.client.HTTPConnection('127.0.0.1', 5000, timeout=300)
+        try:
+            conn.request('GET', self.path)
+            resp = conn.getresponse()
+            self.send_response(resp.status)
+            skip = {'connection', 'transfer-encoding', 'content-length',
+                    'keep-alive', 'te', 'trailer', 'upgrade'}
+            for key, value in resp.getheaders():
+                if key.lower() not in skip:
+                    self.send_header(key, value)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            while True:
+                chunk = resp.read(4096)
+                if not chunk:
+                    break
+                try:
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+        except Exception as exc:
+            try:
+                self.send_response(502)
+                self.send_header('Content-Type', 'text/plain')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(('Proxy error: ' + str(exc)).encode())
+            except Exception:
+                pass
+        finally:
+            conn.close()
+
     def do_GET(self):
         if self.path.split('?')[0] == '/__reload_signal':
             try:
@@ -149,6 +184,9 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+            return
+        if self.path.split('?')[0].startswith('/api/'):
+            self._proxy_api_get()
             return
         super().do_GET()
 
