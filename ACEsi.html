@@ -16645,13 +16645,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.aceAppendTerminalLine = function (text, color) {
     try { if (typeof window.aceTermHeartbeatInit === 'function') window.aceTermHeartbeatInit(); } catch (e) {}
-    // Type the log only as far as the HTTP status (the final green 200).
-    // The server appends " - 😊 | " for its animated pipe; that trailing
-    // marker is what left a stray "1"/cursor line after the line finished.
-    var s = String(text == null ? '' : text)
-      .replace(/\uD83D\uDE0A/g, '')
-      .replace(/\s*[|\u2502]\s*$/, '')
-      .replace(/\s+-\s*$/, '');
+    var s = String(text == null ? '' : text).replace(/\uD83D\uDE0A/g, '');
     var segs = window.aceColorizeLogLine ? window.aceColorizeLogLine(s) : [{ text: s, color: color || '#8fd3ff' }];
     window.__aceLogQueue.push({ text: s, segs: segs, color: color || '#8fd3ff' });
     // Every line types in order - no instant flood dump (it caused multiple
