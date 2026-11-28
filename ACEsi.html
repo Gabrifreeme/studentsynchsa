@@ -16559,7 +16559,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!document.getElementById('acePipeRunKeyframe')) {
             var pstyle = document.createElement('style');
             pstyle.id = 'acePipeRunKeyframe';
-            pstyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(100vw);}}';
+            pstyle.textContent = '.ace-pipe-run{display:inline-block;color:#ffa500;text-shadow:0 0 8px #ffa500;animation:acePipeRun 1.4s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-10vw);}to{transform:translateX(70vw);}}';
             document.head.appendChild(pstyle);
           }
         }
@@ -16599,7 +16599,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // If logs arrive faster than they can be typed, stop animating this
         // line and let the queue drain instantly. This keeps the terminal on
         // the newest output during long Flutter builds instead of lagging.
-        if (window.__aceLogQueue && window.__aceLogQueue.length > 5) {
+        if (window.__aceLogQueue && window.__aceLogQueue.length > 60) {
           window.__aceFinishTyping();
           return;
         }
@@ -16622,7 +16622,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!document.getElementById('acePipeRunKeyframe')) {
           var liveStyle = document.createElement('style');
           liveStyle.id = 'acePipeRunKeyframe';
-          liveStyle.textContent = '.ace-pipe-run{display:inline-block;animation:acePipeRun 1s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-100vw);}to{transform:translateX(100vw);}}';
+          liveStyle.textContent = '.ace-pipe-run{display:inline-block;color:#ffa500;text-shadow:0 0 8px #ffa500;animation:acePipeRun 1.4s linear infinite;}@keyframes acePipeRun{from{transform:translateX(-10vw);}to{transform:translateX(70vw);}}';
           document.head.appendChild(liveStyle);
         }
         // Re-pin the viewport as the line grows, otherwise long wrapped lines
